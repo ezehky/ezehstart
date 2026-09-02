@@ -48,6 +48,25 @@ php artisan db:seed
 That creates `admin@example.test` / `password`. **Change it** in
 `database/seeders/UserSeeder.php` before this becomes a real project.
 
+### Add-ons
+
+The last step of `composer setup` asks which optional first-party packages you want:
+
+```bash
+php artisan kit:install                      # ask
+php artisan kit:install --package=transaction  # or name them
+php artisan kit:install --dry-run            # see what would be pulled in
+```
+
+| Add-on | Package | What it adds |
+| --- | --- | --- |
+| `transaction` | `ezehky/ezeh-transaction` | Wallets, transactions and withdrawal requests |
+
+A run with nothing to answer the prompt — CI, `--no-interaction` — installs nothing and
+exits clean, so the setup script is safe unattended. Adding a future add-on is one case
+and one match arm per presenter in [`KitPackageEnum`](app/Enums/KitPackageEnum.php); the
+matches are exhaustive, so PHP names anything you forget.
+
 ## Working on it
 
 ```bash
