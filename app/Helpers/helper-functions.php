@@ -46,8 +46,7 @@ if (! function_exists('kSafeImage')) {
 
         // If still empty or invalid, use fallback
         if (empty($output)) {
-            $output = kTextCompare($altImage, 'user')
-                ? asset('images/user.png') : $noImage;
+            $output = $noImage;
         }
 
         return $output;
