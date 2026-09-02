@@ -32,21 +32,18 @@ trait WithUserRoleManager
     #[Computed]
     public function roleUser(): ?User
     {
-        return $this->roleUserId ? User::query()->with('trainer')->find($this->roleUserId) : null;
+        return $this->roleUserId ? User::query()->find($this->roleUserId) : null;
     }
 
     /**
-     * The roles the modal offers. Staff listings manage admin and trainer only — a
-     * student never appears alongside them, they are switched across instead.
+     * The roles the modal offers. Every case by default — override on a listing that
+     * should only manage a subset.
      *
      * @return array<int, UserRoleEnum>
      */
     protected function roleManagerRoles(): array
     {
-        return collect(UserRoleEnum::cases())
-            ->reject(fn (UserRoleEnum $role) => $role->isStudent())
-            ->values()
-            ->all();
+        return UserRoleEnum::cases();
     }
 
     /**
@@ -78,7 +75,7 @@ trait WithUserRoleManager
                     return [...$entry, 'action' => 'revoke', 'blocked' => $service->revokeBlockedReason($user, $role)];
                 }
 
-                // Crossing the staff/learner divide is a swap, not an addition.
+                // Crossing an exclusivity boundary is a swap, not an addition.
                 if ($service->conflictingRoles($user, $role) !== []) {
                     return [...$entry, 'action' => 'switch', 'blocked' => $service->switchBlockedReason($user, $role)];
                 }
@@ -173,8 +170,7 @@ trait WithUserRoleManager
     {
         return match ($role) {
             UserRoleEnum::ADMIN => 'Full access to the administration workspace.',
-            UserRoleEnum::TRAINER => 'Can be assigned to cohorts and lead classes.',
-            UserRoleEnum::STUDENT => 'Can enroll in cohorts and attend classes.',
+            UserRoleEnum::USER => 'Access to the member workspace and account settings.',
         };
     }
 }

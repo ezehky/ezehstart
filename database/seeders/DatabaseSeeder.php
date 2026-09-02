@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Services\SiteConfigurationService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +15,24 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $seeders = [];
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // The site config is written to storage rather than a table, so it is only
+        // laid down the first time — re-seeding must not wipe what an admin saved.
+        //
+        // The check reads the stored file, not kSiteConfig(): the cached copy always
+        // carries resolved logo and support-link keys, so it is never empty and would
+        // make this guard always true.
+        if (! app(SiteConfigurationService::class)->getConfigs(raw: true)) {
+            $seeders[] = SiteConfigSeeder::class;
+        }
+
+        $seeders = [
+            ...$seeders,
+            RoleSeeder::class,
+            UserSeeder::class,
+        ];
+
+        $this->call($seeders);
     }
 }

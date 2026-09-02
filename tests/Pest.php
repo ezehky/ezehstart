@@ -1,6 +1,13 @@
 <?php
 
+use App\Enums\StatusDefault;
+use App\Enums\StatusUser;
+use App\Enums\UserRoleEnum;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /*
@@ -16,6 +23,18 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // The site configuration lives in a JSON file on the local disk, not in a
+        // table, so RefreshDatabase does not touch it. Faking the disk keeps each
+        // test starting from an unconfigured install and stops the suite writing
+        // over the real site-configuration.json.
+        Storage::fake('local');
+
+        // config('_site-config') is injected once when the app boots; clear it so
+        // one test's configuration cannot leak into the next.
+        config(['_site-config' => []]);
+        cache()->forget('site_configuration');
+    })
     ->in('Feature');
 
 /*
@@ -44,7 +63,37 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * An active account carrying the given role.
+ *
+ * Almost every feature test starts here — a workspace is unreachable without a role,
+ * so a plain User::factory() account can only ever assert a redirect.
+ */
+function userWithRole(UserRoleEnum $role, array $attributes = []): User
 {
-    // ..
+    $user = User::factory()->create([
+        'status' => StatusUser::ACTIVE,
+        ...$attributes,
+    ]);
+
+    $roleRecord = Role::query()->firstOrCreate(['name' => $role]);
+
+    UserRole::query()->create([
+        'user_id' => $user->id,
+        'role_id' => $roleRecord->id,
+        'status' => StatusDefault::ACTIVE,
+    ]);
+
+    return $user;
+}
+
+/**
+ * An account holding no role at all, which can sign in but reach no workspace.
+ */
+function userWithoutRole(array $attributes = []): User
+{
+    return User::factory()->create([
+        'status' => StatusUser::ACTIVE,
+        ...$attributes,
+    ]);
 }

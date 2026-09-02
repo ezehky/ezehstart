@@ -3,8 +3,11 @@
 ## Rule
 
 **Every** status, type, category, provider, role, and vocabulary in this project is a
-backed PHP enum in `app/Enums/`. There are 37. A bare string or int in a status column
-is a bug.
+backed PHP enum in `app/Enums/`. A bare string or int in a status column is a bug.
+
+Ten ship with the starter. Before adding an eleventh, check whether `StatusDefault`
+(active/inactive) or `StatusYes` (yes/no) already says what you mean — most on/off
+columns need neither a new enum nor a boolean.
 
 Every enum:
 
@@ -19,9 +22,9 @@ Every enum:
 
 | Use | Backing | Examples |
 | --- | --- | --- |
-| Lifecycle / status | `int` | `StatusDefault`, `StatusUser`, `StatusCohort`, `StatusTransaction`, `StatusAdmission`, `StatusPolicy`, `StatusClassSession`, `StatusAttendance` |
+| Lifecycle / status | `int` | `StatusDefault`, `StatusUser` |
 | Boolean-ish flag stored as a column | `int` with `YES = 1` / `NO = 0` | `StatusYes` |
-| Vocabulary / identifier | `string` | `UserRoleEnum`, `PolicyTypeEnum`, `FaqTypeEnum`, `TransactionTypeEnum`, `DayOfWeekEnum`, `SocialProviderEnum`, `VendorEnum`, `ActivityActionEnum` |
+| Vocabulary / identifier | `string` | `UserRoleEnum`, `GenderEnum`, `ActivityActionEnum`, `ActivityPlatformEnum`, `NotificationTopicEnum`, `NotificationTypeEnum`, `SocialHandleEnum` |
 
 `StatusDefault` (`ACTIVE = 1`, `INACTIVE = 0`) is the **shared default** — use it for
 any generic on/off column rather than inventing a new enum.

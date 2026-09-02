@@ -2,7 +2,6 @@
 
 namespace App\Rules;
 
-use App\Enums\TransactionWalletEnum;
 use App\Models\User;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -18,7 +17,7 @@ class MoneyRule implements ValidationRule
         private readonly float $percentFee = 0,
         private readonly bool $isRequired = true,
         private readonly ?string $currency = null,
-        private readonly TransactionWalletEnum $walletType = TransactionWalletEnum::BALANCE
+        private readonly string $walletColumn = 'balance',
     ) {}
 
     protected function resolvePercentFees(float $value): void
@@ -57,11 +56,13 @@ class MoneyRule implements ValidationRule
             return;
         }
 
-        // Check if user exist for sufficient balance validation
+        // Check if user exist for sufficient balance validation. $walletColumn names
+        // the money column on the profile; a project that ships wallets swaps in its
+        // own enum here.
         if ($this->user && $profile = $this->user->userProfile) {
             $totalAmount = $value + $this->fee;
-            if ($profile->{$this->walletType->value} < $totalAmount) {
-                $fail("The {$attribute} exceeds your available ".kBreakText($this->walletType->value, lowercase: true).'.');
+            if ($profile->{$this->walletColumn} < $totalAmount) {
+                $fail("The {$attribute} exceeds your available ".kBreakText($this->walletColumn, lowercase: true).'.');
 
                 return;
             }

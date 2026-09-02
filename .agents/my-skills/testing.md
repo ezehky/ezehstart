@@ -2,25 +2,36 @@
 
 ## Rule
 
-Pest 4. Feature tests only, in `tests/Feature/`, named `{Area}{Subject}Test.php`.
-Livewire pages are tested through `Livewire::test('pages::…')`.
+Pest 5. Feature tests in `tests/Feature/`, named `{Area}{Subject}Test.php`. Livewire
+pages are tested through `Livewire::test('pages::…')`. `tests/Unit/` holds tests for
+the pure functions — the `k*()` helpers and enum behaviour — and nothing else.
 
-### `RefreshDatabase` is declared per file, not globally
+### `tests/Pest.php` sets up every feature test
 
-`tests/Pest.php` deliberately leaves it commented out:
+`RefreshDatabase` is applied globally, and a `beforeEach` resets the things
+`RefreshDatabase` cannot:
 
 ```php
 pest()->extend(TestCase::class)
- // ->use(RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // The site configuration is a JSON file on the local disk, not a table.
+        Storage::fake('local');
+
+        // config('_site-config') is injected once at boot.
+        config(['_site-config' => []]);
+        cache()->forget('site_configuration');
+    })
     ->in('Feature');
 ```
 
-So every test file that touches the database declares it itself:
+So a test file does **not** declare `uses(RefreshDatabase::class)` — it is already on.
+
+**A test that needs site configuration must lay it down itself**, since every test
+starts from an unconfigured install:
 
 ```php
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
+app(SiteConfigurationService::class)->update(initials: true);
 ```
 
 ### File shape
@@ -30,23 +41,12 @@ uses(RefreshDatabase::class);
 
 use App\Enums\FaqTypeEnum;
 use App\Enums\StatusDefault;
-use App\Enums\StatusUser;
 use App\Enums\UserRoleEnum;
 use App\Models\Faq;
-use App\Models\Role;
-use App\Models\User;
-use App\Models\UserRole;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);
-    $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
-    UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
-
-    $this->actingAs($admin);
+    $this->actingAs(userWithRole(UserRoleEnum::ADMIN));
 });
 
 /**
@@ -69,7 +69,7 @@ test('a new question is added to the bottom of its group', function () {
 });
 ```
 
-Order: imports → `uses()` → `beforeEach()` → file-local helper functions → tests.
+Order: imports → `beforeEach()` → file-local helper functions → tests.
 
 ### Test names are sentences
 
@@ -89,17 +89,23 @@ Never `'test_save_method'` or `'it works'`.
 
 ### Setting up an authenticated role
 
-There is only a `UserFactory` — roles are wired manually:
+There is only a `UserFactory`, so roles are wired by two global helpers defined in
+`tests/Pest.php`:
 
 ```php
-$admin = User::factory()->create(['status' => StatusUser::ACTIVE]);
-$role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
-UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
-
-$this->actingAs($admin);
+userWithRole(UserRoleEnum::ADMIN);              // active, carrying that role
+userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+userWithoutRole();                              // can sign in, reaches nothing
 ```
 
-`firstOrCreate` on the role so several `beforeEach` runs share it.
+**A workspace is unreachable without a role**, so a plain `User::factory()->create()`
+can only ever assert a redirect or a 404. Reach for `userWithRole()` first.
+
+```php
+beforeEach(function () {
+    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+});
+```
 
 ### File-local factory helpers
 
@@ -154,8 +160,10 @@ Model arguments by **id**: `->call('edit', $faq->id)`.
 Pages with route parameters take them as the second argument:
 
 ```php
-Livewire::test('pages::admin.training.cohort-students', ['cohort' => $cohort]);
+Livewire::test('pages::admin.users.user-view', ['user' => $account]);
 ```
+
+To act as somebody, `Livewire::actingAs($admin)->test(…)`.
 
 ### Expectations
 
@@ -260,23 +268,12 @@ Run the narrowest filter that proves your change.
 <?php
 
 use App\Enums\StatusInvoice;
-use App\Enums\StatusUser;
 use App\Enums\UserRoleEnum;
 use App\Models\Invoice;
-use App\Models\Role;
-use App\Models\User;
-use App\Models\UserRole;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);
-    $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
-    UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
-
-    $this->actingAs($admin);
+    $this->actingAs(userWithRole(UserRoleEnum::ADMIN));
 });
 
 /**
@@ -332,8 +329,13 @@ Create with `php artisan make:test --pest AdminInvoiceTest`.
 
 ## Avoid
 
-- `uses(RefreshDatabase::class)` missing from a file that writes to the database.
-- Un-commenting the global `->use(RefreshDatabase::class)` in `tests/Pest.php`.
+- Re-declaring `uses(RefreshDatabase::class)` — `tests/Pest.php` already applies it.
+- Wiring a role by hand instead of calling `userWithRole()`.
+- Assuming the site configuration exists. Every feature test starts from an
+  unconfigured install; lay it down with `update(initials: true)` if the code under
+  test reads it.
+- Writing to the real `storage/app/private/site-configuration.json` from a test.
+  `Storage::fake('local')` in `tests/Pest.php` prevents it — do not undo that.
 - PHPUnit class-style tests — this project is Pest functions.
 - `it('…')` — the project uses `test('…')`.
 - Test names that describe the method rather than the behaviour.

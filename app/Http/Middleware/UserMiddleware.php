@@ -18,7 +18,7 @@ class UserMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         // Check if the user is authenticated and has the required role
-        $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::STUDENT);
+        $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::USER);
 
         // If the result is a string, it means we need to redirect the user to a specific route with an error message
         if (\is_string($result)) {

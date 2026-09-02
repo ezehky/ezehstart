@@ -5,15 +5,14 @@ namespace App\Traits;
 use App\Enums\ActivityActionEnum;
 use App\Enums\UserRoleEnum;
 use App\Mail\LoginEmail;
-use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\EmailVerificationOtpService;
-use App\Services\PolicyContentService;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 trait WithAuthWorker
@@ -29,12 +28,7 @@ trait WithAuthWorker
             return redirect()->intended(route('admin.dashboard'))->with($with);
         }
 
-        // Trainer
-        if ($user->isTrainer()) {
-            return redirect()->intended(route('trainer.dashboard'))->with($with);
-        }
-
-        // Student
+        // Everyone else
         return redirect()->intended(route('user.dashboard'))->with($with);
     }
 
@@ -43,34 +37,30 @@ trait WithAuthWorker
         app(ActivityLogService::class)->logActivity($action, $description);
     }
 
-    private function createUser(array $data, array $profileData = [], ?User $referred_by = null, bool $sendOtp = true): ?User
+    /**
+     * Register an account and everything that has to exist alongside it.
+     *
+     * The user, their role and their profile are written together, so a failure
+     * halfway through cannot leave an account that can sign in but reach nothing.
+     * Mail is sent after the commit, never inside it.
+     */
+    private function createUser(array $data, array $profileData = [], bool $sendOtp = true): ?User
     {
         $userService = app(UserService::class);
-        $getCurrentRequiringConsent = app(PolicyContentService::class)->getCurrentRequiringConsent();
 
         try {
-            $user = DB::transaction(function () use ($data, $profileData, $referred_by, $userService, $getCurrentRequiringConsent) {
+            $user = DB::transaction(function () use ($data, $profileData, $userService) {
                 // Create the user
                 $user = User::query()->create([
                     ...$data,
                     'ip_address' => request()->ip(),
                 ]);
 
-                // Assign the student role to the user
-                $this->assignStudentRole($user);
+                // Assign the default role to the user
+                $this->assignDefaultRole($user);
 
                 // Create the user profile if provided
                 $user->userProfile()->create([...$profileData, 'settings' => $userService->profileDefaultSettings()]);
-
-                // Affiliate profile
-                $user->affiliateProfile()->create([
-                    'affiliate_code' => $userService->generateUsername($data['name']),
-                    'referred_by' => $referred_by?->id,
-                ]);
-
-                // Record consent for all current policies requiring consent
-                $getCurrentRequiringConsent
-                    ->each(fn (Policy $policy) => $userService->recordConsent($policy, $user));
 
                 return $user;
             });
@@ -88,11 +78,10 @@ trait WithAuthWorker
             return $user;
         } catch (\Throwable $e) {
             // Log the error for debugging purposes
-            logger()->error('Error creating user: '.$e->getMessage(), [
+            Log::channel('code')->error('Error creating user: '.$e->getMessage(), [
                 'exception' => $e,
                 'data' => $data,
                 'profileData' => $profileData,
-                'referred_by' => $referred_by?->id,
             ]);
         }
 
@@ -117,21 +106,13 @@ trait WithAuthWorker
         Mail::to($user->email)->queue(new LoginEmail($user, request()->ip()));
     }
 
-    private function assignStudentRole(User $user): void
+    /**
+     * The role every self-registered account starts with.
+     */
+    private function assignDefaultRole(User $user): void
     {
-        $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::STUDENT]);
+        $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::USER]);
 
         $user->roles()->syncWithoutDetaching([$role->id]);
-    }
-
-    private function getReferringUser(?string $affiliate_code = null): ?User
-    {
-        if (! $affiliate_code) {
-            return null;
-        }
-
-        return User::query()
-            ->whereHas('affiliateProfile', fn ($query) => $query->where('affiliate_code', $affiliate_code))
-            ->first();
     }
 }

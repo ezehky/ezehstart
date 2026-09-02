@@ -61,7 +61,9 @@ if (! function_exists('kStoreFile')) {
      * @param  string|null  $filename  Custom filename (optional).
      * @param  string  $path  Storage path (default "/").
      * @param  string  $disk  Storage disk (default "public").
-     * @return string|false Path where the file was stored or false on failure.
+     * @return string Path where the file was stored.
+     *
+     * @throws RuntimeException When the disk refuses the write.
      */
     function kStoreFile(
         $file,
@@ -76,8 +78,15 @@ if (! function_exists('kStoreFile')) {
                 .'.'.$file->getClientOriginalExtension();
         }
 
-        // STORE FILE
-        return $filename ? $file->storeAs($path, $filename, $disk) : $file->store($path, $disk);
+        // STORE FILE. A disk that refuses the write hands back false, which would
+        // otherwise be cast to '' and saved as a valid-looking empty path.
+        $stored = $filename ? $file->storeAs($path, $filename, $disk) : $file->store($path, $disk);
+
+        if ($stored === false) {
+            throw new RuntimeException("Could not store the uploaded file on the [{$disk}] disk.");
+        }
+
+        return $stored;
     }
 }
 if (! function_exists('kDeleteFile')) {

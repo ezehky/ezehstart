@@ -36,7 +36,7 @@ existing file.
 | `kPluralize` | `(string $string, int $count, string\|bool $prepend = true, bool $format = true): string` | "3 weeks", "week" |
 | `kConvertToString` | `(mixed $value): string` | Any value → string (JSON for arrays/objects) |
 | `kRemoveUnicode` | `(string $text): string` | Strip emoji / non-ASCII |
-| `kStripDomainProtocols` | `(?string $url = null, ?string $prefix = null, string $character = '@', ?string $protocol = null): string` | `https://site.test` → `site.test`, or `info@site.test` |
+| `kStripDomainProtocols` | `(?string $url = null, ?string $prefix = null, string $character = '@', ?string $protocol = null): string` | `https://site.test` → `site.test`, or `info@site.test`. Any port is dropped, so a local `APP_URL` still yields a valid address |
 | `kMarkdownFormat` | `(): array` | The markdown cheat-sheet rendered in `x-form.markdown-field` |
 
 ### `money-helpers.php`
@@ -47,6 +47,14 @@ existing file.
 | `kMoneyFormat` | `(float $amount, ?string $default = null, bool $decodeHtml = false, int $decimals = 2): string` | **Currency output.** Returns `&#8358;12,500` by default |
 | `kPointFormat` | `(?float $point): string` | "12 pv" or `-` |
 
+`kSiteConfig()` is **never empty** once the app has booted — the cache layer injects
+resolved `logo`, `favicon` and support-link keys even from an empty file. To ask whether
+an administrator has actually saved a configuration, read the stored file instead:
+
+```php
+app(SiteConfigurationService::class)->getConfigs(raw: true)
+```
+
 `kMoneyFormat()` returns an **HTML entity**, so Blade must use `{!! !!}`.
 Pass `decodeHtml: true` when the string goes somewhere HTML is not rendered (a
 plain-text email subject, an aria-label, JSON).
@@ -56,7 +64,7 @@ plain-text email subject, an aria-label, JSON).
 | Function | Signature | Purpose |
 | --- | --- | --- |
 | `kSafeImage` | `(?string $name = null, ?string $altImage = null, bool $useStorage = true, bool $prependSiteAddress = false, string $disk = 'public'): string` | A URL that is **never broken** — falls back to `images/image.png` or `images/user.png` |
-| `kStoreFile` | `($file, ?string $filename = null, string $path = '/', string $disk = 'public'): string` | Store an upload; named files get `slug_YmdHi.ext` |
+| `kStoreFile` | `($file, ?string $filename = null, string $path = '/', string $disk = 'public'): string` | Store an upload; named files get `slug_YmdHi.ext`. Throws `RuntimeException` if the disk refuses the write |
 | `kDeleteFile` | `(?string $file = null, string $disk = 'public'): bool` | Delete, null-safe |
 | `kDatetimeConverter` | `(Carbon\|string\|null $datetime, ?User $user = null, bool $dateFormat = false, bool $dtFormat = false, bool $diffForHumans = false, bool $compareGT = false, bool $compareLT = false, bool $showTZ = false, ?string $timezone = null, ?string $format = null, bool $addDaySymbol = false): bool\|Carbon\|string` | **The** date function. Timezone-aware, returns `-` for null |
 | `kSiteConfig` | `(string $key = '', array $keys = [], mixed $default = [])` | Read site configuration |
@@ -92,7 +100,7 @@ $this->training->slug = kSlug($this->training->name);
 **Money** — always `kMoneyFormat()` or `->fooMoney()`, never manual `number_format`:
 
 ```blade
-<flux:table.cell>{!! kMoneyFormat($cohort->fee) !!}</flux:table.cell>
+<flux:table.cell>{!! kMoneyFormat($order->total) !!}</flux:table.cell>
 <flux:table.cell>{!! $transaction->amountMoney() !!}</flux:table.cell>
 ```
 
@@ -120,7 +128,7 @@ $url = kSafeImage($model->avatar, altImage: 'user');
 
 ```php
 $name = kSiteConfig('name');
-$config = kSiteConfig('withdrawal');
+$config = kSiteConfig('email-settings');
 $configs = kSiteConfig(keys: ['logo', 'name', 'favicon']);
 $days = kSiteConfig('user.account-deletion-days', default: 30);
 ```

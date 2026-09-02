@@ -2,9 +2,13 @@
 
 ## Rule
 
-There are exactly **three** application middlewares — `AdminMiddleware`,
-`TrainerMiddleware`, `UserMiddleware` — and they are **identical except for the enum
+There is one application middleware **per workspace** — `AdminMiddleware` and
+`UserMiddleware` ship with the kit — and they are **identical except for the enum
 they pass**. All the logic lives in `UserService::middlewareGeneralCheck()`.
+
+A new workspace means a new middleware that is a copy of `UserMiddleware` with a
+different enum case. Never put logic in one: if the check is workspace-specific, it
+belongs in `middlewareGeneralCheck()` behind a `match` on the role.
 
 ```php
 <?php
@@ -60,7 +64,9 @@ class AdminMiddleware
 2. Suspended → log out, `'Your account has been suspended. Please contact support.'`
 3. **Wrong role → `abort_unless($user->hasRole($role), 404)`** — a 404, not a 403, so
    the existence of the workspace is not confirmed
-4. Students only: strict email verification → redirect array to the verification page
+4. Members only: strict email verification → redirect array to the verification page.
+   The `email-settings` keys are read with `data_get()` defaults, so an install whose
+   site config has not been seeded still serves the workspace
 5. `updateLastSeen()` (throttled to once a minute)
 6. Build the available-dashboard links for multi-role accounts
 7. `View::share()` the workspace nav data:
@@ -69,7 +75,6 @@ class AdminMiddleware
 View::share([
     'dashboardRoute' => match ($role) {
         UserRoleEnum::ADMIN => route('admin.dashboard'),
-        UserRoleEnum::TRAINER => route('trainer.dashboard'),
         default => route('user.dashboard'),
     },
     'currentRole' => $role,
@@ -98,11 +103,6 @@ then: function (Application $app) {
         ->prefix('app')
         ->name('user.')
         ->group(__DIR__.'/../routes/user.php');
-
-    Route::middleware(['web', 'auth', 'auth.session', TrainerMiddleware::class])
-        ->prefix('splash-trainer')
-        ->name('trainer.')
-        ->group(__DIR__.'/../routes/trainer.php');
 }
 ```
 
@@ -119,11 +119,9 @@ Classes are referenced directly — **there are no middleware aliases**.
     $middleware->redirectUsersTo(function (Request $request) {
         if ($request->user()->isAdmin()) {
             return route('admin.dashboard');
-        } elseif ($request->user()->isTrainer()) {
-            return route('trainer.dashboard');
-        } else {
-            return route('user.dashboard');
         }
+
+        return route('user.dashboard');
     });
 
     // Prevent CSRF for webhooks
@@ -185,8 +183,8 @@ The three files differ only here:
 // AdminMiddleware
 $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::ADMIN);
 
-// TrainerMiddleware
-$result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::TRAINER);
+// UserMiddleware
+$result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::USER);
 
 // UserMiddleware
 $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::STUDENT);

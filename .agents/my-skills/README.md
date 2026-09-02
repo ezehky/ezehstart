@@ -31,11 +31,19 @@ complete.
 | Components | Flux UI free v2 |
 | CSS | Tailwind v4 (CSS-first, lime accent, `zinc`→`slate` remap) |
 | JS | Alpine (bundled with Livewire) |
-| Tests | Pest 4 |
+| Tests | Pest 5 |
 | Format | Laravel Pint, default preset |
+| Types | PHPStan level 1 (see `phpstan.neon`) |
 
-Domain: cohort-based training platform — **admin**, **trainer**, and **student**
-workspaces plus a public marketing site.
+This is a **starter kit**, not an application: authentication, roles, two workspaces
+(**admin** and **member**), and account management. No domain models ship with it.
+
+> **About the examples.** This library was written against a cohort-based training
+> platform, and many examples still name cohorts, trainings, admissions and
+> transactions. Read them for the *shape* — folder, naming, method order, comment
+> voice — and substitute your own domain. None of those models exist here. Where a
+> file states a fact about this repo (a folder map, an inventory, a route table), it
+> describes what actually ships.
 
 ---
 
@@ -77,7 +85,7 @@ workspaces plus a public marketing site.
 | [services.md](services.md) | Writing business logic |
 | [models.md](models.md) | Creating or editing a model |
 | [enums.md](enums.md) | Any status, type, or category |
-| [traits.md](traits.md) | Sharing behaviour — the 15 `With*` traits |
+| [traits.md](traits.md) | Sharing behaviour — the `With*` traits |
 | [helpers.md](helpers.md) | Formatting anything — the `k*()` inventory |
 | [validation.md](validation.md) | Validating input |
 | [activity-logging.md](activity-logging.md) | **Any admin write** — mandatory |
@@ -150,6 +158,10 @@ If you read nothing else:
 | File | Authority |
 | --- | --- |
 | `AGENTS.md` | Laravel Boost guidelines — authoritative on **framework** usage |
-| `skills/` | **This library — authoritative on project style.** Where the two overlap, follow this |
-| `database/tables.md` | Generated schema snapshot — read before writing a migration |
-| `.agents/skills/` | Boost's bundled per-package skills (Livewire, Flux, Pest, Tailwind) |
+| `CLAUDE.md` | The orientation file every session reads first |
+| `.agents/my-skills/` | **This library — authoritative on project style.** Where the two overlap, follow this |
+| `.agents/skills/house-style/SKILL.md` | The skill that routes agents into this library |
+| `.agents/skills/` | Boost's bundled per-package skills (Livewire, Flux, Pest, Tailwind, Blaze) |
+
+To inspect the schema, run `php artisan db:table <name>` or use Boost's
+`database-schema` tool — there is no generated snapshot file.

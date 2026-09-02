@@ -26,7 +26,15 @@ class EmailRule implements ValidationRule
         'sharklasers.com',
     ];
 
-    public function __construct()
+    /**
+     * @param  bool|null  $verifyMailServer  Whether to ask DNS if the domain actually
+     *                                       accepts mail. It is a network call inside
+     *                                       validation, so it is off under test — where
+     *                                       fixture domains have no MX record and the
+     *                                       suite would need a working resolver to pass.
+     *                                       Pass true to exercise it deliberately.
+     */
+    public function __construct(private readonly ?bool $verifyMailServer = null)
     {
         $this->loadDisposableList();
     }
@@ -66,8 +74,13 @@ class EmailRule implements ValidationRule
         }
 
         // Check DNS MX record (mail server exists)
-        if (! checkdnsrr($domain, 'MX')) {
+        if ($this->shouldVerifyMailServer() && ! checkdnsrr($domain, 'MX')) {
             $fail('The email does not appear to accept emails.');
         }
+    }
+
+    protected function shouldVerifyMailServer(): bool
+    {
+        return $this->verifyMailServer ?? ! app()->runningUnitTests();
     }
 }

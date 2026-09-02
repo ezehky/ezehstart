@@ -10,20 +10,17 @@ Shared behaviour is composed with traits in `app/Traits/`, all named `With{Capab
 | `WithEnumHelpers` | **every enum** | `label()`, `color()`, `boolValue()`, `values()`, `forSelect()` |
 | `WithDynamicModelFormatting` | **almost every model** | magic `->fooMoney()`, `->fooNumber()`, `->fooUrl()`, `->fooHuman()`, `->fooDatetimeForUpdate()` |
 | `WithFormResponseMessage` | **every form page** | `respondSuccess()`, `respondError()`, `respondPrimary()`, `createAttributes()` |
-| `WithAuthWorker` | auth pages | `createUser()`, `loginUser()`, `userDashboardRedirect()`, `assignStudentRole()`, `getReferringUser()`, `logActivity()` |
+| `WithAuthWorker` | auth pages | `createUser()`, `loginUser()`, `userDashboardRedirect()`, `assignDefaultRole()`, `logActivity()` |
 | `WithPasswordTools` | any page taking a password | `passwordStrengthRule()`, `$passwordNote` |
 | `WithUserRoleManager` | admin user listings | the whole "manage roles" modal — `roleUser`, `roleMatrix`, `grantRole()`, `revokeRole()`, `switchRole()`, `afterRoleChange()` hook |
-| `WithCohortAdmin` | every admin cohort tab | `public Cohort $cohort`, `loadCohort()`, `canUpdateCohort`, `ensureCohortIsEditable()`, `statusAction()` |
-| `WithCohortEnrollment` | enrolment/refund pages | enrolment state helpers |
-| `WithClassSessionEditor` | class session CRUD | session form state and save |
-| `WithCurriculumEditor` | curriculum pages | module/topic/outcome editing |
-| `WithTrainingTools` | training pages | `serviceInstance()`, `cohortOwnership()` |
-| `WithTrainerResource` | trainer pages | `trainerService()` scoped to the current user |
-| `WithRefundStatus` | refund flows | refund status transitions |
-| `WithWithdrawTool` | withdrawal flows | withdrawal form + validation |
 | `WithEmailResolver` | **every Mailable** | injects `$emailConfig` into the mail view |
 
 Livewire's own traits used alongside them: `WithPagination`, `WithFileUploads`.
+
+Those seven are the whole of `app/Traits/`. The eighth is the one you write the moment
+two pages need the same state and the same handful of methods — a shared modal, a
+shared editor, a shared set of guards. Name it `With{Capability}` and follow the rules
+below.
 
 ### Composition order at the `use` line
 
@@ -32,15 +29,13 @@ Project traits, alphabetical-ish, with Livewire traits first where both appear:
 ```php
 use WithPagination, WithUserRoleManager;
 use WithFileUploads, WithFormResponseMessage;
-use WithCurriculumEditor, WithFileUploads;
-use WithCohortAdmin;
+use WithAuthWorker, WithPasswordTools;
 ```
 
 ### Traits that require other traits
 
-A trait may `use` another. `WithCohortAdmin`, `WithUserRoleManager`,
-`WithTrainingTools`, and `WithAuthWorker` all pull in `WithFormResponseMessage`, so the
-page does **not** need to list it again:
+A trait may `use` another. `WithUserRoleManager` and `WithAuthWorker` both pull in
+`WithFormResponseMessage`, so a page using either does **not** need to list it again:
 
 ```php
 trait WithCohortAdmin

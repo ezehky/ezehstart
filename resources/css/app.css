@@ -1,8 +1,321 @@
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Roboto:wght@400;500;700&family=Libre+Baskerville:wght@400;700&display=swap");
+@import "tailwindcss";
+@import "../../vendor/livewire/flux/dist/flux.css";
 
-@source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Re-assign Flux's gray of choice... */
+@theme {
+    --color-zinc-50: var(--color-slate-50);
+    --color-zinc-100: var(--color-slate-100);
+    --color-zinc-200: var(--color-slate-200);
+    --color-zinc-300: var(--color-slate-300);
+    --color-zinc-400: var(--color-slate-400);
+    --color-zinc-500: var(--color-slate-500);
+    --color-zinc-600: var(--color-slate-600);
+    --color-zinc-700: var(--color-slate-700);
+    --color-zinc-800: var(--color-slate-800);
+    --color-zinc-900: var(--color-slate-900);
+    --color-zinc-950: var(--color-slate-950);
+}
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-accent: var(--color-lime-400);
+    --color-accent-content: var(--color-lime-600);
+    --color-accent-foreground: var(--color-lime-900);
+    --color-primary: var(--color-lime-500);
+    --color-secondary: var(--color-emerald-500);
+}
+
+@layer theme {
+    .dark {
+        --color-accent: var(--color-lime-400);
+        --color-accent-content: var(--color-lime-400);
+        --color-accent-foreground: var(--color-lime-950);
+    }
+}
+
+@theme {
+    /* FONTS */
+    --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+    --font-outfit: "Outfit", sans-serif;
+    --font-heading: "Outfit", sans-serif;
+    --font-libre: "Libre Baskerville", serif;
+    /* COLORS */
+    --color-dark: #1b1d22;
+    --color-background-light: #f5f6f8;
+    --color-background-dark: #101622;
+    --color-surface-light: #ffffff;
+    --color-surface-dark: #23252a;
+
+    /* |||||||||||||||||| */
+    /* EASING — strong custom curves (Emil Kowalski design guide) */
+    --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* ANIMATIONS */
+    --animate-fade-in: fadeIn 0.5s ease-in-out;
+    --animate-fade-in-up: fadeInUp 0.5s ease-in-out;
+    --animate-slide-up: slideUp 0.5s ease-in;
+    --animate-marquee: marquee 34s linear infinite;
+    --animate-float: float 7s var(--ease-in-out-strong) infinite;
+
+    @keyframes fadeIn {
+        0% {
+            opacity: 0;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+    @keyframes fadeInUp {
+        0% {
+            opacity: 0;
+            transform: translateY(100%);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes slideUp {
+        0% {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        100% {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    @keyframes marquee {
+        from {
+            transform: translateX(0);
+        }
+        to {
+            transform: translateX(-50%);
+        }
+    }
+    @keyframes float {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-12px);
+        }
+    }
+    /* ANIMATIONS */
+    /* |||||||||||||||||| */
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    button {
+        @apply cursor-pointer;
+    }
+
+    /* Respect users who prefer reduced motion: keep meaning, drop movement */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+    /* Hide number input spinners for a cleaner look */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type="number"] {
+        appearance: textfield;
+        -moz-appearance: textfield;
+    }
+}
+
+
+@layer utilities {
+    select,
+    .custom-scrollbar {
+        &::-webkit-scrollbar {
+            width: calc(var(--spacing) * 1);
+            height: calc(var(--spacing) * 1.5);
+        }
+        &::-webkit-scrollbar-track {
+            border-radius: calc(infinity * 1px);
+        }
+        &::-webkit-scrollbar-thumb {
+            border-radius: calc(infinity * 1px);
+            background-color: var(--color-primary);
+        }
+        scroll-behavior: smooth;
+    }
+    .no-scrollbar {
+        &::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+        scroll-behavior: smooth; /* 👈 enables smooth drag + arrow scroll */
+    }
+}
+
+@layer components {
+    /* Rendered admin-authored markdown (policy pages, FAQ answers). The HTML is
+       produced by MarkdownService, so it cannot carry utility classes of its own. */
+    .markdown-prose > * + * {
+        @apply mt-4;
+    }
+    .markdown-prose p,
+    .markdown-prose li {
+        @apply text-[15px] leading-relaxed text-slate-600 dark:text-slate-400;
+    }
+    .markdown-prose h3 {
+        @apply mt-8 font-heading text-base font-semibold text-slate-900 dark:text-white;
+    }
+    .markdown-prose strong {
+        @apply font-semibold text-slate-800 dark:text-slate-200;
+    }
+    .markdown-prose a {
+        @apply font-medium text-lime-700 underline underline-offset-2 transition-colors hover:text-lime-800 dark:text-lime-300 dark:hover:text-lime-200;
+    }
+    .markdown-prose ul,
+    .markdown-prose ol {
+        @apply mt-5 space-y-2.5 ps-5;
+    }
+    .markdown-prose ul {
+        @apply list-disc marker:text-lime-500 dark:marker:text-lime-400;
+    }
+    .markdown-prose ol {
+        @apply list-decimal marker:text-slate-400;
+    }
+    .markdown-prose blockquote {
+        @apply border-s-2 border-lime-400 ps-4 italic;
+    }
+    .markdown-prose code {
+        @apply rounded-md bg-slate-100 px-1.5 py-0.5 text-sm dark:bg-white/10;
+    }
+    .markdown-prose hr {
+        @apply my-8 border-slate-200 dark:border-white/10;
+    }
+    /* Wide tables scroll inside their own wrapper so the page never scrolls sideways. */
+    .markdown-prose .table-scroll {
+        @apply mt-6 overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10;
+    }
+    .markdown-prose table {
+        @apply w-full min-w-[36rem] border-collapse text-left text-sm;
+    }
+    .markdown-prose thead {
+        @apply bg-slate-50 dark:bg-white/[0.04];
+    }
+    .markdown-prose th {
+        @apply px-4 py-3 font-semibold text-slate-900 dark:text-white;
+    }
+    .markdown-prose td {
+        @apply border-t border-slate-200 px-4 py-3 align-top text-slate-600 dark:border-white/10 dark:text-slate-400;
+    }
+    .markdown-prose tbody tr td:first-child {
+        @apply font-medium text-slate-800 dark:text-slate-200;
+    }
+
+    .container {
+        @apply px-3 sm:px-0 mx-auto;
+    }
+    .container-space {
+        @apply py-6 md:py-24;
+    }
+    /* COLORS */
+    .gradient-text {
+        @apply bg-linear-to-r from-secondary to-accent bg-clip-text text-transparent;
+    }
+
+    .light-text {
+        @apply text-zinc-950 dark:text-gray-50;
+    }
+    .dim-text {
+        @apply text-zinc-600 dark:text-zinc-400;
+    }
+
+    .border-normal {
+        @apply border border-gray-200 dark:border-gray-800;
+    }
+
+    .border-normal-color {
+        @apply border-gray-200 dark:border-gray-800;
+    }
+
+    .bg-normal {
+        @apply bg-white dark:bg-dark;
+    }
+
+    /* Press feedback — buttons must feel responsive (scale on :active) */
+    .press {
+        @apply transition-transform duration-150 ease-out-strong;
+    }
+    .press:active {
+        transform: scale(0.97);
+    }
+
+    /* Horizontal scrollbar only shows on hover — keeps tab strips/tables clean at rest */
+    .scrollbar-hover {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .scrollbar-hover::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
+    }
+    .scrollbar-hover::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 9999px;
+    }
+    .scrollbar-hover:hover {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-slate-300) transparent;
+    }
+    .dark .scrollbar-hover:hover {
+        scrollbar-color: var(--color-slate-600) transparent;
+    }
+    .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+        /* @apply bg-slate-300 dark:bg-slate-600; */
+        @apply bg-primary;
+    }
+
+    /* Fade edges of the logo marquee */
+    .marquee-mask {
+        -webkit-mask-image: linear-gradient(
+            to right,
+            transparent,
+            #000 12%,
+            #000 88%,
+            transparent
+        );
+        mask-image: linear-gradient(
+            to right,
+            transparent,
+            #000 12%,
+            #000 88%,
+            transparent
+        );
+    }
 }

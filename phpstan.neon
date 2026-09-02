@@ -10,4 +10,14 @@ parameters:
         - database/
         - routes/
 
-    level: 7
+    # Level 1, not the Laravel default of 7, and deliberately so.
+    #
+    # This codebase leans on two patterns Larastan cannot follow. #[Scope] methods
+    # chained onto a relation ($user->userRoles()->isActive()) read as calls to an
+    # undefined method on HasMany, and #[Unguarded] models expose their columns as
+    # magic properties with no declared types. Both are correct at runtime; raising
+    # the level only produces false positives against the house style.
+    #
+    # Raise it per-project once you have added @property blocks to your models, and
+    # keep it here as the floor that catches genuinely undefined symbols.
+    level: 1

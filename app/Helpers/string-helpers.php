@@ -20,6 +20,10 @@ if (! function_exists('kStripDomainProtocols')) {
         $url ??= config('app.url');
         $url = trim(substr($url, strpos($url, '://') + 3), '/');
 
+        // Drop any port. A local APP_URL carries one, and "info@localhost:8000" is
+        // not an address any validator will accept.
+        $url = (string) preg_replace('/:\d+$/', '', $url);
+
         // If a prefix is provided, generate a subdomain
         if ($prefix) {
             $url = "{$protocol}{$prefix}{$character}{$url}";

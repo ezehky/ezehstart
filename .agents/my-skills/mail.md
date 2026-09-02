@@ -182,7 +182,7 @@ foreach ($recipients as $row) {
         $queued++;
     } catch (\Throwable $exception) {
         // One bad address must not stop the rest of the cohort.
-        Log::error('Class reminder failed to queue', [
+        Log::channel('code')->error('Class reminder failed to queue', [
             'class_session_id' => $session->id,
             'user_id' => $row['user']->id,
             'reminder' => $reminder->value,

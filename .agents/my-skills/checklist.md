@@ -94,8 +94,8 @@ If a line does not apply, it is ✓ by default — but read it first.
 
 - [ ] ✓ The route sits in the correct role-scoped route file
 - [ ] ✓ Cross-model ownership is re-checked server-side (`abort_unless(...)`)
-- [ ] ✓ Locked records (`$cohort->isLocked()`) are refused in the **method**, not just
-      hidden in the UI
+- [ ] ✓ Locked or settled records are refused in the **method**, not just hidden in
+      the UI — a disabled button is not a guard
 - [ ] ✓ Multi-write operations are wrapped in `DB::transaction()`
 - [ ] ✓ User-authored HTML is escaped (`MarkdownService`), never `{!! !!}` on raw input
 

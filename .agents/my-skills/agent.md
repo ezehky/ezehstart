@@ -11,19 +11,24 @@ original developer has a specific, consistent style. Your job is to disappear in
 
 | Thing | Value |
 | --- | --- |
-| Framework | Laravel 13 (`laravel/framework: ^13.8`) |
+| Framework | Laravel 13 (`laravel/framework: ^13.17`) |
 | PHP | 8.3+ (runtime 8.4) |
 | UI layer | Livewire 4 — **single-file components only** |
 | Component library | Flux UI **free** v2 (`livewire/flux`) |
 | CSS | Tailwind CSS v4 (CSS-first config in `resources/css/app.css`) |
 | JS | Alpine (bundled with Livewire), no other framework |
-| Tests | Pest 4 |
+| Tests | Pest 5 |
 | Formatter | Laravel Pint (default `laravel` preset) |
-| Payments | Paystack, Flutterwave, Kora (via `GatewayAbstract`) |
-| Auth extras | Laravel Socialite, OTP / passwordless |
+| Types | PHPStan / Larastan, level 1 — read the note in `phpstan.neon` before raising it |
+| Auth extras | OTP email verification, passwordless sign-in |
 
-Domain: a cohort-based training platform. Three workspaces — **admin**, **trainer**,
-**user (student/affiliate)** — plus a public marketing site.
+This is a **starter kit**, not a finished application. Two workspaces — **admin** and
+**member** — plus the guest auth screens. No domain models ship with it.
+
+> **The examples in this library come from the project the style was extracted from**,
+> a cohort-based training platform. Cohorts, trainings, admissions and transactions
+> appear throughout. They illustrate the *pattern*; none of those models exist here.
+> Copy the shape, substitute your domain.
 
 ---
 
@@ -47,11 +52,11 @@ Do **not** create any of them. If you think you need one, you need a **Service**
 [policies.md](policies.md) for what this project does instead.
 
 ### 2. Always reuse existing services
-Before writing any business logic, check `app/Services/`. There are 20 of them.
-`ActivityLogService`, `UserService`, `TrainingService`, `TransactionService`,
+Before writing any business logic, check `app/Services/`. Eleven ship with the kit:
+`ActivityLogService`, `AdminActionService`, `UserService`, `UserRoleService`,
 `NotificationService`, `SiteConfigurationService`, `MarkdownService`,
-`PolicyContentService`, `UserRoleService`, `AffiliateService` cover most of the domain.
-Resolve with `app(TheService::class)` — never `new`.
+`AccountDeletionService`, `AccountOtpService`, `EmailVerificationOtpService`,
+`PasswordlessOtpService`. Resolve with `app(TheService::class)` — never `new`.
 
 ### 3. Follow naming conventions exactly
 See [naming.md](naming.md). The two rules people get wrong:
@@ -67,14 +72,14 @@ See [naming.md](naming.md). The two rules people get wrong:
 - Run `vendor/bin/pint --dirty` after touching any PHP file.
 
 ### 5. Reuse traits
-`app/Traits/` holds 15 `With*` traits. `WithFormResponseMessage` is used by nearly every
+`app/Traits/` holds 7 `With*` traits. `WithFormResponseMessage` is used by nearly every
 form page. `WithEnumHelpers` is used by **every** enum. `WithDynamicModelFormatting` is
 used by almost every model. See [traits.md](traits.md). Never re-implement their
-behaviour inline.
+behaviour inline. A capability shared by two or more pages becomes the eighth.
 
 ### 6. Prefer existing components over creating new ones
-Check `resources/views/components/` first: `dashboard/`, `form/`, `site/`, `training/`,
-`finance/`, plus the top-level `x-status`. Then check Flux (`flux:card`, `flux:table`,
+Check `resources/views/components/` first: `dashboard/`, `form/`, `layouts/`, `lv/`,
+plus the top-level `x-status`. Then check Flux (`flux:card`, `flux:table`,
 `flux:modal`, `flux:input`, …). Only create a Blade component when a pattern is used in
 **three or more** places.
 
@@ -133,11 +138,12 @@ Never generate any of the following in this project:
 Follow this order every time.
 
 1. **Locate the closest sibling.** Find the file in the project that does the most
-   similar thing. A new admin CRUD page? Open
-   `resources/views/pages/admin/configs/⚡faqs.blade.php`. A new index with filters?
-   Open `resources/views/pages/admin/users/⚡students.blade.php`. Copy its shape.
-2. **Check for an existing enum** for any status/type/category field.
-   `app/Enums/` has 37 of them.
+   similar thing. A settings form? Open
+   `resources/views/pages/admin/configs/⚡site-config.blade.php`. A listing with
+   filters and pagination? Open `resources/views/pages/admin/users/⚡members.blade.php`.
+   A single-record view? `⚡user-view.blade.php`. Copy its shape.
+2. **Check for an existing enum** for any status/type/category field. Ten ship with
+   the kit; `StatusDefault` and `StatusYes` cover most on/off columns.
 3. **Check for an existing service** for the business logic.
 4. **Check for an existing trait** for shared page behaviour.
 5. **Check for an existing Blade component** for the UI.
@@ -146,8 +152,8 @@ Follow this order every time.
 8. **Log the activity** if it is an admin write — `ActivityLogService`. See
    [activity-logging.md](activity-logging.md).
 9. **Register the route** in the right file (`routes/admin.php`, `routes/user.php`,
-   `routes/trainer.php`, `routes/web.php`) and the **nav tree** in
-   `app/Helpers/navigations.php` if it needs a sidebar entry.
+   `routes/web.php`) and the **nav tree** in `app/Helpers/navigations.php` if it needs
+   a sidebar entry.
 10. **Write the Pest test.**
 11. `vendor/bin/pint --dirty` then `php artisan test --compact --filter=…`.
 12. Walk [checklist.md](checklist.md) before you report done.
@@ -205,7 +211,7 @@ Follow this order every time.
 ## 5. When you are unsure
 
 1. Grep the codebase for the closest analogue and copy it.
-2. If two existing patterns conflict, prefer the one used in the **most recent** files
-   (FAQs, policies, notifications, class-session reminders — mid-2026 work) over older
-   ones. Git history orders them.
+2. If two existing patterns conflict, prefer the one the shipped starter files use —
+   `⚡members.blade.php` for a listing, `⚡user-view.blade.php` for a single record,
+   `⚡site-config.blade.php` for a settings form.
 3. If still unsure, ask. Do not invent.

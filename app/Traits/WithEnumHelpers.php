@@ -23,8 +23,9 @@ trait WithEnumHelpers
     /**
      * Build a [value => label] array of enum cases.
      *
-     * @param  string[]  $values
-     * @param  bool[]  $isExclusives
+     * @param  string[]  $values  Case values to include, or to leave out.
+     * @param  bool  $isExclusives  True treats $values as the only cases to keep;
+     *                              false treats them as cases to drop.
      * @return array<string, string>
      */
     public static function forSelect(array $values = [], bool $isExclusives = false): array

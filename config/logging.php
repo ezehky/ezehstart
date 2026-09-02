@@ -131,6 +131,20 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'site-config' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/site-config.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'code' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/code.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

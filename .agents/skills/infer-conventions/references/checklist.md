@@ -85,6 +85,8 @@ This app ships a frontend stack, so the items below apply.
     - Hint: `ls app/View/Components`; grep `<x-`, `@include` in `resources/views`.
 30. Livewire component format: Volt functional/class components, native Livewire 4 single-file (SFC), multi-file (MFC), view-based, or class-based components. Evaluate full-page vs nested separately because it is an independent usage choice.
     - Hint: check the installed Livewire major and `livewire/volt`; inspect `app/Livewire`, `resources/views/livewire`, and Livewire 4 component/page directories for `@volt`, SFC, MFC, view-based, and class-based formats.
+31. UI kit (Flux): Flux components vs custom components vs another library.
+    - Hint: grep `<flux:` in `resources/views`.
 32. Localization: short keys (`lang/*/*.php` + `__('messages.welcome')`) vs JSON string keys (`lang/*.json` + `__('Full sentence')`).
     - Hint: `ls lang`; grep dotted `__('` vs sentence keys.
 

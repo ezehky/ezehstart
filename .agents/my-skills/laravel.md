@@ -106,12 +106,14 @@ static $construct = null;
 ### Logging
 
 ```php
-logger()->error('Error creating user: '.$e->getMessage(), ['exception' => $e, 'data' => $data]);
-Log::error('Class reminder failed to queue', ['class_session_id' => $session->id, …]);
+Log::channel('code')->error('Error creating user: '.$e->getMessage(), ['exception' => $e, 'data' => $data]);
+Log::channel('code')->error('Class reminder failed to queue', ['class_session_id' => $session->id, …]);
 Log::channel($vendor->value)->error("{$vendor->label()}: Transaction verification failed.", […]);
 ```
 
-Always with a context array. Payment vendors log to their own channel.
+Always with a context array. Application errors go to the `code` channel
+(`storage/logs/code.log`). Only the surfaces with a channel of their own opt out:
+site configuration writes to `site-config`, payment vendors to their vendor channel.
 
 ### Storage
 

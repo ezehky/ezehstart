@@ -2,15 +2,14 @@
 
 ## Rule
 
-Four route files. Three of them are registered by `bootstrap/app.php` with a URL
-prefix, a name prefix, and a role middleware.
+One route file per workspace, plus `web.php`. Each workspace file is registered by
+`bootstrap/app.php` with a URL prefix, a name prefix, and a role middleware.
 
 | File | Prefix | Name prefix | Middleware |
 | --- | --- | --- | --- |
 | `routes/web.php` | `/` | *(none)* | `web` (+ `guest`/`auth` groups inside) |
 | `routes/admin.php` | `/app-splash` | `admin.` | `web`, `auth`, `auth.session`, `AdminMiddleware` |
 | `routes/user.php` | `/app` | `user.` | `web`, `auth`, `auth.session`, `UserMiddleware` |
-| `routes/trainer.php` | `/splash-trainer` | `trainer.` | `web`, `auth`, `auth.session`, `TrainerMiddleware` |
 
 ```php
 // bootstrap/app.php
@@ -26,35 +25,31 @@ then: function (Application $app) {
 ### `Route::livewire()` — the only way to route a page
 
 ```php
-Route::livewire('/trainings', 'pages::admin.training.trainings')->name('trainings');
+Route::livewire('/members', 'pages::admin.users.members')->name('members');
 ```
 
 - The component string is the `pages::` namespace path with **dots**, no `⚡`, no
   extension.
 - The name is **relative** — the group prefix is applied automatically. Writing
-  `->name('admin.trainings')` inside `routes/admin.php` produces `admin.admin.trainings`.
+  `->name('admin.members')` inside `routes/admin.php` produces `admin.admin.members`.
 
 ### Route model binding
 
 ```php
 Route::livewire('/user/{user}', 'pages::admin.users.user-view')->name('user');
-Route::livewire('/cohort/{cohort:slug}', 'pages::admin.training.cohort-editor')->name('cohort');
-Route::livewire('/transaction/{transaction:reference}', 'pages::admin.finance.transaction')->name('transaction');
-Route::livewire('/cohorts/{training:slug?}', 'pages::admin.training.cohorts')->name('cohorts');
+Route::livewire('/email-verification/{user:email}', 'pages::auth.email-verification')->name('email.verification');
 ```
 
-- `{model}` binds by id — used for `User`.
-- `{model:slug}` for anything with a slug — `Cohort`, `Training`.
-- `{model:reference}` for transactions.
-- `{model:slug?}` optional — the page then filters by the training or shows all.
-- Nested parameters keep the parent first:
-  `/cohort/{cohort:slug}/classes/{classSession}/attendance`.
+- `{model}` binds by id — used for `User` in the admin workspace.
+- `{model:slug}` for anything carrying a slug.
+- `{model:column}` for any other natural key — `{user:email}` above.
+- `{model:slug?}` optional — the page then filters by it, or shows everything.
+- Nested parameters keep the parent first: `/parent/{parent:slug}/children/{child}`.
 
 The Livewire page receives them as typed public properties:
 
 ```php
-public Cohort $cohort;
-public ClassSession $classSession;
+public User $user;
 ```
 
 **Always re-verify the relationship** between two bound models:
@@ -154,11 +149,9 @@ $middleware->redirectGuestsTo(fn () => route('login'));
 $middleware->redirectUsersTo(function (Request $request) {
     if ($request->user()->isAdmin()) {
         return route('admin.dashboard');
-    } elseif ($request->user()->isTrainer()) {
-        return route('trainer.dashboard');
-    } else {
-        return route('user.dashboard');
     }
+
+    return route('user.dashboard');
 });
 
 $middleware->preventRequestForgery(except: ['webhooks/*']);
@@ -170,22 +163,22 @@ Always `route()`. Internal links carry `wire:navigate`.
 
 ```blade
 <flux:button :href="route('admin.user', $item)" wire:navigate icon="eye" variant="primary" size="sm" />
-<flux:menu.item icon="list-bullet" href="{{ route('admin.cohorts', ['training' => $item->slug]) }}">Cohorts</flux:menu.item>
+<flux:menu.item icon="list-bullet" href="{{ route('admin.activity-logs', ['q' => $item->email]) }}">Activity</flux:menu.item>
 ```
 
 ### The navigation tree
 
 A new page that needs a sidebar entry must be added to
-`kPageNavigationLinks()` in `app/Helpers/navigations.php`, under `admin`, `student`, or
-`trainer`:
+`kPageNavigationLinks()` in `app/Helpers/navigations.php`, under the key matching its
+workspace — `admin` or `user`:
 
 ```php
 'config' => [
     'label' => 'Configuration',
     'children' => [
-        'faqs' => [
-            'label' => 'FAQs',
-            'link' => route('admin.config.faqs'),
+        'social-handles' => [
+            'label' => 'Social handles',
+            'link' => route('admin.config.social-handles'),
         ],
     ],
     'icon' => 'cog-6-tooth',
@@ -193,13 +186,18 @@ A new page that needs a sidebar entry must be added to
 ```
 
 **The array keys must match the `kSetSiteTitle()` segments** on the page —
-`kSetSiteTitle('config', 'faqs')` is what lights up `config › faqs` in the sidebar
-(`kCheckActiveTitle()` slugs and compares them).
+`kSetSiteTitle('config', 'social-handles')` is what lights up `config › social handles`
+in the sidebar (`kCheckActiveTitle()` slugs and compares them). Get this wrong and the
+page still works, but nothing in the sidebar highlights.
+
+A branch carrying a falsy `check` key is dropped, and a parent left with no children
+disappears with them — that is how a feature behind a site-config switch hides its own
+menu entry.
 
 ## Why
 
-- Non-obvious prefixes (`app-splash`, `splash-trainer`) keep the staff surfaces off
-  guessable paths without needing subdomains.
+- Non-obvious prefixes (`app-splash`) keep the staff surface off guessable paths
+  without needing subdomains.
 - Registering role groups in `bootstrap/app.php` means the middleware can never be
   forgotten on an individual route.
 - `Route::livewire()` with the `pages::` namespace makes the route file a readable

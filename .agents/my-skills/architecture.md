@@ -23,57 +23,74 @@ Route (Route::livewire)
 ```
 app/
 ├── Casts/            MoneyCast, TimeCast — attribute casts only
-├── Console/Commands/ scheduled maintenance + reminder commands
-├── Contracts/        GatewayAbstract — the payment gateway contract
-├── Enums/            37 enums. Every status, type, category, provider.
+├── Console/Commands/ scheduled maintenance commands (empty in the starter)
+├── Contracts/        interfaces and abstracts (empty in the starter)
+├── Enums/            every status, type, category. 10 ship with the kit.
 ├── Helpers/          4 autoloaded function files, all functions prefixed k
 ├── Http/
-│   ├── Controllers/  6 controllers: landing, policy, 2 callbacks, 1 webhook, base
-│   └── Middleware/   AdminMiddleware, TrainerMiddleware, UserMiddleware
-├── Mail/             11 Mailables, all queued
-├── Models/           40 models
+│   ├── Controllers/  the base Controller only — authenticated screens use no controller
+│   └── Middleware/   AdminMiddleware, UserMiddleware
+├── Mail/             6 Mailables, all queued
+├── Models/           User, UserProfile, Role, UserRole, ActivityLog,
+│                     NotificationSubscription
 ├── Notifications/    GeneralNotification (database channel only)
 ├── Providers/        AppServiceProvider only
 ├── Rules/            EmailRule, ImageRule, MoneyRule
-├── Services/         20 services, all #[Singleton]
-└── Traits/           15 With* traits
+├── Services/         11 services, all #[Singleton]
+└── Traits/           7 With* traits
 ```
+
+`Console/Commands` and `Contracts` ship empty. They are part of the map so a scheduled
+command or a gateway interface has an obvious home — creating them is not "inventing
+architecture", creating a thirteenth sibling is.
 
 ```
 resources/views/
 ├── components/
-│   ├── dashboard/    avatar, stat-card, sidebar, tab-nav, workspace-no-record, …
-│   ├── finance/      withdraw-button-card, withdraw-modal
-│   ├── form/         file-field, image-field, markdown-field, number-field, …
-│   ├── layouts/      base, email, email/*, site-master
-│   ├── lv/           ⚡notifications, ⚡newsletter-form  (Livewire SFCs, not pages)
-│   ├── site/         public marketing sections
-│   ├── training/     cohort cards, status, callouts
+│   ├── dashboard/    avatar, stat-card, mini-stat, icon-box, sidebar, tab-nav,
+│   │                 top-navigation, user-roles, workspace-no-record, …
+│   ├── form/         file-field, image-field, markdown-field, number-field,
+│   │                 password, phone-field
+│   ├── layouts/      base, email, email/*
+│   ├── lv/           ⚡notifications  (a Livewire SFC used as a component, not a page)
 │   └── status.blade.php
-├── emails/           mail views, grouped by domain
+├── emails/auth/      mail views
 ├── flux/icon/        custom Flux icons (brand logos)
 ├── layouts/          app.blade.php, auth.blade.php  → the "layouts::" namespace
 ├── pages/            every routed screen → the "pages::" namespace
-│   ├── admin/{configs,finance,training,users}/  + ⚡dashboard
-│   ├── auth/
-│   ├── shared/
-│   ├── trainer/
-│   └── user/{account,finance,membership,training}/ + ⚡dashboard
-└── static/site/      landing + policy Blade views (controller-rendered)
+│   ├── admin/{configs,users}/ + ⚡dashboard
+│   ├── auth/         ⚡login, ⚡register, ⚡forgot-password, ⚡passwordless,
+│   │                 ⚡email-verification
+│   ├── shared/       ⚡profile — mounted by both workspaces
+│   └── user/account/ + ⚡dashboard
+└── welcome.blade.php the public landing page
 ```
 
-### The three workspaces
+### The workspaces
 
 Defined in `bootstrap/app.php`:
 
 | Workspace | URL prefix | Route name prefix | Route file | Middleware |
 | --- | --- | --- | --- | --- |
 | Admin | `/app-splash` | `admin.` | `routes/admin.php` | `AdminMiddleware` |
-| Student / affiliate | `/app` | `user.` | `routes/user.php` | `UserMiddleware` |
-| Trainer | `/splash-trainer` | `trainer.` | `routes/trainer.php` | `TrainerMiddleware` |
+| Member | `/app` | `user.` | `routes/user.php` | `UserMiddleware` |
 | Public + auth | `/` | *(none)* | `routes/web.php` | `guest` / `auth` |
 
-All three role groups also carry `['web', 'auth', 'auth.session']`.
+Both role groups also carry `['web', 'auth', 'auth.session']`.
+
+### Adding a third workspace
+
+Three files, plus two `match` arms:
+
+1. `app/Http/Middleware/{Role}Middleware.php` — a copy of `UserMiddleware` with the
+   new enum case.
+2. `routes/{role}.php`.
+3. A `Route::middleware(...)->prefix(...)->name(...)->group(...)` block in
+   `bootstrap/app.php`.
+4. The case in `UserRoleEnum`, then the `match` in
+   `UserService::middlewareGeneralCheck()` and the branch in
+   `WithAuthWorker::userDashboardRedirect()`. Both are exhaustive, so PHP will tell
+   you if you forget.
 
 ## Why
 
@@ -85,32 +102,32 @@ All three role groups also carry `['web', 'auth', 'auth.session']`.
   `->label()`) live in one place and never leak as magic strings into Blade.
 - **Traits over inheritance** — a Livewire SFC cannot extend a project base class
   cleanly, so shared page behaviour is composed with `With*` traits.
-- **Three separate URL prefixes**, deliberately non-obvious (`app-splash`,
-  `splash-trainer`), keep the admin surface off the guessable path.
+- **Separate URL prefixes**, deliberately non-obvious (`app-splash`), keep the admin
+  surface off the guessable path.
 
 ## Example
 
-The full path of one feature — admin FAQ management:
+The full path of one feature that ships — the admin members listing:
 
 ```
 routes/admin.php
-  Route::livewire('/site-config/faqs', 'pages::admin.configs.faqs')->name('config.faqs');
+  Route::livewire('/members', 'pages::admin.users.members')->name('members');
 
 app/Helpers/navigations.php
-  'config' => ['children' => ['faqs' => ['label' => 'FAQs', 'link' => route('admin.config.faqs')]]]
+  'users' => ['children' => ['members' => ['label' => 'Members', 'link' => route('admin.members')]]]
 
-resources/views/pages/admin/configs/⚡faqs.blade.php     ← the page (class + Blade)
-app/Models/Faq.php                                       ← casts, answerHtml(), scopes
-app/Enums/FaqTypeEnum.php                                ← faq_type
-app/Enums/StatusDefault.php                              ← status
-app/Services/MarkdownService.php                         ← markdown → HTML
+resources/views/pages/admin/users/⚡members.blade.php    ← the page (class + Blade)
+app/Models/User.php                                      ← casts, carriesRole() scope
+app/Enums/UserRoleEnum.php                               ← the role vocabulary
+app/Enums/StatusUser.php                                 ← status
+app/Traits/WithUserRoleManager.php                       ← the manage-roles modal
+app/Services/UserRoleService.php                         ← grant / revoke / guards
 app/Services/ActivityLogService.php                      ← the audit entry
-database/migrations/..._create_faqs_table.php
-database/seeders/FaqSeeder.php
-tests/Feature/AdminFaqTest.php
+tests/Feature/AdminWorkspaceTest.php
 ```
 
-The public side reads the same model through `LandingPageController::faqs()`.
+`⚡user-view.blade.php` reads the same model as a single record, and reuses the same
+trait for its role modal.
 
 ## Template
 
@@ -129,6 +146,8 @@ When adding a feature, create files in this order and no others:
 10. tests/Feature/{Workspace}ThingTest.php
 ```
 
+Steps 1-4 are optional; steps 5, 6 and 10 never are.
+
 ## Avoid
 
 - Creating `app/Actions/`, `app/Repositories/`, `app/DTOs/`, `app/Jobs/`,
@@ -139,6 +158,7 @@ When adding a feature, create files in this order and no others:
   small pure getters (`isLocked()`, `progress()`, `displayName()`) — nothing that
   writes, sends mail, or spans several tables.
 - Putting business logic in a Blade component.
-- Calling a Service from a model (the one exception is a read-only compile step, e.g.
-  `Faq::answerHtml()` → `MarkdownService`; follow that only for pure formatting).
+- Calling a Service from a model. The one exception is a read-only compile step —
+  a model method that renders stored markdown through `MarkdownService`, say. Follow
+  that only for pure formatting, never for anything that writes.
 - Bypassing the workspace route files — never register an admin page in `web.php`.

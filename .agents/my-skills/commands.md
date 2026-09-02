@@ -155,7 +155,7 @@ try {
     $queued++;
 } catch (\Throwable $exception) {
     // One bad address must not stop the rest of the cohort.
-    Log::error('Class reminder failed to queue', [
+    Log::channel('code')->error('Class reminder failed to queue', [
         'class_session_id' => $session->id,
         'user_id' => $row['user']->id,
         'message' => $exception->getMessage(),
@@ -294,7 +294,7 @@ class SendInvoiceReminderCommand extends Command
                 $sent++;
             } catch (\Throwable $exception) {
                 // One bad address must not stop the rest of the run.
-                Log::error('Invoice reminder failed to queue', [
+                Log::channel('code')->error('Invoice reminder failed to queue', [
                     'invoice_id' => $invoice->id,
                     'message' => $exception->getMessage(),
                 ]);

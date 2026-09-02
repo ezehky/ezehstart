@@ -3,7 +3,21 @@
 ## Rule
 
 All business logic that is shared, transactional, or spans more than one aggregate
-lives in `app/Services/`. There are 20.
+lives in `app/Services/`. Eleven ship with the starter:
+
+| Service | Owns |
+| --- | --- |
+| `ActivityLogService` | The audit trail — `affectedColumns()` and `logActivity()` |
+| `AdminActionService` | The "waiting on you" queues on the admin dashboard |
+| `UserService` | Sessions, last-seen, profile settings, the workspace middleware check |
+| `UserRoleService` | Granting, revoking and switching roles, and the guards on each |
+| `NotificationService` | Database notifications behind the bell menu |
+| `SiteConfigurationService` | The site-configuration JSON file and its cache |
+| `MarkdownService` | Stored markdown → HTML, with raw HTML escaped |
+| `AccountDeletionService` | Anonymising or hard-deleting an account |
+| `AccountOtpService` | Codes confirming a sensitive account change |
+| `EmailVerificationOtpService` | Welcome mail and email-verification codes |
+| `PasswordlessOtpService` | Sign-in codes keyed by address, with throttle and attempt limits |
 
 ```php
 <?php
@@ -156,7 +170,7 @@ try {
     return $user;
 } catch (\Throwable $e) {
     // Log the error for debugging purposes
-    logger()->error('Error creating user: '.$e->getMessage(), [
+    Log::channel('code')->error('Error creating user: '.$e->getMessage(), [
         'exception' => $e,
         'data' => $data,
     ]);
@@ -377,7 +391,7 @@ class InvoiceService
                 return $invoice;
             });
         } catch (\Throwable $exception) {
-            logger()->error('Error issuing invoice: '.$exception->getMessage(), [
+            Log::channel('code')->error('Error issuing invoice: '.$exception->getMessage(), [
                 'exception' => $exception,
                 'user_id' => $user->id,
             ]);

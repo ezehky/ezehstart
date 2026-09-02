@@ -2,11 +2,10 @@
 
 namespace App\Providers;
 
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
+use App\Services\SiteConfigurationService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,28 +22,38 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->configureDefaults();
-    }
+        Builder::macro('searchMacro', function ($columns, $search) {
+            if ($search) {
+                if (\is_array($columns)) {
+                    $this->where(function ($query) use ($columns, $search) {
+                        foreach ($columns as $column) {
+                            $query->orWhere($column, 'like', "%{$search}%");
+                        }
+                    });
 
-    /**
-     * Configure default behaviors for production-ready applications.
-     */
-    protected function configureDefaults(): void
-    {
-        Date::use(CarbonImmutable::class);
+                    return $this;
+                } else {
+                    return $this->where($columns, 'like', '%'.$search.'%');
+                }
+            } else {
+                return $this;
+            }
+        });
 
-        DB::prohibitDestructiveCommands(
-            app()->isProduction(),
-        );
+        // Site Configuration Service
+        $serviceInstance = app(SiteConfigurationService::class);
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
-        );
+        // INITIATE SITE CONFIG
+        if (! app()->runningInConsole() || app()->runningUnitTests()) {
+            $serviceInstance->cacheSiteConfig(true);
+
+            // ===================================For View
+
+            $configs = kSiteConfig(keys: ['logo', 'logo-dark', 'name', 'favicon', 'email', 'phone', 'address', 'social-handles']);
+
+            // $configs['socials'] = $serviceInstance->getSocialHandles(data: $configs['social-handles']);
+
+            View::share(['_configs' => $configs]);
+        }
     }
 }
