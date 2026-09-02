@@ -1,11 +1,19 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/blank-livewire-starter-kit",
+    "name": "ezehky/ezehstart",
+    "authors": [
+        {
+            "name": "Kingsley Ezeh",
+            "email": "kingsley.uchenna.ezeh@gmail.com",
+            "role": "Developer"
+        }
+    ],
     "type": "project",
-    "description": "The official Laravel starter kit for Livewire.",
+    "description": "A Laravel 13 + Livewire 4 starter kit with the batteries a project actually needs on day one — and a written house style that keeps everything added after day one looking like it was there from the start.",
     "keywords": [
         "laravel",
-        "framework"
+        "framework",
+        "ezehstart"
     ],
     "license": "MIT",
     "require": {

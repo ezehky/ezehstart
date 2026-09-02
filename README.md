@@ -1,7 +1,7 @@
 # Ezeh Start
 
 A Laravel 13 + Livewire 4 starter kit with the batteries a project actually needs on
-day one — and a written house style that keeps everything added after day one looking
+day one, and a written house style that keeps everything added after day one looking
 like it was there from the start.
 
 ## What ships
