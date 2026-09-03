@@ -1,5 +1,5 @@
 @php
-    kSetSiteTitle('Home');
+    kSetSiteTitle('home');
 @endphp
 
 <x-layouts.base class="min-h-screen">
