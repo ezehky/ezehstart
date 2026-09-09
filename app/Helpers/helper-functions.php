@@ -199,6 +199,54 @@ if (! function_exists('kSiteConfig')) {
     }
 }
 
+if (! function_exists('kFluxIcons')) {
+    /**
+     * Every icon name `<flux:icon>` can render, read from the registered component paths.
+     *
+     * Flux registers two anonymous component paths under the `flux` prefix — the app's own
+     * `resources/views/flux` first, then the package's bundled Heroicons — so reading the
+     * registration rather than a hard-coded vendor path keeps the list correct if either
+     * side moves, and keeps a published icon ahead of the bundled one of the same name.
+     *
+     * @param  bool  $grouped  Key the names by their source ("Site icons" / "Heroicons").
+     * @return array<int|string, mixed> A sorted list of icon names, or two groups of them.
+     */
+    function kFluxIcons(bool $grouped = false): array
+    {
+        // The directory scan is the expensive part, so it is memoized for the request
+        // rather than per argument — both shapes are built from the same groups.
+        $groups = once(function (): array {
+            $groups = [];
+
+            foreach (Blade::getAnonymousComponentPaths() as $registered) {
+                if (($registered['prefix'] ?? null) !== 'flux') {
+                    continue;
+                }
+
+                // Icons published into the app shadow the bundled set, so they are listed first.
+                $group = str_starts_with($registered['path'], resource_path()) ? 'Site icons' : 'Heroicons';
+
+                foreach (glob($registered['path'].'/icon/*.blade.php') ?: [] as $file) {
+                    $name = basename($file, '.blade.php');
+
+                    // `index` is the `<flux:icon name="…">` dispatcher itself, not an icon.
+                    if ($name !== 'index') {
+                        $groups[$group][] = $name;
+                    }
+                }
+            }
+
+            return collect($groups)
+                ->map(fn (array $names): array => collect($names)->unique()->sort()->values()->all())
+                ->all();
+        });
+
+        return $grouped
+            ? $groups
+            : collect($groups)->flatten()->unique()->values()->all();
+    }
+}
+
 // COMPARE PRICE
 if (! function_exists('kStoreComparePrice')) {
     /**

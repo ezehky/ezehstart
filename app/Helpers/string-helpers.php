@@ -152,18 +152,22 @@ if (! function_exists('kGreeting')) {
      * Return a greeting based on the current hour of the day.
      *
      * @param  string  $name  Name to greet (default: 'Guest').
+     * @param  bool  $exclamation  Whether to add an exclamation mark (default: true).
+     * @param  string  $greet  Custom greeting message (default: '').
      * @return string Greeting string, e.g., "Good Morning, John!".
      */
-    function kGreeting(string $name = 'Guest', bool $exclamation = true): string
+    function kGreeting(string $name = 'Guest', bool $exclamation = true, ?string $greet = null): string
     {
         $hour = (int) date('H');
 
-        if ($hour < 12) {
-            $greet = 'Good Morning';
-        } elseif ($hour < 18) {
-            $greet = 'Good Afternoon';
-        } else {
-            $greet = 'Good Evening';
+        if ($greet === null) {
+            if ($hour < 12) {
+                $greet = 'Good Morning';
+            } elseif ($hour < 18) {
+                $greet = 'Good Afternoon';
+            } else {
+                $greet = 'Good Evening';
+            }
         }
 
         // Append the name to the greeting
