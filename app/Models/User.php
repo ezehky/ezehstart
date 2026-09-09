@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\StatusUser;
 use App\Enums\UserRoleEnum;
+use App\Services\PolicyContentService;
 use App\Traits\WithDynamicModelFormatting;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -110,6 +111,25 @@ class User extends Authenticatable
         return (int) round(collect($fields)->filter()->count() / \count($fields) * 100);
     }
 
+    /**
+     * The policies in force that this account has not accepted.
+     *
+     * Non-empty after a new version is published: consent is recorded against a
+     * specific version, so superseding one puts everybody back in this list until
+     * they accept the replacement.
+     *
+     * @return Collection<int, Policy>
+     */
+    public function outstandingConsents(): Collection
+    {
+        $accepted = $this->consents()->pluck('policy_id');
+
+        return app(PolicyContentService::class)
+            ->getCurrentRequiringConsent()
+            ->reject(fn (Policy $policy) => $accepted->contains($policy->id))
+            ->values();
+    }
+
     // Relationships
 
     public function userProfile(): HasOne
@@ -138,6 +158,11 @@ class User extends Authenticatable
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function consents(): HasMany
+    {
+        return $this->hasMany(UserConsent::class);
     }
 
     // Scopes

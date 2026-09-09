@@ -33,6 +33,14 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Social handles',
                         'link' => route('admin.config.social-handles'),
                     ],
+                    'policies' => [
+                        'label' => 'Policies',
+                        'link' => route('admin.config.policies'),
+                    ],
+                    'faqs' => [
+                        'label' => 'FAQs',
+                        'link' => route('admin.config.faqs'),
+                    ],
                 ],
                 'icon' => 'cog-6-tooth',
             ],

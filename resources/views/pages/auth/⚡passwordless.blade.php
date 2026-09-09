@@ -312,11 +312,7 @@ new #[Layout('layouts::auth')] class extends Component
             <flux:input wire:model="name" autocomplete="name" autofocus placeholder="Enter your full name" />
             <flux:error name="name" />
 
-            <flux:field variant="inline">
-                <flux:checkbox wire:model="agreed_to_terms" />
-                <flux:label>I agree to the terms of service and privacy policy.</flux:label>
-                <flux:error name="agreed_to_terms" />
-            </flux:field>
+            <x-form.consent-field />
 
             <flux:error name="email" />
 

@@ -31,6 +31,12 @@ class DatabaseSeeder extends Seeder
             ...$seeders,
             RoleSeeder::class,
             UserSeeder::class,
+            // Both match on natural keys rather than ids, so re-seeding refreshes
+            // the copy instead of stacking up duplicates. PolicySeeder only ever
+            // writes version 1.0 — once a real 2.0 is published it stops being
+            // what the public page shows.
+            PolicySeeder::class,
+            FaqSeeder::class,
         ];
 
         $this->call($seeders);

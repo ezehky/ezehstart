@@ -5,10 +5,12 @@ namespace App\Traits;
 use App\Enums\ActivityActionEnum;
 use App\Enums\UserRoleEnum;
 use App\Mail\LoginEmail;
+use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\EmailVerificationOtpService;
+use App\Services\PolicyContentService;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -48,8 +50,14 @@ trait WithAuthWorker
     {
         $userService = app(UserService::class);
 
+        // Resolved before the transaction opens. Which policies are in force is a
+        // read against the same rows the consent checkbox was rendered from, and
+        // doing it inside the write would hold the account open on a query that
+        // has nothing to do with creating it.
+        $consentPolicies = app(PolicyContentService::class)->getCurrentRequiringConsent();
+
         try {
-            $user = DB::transaction(function () use ($data, $profileData, $userService) {
+            $user = DB::transaction(function () use ($data, $profileData, $userService, $consentPolicies) {
                 // Create the user
                 $user = User::query()->create([
                     ...$data,
@@ -61,6 +69,11 @@ trait WithAuthWorker
 
                 // Create the user profile if provided
                 $user->userProfile()->create([...$profileData, 'settings' => $userService->profileDefaultSettings()]);
+
+                // The account and its consent records are written together. An
+                // account that exists without the record of what it agreed to is
+                // exactly the state this feature is here to prevent.
+                $consentPolicies->each(fn (Policy $policy) => $userService->recordConsent($policy, $user));
 
                 return $user;
             });

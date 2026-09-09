@@ -123,11 +123,7 @@ new #[Layout('layouts::auth')] class extends Component
     <flux:error name="password" />
     <flux:text class="text-xs">{!! $passwordNote !!}</flux:text>
 
-    <flux:field variant="inline">
-        <flux:checkbox wire:model="agreed_to_terms" />
-        <flux:label>I agree to the terms of service and privacy policy.</flux:label>
-        <flux:error name="agreed_to_terms" />
-    </flux:field>
+    <x-form.consent-field />
 
     <flux:button type="submit" variant="primary" class="w-full">
         Create account

@@ -1,36 +1,15 @@
 @php
     kSetSiteTitle('home');
+
+    // Read here rather than through a controller: this is a plain view route, and
+    // the section renders nothing at all when no question is published, so an
+    // untouched starter kit shows no empty accordion.
+    $faqs = App\Models\Faq::query()->active()->inFlowOrder()->get();
 @endphp
 
 <x-layouts.base class="min-h-screen">
     <div class="flex min-h-screen flex-col">
-        <header class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-6">
-            <flux:brand
-                href="{{ route('home') }}"
-                :logo="$_configs['logo'] ?? ''"
-                :logoDark="$_configs['logo-dark'] ?? ''"
-                :name="$_configs['name']"
-                alt="{{ $_configs['name'] }} official logo"
-            />
-
-            <div class="flex items-center gap-2">
-                <flux:switch x-data x-model="$flux.dark" />
-
-                @auth
-                    <flux:button
-                        :href="auth()->user()->isAdmin() ? route('admin.dashboard') : route('user.dashboard')"
-                        variant="primary"
-                        size="sm"
-                        wire:navigate
-                    >
-                        Dashboard
-                    </flux:button>
-                @else
-                    <flux:button :href="route('login')" variant="ghost" size="sm" wire:navigate>Sign in</flux:button>
-                    <flux:button :href="route('register')" variant="primary" size="sm" wire:navigate>Get started</flux:button>
-                @endauth
-            </div>
-        </header>
+        <x-site.header />
 
         <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-16">
             <div class="max-w-2xl">
@@ -71,11 +50,8 @@
             </div>
         </main>
 
-        <footer class="mx-auto w-full max-w-6xl px-6 py-8">
-            <flux:separator variant="subtle" />
-            <flux:text class="mt-6 text-sm">
-                &copy; {{ now()->year }} {{ $_configs['name'] }}.
-            </flux:text>
-        </footer>
+        <x-site.faq :faqs="$faqs" />
+
+        <x-site.footer />
     </div>
 </x-layouts.base>

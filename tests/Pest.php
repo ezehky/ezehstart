@@ -1,8 +1,12 @@
 <?php
 
+use App\Enums\PolicyTypeEnum;
 use App\Enums\StatusDefault;
+use App\Enums\StatusPolicy;
 use App\Enums\StatusUser;
+use App\Enums\StatusYes;
 use App\Enums\UserRoleEnum;
+use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
@@ -85,6 +89,33 @@ function userWithRole(UserRoleEnum $role, array $attributes = []): User
     ]);
 
     return $user;
+}
+
+/**
+ * A published policy of the given type, in force from now.
+ *
+ * Most tests only care that one exists, so the content defaults to something with
+ * two headings in it — enough for the section compiler to have work to do.
+ */
+function publishedPolicy(PolicyTypeEnum $type = PolicyTypeEnum::TERMS, array $attributes = []): Policy
+{
+    return Policy::query()->create([
+        'policy_type' => $type,
+        'version' => '1.0',
+        'title' => $type->defaultTitle(),
+        'intro' => 'What this page covers.',
+        'content' => '## 1. First heading
+
+The first body.
+
+## 2. Second heading
+
+The second body.',
+        'requires_consent' => StatusYes::YES,
+        'status' => StatusPolicy::PUBLISHED,
+        'effective_at' => now(),
+        ...$attributes,
+    ]);
 }
 
 /**

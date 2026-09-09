@@ -8,6 +8,8 @@ Route::livewire('/profile', 'pages::shared.profile')->name('profile');
 // Site Configuration
 Route::livewire('/site-config-set', 'pages::admin.configs.site-config')->name('site-config');
 Route::livewire('/site-config/social-handles', 'pages::admin.configs.social-handles')->name('config.social-handles');
+Route::livewire('/site-config/policies', 'pages::admin.configs.policies')->name('config.policies');
+Route::livewire('/site-config/faqs', 'pages::admin.configs.faqs')->name('config.faqs');
 
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');

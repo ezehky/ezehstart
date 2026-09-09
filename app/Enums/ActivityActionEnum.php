@@ -49,6 +49,17 @@ enum ActivityActionEnum: string
     // Site configuration
     case CONFIG_UPDATE = 'config.update';
 
+    // Legal pages. Publishing is its own case rather than an update: it is the
+    // moment a version becomes the text people are held to, and an audit trail
+    // that cannot tell the two apart is not worth reading.
+    case POLICY_CREATE = 'policy.create';
+    case POLICY_UPDATE = 'policy.update';
+    case POLICY_PUBLISH = 'policy.publish';
+
+    case FAQ_CREATE = 'faq.create';
+    case FAQ_UPDATE = 'faq.update';
+    case FAQ_DELETE = 'faq.delete';
+
     // Methods
 
     /**
@@ -60,16 +71,24 @@ enum ActivityActionEnum: string
         return match ($this) {
             // Create
             self::CREATE,
-            self::USER_CREATE => 'Created new ',
+            self::USER_CREATE,
+            self::POLICY_CREATE,
+            self::FAQ_CREATE => 'Created new ',
 
             // Update
             self::UPDATE,
             self::USER_UPDATE,
-            self::CONFIG_UPDATE => 'Updated ',
+            self::CONFIG_UPDATE,
+            self::POLICY_UPDATE,
+            self::FAQ_UPDATE => 'Updated ',
 
             // Delete
             self::DELETE,
-            self::USER_DELETE => 'Deleted ',
+            self::USER_DELETE,
+            self::FAQ_DELETE => 'Deleted ',
+
+            // Legal
+            self::POLICY_PUBLISH => 'Published ',
 
             // Personal
             self::PASSWORD_RESET_REQUEST => 'Requested a password reset for ',

@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Enums\ActivityActionEnum;
 use App\Enums\NotificationTypeEnum;
 use App\Enums\UserRoleEnum;
+use App\Models\Policy;
 use App\Models\User;
+use App\Models\UserConsent;
 use App\Models\UserProfile;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Facades\Auth;
@@ -66,6 +68,28 @@ class UserService
             ActivityActionEnum::PASSWORD_RESET,
             "Reset {$this->user->name}'s password to {$password}.",
             model: $this->user
+        );
+    }
+
+    /**
+     * Record that a user accepted a policy.
+     *
+     * firstOrCreate rather than create: the unique index already says one consent
+     * per user per version, and a double submit is a thing that happens rather
+     * than an error worth showing somebody. The IP and user agent are what make
+     * the record evidence rather than a claim.
+     */
+    public function recordConsent(Policy $policy, ?User $user = null): UserConsent
+    {
+        $user ??= $this->user;
+
+        return UserConsent::query()->firstOrCreate(
+            ['user_id' => $user->id, 'policy_id' => $policy->id],
+            [
+                'accepted_at' => now(),
+                'ip_address' => request()->ip(),
+                'user_agent' => substr((string) request()->userAgent(), 0, 500),
+            ],
         );
     }
 

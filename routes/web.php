@@ -1,10 +1,22 @@
 <?php
 
+use App\Enums\PolicyTypeEnum;
+use App\Http\Controllers\PolicyPageController;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+// Legal pages. One route per policy type, named after the case, so /terms is
+// route('terms') and adding a case to the enum publishes a page without anything
+// here needing an edit. The type is bound as a route default rather than a URL
+// segment, which keeps the URLs flat and the route names stable.
+foreach (PolicyTypeEnum::cases() as $policyType) {
+    Route::get('/'.$policyType->value, PolicyPageController::class)
+        ->defaults('type', $policyType->value)
+        ->name($policyType->routeName());
+}
 
 // Authentication Routes
 Route::middleware('guest')->group(function (): void {
