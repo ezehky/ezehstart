@@ -38,10 +38,40 @@ used as `icon="google"`.
 | Row action | `<flux:button icon="eye" variant="primary" size="sm" :href="route(…)" wire:navigate title="View profile" />` |
 | Secondary row action | `<flux:button icon="shield-check" variant="filled" size="sm" wire:click="…" title="Manage roles" />` |
 | Kebab menu trigger | `<flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />` |
-| Destructive menu item | `<flux:menu.item icon="trash" variant="danger" wire:confirm="…">Delete</flux:menu.item>` |
+| Destructive menu item | `<flux:menu.item icon="trash" variant="danger" wire:click="confirmDelete({{ $item->id }})">Delete</flux:menu.item>` |
 
 Variants in use: `primary`, `filled`, `ghost`, `danger`, `subtle`.
 Sizes: default and `sm`. Icon-only buttons carry a `title`.
+
+### Confirmations
+
+There is no `wire:confirm` anywhere in this project and no `confirm()` in any script.
+Every destructive action opens `<x-dashboard.confirm-modal>` instead — a Flux dialog
+that can carry the amount, the penalty, or the consequence the browser's own box
+cannot, and that still appears in the in-app browsers that suppress `confirm()`:
+
+```blade
+<x-dashboard.confirm-modal
+    name="deleteModal"
+    title="Delete this thing?"
+    icon="trash"
+    confirm="Delete thing"
+    confirm-icon="trash"
+    wire:click="delete"
+>
+    It is removed for good, and nothing linked to it keeps a copy.
+</x-dashboard.confirm-modal>
+```
+
+Everything after `name` is optional. `variant` and `tone` default to the destructive
+pair (`danger` / `rose`) — a confirmation that is not destructive passes `primary`
+with `sky` or `emerald`. The component closes itself on click, so the action does not
+call `Flux::modal()->close()`.
+
+A single fixed target opens it from the trigger with
+`x-on:click="$flux.modal('deleteModal').show()"`. A row inside a loop cannot: it calls
+a `confirm{Action}(int $id)` that stores the id and opens the modal server-side, and
+the write itself then reads that stored id. See [tables.md](tables.md).
 
 ### Card + heading block
 

@@ -163,8 +163,7 @@ Non-negotiables:
             <flux:menu.item
                 icon="trash"
                 variant="danger"
-                wire:click="delete({{ $item->id }})"
-                wire:confirm="Delete this question? This cannot be undone."
+                wire:click="confirmDelete({{ $item->id }})"
             >
                 Delete
             </flux:menu.item>
@@ -174,7 +173,37 @@ Non-negotiables:
 ```
 
 `position="right" align="start"` on every dropdown. Destructive items are
-`variant="danger"` and **always** carry `wire:confirm`.
+`variant="danger"` and **always** confirm first — the row action opens
+`<x-dashboard.confirm-modal>` rather than deleting outright:
+
+```php
+public ?int $deletingId = null;
+
+public function confirmDelete(int $id): void
+{
+    $this->deletingId = $id;
+
+    Flux::modal('deleteModal')->show();
+}
+
+public function delete(): bool
+{
+    // …reads $this->deletingId, guards it, then deletes.
+}
+```
+
+```blade
+<x-dashboard.confirm-modal
+    name="deleteModal"
+    title="Delete this question?"
+    icon="trash"
+    confirm="Delete question"
+    confirm-icon="trash"
+    wire:click="delete"
+>
+    It stops appearing on the site straight away, and it cannot be undone.
+</x-dashboard.confirm-modal>
+```
 
 ### Empty states — two forms
 
@@ -264,8 +293,10 @@ wire:click="create('{{ $faqType->value }}')"       {{-- enum bound by value, quo
 - `$item` everywhere means the body of any two tables in the project diff cleanly.
 - Actions-last plus the two fixed action shapes means an admin's muscle memory works on
   every screen.
-- `wire:confirm` on destructive items is the only guard between a mis-click and a
-  deleted record — there is no undo.
+- The confirm modal on destructive items is the only guard between a mis-click and a
+  deleted record — there is no undo. It is a Flux dialog rather than `wire:confirm`
+  because the browser's own `confirm()` cannot be styled, cannot carry an amount or a
+  consequence, and is suppressed outright in some in-app browsers.
 - Em dash for empty values keeps column widths stable and makes "no value" visibly
   intentional rather than a rendering bug.
 
@@ -333,7 +364,7 @@ See the block at the top of this file, and the full page template in
 - `@foreach` without `@empty`.
 - A `colspan` that does not match the column count.
 - Actions in a column other than the last.
-- A destructive action without `wire:confirm`.
+- A destructive action without a confirm modal, or one still using `wire:confirm`.
 - `{{ $item->amountMoney() }}` — money needs `{!! !!}` (it returns `&#8358;`).
 - `{{ $item->created_at->format('d/m/Y') }}` — use `createdAtHuman()`.
 - `{{ $item->status->value }}` or a hard-coded badge colour — use `<x-status>`.

@@ -263,13 +263,31 @@ public function save(): bool
 Delete-with-confirm:
 
 ```php
-public function delete(Thing $thing): bool
+public ?int $deletingId = null;
+
+/**
+ * The row the dialog is about. Nothing is deleted until it is confirmed.
+ */
+public function confirmDelete(int $id): void
 {
+    $this->deletingId = $id;
+
+    Flux::modal('deleteModal')->show();
+}
+
+public function delete(): bool
+{
+    $thing = Thing::query()->find($this->deletingId);
+
+    abort_unless((bool) $thing, 404);
+
     $description = " thing: {$thing->name}";
 
     $thing->delete();
 
     app(ActivityLogService::class)->logActivity(ActivityActionEnum::THING_DELETE, $description);
+
+    $this->reset('deletingId');
 
     unset($this->things);
 
@@ -278,14 +296,20 @@ public function delete(Thing $thing): bool
 ```
 
 ```blade
-<flux:menu.item
-    icon="trash"
-    variant="danger"
-    wire:click="delete({{ $item->id }})"
-    wire:confirm="Delete this thing? This cannot be undone."
->
+<flux:menu.item icon="trash" variant="danger" wire:click="confirmDelete({{ $item->id }})">
     Delete
 </flux:menu.item>
+
+<x-dashboard.confirm-modal
+    name="deleteModal"
+    title="Delete this thing?"
+    icon="trash"
+    confirm="Delete thing"
+    confirm-icon="trash"
+    wire:click="delete"
+>
+    It is removed for good, and nothing linked to it keeps a copy.
+</x-dashboard.confirm-modal>
 ```
 
 Toggle-status:

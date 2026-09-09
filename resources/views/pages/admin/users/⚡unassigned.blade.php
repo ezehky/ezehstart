@@ -312,5 +312,5 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" />
+    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
 </div>

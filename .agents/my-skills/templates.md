@@ -528,8 +528,7 @@ new class extends Component
                                     <flux:menu.item
                                         icon="trash"
                                         variant="danger"
-                                        wire:click="delete({{ $item->id }})"
-                                        wire:confirm="Delete this invoice? This cannot be undone."
+                                        wire:click="confirmDelete({{ $item->id }})"
                                     >
                                         Delete
                                     </flux:menu.item>
@@ -973,8 +972,7 @@ Widths: `md:w-96` confirm · `md:w-150` standard form · `md:w-3xl` form with an
                             <flux:menu.item
                                 icon="trash"
                                 variant="danger"
-                                wire:click="delete({{ $item->id }})"
-                                wire:confirm="Delete this? This cannot be undone."
+                                wire:click="confirmDelete({{ $item->id }})"
                             >
                                 Delete
                             </flux:menu.item>

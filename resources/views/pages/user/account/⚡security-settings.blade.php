@@ -307,7 +307,7 @@ new class extends Component
                 <flux:text class="mt-1">Devices currently signed in to your account.</flux:text>
             </div>
             @if ($this->sessions->count() > 1)
-                <flux:button size="sm" variant="danger" wire:click="logoutOtherSessions" wire:confirm="Log out of all other sessions?">
+                <flux:button size="sm" variant="danger" x-on:click="$flux.modal('sessionsModal').show()">
                     Log out other sessions
                 </flux:button>
             @endif
@@ -339,4 +339,16 @@ new class extends Component
             @endforeach
         </ul>
     </flux:card>
+
+    <x-dashboard.confirm-modal
+        name="sessionsModal"
+        title="Log out of all other sessions?"
+        icon="computer-desktop"
+        confirm="Log the others out"
+        cancel="Leave them signed in"
+        wire:click="logoutOtherSessions"
+    >
+        Every device signed in to this account apart from the one you are using now is signed
+        out and has to sign in again. This device stays signed in.
+    </x-dashboard.confirm-modal>
 </div>

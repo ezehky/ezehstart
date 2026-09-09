@@ -247,8 +247,7 @@ new class extends Component
                                     <flux:menu.item
                                         icon="trash"
                                         variant="danger"
-                                        wire:click="delete({{ $item->id }})"
-                                        wire:confirm="Delete this thing? This cannot be undone."
+                                        wire:click="confirmDelete({{ $item->id }})"
                                     >
                                         Delete
                                     </flux:menu.item>
@@ -290,11 +289,22 @@ new class extends Component
             </div>
         </form>
     </flux:modal>
+
+    <x-dashboard.confirm-modal
+        name="deleteModal"
+        title="Delete this thing?"
+        icon="trash"
+        confirm="Delete thing"
+        confirm-icon="trash"
+        wire:click="delete"
+    >
+        It is removed for good, and nothing linked to it keeps a copy.
+    </x-dashboard.confirm-modal>
 </div>
 ```
 
 Modal widths in use: `md:w-150` (standard form), `md:w-3xl` (form with an editor or
-preview), `md:w-96` (confirm).
+preview), `md:w-110` (the confirm modal's own width — callers do not set it).
 
 ---
 

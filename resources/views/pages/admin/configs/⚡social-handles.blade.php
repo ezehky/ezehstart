@@ -20,6 +20,8 @@ new class extends Component
 
     public ?int $editingIndex = null;
 
+    public ?int $deletingIndex = null;
+
     public function mount(): void
     {
         kSetSiteTitle('config', 'social-handles');
@@ -83,11 +85,25 @@ new class extends Component
         );
     }
 
-    public function delete(int $index): bool
+    public function confirmDelete(int $index): void
     {
-        unset($this->socialHandles[$index]);
+        $this->deletingIndex = $index;
+
+        Flux::modal('deleteModal')->show();
+    }
+
+    public function delete(): bool
+    {
+        $this->respondError(
+            'That social handle is no longer there.',
+            if: ! isset($this->socialHandles[$this->deletingIndex]),
+        );
+
+        unset($this->socialHandles[$this->deletingIndex]);
         $this->socialHandles = array_values($this->socialHandles);
         $this->persistSocialHandles();
+
+        $this->reset('deletingIndex');
 
         return $this->respondSuccess('Social handle deleted.');
     }
@@ -140,7 +156,7 @@ new class extends Component
                                 </flux:tooltip>
 
                                 <flux:tooltip content="Delete social handle">
-                                    <flux:button variant="ghost" size="sm" icon="trash" wire:click="delete({{ $index }})" wire:confirm="Delete this social handle?" />
+                                    <flux:button variant="ghost" size="sm" icon="trash" wire:click="confirmDelete({{ $index }})" />
                                 </flux:tooltip>
                             </div>
                         </flux:table.cell>
@@ -190,4 +206,20 @@ new class extends Component
             </div>
         </form>
     </flux:modal>
+
+    <x-dashboard.confirm-modal
+        name="deleteModal"
+        title="Delete this social handle?"
+        icon="trash"
+        confirm="Delete handle"
+        confirm-icon="trash"
+        wire:click="delete"
+    >
+        @php($deleting = $socialHandles[$deletingIndex] ?? null)
+
+        The
+        {{ $deleting ? (SocialHandleEnum::tryFrom($deleting['platform'] ?? '')?->label() ?? $deleting['platform']) : 'social' }}
+        link stops appearing across the site as soon as this is saved. Adding it again means
+        entering the URL afresh.
+    </x-dashboard.confirm-modal>
 </div>

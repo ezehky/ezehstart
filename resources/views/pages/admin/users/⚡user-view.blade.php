@@ -290,8 +290,7 @@ new class extends Component
                 <flux:button
                     :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
                     :variant="$user->status->isActive() ? 'danger' : 'filled'"
-                    wire:click="toggleStatus"
-                    wire:confirm="{{ $user->status->isActive() ? 'Suspend this account?' : 'Reactivate this account?' }}"
+                    x-on:click="$flux.modal('statusModal').show()"
                 >
                     {{ $user->status->isActive() ? 'Suspend' : 'Activate' }}
                 </flux:button>
@@ -459,5 +458,22 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" />
+    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
+
+    <x-dashboard.confirm-modal
+        name="statusModal"
+        :title="$user->status->isActive() ? 'Suspend this account?' : 'Reactivate this account?'"
+        :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
+        :variant="$user->status->isActive() ? 'danger' : 'primary'"
+        :tone="$user->status->isActive() ? 'rose' : 'emerald'"
+        :confirm="$user->status->isActive() ? 'Suspend account' : 'Reactivate account'"
+        wire:click="toggleStatus"
+    >
+        @if ($user->status->isActive())
+            {{ $user->name }} is signed out of every workspace and cannot sign back in until the
+            account is reactivated.
+        @else
+            {{ $user->name }} can sign in again with whatever roles the account still carries.
+        @endif
+    </x-dashboard.confirm-modal>
 </div>

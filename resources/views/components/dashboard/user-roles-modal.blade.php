@@ -1,4 +1,4 @@
-@props(['user' => null, 'matrix' => []])
+@props(['user' => null, 'matrix' => [], 'pending' => null])
 
 <flux:modal name="userRolesModal" class="md:w-135">
     <div class="space-y-6">
@@ -38,8 +38,7 @@
                             icon="minus-circle"
                             class="shrink-0"
                             :disabled="(bool) $entry['blocked']"
-                            wire:click="revokeRole('{{ $entry['role'] }}')"
-                            wire:confirm="Remove the {{ $entry['label'] }} role?"
+                            wire:click="confirmRoleAction('{{ $entry['role'] }}')"
                         >
                             Remove
                         </flux:button>
@@ -50,8 +49,7 @@
                             icon="arrows-right-left"
                             class="shrink-0"
                             :disabled="(bool) $entry['blocked']"
-                            wire:click="switchRole('{{ $entry['role'] }}')"
-                            wire:confirm="Switch this account over to {{ $entry['label'] }}? Its current role is given up."
+                            wire:click="confirmRoleAction('{{ $entry['role'] }}')"
                         >
                             Switch to {{ $entry['label'] }}
                         </flux:button>
@@ -78,3 +76,28 @@
         </div>
     </div>
 </flux:modal>
+
+{{-- Sits beside the roles modal rather than inside it, so the confirmation stacks
+     over a dialog that is still open and the matrix is back the moment it closes. --}}
+@if ($pending)
+    <x-dashboard.confirm-modal
+        name="roleActionModal"
+        :title="$pending['action'] === 'switch'
+            ? 'Switch this account to '.$pending['label'].'?'
+            : 'Remove the '.$pending['label'].' role?'"
+        :icon="$pending['action'] === 'switch' ? 'arrows-right-left' : 'minus-circle'"
+        :variant="$pending['action'] === 'switch' ? 'primary' : 'danger'"
+        :tone="$pending['action'] === 'switch' ? 'sky' : 'rose'"
+        :confirm="$pending['action'] === 'switch' ? 'Switch role' : 'Remove role'"
+        cancel="Leave it as it is"
+        wire:click="applyRoleAction"
+    >
+        @if ($pending['action'] === 'switch')
+            The role this account holds now is given up in exchange. It keeps its data, but the
+            workspace it signs into changes.
+        @else
+            {{ $user?->name ?? 'This account' }} loses access to everything the
+            {{ $pending['label'] }} role opens. It can be granted again later.
+        @endif
+    </x-dashboard.confirm-modal>
+@endif

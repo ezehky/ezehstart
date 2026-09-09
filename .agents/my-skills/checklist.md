@@ -75,7 +75,8 @@ If a line does not apply, it is ✓ by default — but read it first.
       `affectedColumns()` → `save()` → `logActivity()` → close modal → reset →
       `unset()` computed → `return $this->respondSuccess('…')`
 - [ ] ✓ Write methods return `bool` and end in `return $this->respondSuccess(...)`
-- [ ] ✓ Destructive actions carry `wire:confirm="…"`
+- [ ] ✓ Destructive actions confirm through `<x-dashboard.confirm-modal>`, never
+      `wire:confirm` or a browser `confirm()`
 - [ ] ✓ Root Blade element is a single `<div class="space-y-6">` (or a `<form>`)
 
 ## UI

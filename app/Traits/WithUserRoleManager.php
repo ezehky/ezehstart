@@ -13,6 +13,7 @@ use Livewire\Attributes\Computed;
  *
  * @property-read User|null $roleUser
  * @property-read array<int, array{role: string, label: string, description: string, has: bool, blocked: string|null}> $roleMatrix
+ * @property-read array{role: string, label: string, description: string, has: bool, action: string, blocked: string|null}|null $pendingRoleEntry
  */
 trait WithUserRoleManager
 {
@@ -20,11 +21,15 @@ trait WithUserRoleManager
 
     public ?int $roleUserId = null;
 
+    public ?string $pendingRole = null;
+
     public function openRoleManager(User $user): void
     {
         $this->roleUserId = $user->id;
 
-        unset($this->roleUser, $this->roleMatrix);
+        unset($this->roleUser, $this->roleMatrix, $this->pendingRoleEntry);
+
+        $this->reset('pendingRole');
 
         Flux::modal('userRolesModal')->show();
     }
@@ -83,6 +88,43 @@ trait WithUserRoleManager
                 return [...$entry, 'action' => 'grant', 'blocked' => $service->grantBlockedReason($user, $role)];
             })
             ->all();
+    }
+
+    /**
+     * Giving a role up — on its own or as half of a switch — asks first. The row that
+     * was clicked is remembered here rather than carried through the dialog, which
+     * only ever confirms the one action.
+     */
+    public function confirmRoleAction(string $role): void
+    {
+        $this->pendingRole = $role;
+
+        unset($this->pendingRoleEntry);
+
+        Flux::modal('roleActionModal')->show();
+    }
+
+    /**
+     * The matrix row the confirmation is about, re-read rather than trusted: the
+     * action it accepts may have moved on since the modal was opened.
+     *
+     * @return array{role: string, label: string, description: string, has: bool, action: string, blocked: string|null}|null
+     */
+    #[Computed]
+    public function pendingRoleEntry(): ?array
+    {
+        return collect($this->roleMatrix)->firstWhere('role', $this->pendingRole);
+    }
+
+    public function applyRoleAction(): bool
+    {
+        $entry = $this->pendingRoleEntry;
+
+        abort_unless((bool) $entry, 404);
+
+        return $entry['action'] === 'switch'
+            ? $this->switchRole($entry['role'])
+            : $this->revokeRole($entry['role']);
     }
 
     public function switchRole(string $role): bool
@@ -152,7 +194,9 @@ trait WithUserRoleManager
 
     private function refreshRoleState(): void
     {
-        unset($this->roleUser, $this->roleMatrix);
+        unset($this->roleUser, $this->roleMatrix, $this->pendingRoleEntry);
+
+        $this->reset('pendingRole');
 
         $this->afterRoleChange();
     }
