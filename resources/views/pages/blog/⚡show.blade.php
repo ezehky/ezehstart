@@ -75,7 +75,7 @@ new #[Layout('layouts::site')] class extends Component
 
         {{-- The body is sanitised on the way in by BlogService::sanitize(), which
              is what makes rendering it unescaped here safe. --}}
-        <div class="prose prose-slate dark:prose-invert max-w-none">
+        <div class="rich-prose max-w-none">
             {!! $post->content !!}
         </div>
 

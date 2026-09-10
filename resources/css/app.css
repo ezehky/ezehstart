@@ -253,6 +253,87 @@
         @apply font-medium text-slate-800 dark:text-slate-200;
     }
 
+    /* Rich-text (tiptap) output — the editor surface in <x-form.rich-text> and the
+       rendered post body. The HTML comes from the editor, so it carries no utility
+       classes of its own, and Tailwind's preflight flattens headings, lists and
+       quotes down to plain paragraphs unless they are styled back here. This is
+       what @tailwindcss/typography's `prose` would do; the plugin is deliberately
+       not a dependency of this kit. */
+    .rich-prose > * + * {
+        @apply mt-4;
+    }
+    .rich-prose p,
+    .rich-prose li {
+        @apply text-[15px] leading-relaxed text-slate-600 dark:text-slate-400;
+    }
+    .rich-prose h2 {
+        @apply mt-8 font-heading text-xl font-semibold text-slate-900 dark:text-white;
+    }
+    .rich-prose h3 {
+        @apply mt-8 font-heading text-lg font-semibold text-slate-900 dark:text-white;
+    }
+    .rich-prose h4 {
+        @apply mt-6 font-heading text-base font-semibold text-slate-900 dark:text-white;
+    }
+    .rich-prose strong {
+        @apply font-semibold text-slate-800 dark:text-slate-200;
+    }
+    .rich-prose em {
+        @apply italic;
+    }
+    .rich-prose s {
+        @apply line-through;
+    }
+    .rich-prose u {
+        @apply underline underline-offset-2;
+    }
+    .rich-prose a {
+        @apply font-medium text-lime-700 underline underline-offset-2 transition-colors hover:text-lime-800 dark:text-lime-300 dark:hover:text-lime-200;
+    }
+    .rich-prose ul,
+    .rich-prose ol {
+        @apply mt-5 space-y-2.5 ps-5;
+    }
+    .rich-prose ul {
+        @apply list-disc marker:text-lime-500 dark:marker:text-lime-400;
+    }
+    .rich-prose ol {
+        @apply list-decimal marker:text-slate-400;
+    }
+    .rich-prose li p {
+        @apply mt-0;
+    }
+    .rich-prose li > ul,
+    .rich-prose li > ol {
+        @apply mt-2.5;
+    }
+    .rich-prose blockquote {
+        @apply border-s-2 border-lime-400 ps-4 italic;
+    }
+    .rich-prose code {
+        @apply rounded-md bg-slate-100 px-1.5 py-0.5 text-sm dark:bg-white/10;
+    }
+    .rich-prose pre {
+        @apply overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100 dark:bg-black/40;
+    }
+    /* A <code> inside <pre> is the code block's own text, not an inline span. */
+    .rich-prose pre code {
+        @apply bg-transparent p-0 text-inherit dark:bg-transparent;
+    }
+    .rich-prose img {
+        @apply rounded-xl;
+    }
+    .rich-prose hr {
+        @apply my-8 border-slate-200 dark:border-white/10;
+    }
+
+    /* tiptap's Placeholder extension marks the empty first node; without a rule
+       the placeholder text never renders. */
+    .rich-prose p.is-editor-empty:first-child::before {
+        @apply pointer-events-none float-left h-0 text-slate-400 dark:text-slate-500;
+        content: attr(data-placeholder);
+    }
+
     .container {
         @apply px-3 sm:px-0 mx-auto;
     }

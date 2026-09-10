@@ -54,7 +54,7 @@
 
             <flux:separator vertical class="mx-1 h-5" />
 
-            <flux:button size="xs" type="button" icon="link" x-bind:variant="active.link ? 'primary' : 'ghost'" x-on:click="toggleLink()" />
+            <flux:button size="xs" type="button" icon="link" x-bind:variant="active.link || linkOpen ? 'primary' : 'ghost'" x-on:click="openLink()" />
 
             {{-- Opens the library picker. The picker dispatches a URL back, so
                  the editor never talks to the upload endpoint itself. --}}
@@ -62,6 +62,32 @@
 
             <flux:button size="xs" type="button" icon="arrow-uturn-left" variant="ghost" x-on:click="run('undo')" />
             <flux:button size="xs" type="button" icon="arrow-uturn-right" variant="ghost" x-on:click="run('redo')" />
+        </div>
+
+        {{-- The link bar. It lives in the toolbar rather than in a prompt() so the
+             URL can be corrected, dismissed with Escape, and styled with the rest
+             of the form. --}}
+        <div
+            x-cloak
+            x-show="linkOpen"
+            x-on:keydown.escape.stop="closeLink()"
+            class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800"
+        >
+            <flux:input
+                size="sm"
+                type="text"
+                x-ref="linkInput"
+                x-model="linkUrl"
+                placeholder="https://example.com"
+                x-on:keydown.enter.prevent.stop="applyLink()"
+                class="flex-1"
+            />
+
+            <flux:button size="xs" type="button" variant="primary" x-on:click="applyLink()">Apply</flux:button>
+
+            <flux:button size="xs" type="button" variant="ghost" x-show="active.link" x-on:click="removeLink()">Remove</flux:button>
+
+            <flux:button size="xs" type="button" variant="ghost" icon="x-mark" x-on:click="closeLink()" />
         </div>
 
         <div x-ref="editor"></div>
