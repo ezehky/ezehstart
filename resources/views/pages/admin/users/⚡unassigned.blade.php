@@ -35,6 +35,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('users', 'unassigned');
+        kPageGate('users.unassigned');
     }
 
     public function updatedSearch(): void

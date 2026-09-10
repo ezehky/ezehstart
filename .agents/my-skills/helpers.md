@@ -87,12 +87,20 @@ plain-text email subject, an aria-label, JSON).
 | `kSiteFlag` | `(string $group, string $key, mixed $default = false)` | Read an on/off switch out of a config group |
 | `kStoreComparePrice` | `(float $price, ?float $compare_price = 0): float` | Returns the higher of the two |
 
+### Gates — see [gates.md](gates.md)
+
+| Function | Signature | Notes |
+| --- | --- | --- |
+| `kGate` | `(string $resource, GateAccessEnum\|string $level = VIEW, ?User $user = null): bool` | May this account reach the screen, at least this far? Ask for the **lowest** level you need |
+| `kGateAccess` | `(string $resource, ?User $user = null): GateAccessEnum` | The level itself, for a screen that renders differently at each one |
+| `kPageGate` | `(string $resource, GateAccessEnum\|string $required = VIEW): void` | **Call in every admin `mount()`**, next to `kSetSiteTitle()`. Aborts 404. No-ops off an `admin.*` route |
+
 ### `navigations.php`
 
 | Function | Purpose |
 | --- | --- |
 | `kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $grouped = false): array` | **The sidebar tree.** Add new pages here |
-| `kNavigationStrictAction(array $construct): array` | Filters the tree by admin page access |
+| `kNavigationStrictAction(array $construct, string $key = ''): array` | Filters the tree by `check` keys and, for `'admin'`, by gates |
 | `kCheckActiveTitle(string $page, bool $checkParent = true, string $pageTitle = ''): bool` | Sidebar highlight, by comparing slugged title segments |
 | `kSetSiteTitle(string $parent, ?string $child = null, ?string $grandchild = null, ?string $print = null, ?string $subtitle = null, bool $format = true): void` | **Call in every `mount()`** |
 | `kSetMetaData(...$rest): void` | SEO / OG metadata |

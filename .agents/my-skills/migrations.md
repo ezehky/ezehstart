@@ -169,8 +169,31 @@ Separate migration, descriptive name, real `down()`:
 ### Indexes
 
 Index every column that appears in a `where`, `orderBy`, or filter:
-enum/type columns, foreign keys (automatic with `constrained()`), `last_activity`.
-Composite uniqueness for "once per parent" rules:
+enum/type columns, `last_activity`.
+
+**Declare a single-column index or unique on the column, not as a separate statement.**
+
+```php
+$table->string('slug')->unique();        // yes
+$table->unique(['slug']);                // no — same index, two lines, reads as composite
+$table->string('faq_type')->index();     // yes
+$table->index('faq_type');               // no
+```
+
+The array form is for composites and nothing else. Written on one column it produces
+exactly the same index while reading like the start of a multi-column key somebody
+forgot to finish.
+
+**Never index a foreign key by hand.** `foreignId()->constrained()` creates the index
+along with the constraint, so a second one is a duplicate the database still has to
+maintain on every write:
+
+```php
+$table->foreignId('user_id')->constrained()->cascadeOnDelete();   // indexed already
+$table->index('user_id');                                          // no — duplicate
+```
+
+Composite uniqueness is the one place the array form belongs — "once per parent" rules:
 
 ```php
 $table->unique(['class_session_id', 'reminder']);

@@ -44,7 +44,7 @@ class SocialAuthController extends Controller
         } catch (\Throwable $e) {
             // A cancelled consent screen lands here too, so this is not
             // necessarily an error worth alarming anybody about.
-            Log::channel('code')->warning('Social sign-in failed: '.$e->getMessage(), [
+            Log::channel('ezeh')->warning('Social sign-in failed: '.$e->getMessage(), [
                 'provider' => $case->value,
             ]);
 

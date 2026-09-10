@@ -172,7 +172,7 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
     }
     // RESOLVE STRICT MODE
     if ($strict) {
-        $output = kNavigationStrictAction($output);
+        $output = kNavigationStrictAction($output, $key);
     }
 
     // RETURN OUTPUT
@@ -187,14 +187,24 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
  * site-config switch hides its own menu entry. A parent with no surviving children
  * disappears with them, so the sidebar never shows an empty group.
  *
+ * In the admin workspace a branch also disappears when the signed-in account has no
+ * gate over it. This is the *same* question `UserService::pageAccess()` asks on the
+ * way into the page, which is what stops a page being visible but forbidden, or
+ * reachable but hidden. It is a courtesy, not the boundary: hiding a link protects
+ * nothing on its own, so the page still refuses the request itself.
+ *
  * @param  array  $construct  The navigation structure.
+ * @param  string  $key  The navigation set being filtered. Only 'admin' is gated.
  * @return array Filtered navigation links.
  */
-function kNavigationStrictAction(array $construct): array
+function kNavigationStrictAction(array $construct, string $key = ''): array
 {
     if (! $construct) {
         return [];
     }
+    // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // GATES ONLY APPLY TO THE ADMIN WORKSPACE, AND ONLY TO A SIGNED-IN ACCOUNT.
+    $gated = $key === 'admin' && auth()->check();
     // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     $output = [];
     // |||
@@ -206,6 +216,14 @@ function kNavigationStrictAction(array $construct): array
         // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         // ASSIGN CHILDREN
         $children = data_get($item, 'children');
+
+        // RESOLVE GATE. Only a leaf answers for itself. A branch is decided by its
+        // children — it survives if any of them do, which the empty-children check
+        // further down is what enforces. Gating the branch here as well would hide a
+        // group whose child was granted on its own.
+        if ($gated && ! $children && ! kGate($index)) {
+            continue;
+        }
 
         // ASSIGN LINK
         $link = data_get($item, 'link');
@@ -222,7 +240,12 @@ function kNavigationStrictAction(array $construct): array
         // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         // CHILDREN
         if ($children) {
-            foreach ($children as $key => $child) {
+            // REBUILT RATHER THAN FILTERED IN PLACE: a child that fails its check or
+            // its gate has to actually leave the array. Skipping over it only misses
+            // the spa and active keys — the entry itself would still be rendered.
+            $item['children'] = [];
+
+            foreach ($children as $childKey => $child) {
                 // RESOLVE EMPTY LINKS AND CHILD CHECK KEY
                 if (
                     ! data_get($child, 'check', true) ||
@@ -231,14 +254,21 @@ function kNavigationStrictAction(array $construct): array
                     continue;
                 }
 
+                // RESOLVE CHILD GATE
+                if ($gated && ! kGate("{$index}.{$childKey}")) {
+                    continue;
+                }
+
                 // RESOLVE CHILD SPA
-                $item['children'][$key]['spa'] = data_get($child, 'spa', true);
+                $child['spa'] = data_get($child, 'spa', true);
 
                 // RESOLVE CHILD ACTIVE LINK
-                $item['children'][$key]['active'] = $item['active'] && kCheckActiveTitle($key, false);
+                $child['active'] = $item['active'] && kCheckActiveTitle($childKey, false);
+
+                $item['children'][$childKey] = $child;
             }
             // CHECK IF CHILDREN IS EMPTY
-            if (! data_get($item, 'children')) {
+            if (! $item['children']) {
                 continue;
             }
         }

@@ -14,7 +14,7 @@ Authorization is four layers:
 | Layer | Mechanism | Guards |
 | --- | --- | --- |
 | 1. Workspace | Role middleware in `bootstrap/app.php` | Can this user reach `/app-splash` at all? |
-| 2. Page | `UserService::pageAccess()` + the sidebar filter | Can this admin see *this* admin page? |
+| 2. Page | `kPageGate()` + the sidebar filter — see [gates.md](gates.md) | Can this admin see *this* admin page, and how far in? |
 | 3. Record | `abort_unless(...)` in `mount()` / actions | Does this record belong to this user / parent? |
 | 4. Action | Model `can*()` + service `*BlockedReason()` + trait `ensure*()` | Is this write allowed *right now*? |
 
@@ -26,36 +26,44 @@ See [middleware.md](middleware.md). `abort_unless($user->hasRole($role), 404)`.
 
 ### Layer 2 — admin page access
 
-Admins carry a JSON `access` map on their admin role.
+**Gates.** Roles carry a JSON `gates` map keyed by navigation key; an individual
+administrator may override single keys on their role assignment. Full treatment in
+[gates.md](gates.md) — this is the short version.
+
+One line in `mount()`, next to the title:
 
 ```php
-public function pageAccess(string $parent, ?string $child = null, bool $setTitle = true, bool $redirect = true)
+public function mount(): void
 {
-    $admin = auth()->user();
-    $pageLinks = $admin->adminRole->access;
-
-    $parentCheck = (! $child and data_get($pageLinks, kSlug($parent)));
-    $childCheck = ($child and data_get($pageLinks, kSlug($parent).'.'.kSlug($child)));
-
-    // CONDITIONS: admin is executive pass || the rest
-    $hasAccess = $admin->isExecutive() || $parentCheck || $childCheck;
-
-    if ($redirect and ! $hasAccess) {
-        return to_route('admin.profile')
-            ->with('accessDenied', 'Your to this page was denied! Contact admin for more information.');
-    }
-
-    if ($hasAccess and $setTitle) {
-        kSetSiteTitle($parent, $child);
-    }
-
-    return $hasAccess;
+    kSetSiteTitle('users', 'roles');
+    kPageGate('users.roles');
 }
 ```
 
-The **same** function filters the sidebar, called with `redirect: false,
-setTitle: false` from `kNavigationStrictAction()` — so a page a user cannot open is
-also a page they cannot see.
+```php
+// app/Helpers/helper-functions.php
+function kPageGate(string $resource, GateAccessEnum|string $required = GateAccessEnum::VIEW): void
+{
+    if (! request()->routeIs('admin.*')) {
+        return;
+    }
+
+    abort_unless(kGate($resource, $required), 404);
+}
+```
+
+The sidebar reads the **same** gate through `kGate()` inside
+`kNavigationStrictAction()` — so a page a user cannot open is also a page they cannot
+see, because both are asking one question of one stored value.
+
+A 404 rather than a redirect-with-a-message, for the reason at the bottom of this file:
+the shape of the admin surface stays private.
+
+Access has a level as well as a yes/no, so the same gate answers the delete button too:
+
+```php
+kGate('content.blogs', GateAccessEnum::FULL)
+```
 
 ### Layer 3 — record ownership
 
@@ -179,8 +187,8 @@ required.
   the state lives.
 - The `?string` reason contract lets one sentence serve as both the disabled-button
   tooltip and the refusal toast — a Policy's `bool` return cannot carry that.
-- Sharing `pageAccess()` between the router-side check and the sidebar builder means a
-  page can never be visible-but-forbidden or accessible-but-hidden.
+- Sharing one gate map between the page guard and the sidebar builder means a page can
+  never be visible-but-forbidden or accessible-but-hidden.
 - 404 rather than 403 keeps the shape of the admin surface private.
 
 ## Example

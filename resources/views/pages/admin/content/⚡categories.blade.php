@@ -40,6 +40,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle($this->category_group->parentTitle(), 'categories');
+        kPageGate('content.categories');
     }
 
     /**

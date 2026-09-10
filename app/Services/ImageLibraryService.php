@@ -531,7 +531,7 @@ class ImageLibraryService
         try {
             ImageOptimizer::optimize(Storage::disk('public')->path($path));
         } catch (\Throwable $e) {
-            Log::channel('code')->warning('Image optimisation skipped: '.$e->getMessage(), [
+            Log::channel('ezeh')->warning('Image optimisation skipped: '.$e->getMessage(), [
                 'path' => $path,
             ]);
         }

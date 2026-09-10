@@ -177,7 +177,7 @@ try {
     return $user;
 } catch (\Throwable $e) {
     // Log the error for debugging purposes
-    Log::channel('code')->error('Error creating user: '.$e->getMessage(), [
+    Log::channel('ezeh')->error('Error creating user: '.$e->getMessage(), [
         'exception' => $e,
         'data' => $data,
     ]);
@@ -398,7 +398,7 @@ class InvoiceService
                 return $invoice;
             });
         } catch (\Throwable $exception) {
-            Log::channel('code')->error('Error issuing invoice: '.$exception->getMessage(), [
+            Log::channel('ezeh')->error('Error issuing invoice: '.$exception->getMessage(), [
                 'exception' => $exception,
                 'user_id' => $user->id,
             ]);

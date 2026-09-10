@@ -16,6 +16,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('role_id')->constrained()->cascadeOnDelete();
+            // The per-administrator override, in the same shape as roles.gates.
+            // Null is the normal state and means "inherit the role" — an empty
+            // array does not, it means somebody deliberately took every gate away.
+            // Only keys present here override; the rest still come from the role.
+            $table->json('gates')->nullable();
             $table->boolean('status')->default(StatusDefault::ACTIVE);
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

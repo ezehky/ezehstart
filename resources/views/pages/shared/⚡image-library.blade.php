@@ -19,6 +19,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'image-library');
+        kPageGate('content.image-library');
     }
 
     /**

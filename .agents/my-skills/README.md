@@ -106,6 +106,7 @@ This is a **starter kit**, not an application: authentication, roles, two worksp
 | [auth.md](auth.md) | Anything touching sign-in, roles, or consent |
 | [middleware.md](middleware.md) | Workspace access |
 | [policies.md](policies.md) | Authorization — **without** Laravel Policies |
+| [gates.md](gates.md) | Which admin screens a role or an administrator may open, and how far in |
 | [notifications.md](notifications.md) | Toasts, flashes, bell notifications, admin queues |
 | [mail.md](mail.md) | Sending email |
 | [commands.md](commands.md) | Artisan commands and the schedule |

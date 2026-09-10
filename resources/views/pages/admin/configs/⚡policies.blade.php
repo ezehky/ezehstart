@@ -41,6 +41,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'policies');
+        kPageGate('config.policies');
     }
 
     /**

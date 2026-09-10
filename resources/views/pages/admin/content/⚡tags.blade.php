@@ -37,6 +37,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'tags');
+        kPageGate('content.tags');
     }
 
     #[Computed]

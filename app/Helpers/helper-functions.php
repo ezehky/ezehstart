@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Models\User;
+use App\Services\GateService;
 use App\Services\SiteConfigurationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -244,6 +246,79 @@ if (! function_exists('kSiteFlag')) {
         return \is_array($values) && \array_key_exists($key, $values)
             ? $values[$key]
             : $default;
+    }
+}
+
+if (! function_exists('kGate')) {
+    /**
+     * May this account reach $resource, at least as far as $level?
+     *
+     * $resource is a navigation key — 'content', or 'users.roles' for a child. A
+     * child with no gate of its own inherits its parent's, so asking for the child
+     * is always safe.
+     *
+     * Ask for the *lowest* level the caller needs: a listing asks for VIEW, the
+     * delete button asks for FULL. An account with more than it was asked for passes.
+     *
+     * @param  string  $resource  The navigation key being guarded.
+     * @param  GateAccessEnum|string  $level  The minimum access the caller needs.
+     * @param  User|null  $user  Defaults to the signed-in account.
+     */
+    function kGate(string $resource, GateAccessEnum|string $level = GateAccessEnum::VIEW, ?User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $level = $level instanceof GateAccessEnum
+            ? $level
+            : (GateAccessEnum::tryFrom($level) ?? GateAccessEnum::VIEW);
+
+        return app(GateService::class)->allows($user, $resource, $level);
+    }
+}
+
+if (! function_exists('kGateAccess')) {
+    /**
+     * How far this account may go inside $resource, rather than a yes/no.
+     *
+     * For a screen that renders the same page differently at each level — read-only
+     * at VIEW, with an Add button at CREATE — one call here beats three kGate() calls.
+     */
+    function kGateAccess(string $resource, ?User $user = null): GateAccessEnum
+    {
+        $user ??= auth()->user();
+
+        return $user instanceof User
+            ? app(GateService::class)->accessFor($user, $resource)
+            : GateAccessEnum::NONE;
+    }
+}
+
+if (! function_exists('kPageGate')) {
+    /**
+     * Guard an admin screen. Call it in mount(), next to kSetSiteTitle().
+     *
+     * A 404 rather than a 403, for the same reason the workspace middleware returns
+     * one: the shape of the admin surface is not something a refused account gets to
+     * map. The sidebar hides what it hides as a courtesy — this is the boundary.
+     *
+     * Non-admin routes pass straight through. The image and video libraries are the
+     * same screen in both workspaces, so the decision has to come from the route that
+     * reached it, not from the roles the account happens to carry.
+     *
+     * @param  string  $resource  The navigation key this screen sits under.
+     * @param  GateAccessEnum|string  $required  The minimum access needed to open it.
+     */
+    function kPageGate(string $resource, GateAccessEnum|string $required = GateAccessEnum::VIEW): void
+    {
+        if (! request()->routeIs('admin.*')) {
+            return;
+        }
+
+        abort_unless(kGate($resource, $required), 404);
     }
 }
 

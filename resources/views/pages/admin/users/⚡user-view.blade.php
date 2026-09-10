@@ -5,8 +5,11 @@ use App\Enums\StatusUser;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Models\UserRole;
 use App\Services\ActivityLogService;
+use App\Services\GateService;
 use App\Services\UserService;
+use App\Traits\WithGateManager;
 use App\Traits\WithUserRoleManager;
 use Flux\Flux;
 use Illuminate\Support\Collection;
@@ -16,7 +19,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithUserRoleManager;
+    use WithGateManager, WithUserRoleManager;
 
     public User $user;
 
@@ -41,6 +44,7 @@ new class extends Component
         $this->roleUserId = $this->user->id;
 
         kSetSiteTitle('users', $this->listKey(), $this->user->name, format: false);
+        kPageGate('users');
     }
 
     #[Computed]
@@ -53,6 +57,67 @@ new class extends Component
     public function isAdminAccount(): bool
     {
         return $this->roles->contains(UserRoleEnum::ADMIN);
+    }
+
+    /**
+     * The live admin-role assignment, which is what an access override hangs off.
+     *
+     * Null for an account that is not an administrator — there is nothing to override
+     * a member's access over, because members have no gated workspace.
+     */
+    #[Computed]
+    public function adminAssignment(): ?UserRole
+    {
+        return $this->user->userRoles()
+            ->isActive()
+            ->whereHas('role', fn ($role) => $role->isAdmin())
+            ->with('role')
+            ->first();
+    }
+
+    /**
+     * Every gate with the level this account actually ends up at, and whether that
+     * level came from the role or from an override on the account.
+     *
+     * @return array<int, array{label: string, child: bool, level: GateAccessEnum, overridden: bool}>
+     */
+    #[Computed]
+    public function gateSummary(): array
+    {
+        if (! $assignment = $this->adminAssignment) {
+            return [];
+        }
+
+        $service = app(GateService::class);
+        $overrides = $assignment->gatesArray();
+        $rows = [];
+
+        foreach ($service->resources() as $key => $resource) {
+            $rows[] = [
+                'label' => $resource['label'],
+                'child' => false,
+                'level' => $service->accessFor($this->user, $key),
+                'overridden' => \array_key_exists($key, $overrides),
+            ];
+
+            foreach ($resource['children'] as $childKey => $label) {
+                $rows[] = [
+                    'label' => $label,
+                    'child' => true,
+                    'level' => $service->accessFor($this->user, $childKey),
+                    'overridden' => \array_key_exists($childKey, $overrides),
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    protected function afterGateChange(): void
+    {
+        $this->user->refresh()->load(['userRoles.role', 'userProfile']);
+
+        unset($this->adminAssignment, $this->gateSummary, $this->activityLogs);
     }
 
     /**
@@ -232,6 +297,8 @@ new class extends Component
             $this->roles,
             $this->isAdminAccount,
             $this->activityLogs,
+            $this->adminAssignment,
+            $this->gateSummary,
         );
     }
 };
@@ -368,6 +435,64 @@ new class extends Component
                 @endif
             </flux:card>
 
+            {{-- Workspace access. Only an administrator has any: a member's workspace
+                 is not gated, so there would be nothing on this card to show. --}}
+            @if ($this->adminAssignment)
+                <flux:card class="space-y-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <flux:heading level="2" size="lg">Workspace access</flux:heading>
+                            <flux:text class="mt-1 text-sm">
+                                Which admin screens this account reaches, and how far it may go inside them.
+                            </flux:text>
+                        </div>
+                        <flux:button
+                            variant="ghost"
+                            size="sm"
+                            icon="pencil-square"
+                            wire:click="openAdminGates({{ $this->adminAssignment->id }})"
+                            aria-label="Edit workspace access"
+                        />
+                    </div>
+
+                    @unless ($this->adminAssignment->gates)
+                        <flux:text class="text-xs">
+                            Following the {{ $this->adminAssignment->role?->name?->label() }} role throughout.
+                        </flux:text>
+                    @endunless
+
+                    <dl class="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+                        @foreach ($this->gateSummary as $row)
+                            <div @class([
+                                'flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0',
+                                'ps-4' => $row['child'],
+                            ])>
+                                <dt @class([
+                                    'truncate',
+                                    'font-medium text-slate-700 dark:text-slate-200' => ! $row['child'],
+                                    'text-slate-500 dark:text-slate-400' => $row['child'],
+                                ])>
+                                    {{ $row['label'] }}
+                                </dt>
+                                <dd class="flex shrink-0 items-center gap-1.5">
+                                    @if ($row['overridden'])
+                                        <flux:badge size="sm" color="purple">Override</flux:badge>
+                                    @endif
+
+                                    @if ($row['level']->isNone())
+                                        <flux:badge size="sm" color="zinc">No access</flux:badge>
+                                    @else
+                                        <flux:badge size="sm" :color="$row['level']->isFull() ? 'green' : 'blue'">
+                                            {{ $row['level']->label() }}
+                                        </flux:badge>
+                                    @endif
+                                </dd>
+                            </div>
+                        @endforeach
+                    </dl>
+                </flux:card>
+            @endif
+
             {{-- Permissions --}}
             <flux:card class="space-y-4">
                 <div class="flex items-start justify-between gap-4">
@@ -459,6 +584,13 @@ new class extends Component
     </flux:modal>
 
     <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
+
+    <x-dashboard.gates-modal
+        admin
+        :rows="$gateRows"
+        :inheritance="$this->gateInheritance"
+        :subject="$user->name"
+    />
 
     <x-dashboard.confirm-modal
         name="statusModal"

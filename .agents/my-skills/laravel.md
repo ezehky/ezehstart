@@ -70,7 +70,9 @@ you pass constructor arguments.
 - `casts()` method, enum casts on every status/type column.
 - `#[Scope]` attribute scopes.
 - `MoneyCast` / `TimeCast` for money and time-of-day.
-- `AsArrayObject` for mutable JSON.
+- `AsArrayObject` for **every** JSON column (`AsCollection` for a list you filter or
+  map over). Never `'array'` or `'json'` — those return a fresh copy per access, so a
+  write into one is dropped in silence.
 - Route binding by `slug` / `reference`.
 - No observers, no `booted()`, no global scopes.
 
@@ -106,14 +108,20 @@ static $construct = null;
 ### Logging
 
 ```php
-Log::channel('code')->error('Error creating user: '.$e->getMessage(), ['exception' => $e, 'data' => $data]);
-Log::channel('code')->error('Class reminder failed to queue', ['class_session_id' => $session->id, …]);
+Log::channel('ezeh')->error('Error creating user: '.$e->getMessage(), ['exception' => $e, 'data' => $data]);
+Log::channel('ezeh')->error('Class reminder failed to queue', ['class_session_id' => $session->id, …]);
 Log::channel($vendor->value)->error("{$vendor->label()}: Transaction verification failed.", […]);
 ```
 
-Always with a context array. Application errors go to the `code` channel
-(`storage/logs/code.log`). Only the surfaces with a channel of their own opt out:
+Always with a context array. Application errors go to the **`ezeh`** channel
+(`storage/logs/ezeh.log`). Only the surfaces with a channel of their own opt out:
 site configuration writes to `site-config`, payment vendors to their vendor channel.
+
+**Every channel you name must exist in `config/logging.php`.** `Log::channel()` throws
+`InvalidArgumentException` on a name it does not know, so a typo turns a line that was
+supposed to record a failure into a second failure on top of it — inside the `catch`
+block that was handling the first. Check the channel list before inventing a name; the
+project ships `ezeh` and `site-config` and nothing else of its own.
 
 ### Storage
 

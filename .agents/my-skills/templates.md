@@ -298,7 +298,7 @@ class InvoiceService
                 ]);
             });
         } catch (\Throwable $exception) {
-            Log::channel('code')->error('Error issuing invoice: '.$exception->getMessage(), [
+            Log::channel('ezeh')->error('Error issuing invoice: '.$exception->getMessage(), [
                 'exception' => $exception,
                 'user_id' => $user->id,
             ]);

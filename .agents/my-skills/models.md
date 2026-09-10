@@ -50,8 +50,25 @@ class User extends Authenticatable
 ### `casts()`
 
 Always the method form. Every status/type column casts to its enum. Money casts to
-`MoneyCast`. JSON casts to `AsArrayObject` (or `'array'`/`'json'` where mutation is not
-needed).
+`MoneyCast`.
+
+**A `json` column casts to `AsArrayObject::class`, never to `'array'` or `'json'`.**
+`AsCollection::class` is the alternative where the value is a *list* the code wants to
+`filter`/`map`/`pluck` over; everything else takes `AsArrayObject`. This project uses
+`AsArrayObject` throughout — `ActivityLog::original`, `ActivityLog::changes`,
+`UserProfile::settings`, `TransactionMeta::content`, `Role::gates`, `UserRole::gates`.
+
+The reason is not style. `'array'` decodes to a **new array on every access**, so
+writing into it silently does nothing:
+
+```php
+$model->options['theme'] = 'dark';   // 'array'          → discarded, model stays clean
+$model->options['theme'] = 'dark';   // AsArrayObject    → written, model is dirty
+```
+
+There is no error and no warning. The value is simply not saved, which surfaces later
+as a bug report about a setting that will not stick. `AsArrayObject` returns a mutable
+object the model keeps hold of, so the write lands and `isDirty()` sees it.
 
 ```php
 protected function casts(): array
@@ -67,6 +84,26 @@ protected function casts(): array
     ];
 }
 ```
+
+**Reading one back out.** The cast returns an `ArrayObject`, not an array, and that
+difference bites in three places — spreading (`[...$model->options]`), `count()`, and
+`empty()`/truthiness, where *any* object is truthy however little it holds. Where a
+model's JSON is merged or counted in more than one place, give it a getter and convert
+there once:
+
+```php
+// Getters
+
+/**
+ * The stored map as a plain array, for the callers that merge or count it.
+ */
+public function gatesArray(): array
+{
+    return $this->gates?->toArray() ?? [];
+}
+```
+
+Assigning is unchanged — hand it a plain array and the cast encodes it.
 
 `User` adds framework casts:
 
@@ -259,13 +296,24 @@ audit or restore, and add `$table->softDeletes()` to the migration.
 
 ### Slugs
 
-Slugs are generated in the **page**, not the model, with `kSlug()`:
+Slugs are generated in the **page**, not the model, with `kSlug()`, and only when the
+name they are derived from actually changed:
 
 ```php
-$this->training->slug = kSlug($this->training->name);
+// If the name changed, the slug has to follow it.
+if ($this->category->isDirty('name')) {
+    $this->category->slug = kSlug($this->name);
+}
 ```
 
 Route binding then uses `{training:slug}`. The column is `->unique()`.
+
+The `isDirty()` guard is the point: rewriting the slug on every save churns the URL of
+a record whose name nobody touched, and any link already pointing at it breaks.
+
+A slug is **not a form field**. Nothing binds `wire:model` to it and nothing validates
+it, unless a screen is deliberately built to let somebody choose their own — which is
+the developer's call to make, not the default.
 
 ## Why
 

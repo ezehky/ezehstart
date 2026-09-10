@@ -25,6 +25,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'social-handles');
+        kPageGate('config.social-handles');
 
         $this->socialHandles = app(SiteConfigurationService::class)
             ->getConfigs('social-handles', default: [], raw: true);

@@ -22,6 +22,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('users', 'members');
+        kPageGate('users.members');
     }
 
     public function updatedSearch(): void

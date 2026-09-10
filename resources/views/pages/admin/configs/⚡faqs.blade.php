@@ -38,6 +38,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'faqs');
+        kPageGate('config.faqs');
     }
 
     /**

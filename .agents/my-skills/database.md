@@ -50,9 +50,19 @@ Index anything filtered, sorted, or joined on:
 
 - every enum/type column the admin filters by — `transaction_type`,
   `transaction_group`, `transaction_wallet`, `via`, `faq_type`
-- `constrained()` foreign keys (automatic)
 - `sessions.last_activity`
 - composite uniques that guard concurrency
+
+Two rules about **how** to declare one:
+
+- **On the column, not as a separate statement** — `$table->string('slug')->unique()`,
+  never `$table->unique(['slug'])`. The array form is for composites; on one column it
+  builds the same index while reading like an unfinished composite key.
+- **Foreign keys are already indexed.** `constrained()` creates the index with the
+  constraint. Adding `$table->index('user_id')` next to it is a duplicate index the
+  database maintains on every insert, update and delete for nothing.
+
+See [migrations.md](migrations.md) for the examples.
 
 ### Timestamps
 
@@ -117,19 +127,33 @@ Never the MySQL `enum` type.
 ```php
 $table->json('community_links')->nullable();     // AsArrayObject
 $table->json('settings')->nullable();            // user profile preferences
-$table->json('access')->nullable();              // admin role page access
+$table->json('gates')->nullable();               // role / assignment access maps
 $table->json('original'); $table->json('changes'); // activity log diffs
 $table->json('content');                         // transaction meta
 ```
 
-`AsArrayObject` when the value is mutated; note that the cast does not hand back a
-reference — build the merged array and assign once:
+**Every one of these casts to `AsArrayObject::class`** — or `AsCollection::class` where
+the value is a list the code wants to `filter`/`map`/`pluck`. Never `'array'` or
+`'json'`: those decode to a fresh array on each access, so writing into one is
+discarded without an error and the model never goes dirty. Full reasoning in
+[models.md](models.md).
+
+Assign a plain array; the cast encodes it. Read it back with the model's `*Array()`
+getter wherever it is merged, counted, or spread — an `ArrayObject` is not an array and
+is truthy even when empty:
 
 ```php
-// The cast does not hand back a reference, so build the merged set and assign once.
-$settings = (array) ($profile->settings ?? []);
+$settings = $profile->settingsArray();
 $settings[$key] ??= $value;
 $profile->settings = $settings;
+$profile->save();
+```
+
+A single nested key can also be written straight through, which is what the cast is
+for:
+
+```php
+$profile->settings[$key] = $value;
 $profile->save();
 ```
 
@@ -141,13 +165,23 @@ audit genuinely requires it — the project's preferred pattern is a **status en
 
 ### Slugs
 
-Generated in the page on save, never by an observer:
+Generated in the page on save, never by an observer, and **guarded by `isDirty()` so
+an existing record keeps the slug its links already point at**:
 
 ```php
-$this->training->slug = kSlug($this->training->name);
+// If the name changed, the slug has to follow it.
+if ($this->category->isDirty('name')) {
+    $this->category->slug = kSlug($this->name);
+}
+
+$this->category->save();
 ```
 
 Column: `$table->string('slug')->unique();`
+
+**A slug is never a form field** unless the screen is deliberately offering to let
+somebody choose one. It is derived from the name, and a second input that has to agree
+with the first is a way to get them out of step. See [forms.md](forms.md).
 
 ### Transactions and locking
 

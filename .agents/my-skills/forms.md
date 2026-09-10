@@ -13,7 +13,7 @@ public function save(): bool
     3. // decide create vs update, pick the ActivityActionEnum
     4. // fill the model
     5. $this->respondPrimary(if: $model->isClean());   // "no changes" early-return
-    6. // derived columns (slug, compare price)
+    6. // derived columns (slug, compare price) — guarded by isDirty()
     7. $affectedColumns = $service->affectedColumns($model);   // BEFORE save
        $model->save();
        $service->logActivity($action, " thing: {$model->name}", $affectedColumns, model: $model);
@@ -54,6 +54,28 @@ Always use named arguments: `if:`, `field:`, `flash:`, `heading:`.
 
 `protected function rules(): array` on the component. Array-of-rules syntax.
 See [validation.md](validation.md).
+
+### Derived columns — step 6
+
+A column the form does not ask for and the user does not type. It is written **after**
+the clean check and **before** `save()`, and it is written only when whatever it is
+derived from actually changed:
+
+```php
+// If the name changed, the slug has to follow it.
+if ($this->category->isDirty('name')) {
+    $this->category->slug = kSlug($this->name);
+}
+```
+
+The `isDirty()` guard is not a micro-optimisation. Recomputing a slug on every save
+churns the URL of a record whose name nobody touched, and every link already pointing
+at it breaks.
+
+**A slug is never an input.** No `wire:model`, no rule in `rules()`, no field on the
+screen — unless the screen is deliberately built to let somebody choose their own slug,
+which is a decision to make on purpose rather than a default to fall into. Two fields
+that have to agree with each other is a way to get them out of step.
 
 ### Model fill
 
@@ -170,6 +192,32 @@ Conventions in that markup:
 - `<flux:error name="field" />` under fields whose Flux component does not render its
   own error (custom components, grids).
 - `<flux:separator variant="subtle" />` between logical groups.
+
+### Placeholders
+
+**Every input carries a `placeholder`.** Text, email, number, URL, search, date — if a
+person types into it, it says what a good answer looks like before they start:
+
+```blade
+<flux:input label="Name" wire:model="name" placeholder="e.g. Advanced Web Design" />
+<flux:input type="email" label="Contact email" wire:model="email" placeholder="support@example.com" />
+<x-form.number-field label="Passwords remembered" wire:model="depth" placeholder="e.g. 5" />
+```
+
+Rules for writing one:
+
+- **Show an example, do not repeat the label.** `placeholder="Name"` next to
+  `label="Name"` is noise. `placeholder="e.g. Advanced Web Design"` is an answer.
+- Prefix a sample value with `e.g.` — a bare example reads as a value already filled in.
+- On a search box the placeholder **lists the fields being searched**, so the person
+  knows what will match. See [search.md](search.md).
+- A placeholder is not a label, a help text or an error. It disappears the moment
+  somebody types, so nothing that has to stay readable belongs in it — that is what
+  `label`, `description` and `<flux:error>` are for.
+
+Controls nobody types into — `<flux:switch>`, `<flux:checkbox>`, `<flux:radio>` — have
+no placeholder. A `<flux:select>` takes one only when it has no meaningful default, in
+which case it is the "choose one" row.
 
 ### Field components
 
@@ -358,3 +406,7 @@ public function toggleStatus(Faq $faq): bool
 - Returning `void` from a write method.
 - Wrapping `respondError()` in `try`/`catch`.
 - `wire:model.live` on a form field that is only read on submit.
+- An input with no `placeholder`, or a placeholder that just restates the label.
+- A `slug` input, or a `slug` key in `rules()`, on a screen that did not set out to
+  let somebody choose their own.
+- Recomputing a derived column unconditionally where `isDirty()` should guard it.

@@ -28,6 +28,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'blogs');
+        kPageGate('content.blogs');
     }
 
     #[Computed]

@@ -18,6 +18,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'video-library');
+        kPageGate('content.video-library');
     }
 };
 ?>

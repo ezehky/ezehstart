@@ -97,7 +97,7 @@ foreach ($recipients as $row) {
         $queued++;
     } catch (\Throwable $exception) {
         // One bad address must not stop the rest of the cohort.
-        Log::channel('code')->error('Class reminder failed to queue', [
+        Log::channel('ezeh')->error('Class reminder failed to queue', [
             'class_session_id' => $session->id,
             'user_id' => $row['user']->id,
             'message' => $exception->getMessage(),
@@ -130,7 +130,7 @@ Rules that carry over if a Job is ever genuinely warranted:
 
 - Constructor property promotion for its inputs
 - `$this->afterCommit()` if it reads a record written in a transaction
-- Failure isolation and `Log::channel('code')->error()` with a context array
+- Failure isolation and `Log::channel('ezeh')->error()` with a context array
 - Idempotency through a database constraint, not through queue configuration
 
 ## Avoid

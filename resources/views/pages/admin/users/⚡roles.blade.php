@@ -4,19 +4,21 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\UserRoleEnum;
 use App\Models\Role;
 use App\Services\ActivityLogService;
+use App\Services\GateService;
 use App\Services\UserRoleService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateManager;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithGateManager;
 
     public function mount(): void
     {
         kSetSiteTitle('users', 'roles');
+        kPageGate('users.roles');
     }
 
     #[Computed]
@@ -45,6 +47,39 @@ new class extends Component
             ->reject(fn (UserRoleEnum $role) => $existing->contains($role))
             ->values()
             ->all();
+    }
+
+    /**
+     * How many screens each role reaches, for the listing.
+     *
+     * Counted off the stored map rather than the resolved one: this column is about
+     * the role itself, and an administrator's personal override is not the role's
+     * business. Keys that are no longer gateable are dropped, so a screen removed
+     * from the sidebar stops being counted without anybody editing the role.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function gateCounts(): array
+    {
+        $service = app(GateService::class);
+
+        return $this->roles
+            ->mapWithKeys(fn (Role $role) => [
+                $role->id => \count($service->normalize($role->gatesArray())),
+            ])
+            ->all();
+    }
+
+    #[Computed]
+    public function gateTotal(): int
+    {
+        return \count(app(GateService::class)->keys());
+    }
+
+    protected function afterGateChange(): void
+    {
+        unset($this->roles, $this->gateCounts);
     }
 
     public function description(UserRoleEnum $role): string
@@ -83,7 +118,7 @@ new class extends Component
             prefixDescription: false,
         );
 
-        unset($this->roles, $this->missingRoles);
+        unset($this->roles, $this->missingRoles, $this->gateCounts);
 
         return $this->respondSuccess('Missing role types have been created.');
     }
@@ -111,6 +146,7 @@ new class extends Component
             <flux:table.columns>
                 <flux:table.column>Role</flux:table.column>
                 <flux:table.column>What it can do</flux:table.column>
+                <flux:table.column>Access</flux:table.column>
                 <flux:table.column>Active users</flux:table.column>
                 <flux:table.column>Total assignments</flux:table.column>
                 <flux:table.column>Actions</flux:table.column>
@@ -124,25 +160,46 @@ new class extends Component
                         <flux:table.cell class="max-w-md text-slate-500 dark:text-slate-400">
                             {{ $item->name ? $this->description($item->name) : '—' }}
                         </flux:table.cell>
+                        <flux:table.cell>
+                            @php($granted = data_get($this->gateCounts, $item->id, 0))
+                            @if ($granted)
+                                <flux:badge size="sm" :color="$granted === $this->gateTotal ? 'green' : 'blue'">
+                                    {{ $granted }} of {{ $this->gateTotal }} screens
+                                </flux:badge>
+                            @else
+                                <flux:badge size="sm" color="amber">No screens</flux:badge>
+                            @endif
+                        </flux:table.cell>
                         <flux:table.cell class="font-medium">{{ number_format($item->active_users_count) }}</flux:table.cell>
                         <flux:table.cell>{{ number_format($item->user_roles_count) }}</flux:table.cell>
                         <flux:table.cell>
-                            @if ($item->name)
+                            <div class="flex flex-wrap gap-1">
                                 <flux:button
-                                    icon="arrow-top-right-on-square"
+                                    icon="shield-check"
                                     variant="ghost"
                                     size="sm"
-                                    :href="$this->dashboardRoute($item->name)"
-                                    wire:navigate
+                                    wire:click="openRoleGates({{ $item->id }})"
                                 >
-                                    View users
+                                    Manage access
                                 </flux:button>
-                            @endif
+
+                                @if ($item->name)
+                                    <flux:button
+                                        icon="arrow-top-right-on-square"
+                                        variant="ghost"
+                                        size="sm"
+                                        :href="$this->dashboardRoute($item->name)"
+                                        wire:navigate
+                                    >
+                                        View users
+                                    </flux:button>
+                                @endif
+                            </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="5">
+                        <flux:table.cell colspan="6">
                             <x-dashboard.workspace-no-record
                                 label="Roles"
                                 icon="identification"
@@ -154,4 +211,9 @@ new class extends Component
             </flux:table.rows>
         </flux:table>
     </flux:card>
+
+    <x-dashboard.gates-modal
+        :rows="$gateRows"
+        :subject="$this->gateSubjectLabel()"
+    />
 </div>

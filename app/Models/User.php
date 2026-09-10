@@ -146,8 +146,11 @@ class User extends Authenticatable
 
     public function userRoles(): HasMany
     {
+        // `gates` is in the select because GateService resolves this account's admin
+        // access straight off the assignment. Leave it out and every override reads
+        // as null, which looks exactly like "no override" rather than like a bug.
         return $this->hasMany(UserRole::class)
-            ->select('id', 'user_id', 'role_id', 'status');
+            ->select('id', 'user_id', 'role_id', 'status', 'gates');
     }
 
     public function notificationPreferences(): HasMany

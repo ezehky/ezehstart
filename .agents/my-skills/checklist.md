@@ -56,6 +56,10 @@ If a line does not apply, it is ✓ by default — but read it first.
       `// Relationships` / `// Scopes` section comments
 - [ ] ✓ Scopes use `#[Scope] protected function name(Builder $query): void`
 - [ ] ✓ Every status/type column is cast to an enum
+- [ ] ✓ Every `json` column casts to `AsArrayObject::class` (or `AsCollection::class`
+      for a list) — **never** `'array'` or `'json'`, which discard writes silently
+- [ ] ✓ JSON read back for merging, counting or spreading goes through a `*Array()`
+      getter — an `ArrayObject` is not an array and is truthy when empty
 - [ ] ✓ Money columns are `unsignedBigInteger` + `MoneyCast`
 - [ ] ✓ Migration uses `foreignId()->constrained()->cascadeOnDelete()` (or an
       explicit, justified `nullOnDelete()`)
@@ -63,11 +67,20 @@ If a line does not apply, it is ✓ by default — but read it first.
       not `$table->timestamps()`
 - [ ] ✓ Enum defaults in migrations are written as the enum case, not a literal
 - [ ] ✓ Columns that get filtered on are `->index()`ed
+- [ ] ✓ Single-column indexes are declared **on the column**
+      (`$table->string('slug')->unique()`), never as `$table->unique(['slug'])`
+- [ ] ✓ No hand-written index on a `constrained()` foreign key — it is already indexed
+- [ ] ✓ A new column on `user_roles` / `roles` was added to the explicit `select()` in
+      `User::userRoles()` / `UserRole::role()`, or it reads back null everywhere
+- [ ] ✓ Slugs are derived in `save()` behind `isDirty('name')`, never bound to an input
 
 ## Livewire pages
 
 - [ ] ✓ Single-file component; `new class extends Component` … `};` `?>` then Blade
 - [ ] ✓ `mount()` calls `kSetSiteTitle(...)`
+- [ ] ✓ An admin screen's `mount()` also calls `kPageGate('…')` — see [gates.md](gates.md)
+- [ ] ✓ Every text/number/email/search input has a `placeholder` that shows an example
+      rather than repeating the label
 - [ ] ✓ Derived data is `#[Computed]`, not assigned in `mount()`
 - [ ] ✓ Computed caches are invalidated with `unset($this->name)` after writes
 - [ ] ✓ Validation is `protected function rules(): array`
@@ -94,6 +107,12 @@ If a line does not apply, it is ✓ by default — but read it first.
 ## Authorization & safety
 
 - [ ] ✓ The route sits in the correct role-scoped route file
+- [ ] ✓ A new admin screen has a sidebar entry (which is what makes it gateable) and a
+      `kPageGate()` call
+- [ ] ✓ A control gated in Blade is gated in the **method** too — `kGate()` in the view
+      hides it, it does not guard it
+- [ ] ✓ Every `Log::channel()` name exists in `config/logging.php` (`ezeh` for
+      application errors; `site-config` for configuration writes)
 - [ ] ✓ Cross-model ownership is re-checked server-side (`abort_unless(...)`)
 - [ ] ✓ Locked or settled records are refused in the **method**, not just hidden in
       the UI — a disabled button is not a guard

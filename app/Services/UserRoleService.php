@@ -28,10 +28,24 @@ class UserRoleService
 
     /**
      * Resolve the role record for an enum case, creating it the first time it is used.
+     *
+     * A newly created admin role starts with every gate at full access. Gates default
+     * to none, so an admin role granting nothing would come up with an empty sidebar
+     * and no screen left to grant anything from. Every other role starts closed.
+     *
+     * A role that already exists is returned untouched — resolving a role must never
+     * hand back access somebody deliberately took away.
      */
     public function role(UserRoleEnum $role): Role
     {
-        return Role::query()->firstOrCreate(['name' => $role]);
+        $record = Role::query()->firstOrNew(['name' => $role]);
+
+        if (! $record->exists) {
+            $record->gates = $role->isAdmin() ? app(GateService::class)->fullAccessMap() : [];
+            $record->save();
+        }
+
+        return $record;
     }
 
     /**

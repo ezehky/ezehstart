@@ -31,6 +31,13 @@ enum ActivityActionEnum: string
     case USER_ROLE_REVOKE = 'user-role.revoke';
     case USER_ROLE_SWITCH = 'user-role.switch';
 
+    // Gates. Widening what an administrator can reach is the change you go looking
+    // for after something was touched that should not have been, so it gets its own
+    // cases rather than sitting under a general USER_UPDATE.
+    case ROLE_GATES_UPDATE = 'role.gates-update';
+    case ADMIN_GATES_UPDATE = 'admin.gates-update';
+    case ADMIN_GATES_RESET = 'admin.gates-reset';
+
     // Personal
     case LOGIN = 'login';
     case LOGOUT = 'logout';
@@ -148,7 +155,13 @@ enum ActivityActionEnum: string
             self::POST_UPDATE,
             self::CATEGORY_UPDATE,
             self::TAG_UPDATE,
-            self::NOTIFICATION_TYPE_UPDATE => 'Updated ',
+            self::NOTIFICATION_TYPE_UPDATE,
+            self::ROLE_GATES_UPDATE,
+            self::ADMIN_GATES_UPDATE => 'Updated ',
+
+            // Reset rather than updated: the override is gone and the account is
+            // back on its role, which is a different fact about the account.
+            self::ADMIN_GATES_RESET => 'Reset ',
 
             // Delete
             self::DELETE,

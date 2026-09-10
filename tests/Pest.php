@@ -8,9 +8,9 @@ use App\Enums\StatusYes;
 use App\Enums\UserRoleEnum;
 use App\Models\NotificationType;
 use App\Models\Policy;
-use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use App\Services\UserRoleService;
 use Database\Seeders\NotificationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -83,7 +83,11 @@ function userWithRole(UserRoleEnum $role, array $attributes = []): User
         ...$attributes,
     ]);
 
-    $roleRecord = Role::query()->firstOrCreate(['name' => $role]);
+    // Through the service rather than the model, so the role is created with the
+    // same starting gates the running application would give it. Build it with
+    // firstOrCreate here and an admin lands on an empty sidebar and a 404 on every
+    // admin screen, which is a fixture problem masquerading as a broken page.
+    $roleRecord = app(UserRoleService::class)->role($role);
 
     UserRole::query()->create([
         'user_id' => $user->id,

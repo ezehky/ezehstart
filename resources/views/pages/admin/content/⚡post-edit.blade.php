@@ -80,6 +80,7 @@ new class extends Component
         }
 
         kSetSiteTitle('content', 'blogs', $this->post ? 'edit post' : 'new post');
+        kPageGate('content.blogs');
     }
 
     protected function rules(): array

@@ -33,6 +33,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'notification types');
+        kPageGate('config.notification-types');
     }
 
     /**
