@@ -23,8 +23,8 @@ enum MediaVisibilityEnum: string
     /** Only the uploader — and any administrator — can see it. */
     case PRIVATE = 'private';
 
-    /** Everyone holding the role named in the row's visible_to_role. */
-    case ROLE = 'role';
+    /** Every account of the type named in the row's visible_to_type. */
+    case TYPE = 'type';
 
     /** Anyone signed in, and anywhere the item is rendered publicly. */
     case PUBLIC = 'public';
@@ -34,9 +34,9 @@ enum MediaVisibilityEnum: string
         return $this === self::PRIVATE;
     }
 
-    public function isRole(): bool
+    public function isType(): bool
     {
-        return $this === self::ROLE;
+        return $this === self::TYPE;
     }
 
     public function isPublic(): bool
@@ -45,12 +45,12 @@ enum MediaVisibilityEnum: string
     }
 
     /**
-     * Only ROLE reads visible_to_role — the other two cases must leave it null so
+     * Only TYPE reads visible_to_type — the other two cases must leave it null so
      * a later visibility change cannot silently re-expose an old audience.
      */
-    public function needsRole(): bool
+    public function needsType(): bool
     {
-        return $this === self::ROLE;
+        return $this === self::TYPE;
     }
 
     /**
@@ -63,7 +63,7 @@ enum MediaVisibilityEnum: string
     {
         return match ($this) {
             self::PRIVATE => "Only you and administrators can see this {$noun}.",
-            self::ROLE => "Everyone with the selected role can see and reuse this {$noun}.",
+            self::TYPE => "Every account of the selected type can see and reuse this {$noun}.",
             self::PUBLIC => "Anyone can see this {$noun}, including on public pages.",
         };
     }

@@ -2,7 +2,7 @@
 
 use App\Enums\SocialProviderEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Models\UserConnectedAccount;
 use App\Services\SiteConfigurationService;
@@ -138,7 +138,7 @@ test('an identity whose email changed still lands on the original account', func
 });
 
 test('a provider identity matching an existing email links rather than duplicates', function () {
-    $existing = userWithRole(UserRoleEnum::USER, [
+    $existing = userOfType(UserTypeEnum::USER, [
         'email' => 'someone@example.test',
         'email_verified_at' => now(),
     ]);
@@ -163,7 +163,7 @@ test('a provider that shares no email cannot sign anybody in', function () {
 });
 
 test('a suspended account cannot walk back in through a provider', function () {
-    $suspended = userWithRole(UserRoleEnum::USER, [
+    $suspended = userOfType(UserTypeEnum::USER, [
         'email' => 'someone@example.test',
         'email_verified_at' => now(),
         'status' => StatusUser::SUSPENDED,
@@ -194,7 +194,7 @@ test('tokens are stored encrypted, not in the clear', function () {
 // LINKING AND UNLINKING
 
 test('an already signed-in user connects a provider instead of signing in again', function () {
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     fakeSocialiteReturns(socialiteUser(email: 'other@example.test'));
 
@@ -237,7 +237,7 @@ test('one provider identity cannot be claimed by two local accounts', function (
     fakeSocialiteReturns(socialiteUser());
     $this->get(route('social.callback', 'google'));
 
-    $other = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $other = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     // The unique index on (provider, provider_id) is what enforces this — without
     // it, sign-in becomes a coin toss between two accounts.

@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\ActivityActionEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Image;
 use App\Models\ImageFolder;
 use App\Models\ImageUsage;
@@ -90,7 +90,7 @@ class ImageLibraryService
         ?string $title = null,
         ?ImageFolder $folder = null,
         MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
     ): ?Image {
         $remaining = $this->remainingUploadsFor($user);
 
@@ -124,7 +124,7 @@ class ImageLibraryService
             'size' => Storage::disk('public')->size($path),
             'width' => $dimensions['width'],
             'height' => $dimensions['height'],
-            ...$this->visibilityAttributes($visibility, $visibleToRole),
+            ...$this->visibilityAttributes($visibility, $visibleToType),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -139,13 +139,13 @@ class ImageLibraryService
      * @param  array<int, mixed>  $files
      * @return array{stored: Collection<int, Image>, skipped: int}
      */
-    public function storeMany(User $user, array $files, ?ImageFolder $folder = null, MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE, ?UserRoleEnum $visibleToRole = null): array
+    public function storeMany(User $user, array $files, ?ImageFolder $folder = null, MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE, ?UserTypeEnum $visibleToType = null): array
     {
         $stored = collect();
         $skipped = 0;
 
         foreach ($files as $file) {
-            $image = $this->store($user, $file, null, $folder, $visibility, $visibleToRole);
+            $image = $this->store($user, $file, null, $folder, $visibility, $visibleToType);
 
             $image ? $stored->push($image) : $skipped++;
         }
@@ -168,7 +168,7 @@ class ImageLibraryService
         string $title,
         ?ImageFolder $folder = null,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
         ?string $altText = null,
     ): Image {
         $activity = app(ActivityLogService::class);
@@ -177,7 +177,7 @@ class ImageLibraryService
             'title' => trim($title) ?: $image->title,
             'image_folder_id' => $folder?->id,
             'alt_text' => $altText,
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToRole) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
         ]);
 
         $affected = $activity->affectedColumns($image);
@@ -225,7 +225,7 @@ class ImageLibraryService
         ?ImageFolder $parent = null,
         bool $shared = false,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
     ): ImageFolder {
         // A shared folder belongs to nobody and everybody browses it, so only an
         // administrator can make one.
@@ -241,7 +241,7 @@ class ImageLibraryService
             'parent_id' => $parent?->id,
             'name' => trim($name),
             'slug' => kSlug($name),
-            ...$this->visibilityAttributes($visibility, $visibleToRole),
+            ...$this->visibilityAttributes($visibility, $visibleToType),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -261,14 +261,14 @@ class ImageLibraryService
         ImageFolder $folder,
         string $name,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
     ): ImageFolder {
         $activity = app(ActivityLogService::class);
 
         $folder->fill([
             'name' => trim($name) ?: $folder->name,
             'slug' => kSlug(trim($name) ?: $folder->name),
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToRole) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
         ]);
 
         $affected = $activity->affectedColumns($folder);
@@ -481,11 +481,11 @@ class ImageLibraryService
      *
      * @return array<string, mixed>
      */
-    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserRoleEnum $role): array
+    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role): array
     {
         return [
             'visibility' => $visibility,
-            'visible_to_role' => $visibility->needsRole() ? $role : null,
+            'visible_to_type' => $visibility->needsType() ? $role : null,
         ];
     }
 

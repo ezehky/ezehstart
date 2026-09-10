@@ -4,7 +4,7 @@ use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusPost;
 use App\Enums\StatusYes;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
@@ -14,7 +14,7 @@ use Illuminate\Database\QueryException;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN, ['email_verified_at' => now()]);
+    $this->admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 });
 
 function blogCategory(string $name = 'Skincare', CategoryGroupEnum $group = CategoryGroupEnum::BLOG): Category
@@ -275,7 +275,7 @@ test('an admin can open every blog screen', function (string $route) {
 ]);
 
 test('a member cannot reach the blog admin', function () {
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     $this->actingAs($member)->get(route('admin.blog.blogs'))->assertNotFound();
 });

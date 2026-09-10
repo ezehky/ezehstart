@@ -7,7 +7,7 @@
 | Kind | Pattern | Real examples |
 | --- | --- | --- |
 | Status enum | `Status{Subject}` — **prefix** | `StatusUser`, `StatusCohort`, `StatusAdmission`, `StatusTransaction`, `StatusDefault`, `StatusYes`, `StatusPolicy`, `StatusClassSession`, `StatusAttendance` |
-| Non-status enum | `{Subject}Enum` — **suffix** | `UserRoleEnum`, `TransactionTypeEnum`, `PolicyTypeEnum`, `FaqTypeEnum`, `DayOfWeekEnum`, `SocialProviderEnum`, `VendorEnum`, `ActivityActionEnum` |
+| Non-status enum | `{Subject}Enum` — **suffix** | `UserTypeEnum`, `TransactionTypeEnum`, `PolicyTypeEnum`, `FaqTypeEnum`, `DayOfWeekEnum`, `SocialProviderEnum`, `VendorEnum`, `ActivityActionEnum` |
 | Service | `{Subject}Service` | `TrainingService`, `ActivityLogService`, `SiteConfigurationService` |
 | Trait | `With{Capability}` | `WithFormResponseMessage`, `WithEnumHelpers`, `WithCohortAdmin` |
 | Validation rule | `{Subject}Rule` | `EmailRule`, `ImageRule`, `MoneyRule` |
@@ -114,7 +114,9 @@ Groups in use: `dashboard`, `form`, `site`, `training`, `finance`, `layouts`, `l
 - The `Status*` prefix makes every status enum sort together in `app/Enums/` and reads
   naturally at the call site: `StatusCohort::ONGOING`.
 - `*Enum` suffix on non-status enums avoids collisions with model names
-  (`Role` the model vs `UserRoleEnum` the enum; `Policy` the model vs `PolicyTypeEnum`).
+  (`Policy` the model vs `PolicyTypeEnum` the enum; `Category` vs `CategoryGroupEnum`).
+  Note `Role` has **no** enum beside it — roles are rows, and what a *type* of
+  account is lives in `UserTypeEnum`.
 - `With*` traits signal composition at the `use` line: `use WithPagination,
   WithUserRoleManager;` reads as a list of capabilities.
 - Livewire props named exactly after columns let `$this->fill($model->only([...]))`

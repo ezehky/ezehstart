@@ -1,4 +1,4 @@
-@props(['currentRole'])
+@props(['currentType'])
 
 {{--
     The backdrop blur makes this header a stacking context, so anything opening out
@@ -12,7 +12,7 @@
             <flux:icon name="bars-3" class="size-5" />
         </button>
         <nav class="hidden items-center gap-2 text-sm sm:flex" aria-label="Breadcrumb">
-            <span class="text-slate-500 dark:text-slate-400">{{ $currentRole->label() }}</span>
+            <span class="text-slate-500 dark:text-slate-400">{{ $currentType->label() }}</span>
             <flux:icon name="chevron-right" class="size-4 text-slate-400" />
             <span class="font-medium text-slate-950 dark:text-white">{{ config('_setups.title') }}</span>
         </nav>

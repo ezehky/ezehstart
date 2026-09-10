@@ -51,10 +51,15 @@ Two workspaces, defined in `bootstrap/app.php`:
 | Member | `/app` | `user.` | `routes/user.php` | `UserMiddleware` |
 | Public + auth | `/` | *(none)* | `routes/web.php` | `guest` / `auth` |
 
-Adding a third is three files: a `{Role}Middleware`, a `routes/{role}.php`, and a group
-in `bootstrap/app.php`. Add the case to `UserRoleEnum` and the branch tables in
-`UserService::middlewareGeneralCheck()` and `WithAuthWorker::userDashboardRedirect()`
-at the same time — both `match` on every case and will fail loudly until you do.
+Adding a third is three files: a `{Type}Middleware`, a `routes/{type}.php`, and a group
+in `bootstrap/app.php`. Add the case to `UserTypeEnum` at the same time — every branch a
+type decides (its dashboard route, its label, whether it carries a role) lives on the
+case itself, and those `match` arms will fail loudly until you do.
+
+**Type is not role.** `users.type` is the workspace an account signs in to, fixed in
+code. A **role** is a row in `roles` an administrator creates from the dashboard, it
+divides up the admin workspace only, and **only an admin has one — exactly one**.
+Members carry no role at all.
 
 ## Commands
 

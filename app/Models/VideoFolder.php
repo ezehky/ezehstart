@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -22,7 +22,7 @@ class VideoFolder extends Model
     {
         return [
             'visibility' => MediaVisibilityEnum::class,
-            'visible_to_role' => UserRoleEnum::class,
+            'visible_to_type' => UserTypeEnum::class,
             'status' => StatusDefault::class,
         ];
     }
@@ -53,8 +53,7 @@ class VideoFolder extends Model
 
         return match ($this->visibility) {
             MediaVisibilityEnum::PUBLIC => true,
-            MediaVisibilityEnum::ROLE => $this->visible_to_role !== null
-                && $user->activeRoles()->contains($this->visible_to_role),
+            MediaVisibilityEnum::TYPE => $this->visible_to_type === $user->type,
             default => false,
         };
     }
@@ -132,13 +131,11 @@ class VideoFolder extends Model
             return;
         }
 
-        $roles = $user->activeRoles()->map(fn (UserRoleEnum $role) => $role->value)->all();
-
         $query->where(fn (Builder $inner) => $inner
             ->where('user_id', $user->id)
             ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
-            ->orWhere(fn (Builder $role) => $role
-                ->where('visibility', MediaVisibilityEnum::ROLE)
-                ->whereIn('visible_to_role', $roles)));
+            ->orWhere(fn (Builder $typeQuery) => $typeQuery
+                ->where('visibility', MediaVisibilityEnum::TYPE)
+                ->where('visible_to_type', $user->type)));
     }
 }

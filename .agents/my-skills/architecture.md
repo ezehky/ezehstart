@@ -82,15 +82,18 @@ Both role groups also carry `['web', 'auth', 'auth.session']`.
 
 Three files, plus two `match` arms:
 
-1. `app/Http/Middleware/{Role}Middleware.php` — a copy of `UserMiddleware` with the
+1. `app/Http/Middleware/{Type}Middleware.php` — a copy of `UserMiddleware` with the
    new enum case.
-2. `routes/{role}.php`.
+2. `routes/{type}.php`.
 3. A `Route::middleware(...)->prefix(...)->name(...)->group(...)` block in
    `bootstrap/app.php`.
-4. The case in `UserRoleEnum`, then the `match` in
-   `UserService::middlewareGeneralCheck()` and the branch in
-   `WithAuthWorker::userDashboardRedirect()`. Both are exhaustive, so PHP will tell
-   you if you forget.
+4. The case in `UserTypeEnum`. Every branch a type decides — its dashboard route, its
+   label, whether it carries a role — lives on the case itself, and those `match`
+   arms are exhaustive, so PHP tells you what is missing.
+
+A **type** is a workspace. A **role** is not: roles are rows an administrator creates
+from the dashboard, they only ever divide up the admin workspace, and adding one costs
+no code at all.
 
 ## Why
 
@@ -117,17 +120,18 @@ app/Helpers/navigations.php
   'users' => ['children' => ['members' => ['label' => 'Members', 'link' => route('admin.members')]]]
 
 resources/views/pages/admin/users/⚡members.blade.php    ← the page (class + Blade)
-app/Models/User.php                                      ← casts, carriesRole() scope
-app/Enums/UserRoleEnum.php                               ← the role vocabulary
+app/Models/User.php                                      ← casts, members() scope
+app/Enums/UserTypeEnum.php                               ← the workspace vocabulary
 app/Enums/StatusUser.php                                 ← status
-app/Traits/WithUserRoleManager.php                       ← the manage-roles modal
-app/Services/UserRoleService.php                         ← grant / revoke / guards
+app/Models/Role.php                                      ← an admin role, as a row
+app/Traits/WithUserRoleManager.php                       ← the account-access modal
+app/Services/RoleService.php                             ← role CRUD, assignment, guards
 app/Services/ActivityLogService.php                      ← the audit entry
 tests/Feature/AdminWorkspaceTest.php
 ```
 
 `⚡user-view.blade.php` reads the same model as a single record, and reuses the same
-trait for its role modal.
+trait for its access modal.
 
 ## Template
 

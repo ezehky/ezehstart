@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\NotificationTopicEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
 use App\Models\User;
 use App\Notifications\GeneralNotification;
 use Illuminate\Container\Attributes\Singleton;
@@ -57,7 +56,7 @@ class NotificationService
     public function admins(?User $except = null): Collection
     {
         return User::query()
-            ->carriesRole(UserRoleEnum::ADMIN)
+            ->admins()
             ->where('status', StatusUser::ACTIVE)
             ->when($except, fn ($query) => $query->whereKeyNot($except->getKey()))
             ->get();

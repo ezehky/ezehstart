@@ -112,7 +112,7 @@ new class extends Component
             $this->imagesUpload,
             $folder,
             $folder?->visibility ?? MediaVisibilityEnum::PRIVATE,
-            $folder?->visible_to_role,
+            $folder?->visible_to_type,
         );
 
         $this->reset('imagesUpload');

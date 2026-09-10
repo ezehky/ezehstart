@@ -27,9 +27,16 @@ enum ActivityActionEnum: string
     case USER_UPDATE = 'user.update';
     case USER_DELETE = 'user.delete';
     case USER_STATUS_CHANGE = 'user.status-change';
-    case USER_ROLE_GRANT = 'user-role.grant';
-    case USER_ROLE_REVOKE = 'user-role.revoke';
-    case USER_ROLE_SWITCH = 'user-role.switch';
+    case USER_TYPE_CHANGE = 'user.type-change';
+    case USER_ROLE_ASSIGN = 'user-role.assign';
+    case USER_ROLE_CLEAR = 'user-role.clear';
+
+    // Roles. A role is a row an administrator creates, so its lifecycle is logged
+    // like any other record — but separately from the gate map it carries, because
+    // renaming a role and widening one are not the same event.
+    case ROLE_CREATE = 'role.create';
+    case ROLE_UPDATE = 'role.update';
+    case ROLE_DELETE = 'role.delete';
 
     // Gates. Widening what an administrator can reach is the change you go looking
     // for after something was touched that should not have been, so it gets its own
@@ -138,6 +145,7 @@ enum ActivityActionEnum: string
             self::VIDEO_FOLDER_CREATE,
             self::POST_CREATE,
             self::CATEGORY_CREATE,
+            self::ROLE_CREATE,
             self::TAG_CREATE,
             self::NOTIFICATION_TYPE_CREATE,
             self::TRANSACTION_CREATE => 'Created new ',
@@ -156,6 +164,7 @@ enum ActivityActionEnum: string
             self::CATEGORY_UPDATE,
             self::TAG_UPDATE,
             self::NOTIFICATION_TYPE_UPDATE,
+            self::ROLE_UPDATE,
             self::ROLE_GATES_UPDATE,
             self::ADMIN_GATES_UPDATE => 'Updated ',
 
@@ -165,6 +174,7 @@ enum ActivityActionEnum: string
 
             // Delete
             self::DELETE,
+            self::ROLE_DELETE,
             self::USER_DELETE,
             self::FAQ_DELETE,
             self::IMAGE_DELETE,

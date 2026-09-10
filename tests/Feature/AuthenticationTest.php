@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Mail\EmailVerificationOtpEmail;
 use App\Mail\LoginEmail;
 use App\Mail\WelcomeEmail;
@@ -50,7 +50,7 @@ test('registration requires the terms to be accepted', function () {
 test('a user can sign in with their password', function () {
     Mail::fake();
 
-    $user = userWithRole(UserRoleEnum::USER, ['password' => Hash::make('Password123!')]);
+    $user = userOfType(UserTypeEnum::USER, ['password' => Hash::make('Password123!')]);
 
     Livewire::test('pages::auth.login')
         ->set('email', $user->email)
@@ -68,7 +68,7 @@ test('a user can sign in with their password', function () {
 });
 
 test('bad credentials are rejected', function () {
-    $user = userWithRole(UserRoleEnum::USER, ['password' => Hash::make('Password123!')]);
+    $user = userOfType(UserTypeEnum::USER, ['password' => Hash::make('Password123!')]);
 
     Livewire::test('pages::auth.login')
         ->set('email', $user->email)
@@ -80,7 +80,7 @@ test('bad credentials are rejected', function () {
 });
 
 test('an account with no password is told which flow to use', function () {
-    $user = userWithRole(UserRoleEnum::USER, ['password' => null]);
+    $user = userOfType(UserTypeEnum::USER, ['password' => null]);
 
     Livewire::test('pages::auth.login')
         ->set('email', $user->email)
@@ -90,7 +90,7 @@ test('an account with no password is told which flow to use', function () {
 });
 
 test('signing out clears the session', function () {
-    $user = userWithRole(UserRoleEnum::USER);
+    $user = userOfType(UserTypeEnum::USER);
 
     $this->actingAs($user)->get(route('logout'))->assertRedirect(route('login'));
 

@@ -27,23 +27,18 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->name('user.')
                 ->group(__DIR__.'/../routes/user.php');
 
-            // A third workspace is three files: a {Role}Middleware, a routes/{role}.php,
-            // and a group here. Add the case to UserRoleEnum and the branch tables in
-            // UserService::middlewareGeneralCheck() and WithAuthWorker at the same time.
+            // A third workspace is three files: a {Type}Middleware, a routes/{type}.php,
+            // and a group here. Add the case to UserTypeEnum at the same time — every
+            // branch a type decides lives on the case, so the match arms there will
+            // fail to compile until it does.
         }
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Redirect guests to the login page
         $middleware->redirectGuestsTo(fn () => route('login'));
 
-        // Redirect users to their respective dashboards based on their roles
-        $middleware->redirectUsersTo(function (Request $request) {
-            if ($request->user()->isAdmin()) {
-                return route('admin.dashboard');
-            }
-
-            return route('user.dashboard');
-        });
+        // Send a signed-in account to the workspace its type belongs to
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()->type->dashboardRoute());
 
         // Prevent CSRF for webhooks
         $middleware->preventRequestForgery(except: [

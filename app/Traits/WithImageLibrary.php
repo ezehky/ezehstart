@@ -3,7 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\MediaVisibilityEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Image;
 use App\Models\ImageFolder;
 use App\Models\User;
@@ -84,7 +84,7 @@ trait WithImageLibrary
 
     public string $visibility = 'private';
 
-    public ?string $visible_to_role = null;
+    public ?string $visible_to_type = null;
 
     // Moving a batch
     public ?int $move_folder_id = null;
@@ -100,7 +100,7 @@ trait WithImageLibrary
 
     public string $folder_visibility = 'private';
 
-    public ?string $folder_visible_to_role = null;
+    public ?string $folder_visible_to_type = null;
 
     /**
      * Livewire calls boot{TraitName}() on every request, hydration included, so
@@ -196,7 +196,7 @@ trait WithImageLibrary
     {
         return $this->user->isAdmin()
             ? MediaVisibilityEnum::forSelect()
-            : MediaVisibilityEnum::forSelect([MediaVisibilityEnum::ROLE->value]);
+            : MediaVisibilityEnum::forSelect([MediaVisibilityEnum::TYPE->value]);
     }
 
     /**
@@ -303,7 +303,7 @@ trait WithImageLibrary
             $this->alt_text = $image->alt_text;
             $this->image_folder_id = $image->image_folder_id;
             $this->visibility = $image->visibility->value;
-            $this->visible_to_role = $image->visible_to_role?->value;
+            $this->visible_to_type = $image->visible_to_type?->value;
         }
 
         if ($panel === 'move') {
@@ -324,9 +324,9 @@ trait WithImageLibrary
         $this->panel = null;
 
         $this->reset(
-            'edit_id', 'title', 'alt_text', 'image_folder_id', 'visibility', 'visible_to_role',
+            'edit_id', 'title', 'alt_text', 'image_folder_id', 'visibility', 'visible_to_type',
             'move_folder_id', 'folder_id', 'folder_name', 'folder_parent_id', 'folder_shared',
-            'folder_visibility', 'folder_visible_to_role',
+            'folder_visibility', 'folder_visible_to_type',
         );
 
         $this->resetValidation();
@@ -352,15 +352,15 @@ trait WithImageLibrary
             'alt_text' => ['nullable', 'string', 'max:500'],
             'image_folder_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
             'visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
-            'visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
+            'visible_to_type' => ['nullable', Rule::enum(UserTypeEnum::class)],
         ]);
 
         $visibility = MediaVisibilityEnum::from($this->visibility);
 
         $this->respondError(
             'Choose which role should be able to see this image.',
-            $visibility->needsRole() && ! $this->visible_to_role,
-            field: 'visible_to_role'
+            $visibility->needsType() && ! $this->visible_to_type,
+            field: 'visible_to_type'
         );
 
         app(ImageLibraryService::class)->update(
@@ -368,7 +368,7 @@ trait WithImageLibrary
             $this->title,
             $this->image_folder_id ? ImageFolder::query()->find($this->image_folder_id) : null,
             $visibility,
-            $this->visible_to_role ? UserRoleEnum::from($this->visible_to_role) : null,
+            $this->visible_to_type ? UserTypeEnum::from($this->visible_to_type) : null,
             $this->alt_text,
         );
 
@@ -448,7 +448,7 @@ trait WithImageLibrary
     {
         $this->resetValidation();
 
-        $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_role');
+        $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_type');
 
         $this->folder_parent_id = $this->folder;
         $this->folder_visibility = MediaVisibilityEnum::PRIVATE->value;
@@ -470,7 +470,7 @@ trait WithImageLibrary
         $this->folder_parent_id = $folder->parent_id;
         $this->folder_shared = $folder->isShared();
         $this->folder_visibility = $folder->visibility->value;
-        $this->folder_visible_to_role = $folder->visible_to_role?->value;
+        $this->folder_visible_to_type = $folder->visible_to_type?->value;
 
         $this->panel = 'folder';
     }
@@ -481,18 +481,18 @@ trait WithImageLibrary
             'folder_name' => ['required', 'string', 'max:255'],
             'folder_parent_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
             'folder_visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
-            'folder_visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
+            'folder_visible_to_type' => ['nullable', Rule::enum(UserTypeEnum::class)],
         ]);
 
         $visibility = MediaVisibilityEnum::from($this->folder_visibility);
 
         $this->respondError(
             'Choose which role should be able to browse this folder.',
-            $visibility->needsRole() && ! $this->folder_visible_to_role,
-            field: 'folder_visible_to_role'
+            $visibility->needsType() && ! $this->folder_visible_to_type,
+            field: 'folder_visible_to_type'
         );
 
-        $role = $this->folder_visible_to_role ? UserRoleEnum::from($this->folder_visible_to_role) : null;
+        $role = $this->folder_visible_to_type ? UserTypeEnum::from($this->folder_visible_to_type) : null;
         $service = app(ImageLibraryService::class);
 
         if ($this->folder_id) {

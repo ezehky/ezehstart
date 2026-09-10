@@ -2,18 +2,28 @@
 
 namespace App\Traits;
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
+use App\Models\Role;
 use App\Models\User;
-use App\Services\UserRoleService;
+use App\Services\RoleService;
 use Flux\Flux;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 
 /**
- * Drives the "manage roles" modal shared by the admins list and the user view.
+ * Drives the "account access" modal shared by the admins list, the members list and
+ * the user view.
+ *
+ * Type and role are edited together because they are one decision. A type is which
+ * workspace the account signs in to; a role only exists inside the admin one. Editing
+ * them on separate screens makes it possible to pick a role for an account that is
+ * about to stop being an admin, and then to save both.
  *
  * @property-read User|null $roleUser
- * @property-read array<int, array{role: string, label: string, description: string, has: bool, blocked: string|null}> $roleMatrix
- * @property-read array{role: string, label: string, description: string, has: bool, action: string, blocked: string|null}|null $pendingRoleEntry
+ * @property-read Collection<int, Role> $assignableRoles
+ * @property-read UserTypeEnum|null $pendingAccountType
+ * @property-read string|null $accessBlockedReason
  */
 trait WithUserRoleManager
 {
@@ -21,182 +31,170 @@ trait WithUserRoleManager
 
     public ?int $roleUserId = null;
 
-    public ?string $pendingRole = null;
+    public string $accountType = '';
+
+    /**
+     * The chosen role id, as a string because it comes off a `<select>`. Empty means
+     * no role — a real choice for an admin, and the only choice for a member.
+     */
+    public string $accountRole = '';
 
     public function openRoleManager(User $user): void
     {
+        $this->resetValidation();
+
         $this->roleUserId = $user->id;
+        $this->accountType = $user->type->value;
+        $this->accountRole = (string) ($user->role_id ?? '');
 
-        unset($this->roleUser, $this->roleMatrix, $this->pendingRoleEntry);
-
-        $this->reset('pendingRole');
+        unset($this->roleUser, $this->assignableRoles, $this->accessBlockedReason, $this->pendingAccountType);
 
         Flux::modal('userRolesModal')->show();
+    }
+
+    /**
+     * The type currently in the box, for the modal to branch on.
+     *
+     * Exposed as a computed rather than read off $accountType in the view: the modal
+     * is an anonymous component and gets no access to a Livewire property.
+     */
+    #[Computed]
+    public function pendingAccountType(): ?UserTypeEnum
+    {
+        return $this->pendingType();
     }
 
     #[Computed]
     public function roleUser(): ?User
     {
-        return $this->roleUserId ? User::query()->find($this->roleUserId) : null;
+        return $this->roleUserId ? User::query()->with('role')->find($this->roleUserId) : null;
     }
 
     /**
-     * The roles the modal offers. Every case by default — override on a listing that
-     * should only manage a subset.
+     * The roles the modal offers.
      *
-     * @return array<int, UserRoleEnum>
-     */
-    protected function roleManagerRoles(): array
-    {
-        return UserRoleEnum::cases();
-    }
-
-    /**
-     * Every offered role with its current state, the action it accepts, and the reason
-     * that action is unavailable when it is.
+     * Only live ones: putting an account on a switched-off role would grant nothing
+     * and read as a bug rather than as the deliberate suspension it is.
      *
-     * @return array<int, array{role: string, label: string, description: string, has: bool, action: string, blocked: string|null}>
+     * @return Collection<int, Role>
      */
     #[Computed]
-    public function roleMatrix(): array
+    public function assignableRoles(): Collection
     {
-        if (! $user = $this->roleUser) {
-            return [];
+        return Role::query()->isActive()->orderBy('name')->get();
+    }
+
+    /**
+     * Picking a member clears the role box, so the modal never shows a member holding
+     * one. Nothing is written until save.
+     */
+    public function updatedAccountType(): void
+    {
+        if (! $this->pendingType()?->carriesRole()) {
+            $this->accountRole = '';
         }
 
-        $service = app(UserRoleService::class);
-        $held = $service->rolesFor($user);
-
-        return collect($this->roleManagerRoles())
-            ->map(function (UserRoleEnum $role) use ($service, $user, $held): array {
-                $entry = [
-                    'role' => $role->value,
-                    'label' => $role->label(),
-                    'description' => $this->roleDescription($role),
-                    'has' => $held->contains($role),
-                ];
-
-                if ($entry['has']) {
-                    return [...$entry, 'action' => 'revoke', 'blocked' => $service->revokeBlockedReason($user, $role)];
-                }
-
-                // Crossing an exclusivity boundary is a swap, not an addition.
-                if ($service->conflictingRoles($user, $role) !== []) {
-                    return [...$entry, 'action' => 'switch', 'blocked' => $service->switchBlockedReason($user, $role)];
-                }
-
-                return [...$entry, 'action' => 'grant', 'blocked' => $service->grantBlockedReason($user, $role)];
-            })
-            ->all();
+        unset($this->accessBlockedReason, $this->pendingAccountType);
     }
 
-    /**
-     * Giving a role up — on its own or as half of a switch — asks first. The row that
-     * was clicked is remembered here rather than carried through the dialog, which
-     * only ever confirms the one action.
-     */
-    public function confirmRoleAction(string $role): void
+    public function updatedAccountRole(): void
     {
-        $this->pendingRole = $role;
-
-        unset($this->pendingRoleEntry);
-
-        Flux::modal('roleActionModal')->show();
+        unset($this->accessBlockedReason);
     }
 
     /**
-     * The matrix row the confirmation is about, re-read rather than trusted: the
-     * action it accepts may have moved on since the modal was opened.
-     *
-     * @return array{role: string, label: string, description: string, has: bool, action: string, blocked: string|null}|null
+     * Why the combination currently in the boxes would be refused, or null when it
+     * would be accepted. Rendered live so the Save button can say why it will not work
+     * before it is pressed.
      */
     #[Computed]
-    public function pendingRoleEntry(): ?array
+    public function accessBlockedReason(): ?string
     {
-        return collect($this->roleMatrix)->firstWhere('role', $this->pendingRole);
+        if (! $user = $this->roleUser) {
+            return null;
+        }
+
+        $type = $this->pendingType();
+
+        if (! $type) {
+            return null;
+        }
+
+        $service = app(RoleService::class);
+
+        if ($type !== $user->type) {
+            return $service->typeChangeBlockedReason($user, $type);
+        }
+
+        return $type->carriesRole()
+            ? $service->assignBlockedReason($user, $this->pendingRole())
+            : null;
     }
 
-    public function applyRoleAction(): bool
-    {
-        $entry = $this->pendingRoleEntry;
-
-        abort_unless((bool) $entry, 404);
-
-        return $entry['action'] === 'switch'
-            ? $this->switchRole($entry['role'])
-            : $this->revokeRole($entry['role']);
-    }
-
-    public function switchRole(string $role): bool
+    public function saveRoleAccess(): bool
     {
         $user = $this->resolveRoleUser();
-        $enum = UserRoleEnum::from($role);
-        $service = app(UserRoleService::class);
 
-        $reason = $service->switchBlockedReason($user, $enum);
+        // Validated inline rather than through rules(). A class method beats a trait
+        // method in PHP, so a screen with a rules() of its own would silently drop
+        // these and save whatever came off the wire.
+        $this->validate($this->roleManagerRules());
+
+        $service = app(RoleService::class);
+        $type = $this->pendingType();
+        $role = $type?->carriesRole() ? $this->pendingRole() : null;
+
+        // The guard's own wording, rather than a generic failure.
+        $reason = $this->accessBlockedReason;
         $this->respondError($reason ?? '', if: $reason !== null);
 
-        $dropped = collect($service->conflictingRoles($user, $enum))
-            ->map(fn (UserRoleEnum $current) => $current->label())
-            ->implode(' and ');
+        $changed = $type === $user->type
+            ? $service->assign($user, $role)
+            : $service->changeType($user, $type, $role);
 
-        $this->respondPrimary("{$user->name} could not be switched.", if: ! $service->switchTo($user, $enum));
+        $this->respondPrimary(if: ! $changed);
+
+        Flux::modal('userRolesModal')->close();
 
         $this->refreshRoleState();
 
-        return $this->respondSuccess("{$user->name} switched from {$dropped} to {$enum->label()}.");
-    }
-
-    public function grantRole(string $role): bool
-    {
-        $user = $this->resolveRoleUser();
-        $enum = UserRoleEnum::from($role);
-        $service = app(UserRoleService::class);
-
-        // Surface the guard's own wording rather than a generic failure.
-        $reason = $service->grantBlockedReason($user, $enum);
-        $this->respondError($reason ?? '', if: $reason !== null);
-
-        $this->respondPrimary(
-            "{$user->name} already carries the {$enum->label()} role.",
-            if: ! $service->grant($user, $enum),
-        );
-
-        $this->refreshRoleState();
-
-        return $this->respondSuccess("{$enum->label()} role granted to {$user->name}.");
-    }
-
-    public function revokeRole(string $role): bool
-    {
-        $user = $this->resolveRoleUser();
-        $enum = UserRoleEnum::from($role);
-        $service = app(UserRoleService::class);
-
-        // Surface the guard's own wording rather than a generic failure.
-        $reason = $service->revokeBlockedReason($user, $enum);
-        $this->respondError($reason ?? '', if: $reason !== null);
-
-        $this->respondPrimary(
-            "{$user->name} does not carry the {$enum->label()} role.",
-            if: ! $service->revoke($user, $enum),
-        );
-
-        $this->refreshRoleState();
-
-        return $this->respondSuccess("{$enum->label()} role removed from {$user->name}.");
+        return $this->respondSuccess("Access for {$user->name} has been saved.");
     }
 
     /**
-     * Refresh whatever the host page renders once a role changed. Pages override this.
+     * The whitelist the modal posts against. A role id is compared as a string
+     * because that is what a `<select>` sends.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    protected function roleManagerRules(): array
+    {
+        return [
+            'accountType' => ['required', Rule::in(UserTypeEnum::values())],
+            'accountRole' => ['nullable', Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
+        ];
+    }
+
+    /**
+     * Refresh whatever the host page renders once access changed. Pages override this.
      */
     protected function afterRoleChange(): void {}
 
+    private function pendingType(): ?UserTypeEnum
+    {
+        return UserTypeEnum::tryFrom($this->accountType);
+    }
+
+    private function pendingRole(): ?Role
+    {
+        return $this->accountRole === ''
+            ? null
+            : $this->assignableRoles->firstWhere('id', (int) $this->accountRole);
+    }
+
     private function refreshRoleState(): void
     {
-        unset($this->roleUser, $this->roleMatrix, $this->pendingRoleEntry);
-
-        $this->reset('pendingRole');
+        unset($this->roleUser, $this->assignableRoles, $this->accessBlockedReason, $this->pendingAccountType);
 
         $this->afterRoleChange();
     }
@@ -208,13 +206,5 @@ trait WithUserRoleManager
         abort_unless((bool) $user, 404);
 
         return $user;
-    }
-
-    private function roleDescription(UserRoleEnum $role): string
-    {
-        return match ($role) {
-            UserRoleEnum::ADMIN => 'Full access to the administration workspace.',
-            UserRoleEnum::USER => 'Access to the member workspace and account settings.',
-        };
     }
 }

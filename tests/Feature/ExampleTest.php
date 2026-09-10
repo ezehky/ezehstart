@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 
 test('returns a successful response', function () {
     $response = $this->get('/');
@@ -16,7 +16,7 @@ test('the landing page routes guests into the auth flow', function () {
 });
 
 test('the landing page points a signed-in user at their own workspace', function () {
-    $this->actingAs(userWithRole(UserRoleEnum::ADMIN))
+    $this->actingAs(userOfType(UserTypeEnum::ADMIN))
         ->get('/')
         ->assertOk()
         ->assertSee(route('admin.dashboard'));

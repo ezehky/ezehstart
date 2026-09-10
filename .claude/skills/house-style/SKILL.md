@@ -32,7 +32,7 @@ If you read nothing else before starting:
    `Route::livewire('/path', 'pages::group.name')`. Never a class component, never
    a `render()` method.
 3. **Every status is an enum** using `WithEnumHelpers`, with one `is{CASE}()` per case.
-   Status enums are prefixed (`StatusUser`); everything else is suffixed (`UserRoleEnum`).
+   Status enums are prefixed (`StatusUser`); everything else is suffixed (`UserTypeEnum`).
 4. **Every model** is `#[Unguarded]` with a `casts()` method and `#[Scope]` scopes.
    Never `$fillable`, never `protected $casts`, never `scopeFoo()`.
 5. **Every form** follows the nine-step `save()` and ends with `respondSuccess()`.

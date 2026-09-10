@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 
 test('kSlug maps the characters a plain slug would drop', function () {
     expect(kSlug('Design & Build'))->toBe('design-and-build')
@@ -46,11 +46,11 @@ test('kMoneyFormat returns a currency entity', function () {
 });
 
 test('enums built on WithEnumHelpers share a label and a select list', function () {
-    expect(UserRoleEnum::ADMIN->label())->toBe('Admin')
+    expect(UserTypeEnum::ADMIN->label())->toBe('Admin')
         ->and(StatusUser::ACTIVE->boolValue())->toBeTrue()
         ->and(StatusUser::SUSPENDED->boolValue())->toBeFalse()
-        ->and(UserRoleEnum::values())->toBe(['admin', 'user'])
-        ->and(UserRoleEnum::forSelect())->toBe(['admin' => 'Admin', 'user' => 'User']);
+        ->and(UserTypeEnum::values())->toBe(['user', 'admin'])
+        ->and(UserTypeEnum::forSelect())->toBe(['user' => 'User', 'admin' => 'Admin']);
 });
 
 test('a status enum answers one is-question per case', function () {

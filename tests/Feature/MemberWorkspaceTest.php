@@ -1,13 +1,13 @@
 <?php
 
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Services\SiteConfigurationService;
 use App\Services\UserService;
 
 beforeEach(function () {
-    $this->member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 });
 
 test('a member can open every account page', function (string $route) {
@@ -34,7 +34,7 @@ test('the delete-account page is hidden when the site switch is off', function (
 });
 
 test('an unverified member is let through when the site config has not been seeded', function () {
-    $unverified = userWithRole(UserRoleEnum::USER, ['email_verified_at' => null]);
+    $unverified = userOfType(UserTypeEnum::USER, ['email_verified_at' => null]);
 
     // A fresh install has no email-settings keys at all. The workspace has to stay
     // reachable rather than error on the missing key.
@@ -105,7 +105,7 @@ test('an inactive notification type gets no preference row', function () {
 test('an unverified member is pushed to the verification page when strict mode is on', function () {
     app(SiteConfigurationService::class)->update(initials: true);
 
-    $unverified = userWithRole(UserRoleEnum::USER, ['email_verified_at' => null]);
+    $unverified = userOfType(UserTypeEnum::USER, ['email_verified_at' => null]);
 
     $this->actingAs($unverified)
         ->get(route('user.dashboard'))

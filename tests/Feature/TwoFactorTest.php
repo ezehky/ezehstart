@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\UserTwoFactor;
 use App\Services\SiteConfigurationService;
 use App\Services\TwoFactorService;
@@ -9,7 +9,7 @@ use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
 beforeEach(function () {
-    $this->member = userWithRole(UserRoleEnum::USER, [
+    $this->member = userOfType(UserTypeEnum::USER, [
         'email_verified_at' => now(),
         'password' => 'Correct-horse-1!',
     ]);

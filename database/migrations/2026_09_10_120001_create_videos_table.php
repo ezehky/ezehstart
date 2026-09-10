@@ -44,7 +44,7 @@ return new class extends Migration
 
             // Only read when visibility is ROLE. Any other case must leave it null,
             // so changing visibility twice cannot quietly restore an old audience.
-            $table->string('visible_to_role', 20)->nullable()->index(); // UserRoleEnum
+            $table->string('visible_to_type', 20)->nullable()->index(); // UserTypeEnum
 
             $table->boolean('status')->default(StatusDefault::ACTIVE)->index();
 

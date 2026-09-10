@@ -3,24 +3,33 @@
 namespace App\Models;
 
 use App\Enums\GateAccessEnum;
-use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\StatusDefault;
 use App\Services\GateService;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * An admin role — "Administrator", "Media", "Support".
+ *
+ * Rows, not enum cases: an administrator adds them from the roles screen, and the
+ * starter ships no opinion about which ones a project needs beyond the one protected
+ * role that keeps the install administrable.
+ *
+ * Members never have one. What kind of account this is lives on users.type, and a
+ * role only ever hangs off an admin — see UserTypeEnum.
+ */
 #[Unguarded]
 class Role extends Model
 {
     protected function casts(): array
     {
         return [
-            'name' => UserRoleEnum::class,
+            'status' => StatusDefault::class,
+            'is_protected' => 'boolean',
             'gates' => AsArrayObject::class,
         ];
     }
@@ -37,6 +46,15 @@ class Role extends Model
     public function gatesArray(): array
     {
         return $this->gates?->toArray() ?? [];
+    }
+
+    /**
+     * A deactivated role grants nothing, whatever its map says. Access is suspended
+     * wholesale this way rather than by unpicking who held what.
+     */
+    public function grantsAccess(): bool
+    {
+        return $this->status->isActive();
     }
 
     // Methods
@@ -61,29 +79,22 @@ class Role extends Model
 
     // Relationships
 
-    public function userRoles(): HasMany
+    public function users(): HasMany
     {
-        return $this->hasMany(UserRole::class);
-    }
-
-    public function users(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'user_roles')
-            ->withPivot('id', 'status')
-            ->wherePivot('status', StatusUser::ACTIVE);
+        return $this->hasMany(User::class);
     }
 
     // Scopes
 
     #[Scope]
-    public function isAdmin(Builder $builder): void
+    protected function isActive(Builder $builder): void
     {
-        $builder->where('name', UserRoleEnum::ADMIN);
+        $builder->where('status', StatusDefault::ACTIVE);
     }
 
     #[Scope]
-    public function isUser(Builder $builder): void
+    protected function isProtected(Builder $builder): void
     {
-        $builder->where('name', UserRoleEnum::USER);
+        $builder->where('is_protected', true);
     }
 }

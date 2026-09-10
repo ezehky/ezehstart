@@ -1,103 +1,62 @@
-@props(['user' => null, 'matrix' => [], 'pending' => null])
+@props(['user', 'roles', 'type', 'blocked' => null])
+
+{{-- Type and role are one form because they are one decision: a role only exists
+     inside the admin workspace, so choosing a role for an account that is about to
+     stop being an admin is not a thing the screen should let anybody express. --}}
 
 <flux:modal name="userRolesModal" class="md:w-135">
-    <div class="space-y-6">
+    <form wire:submit="saveRoleAccess" class="space-y-6">
         <div>
-            <flux:heading size="lg">Manage roles</flux:heading>
+            <flux:heading size="lg">Account access</flux:heading>
             <flux:text class="mt-1">
                 @if ($user)
-                    Grant or remove workspace roles for <span class="font-medium">{{ $user->name }}</span>.
+                    Which workspace <span class="font-medium">{{ $user->name }}</span> signs in to, and what they reach once inside.
                 @else
-                    Grant or remove workspace roles.
+                    Which workspace this account signs in to, and what they reach once inside.
                 @endif
             </flux:text>
         </div>
 
-        <div class="divide-y divide-slate-100 dark:divide-slate-800">
-            @foreach ($matrix as $entry)
-                <div wire:key="role-entry-{{ $entry['role'] }}" class="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
-                    <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-slate-900 dark:text-white">{{ $entry['label'] }}</span>
-                            @if ($entry['has'])
-                                <flux:badge size="sm" color="lime">Assigned</flux:badge>
-                            @endif
-                        </div>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $entry['description'] }}</p>
-                        @if ($entry['blocked'])
-                            <p class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                {{ $entry['blocked'] }}
-                            </p>
-                        @endif
-                    </div>
-
-                    @if ($entry['action'] === 'revoke')
-                        <flux:button
-                            variant="danger"
-                            size="sm"
-                            icon="minus-circle"
-                            class="shrink-0"
-                            :disabled="(bool) $entry['blocked']"
-                            wire:click="confirmRoleAction('{{ $entry['role'] }}')"
-                        >
-                            Remove
-                        </flux:button>
-                    @elseif ($entry['action'] === 'switch')
-                        <flux:button
-                            variant="primary"
-                            size="sm"
-                            icon="arrows-right-left"
-                            class="shrink-0"
-                            :disabled="(bool) $entry['blocked']"
-                            wire:click="confirmRoleAction('{{ $entry['role'] }}')"
-                        >
-                            Switch to {{ $entry['label'] }}
-                        </flux:button>
-                    @else
-                        <flux:button
-                            variant="primary"
-                            size="sm"
-                            icon="plus-circle"
-                            class="shrink-0"
-                            :disabled="(bool) $entry['blocked']"
-                            wire:click="grantRole('{{ $entry['role'] }}')"
-                        >
-                            Grant
-                        </flux:button>
-                    @endif
-                </div>
+        <flux:select wire:model.live="accountType" label="Account type" badge="required">
+            @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)
+                <option value="{{ $value }}">{{ $label }}</option>
             @endforeach
-        </div>
+        </flux:select>
 
-        <div class="flex justify-end">
-            <flux:modal.close>
-                <flux:button variant="ghost">Done</flux:button>
-            </flux:modal.close>
-        </div>
-    </div>
-</flux:modal>
-
-{{-- Sits beside the roles modal rather than inside it, so the confirmation stacks
-     over a dialog that is still open and the matrix is back the moment it closes. --}}
-@if ($pending)
-    <x-dashboard.confirm-modal
-        name="roleActionModal"
-        :title="$pending['action'] === 'switch'
-            ? 'Switch this account to '.$pending['label'].'?'
-            : 'Remove the '.$pending['label'].' role?'"
-        :icon="$pending['action'] === 'switch' ? 'arrows-right-left' : 'minus-circle'"
-        :variant="$pending['action'] === 'switch' ? 'primary' : 'danger'"
-        :tone="$pending['action'] === 'switch' ? 'sky' : 'rose'"
-        :confirm="$pending['action'] === 'switch' ? 'Switch role' : 'Remove role'"
-        cancel="Leave it as it is"
-        wire:click="applyRoleAction"
-    >
-        @if ($pending['action'] === 'switch')
-            The role this account holds now is given up in exchange. It keeps its data, but the
-            workspace it signs into changes.
+        @if ($type?->carriesRole())
+            <flux:select
+                wire:model.live="accountRole"
+                label="Role"
+                description="What this administrator reaches. Leave it empty to let them sign in while somebody decides."
+            >
+                <option value="">No role yet</option>
+                @foreach ($roles as $role)
+                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                @endforeach
+            </flux:select>
         @else
-            {{ $user?->name ?? 'This account' }} loses access to everything the
-            {{ $pending['label'] }} role opens. It can be granted again later.
+            <flux:callout icon="information-circle" color="zinc">
+                <flux:callout.text>
+                    Members carry no role. The member workspace is not gated — an account reaches
+                    its own records and nothing else.
+                </flux:callout.text>
+            </flux:callout>
         @endif
-    </x-dashboard.confirm-modal>
-@endif
+
+        @if ($blocked)
+            <flux:callout icon="exclamation-triangle" color="amber">
+                <flux:callout.text>{{ $blocked }}</flux:callout.text>
+            </flux:callout>
+        @endif
+
+        <div class="flex justify-end gap-3">
+            <flux:modal.close>
+                <flux:button variant="ghost">Cancel</flux:button>
+            </flux:modal.close>
+
+            <flux:button type="submit" variant="primary" :disabled="(bool) $blocked">
+                Save access
+            </flux:button>
+        </div>
+    </form>
+</flux:modal>

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use Illuminate\Support\Facades\Blade;
 
 test('a chart serialises its rows into the alpine component', function () {
@@ -43,7 +43,7 @@ test('an axis passes its name down to the parts nested inside it', function () {
 });
 
 test('the admin dashboard renders the sign-up chart from real rows', function () {
-    $admin = userWithRole(UserRoleEnum::ADMIN);
+    $admin = userOfType(UserTypeEnum::ADMIN);
 
     $this->actingAs($admin)
         ->get(route('admin.dashboard'))

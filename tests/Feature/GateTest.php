@@ -2,34 +2,24 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\GateAccessEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Role;
-use App\Models\User;
-use App\Models\UserRole;
 use App\Services\GateService;
-use App\Services\UserRoleService;
+use App\Services\RoleService;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
     $this->service = app(GateService::class);
 });
 
 /**
- * The admin-role assignment behind an account, which is what an override hangs off.
- */
-function assignmentFor(User $user): UserRole
-{
-    return $user->userRoles()->isActive()->firstOrFail();
-}
-
-/**
- * Narrow the admin role to exactly the gates given, bypassing the lockout guard so a
- * test can set up a deliberately restricted administrator.
+ * Narrow the protected role to exactly the gates given, bypassing the lockout guard so
+ * a test can set up a deliberately restricted administrator.
  */
 function setAdminRoleGates(array $gates): Role
 {
-    $role = Role::query()->where('name', UserRoleEnum::ADMIN)->firstOrFail();
+    $role = app(RoleService::class)->protectedRole();
     $role->gates = $gates;
     $role->save();
 
@@ -58,7 +48,7 @@ test('none satisfies nothing, including a request for none', function () {
 // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 // RESOLUTION
 
-test('a seeded admin role reaches every gate at full access', function () {
+test('the protected role reaches every gate at full access', function () {
     foreach ($this->service->keys() as $key) {
         expect($this->service->accessFor($this->admin, $key))->toBe(GateAccessEnum::FULL);
     }
@@ -94,9 +84,8 @@ test('the dashboard and profile are never gated', function () {
 test('an override widens what the role grants', function () {
     setAdminRoleGates(['content' => GateAccessEnum::VIEW->value, 'users' => GateAccessEnum::FULL->value]);
 
-    $assignment = assignmentFor($this->admin);
-    $assignment->gates = ['content' => GateAccessEnum::FULL->value];
-    $assignment->save();
+    $this->admin->gates = ['content' => GateAccessEnum::FULL->value];
+    $this->admin->save();
 
     $this->service->flush();
 
@@ -106,9 +95,8 @@ test('an override widens what the role grants', function () {
 test('an override can deny something the role allows', function () {
     setAdminRoleGates($this->service->fullAccessMap());
 
-    $assignment = assignmentFor($this->admin);
-    $assignment->gates = ['content' => GateAccessEnum::NONE->value];
-    $assignment->save();
+    $this->admin->gates = ['content' => GateAccessEnum::NONE->value];
+    $this->admin->save();
 
     $this->service->flush();
 
@@ -145,8 +133,19 @@ test('the dashboard and profile stay reachable with no gates at all', function (
     $this->actingAs($this->admin)->get(route('admin.profile'))->assertSuccessful();
 });
 
+test('an admin with no role reaches nothing but the exempt screens', function () {
+    $stranded = adminWithoutRole();
+
+    expect($this->service->accessFor($stranded, 'content'))->toBe(GateAccessEnum::NONE)
+        ->and($this->service->accessFor($stranded, 'users'))->toBe(GateAccessEnum::NONE)
+        ->and($this->service->accessFor($stranded, 'dashboard'))->toBe(GateAccessEnum::FULL);
+
+    $this->actingAs($stranded)->get(route('admin.dashboard'))->assertSuccessful();
+    $this->actingAs($stranded)->get(route('admin.tags'))->assertNotFound();
+});
+
 test('the member workspace is not gated by the admin map', function () {
-    $member = userWithRole(UserRoleEnum::USER);
+    $member = userOfType(UserTypeEnum::USER);
 
     // The shared library screen sits behind content.image-library in the admin
     // workspace. Reached from /app it is a member screen and gates do not apply.
@@ -186,9 +185,9 @@ test('the sidebar drops a single child without dropping its parent', function ()
 // EDITING
 
 test('an admin can change a role gate map from the roles screen', function () {
-    // The member role has no rows until something asks for it — an admin-only
-    // fixture never creates one.
-    $role = app(UserRoleService::class)->role(UserRoleEnum::USER);
+    // A second role, so the map under test is not the one the lockout guard is
+    // watching. Narrowing the protected role is a different test.
+    $role = roleWithGates('Media');
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.roles')
@@ -204,7 +203,7 @@ test('an admin can change a role gate map from the roles screen', function () {
 });
 
 test('a role map cannot be narrowed until nobody would be left to administer', function () {
-    $role = Role::query()->where('name', UserRoleEnum::ADMIN)->firstOrFail();
+    $role = app(RoleService::class)->protectedRole();
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.roles')
@@ -217,11 +216,9 @@ test('a role map cannot be narrowed until nobody would be left to administer', f
 });
 
 test('an override cannot strip the last account that can administer gates', function () {
-    $assignment = assignmentFor($this->admin);
-
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.user-view', ['user' => $this->admin])
-        ->call('openAdminGates', $assignment->id)
+        ->call('openAdminGates', $this->admin->id)
         ->call('grantEveryGate')
         ->set('gateRows.0.level', GateAccessEnum::NONE->value)
         ->call('saveGates');
@@ -233,10 +230,8 @@ test('an override cannot strip the last account that can administer gates', func
 });
 
 test('an override that leaves nobody able to administer is refused', function () {
-    $assignment = assignmentFor($this->admin);
-
     $reason = $this->service->adminGatesBlockedReason(
-        $assignment,
+        $this->admin,
         [GateService::ADMINISTRATION => GateAccessEnum::NONE->value],
     );
 
@@ -246,27 +241,24 @@ test('an override that leaves nobody able to administer is refused', function ()
 test('clearing an override puts the account back on its role', function () {
     setAdminRoleGates($this->service->fullAccessMap());
 
-    $assignment = assignmentFor($this->admin);
-    $assignment->gates = ['content' => GateAccessEnum::VIEW->value];
-    $assignment->save();
+    $this->admin->gates = ['content' => GateAccessEnum::VIEW->value];
+    $this->admin->save();
 
     $this->service->flush();
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.user-view', ['user' => $this->admin])
-        ->call('openAdminGates', $assignment->id)
+        ->call('openAdminGates', $this->admin->id)
         ->call('clearEveryGate')
         ->call('saveGates')
         ->assertHasNoErrors();
 
-    expect($assignment->fresh()->gates)->toBeNull()
+    expect($this->admin->fresh()->gates)->toBeNull()
         ->and($this->service->accessFor($this->admin->fresh(), 'content'))->toBe(GateAccessEnum::FULL);
 });
 
 test('a gate change is written to the activity log', function () {
-    // The member role has no rows until something asks for it — an admin-only
-    // fixture never creates one.
-    $role = app(UserRoleService::class)->role(UserRoleEnum::USER);
+    $role = roleWithGates('Media');
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.roles')

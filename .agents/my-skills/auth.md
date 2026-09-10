@@ -18,35 +18,52 @@ Fortify**. Every auth screen is a Livewire page in `resources/views/pages/auth/`
 | `social.redirect` / `social.callback` | closure + `SocialiteCallbackController` | Google (Facebook and X are defined but disabled) |
 | `logout` | closure in `web.php` | `UserService::logoutUser()` |
 
-### Roles
+### Types and roles
 
-Roles are **rows**, not a column: `roles` (seeded from `UserRoleEnum`) ↔ `user_roles`
-(pivot with its own `status`). A user can hold several.
+Two different things, and the distinction is the whole model.
+
+**Type** — which workspace an account signs in to. `users.type`, cast to
+`UserTypeEnum`, fixed in code because a workspace is a middleware, a routes file and a
+group in `bootstrap/app.php`. The starter ships `USER` and `ADMIN`; a project adds a
+case when it grows a third workspace.
+
+**Role** — how the *admin* workspace is divided up. A row in `roles`, created from the
+dashboard: "Administrator", "Media", "Support". **Only an admin has one, and exactly
+one** (`users.role_id`). A member has none — the member workspace is not gated, so
+there would be nothing for a role to say.
 
 ```php
-$user->isAdmin();      // exists() over active user_roles → role
-$user->isTrainer();
-$user->isStudent();
-$user->hasRole(UserRoleEnum::TRAINER);
-$user->activeRoles();  // Collection<UserRoleEnum>, read from the loaded relation
+$user->isAdmin();          // $user->type->isAdmin()
+$user->isUser();
+$user->isType(UserTypeEnum::ADMIN);
+$user->hasLiveRole();      // admin, on a role, and that role is switched on
+$user->role;               // ?Role — null for every member
 ```
 
 Query scopes:
 
 ```php
-User::query()->carriesRole(UserRoleEnum::STUDENT);
-User::query()->carriesNoRole();     // accounts with no active role at all
+User::query()->admins();            // type = admin
+User::query()->members();           // type = user
+User::query()->ofType($type);
+User::query()->withoutLiveRole();   // admins with no role, or a switched-off one
 ```
 
-Role changes go through `UserRoleService` + the `WithUserRoleManager` trait —
-`grant()`, `revoke()`, `switchTo()`, each with a `*BlockedReason(): ?string` guard.
-Never write to `user_roles` directly.
+Role and type changes go through `RoleService` + the `WithUserRoleManager` trait —
+`create()`, `update()`, `delete()`, `assign()`, `changeType()`, each with a
+`*BlockedReason(): ?string` guard. Never write `users.role_id` or `users.type`
+directly.
+
+An admin with no live role is a **holding state, not a bug**: they sign in, land on the
+dashboard, and reach nothing else. The admins listing and the dashboard both call it
+out.
 
 ### Registration — `WithAuthWorker::createUser()`
 
-One transaction creates the user, the student role, the profile, and the affiliate
-profile, and records consent for every current policy. Mail is queued **after** the
-commit.
+One transaction creates the user, the profile, and a consent record for every current
+policy. Mail is queued **after** the commit. Self-registration only ever makes a
+member — `users.type` defaults to `UserTypeEnum::USER` and there is no role to
+assign.
 
 ```php
 $user = DB::transaction(function () use (…) {
@@ -320,9 +337,12 @@ new #[Layout('layouts::auth')] class extends Component
 - Installing Breeze / Jetstream / Fortify, or scaffolding auth controllers.
 - `Hash::make()` in a page — the `'password' => 'hashed'` cast handles it.
 - Signing a user in without `session()->regenerate()`.
-- Writing to `user_roles` directly instead of `UserRoleService`.
-- Checking a role with a string (`$user->role === 'admin'`) — use `isAdmin()` /
-  `hasRole(UserRoleEnum::ADMIN)`.
+- Writing `users.role_id` or `users.type` directly instead of going through
+  `RoleService`.
+- Checking a type with a string (`$user->type === 'admin'`) — use `isAdmin()` /
+  `isType(UserTypeEnum::ADMIN)`.
+- Giving a member a role, or reaching for one on a member. They have none by design.
+- Treating "admin with no role" as broken. It is a state the UI is built to show.
 - Assuming `password` is non-null.
 - Skipping the login activity log or the login-alert email on a new sign-in path.
 - Hard-coding a post-login route — use `userDashboardRedirect()`.

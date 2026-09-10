@@ -2,7 +2,6 @@
 
 use App\Enums\NotificationTopicEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\AdminActionService;
@@ -38,11 +37,11 @@ new class extends Component
     public function metrics(): array
     {
         $usersCount = User::query()->count();
-        $adminsCount = User::query()->carriesRole(UserRoleEnum::ADMIN)->count();
-        $membersCount = User::query()->carriesRole(UserRoleEnum::USER)->count();
+        $adminsCount = User::query()->admins()->count();
+        $membersCount = User::query()->members()->count();
         $suspendedCount = User::query()->where('status', StatusUser::SUSPENDED)->count();
         $unverifiedCount = User::query()->whereNull('email_verified_at')->count();
-        $unassignedCount = User::query()->carriesNoRole()->count();
+        $strandedCount = User::query()->withoutLiveRole()->count();
 
         return [
             'users' => [
@@ -56,7 +55,7 @@ new class extends Component
                 'label' => 'Members',
                 'value' => number_format($membersCount),
                 'icon' => 'user-group',
-                'change' => 'Accounts carrying the member role',
+                'change' => 'Accounts in the member workspace',
                 'tone' => 'emerald',
             ],
             'admins' => [
@@ -66,11 +65,11 @@ new class extends Component
                 'change' => 'Accounts with workspace access',
                 'tone' => 'slate',
             ],
-            'unassigned' => [
-                'label' => 'Unassigned',
-                'value' => number_format($unassignedCount),
+            'stranded' => [
+                'label' => 'Admins without a role',
+                'value' => number_format($strandedCount),
                 'icon' => 'user-plus',
-                'change' => 'Holding no role, so blocked everywhere',
+                'change' => 'No live role, so nothing is reachable',
                 'tone' => 'amber',
             ],
             'unverified' => [

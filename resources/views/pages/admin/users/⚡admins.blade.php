@@ -2,10 +2,10 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Services\ActivityLogService;
-use App\Services\UserRoleService;
+use App\Services\RoleService;
 use App\Traits\WithUserRoleManager;
 use Flux\Flux;
 use Illuminate\Validation\Rule;
@@ -30,11 +30,24 @@ new class extends Component
 
     public ?string $password = null;
 
+    /**
+     * The role a newly created admin starts on. Empty is allowed and deliberate —
+     * an account can be stood up before anybody has decided what it should reach.
+     */
+    public string $role_id = '';
+
     #[Url(as: 'q')]
     public string $search = '';
 
     #[Url]
     public string $accountStatus = '';
+
+    /**
+     * Either a role id, or 'none' for the admins who cannot reach anything. The
+     * pending-work queue on the dashboard links straight into 'none'.
+     */
+    #[Url]
+    public string $roleState = '';
 
     public function mount(): void
     {
@@ -52,16 +65,35 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatedRoleState(): void
+    {
+        $this->resetPage();
+    }
+
     #[Computed]
     public function admins()
     {
         return User::query()
-            ->carriesRole(UserRoleEnum::ADMIN)
-            ->with('userRoles.role')
+            ->admins()
+            ->with('role')
             ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
             ->when($this->accountStatus !== '', fn ($query) => $query->where('status', $this->accountStatus))
+            ->when($this->roleState === 'none', fn ($query) => $query->withoutLiveRole())
+            ->when($this->roleState !== '' && $this->roleState !== 'none',
+                fn ($query) => $query->where('role_id', (int) $this->roleState))
             ->latest()
             ->paginate(10);
+    }
+
+    /**
+     * How many admins cannot reach anything, for the callout above the table. Counted
+     * rather than read off the page: the answer is about the whole install, and a
+     * filtered page would keep changing it.
+     */
+    #[Computed]
+    public function strandedCount(): int
+    {
+        return User::query()->withoutLiveRole()->count();
     }
 
     #[Computed]
@@ -87,6 +119,7 @@ new class extends Component
         $this->phone_number = $admin->phone_number;
         $this->status = $admin->status->boolValue();
         $this->password = null;
+        $this->role_id = (string) ($admin->role_id ?? '');
 
         Flux::modal('adminModal')->show();
     }
@@ -104,6 +137,7 @@ new class extends Component
             'phone_number' => ['nullable', 'string', 'max:20'],
             'status' => ['boolean'],
             'password' => [$this->admin ? 'nullable' : 'required', 'string', 'min:5'],
+            'role_id' => ['nullable', Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
         ];
     }
 
@@ -112,11 +146,16 @@ new class extends Component
         $this->validate();
 
         $logService = app(ActivityLogService::class);
-        $roleService = app(UserRoleService::class);
+        $roleService = app(RoleService::class);
+        $role = $this->role_id === '' ? null : $this->assignableRoles->firstWhere('id', (int) $this->role_id);
 
         if (! $this->admin) {
             $this->admin = User::make();
             $this->admin->email_verified_at = now();
+            // Every account created here is an admin. The type is set on the object
+            // rather than through changeType(): there is no account yet to move.
+            $this->admin->type = UserTypeEnum::ADMIN;
+            $this->admin->role_id = $role?->id;
             $action = ActivityActionEnum::USER_CREATE;
         } else {
             $action = ActivityActionEnum::USER_UPDATE;
@@ -133,8 +172,15 @@ new class extends Component
 
         $isNew = ! $this->admin->exists;
 
+        // On an edit the role moves through the service, so the lockout guard and the
+        // activity log both see it. Setting role_id here would slip past both.
+        if (! $isNew && $this->admin->role_id !== $role?->id) {
+            $reason = $roleService->assignBlockedReason($this->admin, $role);
+            $this->respondError($reason ?? '', if: $reason !== null);
+        }
+
         // Nothing changed on an edit: stop here.
-        $this->respondPrimary(if: $this->admin->isClean() && $this->admin->exists);
+        $this->respondPrimary(if: $this->admin->isClean() && $this->admin->exists && $this->admin->role_id === $role?->id);
 
         $affectedColumns = $logService->affectedColumns($this->admin);
 
@@ -149,26 +195,27 @@ new class extends Component
             );
         }
 
-        // Every account on this page carries the admin role.
-        $roleService->grant($this->admin, UserRoleEnum::ADMIN);
+        if (! $isNew) {
+            $roleService->assign($this->admin, $role);
+        }
 
         Flux::modal('adminModal')->close();
         $this->resetAdminForm();
 
-        unset($this->admins);
+        unset($this->admins, $this->strandedCount);
 
         return $this->respondSuccess($isNew ? 'Admin has been successfully created.' : 'Admin has been successfully updated.');
     }
 
     protected function afterRoleChange(): void
     {
-        unset($this->admins);
+        unset($this->admins, $this->strandedCount);
     }
 
     private function resetAdminForm(): void
     {
         $this->resetValidation();
-        $this->reset('admin', 'name', 'email', 'phone_number', 'status', 'password');
+        $this->reset('admin', 'name', 'email', 'phone_number', 'status', 'password', 'role_id');
         $this->status = true;
     }
 };
@@ -180,7 +227,7 @@ new class extends Component
             <div>
                 <flux:heading level="2" size="lg">Admins</flux:heading>
                 <flux:text class="mt-1">
-                    Everyone with access to this administration workspace, and the roles they hold.
+                    Everyone with access to this administration workspace, and the role each one carries.
                 </flux:text>
             </div>
 
@@ -189,6 +236,19 @@ new class extends Component
             </flux:button>
         </div>
 
+        @if ($this->strandedCount && $this->roleState !== 'none')
+            <flux:callout icon="exclamation-triangle" color="amber">
+                <flux:callout.heading>
+                    {{ kPluralize('admin account', $this->strandedCount) }} cannot reach anything
+                </flux:callout.heading>
+                <flux:callout.text>
+                    They have no role, or one that has been switched off, so they sign in to an
+                    empty workspace.
+                    <flux:link wire:click="$set('roleState', 'none')" class="cursor-pointer">Show them</flux:link>.
+                </flux:callout.text>
+            </flux:callout>
+        @endif
+
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <flux:input
                 class="sm:min-w-64"
@@ -196,6 +256,13 @@ new class extends Component
                 placeholder="Search name, email or phone"
                 icon="magnifying-glass"
             />
+            <flux:select wire:model.live="roleState">
+                <option value="">All roles</option>
+                <option value="none">No live role</option>
+                @foreach ($this->assignableRoles as $roleOption)
+                    <option value="{{ $roleOption->id }}">{{ $roleOption->name }}</option>
+                @endforeach
+            </flux:select>
             <flux:select wire:model.live="accountStatus">
                 <option value="">All statuses</option>
                 @foreach ($this->statusOptions as $value => $label)
@@ -208,7 +275,7 @@ new class extends Component
             <flux:table.columns>
                 <flux:table.column>Admin</flux:table.column>
                 <flux:table.column>Phone</flux:table.column>
-                <flux:table.column>Roles</flux:table.column>
+                <flux:table.column>Role</flux:table.column>
                 <flux:table.column>Status</flux:table.column>
                 <flux:table.column>Last seen</flux:table.column>
                 <flux:table.column>Actions</flux:table.column>
@@ -227,7 +294,7 @@ new class extends Component
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
                         <flux:table.cell>
-                            <x-dashboard.user-roles :roles="$item->activeRoles()" />
+                            <x-dashboard.user-role :user="$item" />
                         </flux:table.cell>
                         <flux:table.cell>
                             <x-status :status="$item->status" />
@@ -257,7 +324,7 @@ new class extends Component
                                     variant="filled"
                                     size="sm"
                                     wire:click="openRoleManager({{ $item->id }})"
-                                    title="Manage roles"
+                                    title="Manage access"
                                 />
                             </div>
                         </flux:table.cell>
@@ -285,8 +352,8 @@ new class extends Component
                 </flux:heading>
                 <flux:text class="mt-1">
                     {{ $admin === null
-                        ? 'The new account is created with the admin role already granted.'
-                        : 'Update this account. Use the roles action to change what they can reach.' }}
+                        ? 'The new account signs in to the administration workspace and reaches whatever its role grants.'
+                        : 'Update this account. Use Manage access to move it out of the admin workspace entirely.' }}
                 </flux:text>
             </div>
 
@@ -306,6 +373,17 @@ new class extends Component
                 />
             </div>
 
+            <flux:select
+                wire:model="role_id"
+                label="Role"
+                description="What this administrator reaches. Leave it empty to create the account before deciding."
+            >
+                <option value="">No role yet</option>
+                @foreach ($this->assignableRoles as $roleOption)
+                    <option value="{{ $roleOption->id }}">{{ $roleOption->name }}</option>
+                @endforeach
+            </flux:select>
+
             <div class="space-y-4">
                 <flux:switch wire:model="status" label="Active account" description="Allow this admin to sign in." />
             </div>
@@ -320,5 +398,10 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
+    <x-dashboard.user-roles-modal
+        :user="$this->roleUser"
+        :roles="$this->assignableRoles"
+        :type="$this->pendingAccountType"
+        :blocked="$this->accessBlockedReason"
+    />
 </div>

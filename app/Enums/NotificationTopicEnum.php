@@ -53,7 +53,7 @@ enum NotificationTopicEnum: string
             self::ACCOUNT_UPDATED => 'Account updated',
             self::SECURITY_ALERT => 'Security alert',
             self::ADMIN_NEW_ACCOUNT => 'New account',
-            self::ADMIN_UNASSIGNED_ACCOUNT => 'Accounts without a role',
+            self::ADMIN_UNASSIGNED_ACCOUNT => 'Admins without a role',
         };
     }
 

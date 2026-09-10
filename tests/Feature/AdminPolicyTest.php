@@ -3,20 +3,20 @@
 use App\Enums\ActivityActionEnum;
 use App\Enums\PolicyTypeEnum;
 use App\Enums\StatusPolicy;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\ActivityLog;
 use App\Models\Policy;
 use App\Services\PolicyContentService;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
 });
 
 test('the screen is closed to a member', function () {
     // The admin workspace answers 404 rather than 403 to an account that has no
     // business there, which is the behaviour the rest of the suite asserts too.
-    $this->actingAs(userWithRole(UserRoleEnum::USER))
+    $this->actingAs(userOfType(UserTypeEnum::USER))
         ->get(route('admin.config.policies'))
         ->assertNotFound();
 });

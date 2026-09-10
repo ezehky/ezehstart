@@ -162,17 +162,16 @@ public function schedules(): HasMany
     return $this->hasMany(CohortSchedule::class);
 }
 
-public function userRoles(): HasMany
+/**
+ * The admin role, or null. Members never have one.
+ *
+ * The explicit select() is load-bearing: GateService resolves access straight off
+ * the loaded role, and a column left out of this list reads back as null.
+ */
+public function role(): BelongsTo
 {
-    return $this->hasMany(UserRole::class)
-        ->select('id', 'user_id', 'role_id', 'status');
-}
-
-public function roles()
-{
-    return $this->belongsToMany(Role::class, 'user_roles')
-        ->withPivot('id', 'status')
-        ->wherePivot('status', StatusUser::ACTIVE);
+    return $this->belongsTo(Role::class)
+        ->select('id', 'name', 'slug', 'gates', 'status', 'is_protected');
 }
 
 public function transactions(): HasMany
@@ -210,26 +209,31 @@ Scopes with arguments:
 
 ```php
 #[Scope]
-protected function carriesRole(Builder $builder, UserRoleEnum $role): void
+protected function ofType(Builder $builder, UserTypeEnum $type): void
 {
-    $builder->whereHas('userRoles', fn ($query) => $query
-        ->isActive()
-        ->whereHas('role', fn ($roleQuery) => $roleQuery->where('name', $role)));
+    $builder->where('type', $type);
 }
 
 /**
- * Accounts holding no active role at all. They cannot reach any workspace until
- * one is granted, so they are surfaced on their own admin listing.
+ * Admins who cannot reach the workspace: no role, or one that is switched off.
+ * A real state — an account promoted before a role was picked, or a whole role
+ * suspended — so the admins listing can call it out rather than show a blank.
  */
 #[Scope]
-protected function carriesNoRole(Builder $builder): void
+protected function withoutLiveRole(Builder $builder): void
 {
-    $builder->whereDoesntHave('userRoles', fn ($query) => $query->isActive());
+    $builder->where('type', UserTypeEnum::ADMIN)
+        ->where(fn (Builder $query) => $query
+            ->whereNull('role_id')
+            ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));
 }
 ```
 
 Common scope names in the project: `active()`, `inFlowOrder()`, `isActive()`,
-`isAdmin()`, `isTrainer()`, `isStudent()`, `live()`, `carriesRole()`, `carriesNoRole()`.
+`admins()`, `members()`, `ofType()`, `withoutLiveRole()`, `live()`.
+
+Note `admins()` rather than `isAdmin()` on `User`: a scope and a getter of the same
+name are two methods with one name, and PHP will not load the class at all.
 
 ### `WithDynamicModelFormatting`
 

@@ -157,7 +157,7 @@ Callers pass them with `<x-slot:title>`.
 
 <x-status :status="$item->status" />
 <x-dashboard.avatar :user="$item" size="md" />
-<x-dashboard.user-roles :roles="$item->activeRoles()" />
+<x-dashboard.user-role :user="$item" />
 <x-dashboard.workspace-no-record label="Students" icon="academic-cap" text="No students match the current filters." />
 ```
 

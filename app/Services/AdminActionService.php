@@ -49,8 +49,9 @@ class AdminActionService
     // Queues
 
     /**
-     * Accounts that registered but hold no active role, so they can sign in and
-     * reach nothing. One entry covers all of them — the listing does the detail.
+     * Admins who cannot reach the workspace: no role, or one that has been switched
+     * off. They sign in and land on a dashboard with an empty sidebar. One entry
+     * covers all of them — the listing does the detail.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -66,8 +67,8 @@ class AdminActionService
 
         return [[
             'topic' => NotificationTopicEnum::ADMIN_UNASSIGNED_ACCOUNT,
-            'message' => kPluralize('account', $count).' cannot reach a workspace until a role is granted.',
-            'url' => route('admin.unassigned'),
+            'message' => kPluralize('admin account', $count).' cannot reach anything until a live role is assigned.',
+            'url' => route('admin.admins', ['roleState' => 'none']),
             'since' => $oldest,
         ]];
     }
@@ -76,7 +77,7 @@ class AdminActionService
 
     private function accountsWithoutRoleQuery(): Builder
     {
-        return User::query()->carriesNoRole();
+        return User::query()->withoutLiveRole();
     }
 
     /**

@@ -107,9 +107,12 @@ new class extends Component
             <div>
                 <flux:heading size="lg">{{ $user->name }}</flux:heading>
                 <div class="mt-1 flex flex-wrap gap-1.5">
-                    @foreach ($user->activeRoles() as $role)
-                        <flux:badge size="sm" :color="$role->isAdmin() ? 'lime' : 'sky'">{{ $role->label() }}</flux:badge>
-                    @endforeach
+                    <flux:badge size="sm" :color="$user->type->isAdmin() ? 'lime' : 'sky'">
+                        {{ $user->type->label() }}
+                    </flux:badge>
+                    @if ($user->role)
+                        <flux:badge size="sm" color="zinc">{{ $user->role->name }}</flux:badge>
+                    @endif
                 </div>
             </div>
         </div>

@@ -4,7 +4,7 @@ namespace App\Traits;
 
 use App\Enums\GateAccessEnum;
 use App\Models\Role;
-use App\Models\UserRole;
+use App\Models\User;
 use App\Services\GateService;
 use Flux\Flux;
 use Illuminate\Validation\Rule;
@@ -14,9 +14,9 @@ use Livewire\Attributes\Computed;
  * Drives the gate editor shared by the roles listing and the single-account view.
  *
  * The same grid edits both subjects. A role's map is absolute — a key it does not
- * carry is access nobody with that role has. An administrator's map is an override
- * laid over their role, so it has a third state the role editor does not: a blank row
- * means "whatever the role says", and is not the same answer as No access.
+ * carry is access nobody on that role has. An administrator's map is an override laid
+ * over their role, so it has a third state the role editor does not: a blank row means
+ * "whatever the role says", and is not the same answer as No access.
  *
  * @property-read array<int, array{key: string, label: string, level: GateAccessEnum}> $gateInheritance
  */
@@ -37,14 +37,14 @@ trait WithGateManager
 
     public ?int $gateRoleId = null;
 
-    public ?int $gateAssignmentId = null;
+    public ?int $gateUserId = null;
 
     /**
      * Is the editor pointed at one administrator rather than at a whole role?
      */
     public function editingAdminGates(): bool
     {
-        return $this->gateAssignmentId !== null;
+        return $this->gateUserId !== null;
     }
 
     /**
@@ -55,7 +55,7 @@ trait WithGateManager
         $this->resetValidation();
 
         $this->gateRoleId = $role->id;
-        $this->gateAssignmentId = null;
+        $this->gateUserId = null;
 
         $this->buildGateRows($role->gatesArray());
 
@@ -67,17 +67,17 @@ trait WithGateManager
     /**
      * Open the editor on one administrator's override.
      */
-    public function openAdminGates(UserRole $assignment): void
+    public function openAdminGates(User $user): void
     {
         $this->resetValidation();
 
-        $this->gateRoleId = $assignment->role_id;
-        $this->gateAssignmentId = $assignment->id;
+        $this->gateRoleId = $user->role_id;
+        $this->gateUserId = $user->id;
 
         // Null means the account has never been overridden, which is every row blank
         // — not every row denied. gatesArray() flattens both to [], and here that is
         // the right reading: a blank row *is* how "inherit" is shown.
-        $this->buildGateRows($assignment->gatesArray());
+        $this->buildGateRows($user->gatesArray());
 
         unset($this->gateInheritance);
 
@@ -90,10 +90,10 @@ trait WithGateManager
     public function gateSubjectLabel(): string
     {
         if ($this->editingAdminGates()) {
-            return (string) (UserRole::query()->with('user')->find($this->gateAssignmentId)?->user?->name ?? 'this account');
+            return (string) (User::query()->find($this->gateUserId)?->name ?? 'this account');
         }
 
-        return (string) (Role::query()->find($this->gateRoleId)?->name?->label() ?? 'this role');
+        return (string) (Role::query()->find($this->gateRoleId)?->name ?? 'this role');
     }
 
     /**
@@ -207,23 +207,23 @@ trait WithGateManager
 
         $this->afterGateChange();
 
-        return $this->respondSuccess("Access for the {$role->name?->label()} role has been saved.");
+        return $this->respondSuccess("Access for the {$role->name} role has been saved.");
     }
 
     private function saveAdminGates(GateService $service, array $submitted): bool
     {
-        $assignment = UserRole::query()->with('user', 'role')->find($this->gateAssignmentId);
+        $user = User::query()->with('role')->find($this->gateUserId);
 
-        $this->respondError('That role assignment no longer exists.', if: ! $assignment);
+        $this->respondError('That account no longer exists.', if: ! $user);
 
         // Nothing overridden at all is not an empty override, it is no override —
         // and the difference is what puts the account back on its role.
         $gates = $submitted === [] ? null : $submitted;
 
-        $reason = $service->adminGatesBlockedReason($assignment, $gates);
+        $reason = $service->adminGatesBlockedReason($user, $gates);
         $this->respondError($reason ?? '', if: $reason !== null);
 
-        $this->respondPrimary(if: ! $service->updateAdminGates($assignment, $gates));
+        $this->respondPrimary(if: ! $service->updateAdminGates($user, $gates));
 
         Flux::modal('gatesModal')->close();
 

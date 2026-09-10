@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Enums\UserRoleEnum;
-use App\Services\UserRoleService;
+use App\Models\Role;
+use App\Services\RoleService;
 use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
@@ -11,17 +11,26 @@ class RoleSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * Goes through UserRoleService rather than the model so that a role created here
-     * gets the same starting gates as one created anywhere else — the admin role with
-     * everything, every other role closed. Roles that already exist keep the gates
-     * they have: reseeding must not hand back access somebody took away.
+     * Roles are rows an administrator creates, so this only lays down what an install
+     * cannot start without: the protected role, which carries every gate and is what
+     * the seeded admin signs in on.
+     *
+     * The starter roles beside it are examples — created closed, and expected to be
+     * renamed, re-gated or deleted. They are only ever created, never updated:
+     * re-seeding must not hand back access somebody deliberately took away.
      */
     public function run(): void
     {
-        $service = app(UserRoleService::class);
+        $service = app(RoleService::class);
 
-        foreach (UserRoleEnum::cases() as $role) {
-            $service->role($role);
+        $service->protectedRole();
+
+        foreach (RoleService::STARTER_ROLES as $name => $description) {
+            if (Role::query()->where('slug', str($name)->slug())->exists()) {
+                continue;
+            }
+
+            $service->create($name, $description);
         }
     }
 }

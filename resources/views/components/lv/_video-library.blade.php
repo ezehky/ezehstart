@@ -189,13 +189,13 @@
                         </flux:select>
 
                         @if ($folder_visibility === 'role')
-                            <flux:select wire:model="folder_visible_to_role" label="Visible to role">
+                            <flux:select wire:model="folder_visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
-                                @foreach (App\Enums\UserRoleEnum::forSelect() as $value => $label)
+                                @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)
                                     <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
                                 @endforeach
                             </flux:select>
-                            <flux:error name="folder_visible_to_role" />
+                            <flux:error name="folder_visible_to_type" />
                         @endif
 
                         @if ($this->user->isAdmin() && ! $folder_id)
@@ -246,13 +246,13 @@
                         </flux:select>
 
                         @if ($visibility === 'role')
-                            <flux:select wire:model="visible_to_role" label="Visible to role">
+                            <flux:select wire:model="visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
-                                @foreach (App\Enums\UserRoleEnum::forSelect() as $value => $label)
+                                @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)
                                     <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
                                 @endforeach
                             </flux:select>
-                            <flux:error name="visible_to_role" />
+                            <flux:error name="visible_to_type" />
                         @endif
 
                         {{-- The provider and the id are not editable. Repointing a row

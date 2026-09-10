@@ -172,7 +172,7 @@ wins. Its full library is in `.agents/my-skills/` — start at `agent.md`, finis
 ## Pest
 
 - This project uses Pest 5 for testing. Create tests: `php artisan make:test --pest {name}`.
-- `tests/Pest.php` gives you `userWithRole(UserRoleEnum $role)` and `userWithoutRole()`. A workspace is unreachable without a role, so almost every feature test starts with one of them.
+- `tests/Pest.php` gives you `userOfType(UserTypeEnum $type)`, `adminWithoutRole()` and `roleWithGates()`. An admin needs a role to reach any gated screen, so almost every feature test starts with one of them.
 - The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
 - Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
 - Do NOT delete tests without approval.

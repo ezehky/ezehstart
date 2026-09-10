@@ -1,16 +1,15 @@
 <?php
 
 use App\Enums\PolicyTypeEnum;
-use App\Enums\StatusDefault;
 use App\Enums\StatusPolicy;
 use App\Enums\StatusUser;
 use App\Enums\StatusYes;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Models\Policy;
+use App\Models\Role;
 use App\Models\User;
-use App\Models\UserRole;
-use App\Services\UserRoleService;
+use App\Services\RoleService;
 use Database\Seeders\NotificationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
@@ -71,31 +70,41 @@ expect()->extend('toBeOne', function () {
 */
 
 /**
- * An active account carrying the given role.
+ * An active account of the given type.
  *
- * Almost every feature test starts here — a workspace is unreachable without a role,
- * so a plain User::factory() account can only ever assert a redirect.
+ * Almost every feature test starts here. An admin lands on the protected role unless
+ * another is named — that role carries every gate, so a test that just wants "an
+ * admin" gets one who can actually open the screen under test. Build the role with a
+ * bare firstOrCreate instead and the admin hits a 404 on every admin screen, which is
+ * a fixture problem masquerading as a broken page.
  */
-function userWithRole(UserRoleEnum $role, array $attributes = []): User
+function userOfType(UserTypeEnum $type, array $attributes = [], ?Role $role = null): User
 {
-    $user = User::factory()->create([
+    $factory = User::factory();
+
+    if ($type->carriesRole()) {
+        $factory = $factory->admin($role);
+    }
+
+    return $factory->create([
         'status' => StatusUser::ACTIVE,
         ...$attributes,
     ]);
+}
 
-    // Through the service rather than the model, so the role is created with the
-    // same starting gates the running application would give it. Build it with
-    // firstOrCreate here and an admin lands on an empty sidebar and a 404 on every
-    // admin screen, which is a fixture problem masquerading as a broken page.
-    $roleRecord = app(UserRoleService::class)->role($role);
+/**
+ * A role with a gate map, for the tests that care what an admin can and cannot reach.
+ *
+ * @param  array<string, string>  $gates
+ */
+function roleWithGates(string $name, array $gates = []): Role
+{
+    $role = app(RoleService::class)->create($name);
 
-    UserRole::query()->create([
-        'user_id' => $user->id,
-        'role_id' => $roleRecord->id,
-        'status' => StatusDefault::ACTIVE,
-    ]);
+    $role->gates = $gates;
+    $role->save();
 
-    return $user;
+    return $role;
 }
 
 /**
@@ -126,12 +135,15 @@ The second body.',
 }
 
 /**
- * An account holding no role at all, which can sign in but reach no workspace.
+ * An admin with no role, which can sign in but reaches nothing beyond the dashboard
+ * and its own profile.
  */
-function userWithoutRole(array $attributes = []): User
+function adminWithoutRole(array $attributes = []): User
 {
     return User::factory()->create([
         'status' => StatusUser::ACTIVE,
+        'type' => UserTypeEnum::ADMIN,
+        'role_id' => null,
         ...$attributes,
     ]);
 }

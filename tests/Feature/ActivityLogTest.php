@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Services\ActivityLogService;
 
@@ -12,7 +12,7 @@ test('nothing is logged for a guest', function () {
 });
 
 test('an action with no description and no default wording is not logged', function () {
-    $this->actingAs(userWithRole(UserRoleEnum::ADMIN));
+    $this->actingAs(userOfType(UserTypeEnum::ADMIN));
 
     // VIEW has neither a startDescription nor a defaultDescription, so there is
     // nothing to record and the entry is skipped rather than written blank.
@@ -22,7 +22,7 @@ test('an action with no description and no default wording is not logged', funct
 });
 
 test('a description is prefixed by the action wording', function () {
-    $admin = userWithRole(UserRoleEnum::ADMIN);
+    $admin = userOfType(UserTypeEnum::ADMIN);
     $this->actingAs($admin);
 
     app(ActivityLogService::class)->logActivity(ActivityActionEnum::USER_CREATE, 'admin: Ada');
@@ -34,7 +34,7 @@ test('a description is prefixed by the action wording', function () {
 });
 
 test('prefixDescription false leaves the sentence alone', function () {
-    $admin = userWithRole(UserRoleEnum::ADMIN);
+    $admin = userOfType(UserTypeEnum::ADMIN);
     $this->actingAs($admin);
 
     app(ActivityLogService::class)->logActivity(
@@ -76,8 +76,8 @@ test('affectedColumns returns null when nothing changed', function () {
 });
 
 test('a logged entry carries the model it happened to', function () {
-    $admin = userWithRole(UserRoleEnum::ADMIN);
-    $subject = userWithoutRole();
+    $admin = userOfType(UserTypeEnum::ADMIN);
+    $subject = adminWithoutRole();
     $this->actingAs($admin);
 
     app(ActivityLogService::class)->logActivity(

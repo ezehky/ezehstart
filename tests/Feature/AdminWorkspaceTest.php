@@ -2,12 +2,12 @@
 
 use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
 });
 
 test('an admin can open every workspace page', function (string $route) {
@@ -22,7 +22,6 @@ test('an admin can open every workspace page', function (string $route) {
     'admin.config.social-handles',
     'admin.admins',
     'admin.members',
-    'admin.unassigned',
     'admin.roles',
     'admin.activity-logs',
     'admin.config.notification-types',
@@ -34,7 +33,7 @@ test('an admin can open every workspace page', function (string $route) {
 ]);
 
 test('an admin can open a single account', function () {
-    $account = userWithRole(UserRoleEnum::USER);
+    $account = userOfType(UserTypeEnum::USER);
 
     $this->actingAs($this->admin)
         ->get(route('admin.user', $account))
@@ -42,9 +41,9 @@ test('an admin can open a single account', function () {
         ->assertSee($account->name);
 });
 
-test('the members listing only shows accounts carrying the member role', function () {
-    $member = userWithRole(UserRoleEnum::USER, ['name' => 'Ada Member']);
-    $stranger = userWithoutRole(['name' => 'Grace Unassigned']);
+test('the members listing only shows member accounts', function () {
+    $member = userOfType(UserTypeEnum::USER, ['name' => 'Ada Member']);
+    $stranger = adminWithoutRole(['name' => 'Grace Unassigned']);
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.members')
@@ -52,19 +51,22 @@ test('the members listing only shows accounts carrying the member role', functio
         ->assertDontSee($stranger->name);
 });
 
-test('the unassigned listing only shows accounts with no role', function () {
-    $member = userWithRole(UserRoleEnum::USER, ['name' => 'Ada Member']);
-    $stranger = userWithoutRole(['name' => 'Grace Unassigned']);
+test('the admins listing can be narrowed to those with no live role', function () {
+    $member = userOfType(UserTypeEnum::USER, ['name' => 'Ada Member']);
+    $stranger = adminWithoutRole(['name' => 'Grace Unassigned']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.users.unassigned')
+        ->test('pages::admin.users.admins')
+        ->set('roleState', 'none')
         ->assertSee($stranger->name)
-        ->assertDontSee($member->name);
+        ->assertDontSee($member->name)
+        // The signed-in admin is on the protected role, so it is not stranded.
+        ->assertDontSee($this->admin->name);
 });
 
 test('the members listing can be searched', function () {
-    userWithRole(UserRoleEnum::USER, ['name' => 'Ada Lovelace']);
-    userWithRole(UserRoleEnum::USER, ['name' => 'Grace Hopper']);
+    userOfType(UserTypeEnum::USER, ['name' => 'Ada Lovelace']);
+    userOfType(UserTypeEnum::USER, ['name' => 'Grace Hopper']);
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.users.members')
@@ -74,7 +76,7 @@ test('the members listing can be searched', function () {
 });
 
 test('an admin can suspend and reactivate an account', function () {
-    $account = userWithRole(UserRoleEnum::USER);
+    $account = userOfType(UserTypeEnum::USER);
 
     $component = Livewire::actingAs($this->admin)
         ->test('pages::admin.users.user-view', ['user' => $account])

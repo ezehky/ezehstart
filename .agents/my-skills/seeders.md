@@ -11,19 +11,31 @@ duplicating it.
 
 namespace Database\Seeders;
 
-use App\Enums\UserRoleEnum;
 use App\Models\Role;
+use App\Services\RoleService;
 use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     *
+     * Only what an install cannot start without: the protected role, which carries
+     * every gate. The starter roles beside it are examples, created closed and only
+     * ever created — re-seeding must not hand back access somebody took away.
      */
     public function run(): void
     {
-        foreach (UserRoleEnum::cases() as $role) {
-            Role::updateOrCreate(['name' => $role]);
+        $service = app(RoleService::class);
+
+        $service->protectedRole();
+
+        foreach (RoleService::STARTER_ROLES as $name => $description) {
+            if (Role::query()->where('slug', str($name)->slug())->exists()) {
+                continue;
+            }
+
+            $service->create($name, $description);
         }
     }
 }
@@ -78,10 +90,13 @@ Notes:
 Anything whose rows mirror an enum iterates the enum, so adding a case seeds a row:
 
 ```php
-foreach (UserRoleEnum::cases() as $role) {
-    Role::updateOrCreate(['name' => $role]);
+foreach (NotificationTopicEnum::cases() as $topic) {
+    NotificationType::updateOrCreate(['topic' => $topic]);
 }
 ```
+
+Roles are **not** one of these. They are rows an administrator creates, there is no
+enum behind them, and the seeder lays down starting points rather than a vocabulary.
 
 ### Content seeders
 
@@ -151,20 +166,25 @@ Rules for seeded content:
 ### User seeder
 
 ```php
-foreach ($data as $userData) {
-    $admin = User::firstOrCreate(
-        ['email' => $userData['email']],
-        $userData
-    );
+$adminRole = app(RoleService::class)->protectedRole();
 
-    if ($adminRole = Role::where('name', UserRoleEnum::ADMIN)->first()) {
-        $admin->roles()->syncWithoutDetaching([$adminRole->id]);
-    }
+$data = [[
+    'name' => 'Admin User',
+    'email' => 'admin@example.test',
+    'password' => 'password',
+    'type' => UserTypeEnum::ADMIN,
+    'role_id' => $adminRole->id,
+]];
+
+foreach ($data as $userData) {
+    User::firstOrCreate(['email' => $userData['email']], $userData);
 }
 ```
 
-`firstOrCreate` on the email; `syncWithoutDetaching` so re-running never strips a role
-that was granted later.
+`firstOrCreate` on the email, so re-seeding never duplicates the account or resets a
+password somebody changed. The admin goes on the **protected** role rather than a
+starter one: the starters ship closed, and an install whose only admin reaches nothing
+has no screen left to fix itself from.
 
 ### Running
 

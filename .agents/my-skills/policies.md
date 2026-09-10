@@ -22,7 +22,7 @@ Authorization is four layers:
 
 ### Layer 1 — workspace
 
-See [middleware.md](middleware.md). `abort_unless($user->hasRole($role), 404)`.
+See [middleware.md](middleware.md). `abort_unless($user->isType($type), 404)`.
 
 ### Layer 2 — admin page access
 
@@ -331,4 +331,4 @@ public function void(): bool
 - Trusting a route-bound model's parent without `->is()` verification.
 - Duplicating a lock rule in five pages instead of one `ensure*()` in a trait.
 - A guard that returns `bool` where the UI needs to explain **why** — return `?string`.
-- Checking a role by string instead of `hasRole(UserRoleEnum::X)`.
+- Checking an account type by string instead of `isType(UserTypeEnum::X)`.

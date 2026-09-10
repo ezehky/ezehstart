@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Services\PasswordSecurityService;
 use App\Services\SiteConfigurationService;
@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->member = userWithRole(UserRoleEnum::USER, [
+    $this->member = userOfType(UserTypeEnum::USER, [
         'email_verified_at' => now(),
         'password' => 'Correct-horse-1!',
     ]);
@@ -50,7 +50,7 @@ test('too many failed sign-ins lock the account out', function () {
 });
 
 test('the throttle is keyed on the email and ip together, so one account cannot lock out another', function () {
-    $other = userWithRole(UserRoleEnum::USER, [
+    $other = userOfType(UserTypeEnum::USER, [
         'email_verified_at' => now(),
         'password' => 'Correct-horse-1!',
     ]);

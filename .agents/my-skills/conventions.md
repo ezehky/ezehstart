@@ -82,12 +82,12 @@ PHPDoc is used **only when it adds information the signature cannot carry**:
 
 ```php
 /**
- * The roles this user actively carries, read from the loaded relation so a
- * listing can render them without a query per row.
+ * The roles the modal offers, live ones only — putting an account on a switched-off
+ * role would grant nothing and read as a bug rather than a deliberate suspension.
  *
- * @return Collection<int, UserRoleEnum>
+ * @return Collection<int, Role>
  */
-public function activeRoles(): Collection
+public function assignableRoles(): Collection
 
 /**
  * @return Collection<int, array{topic: NotificationTopicEnum, message: string, url: string, since: Carbon|null}>
@@ -246,10 +246,9 @@ public string $answer = '';
 `match` is the default for mapping. `switch` appears only in one older Blade component.
 
 ```php
-return match ($role) {
-    UserRoleEnum::STUDENT => $this->isStudent(),
-    UserRoleEnum::TRAINER => $this->isTrainer(),
-    UserRoleEnum::ADMIN => $this->isAdmin(),
+return match ($this) {
+    UserTypeEnum::ADMIN => route('admin.dashboard'),
+    UserTypeEnum::USER => route('user.dashboard'),
 };
 ```
 

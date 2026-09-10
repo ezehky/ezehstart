@@ -2,10 +2,8 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
 use App\Models\User;
 use App\Models\UserProfile;
-use App\Models\UserRole;
 use App\Services\ActivityLogService;
 use App\Services\GateService;
 use App\Services\UserService;
@@ -38,41 +36,25 @@ new class extends Component
 
     public function mount(): void
     {
-        $this->user->load(['userProfile', 'userRoles.role']);
+        $this->user->load(['userProfile', 'role']);
 
-        // The role manager modal always targets the account being viewed.
-        $this->roleUserId = $this->user->id;
+        // The access modal always targets the account being viewed.
+        $this->openRoleManagerState();
 
         kSetSiteTitle('users', $this->listKey(), $this->user->name, format: false);
         kPageGate('users');
     }
 
-    #[Computed]
-    public function roles(): Collection
-    {
-        return $this->user->activeRoles();
-    }
-
+    /**
+     * Does this account have a gated workspace at all?
+     *
+     * Only an administrator does. There is nothing to override a member's access
+     * over, because the member workspace is not gated.
+     */
     #[Computed]
     public function isAdminAccount(): bool
     {
-        return $this->roles->contains(UserRoleEnum::ADMIN);
-    }
-
-    /**
-     * The live admin-role assignment, which is what an access override hangs off.
-     *
-     * Null for an account that is not an administrator — there is nothing to override
-     * a member's access over, because members have no gated workspace.
-     */
-    #[Computed]
-    public function adminAssignment(): ?UserRole
-    {
-        return $this->user->userRoles()
-            ->isActive()
-            ->whereHas('role', fn ($role) => $role->isAdmin())
-            ->with('role')
-            ->first();
+        return $this->user->type->carriesRole();
     }
 
     /**
@@ -84,12 +66,12 @@ new class extends Component
     #[Computed]
     public function gateSummary(): array
     {
-        if (! $assignment = $this->adminAssignment) {
+        if (! $this->isAdminAccount) {
             return [];
         }
 
         $service = app(GateService::class);
-        $overrides = $assignment->gatesArray();
+        $overrides = $this->user->gatesArray();
         $rows = [];
 
         foreach ($service->resources() as $key => $resource) {
@@ -115,9 +97,9 @@ new class extends Component
 
     protected function afterGateChange(): void
     {
-        $this->user->refresh()->load(['userRoles.role', 'userProfile']);
+        $this->user->refresh()->load(['role', 'userProfile']);
 
-        unset($this->adminAssignment, $this->gateSummary, $this->activityLogs);
+        unset($this->gateSummary, $this->activityLogs);
     }
 
     /**
@@ -125,11 +107,7 @@ new class extends Component
      */
     public function listKey(): string
     {
-        return match (true) {
-            $this->isAdminAccount => 'admins',
-            $this->roles->isNotEmpty() => 'members',
-            default => 'unassigned',
-        };
+        return $this->user->type->isAdmin() ? 'admins' : 'members';
     }
 
     #[Computed]
@@ -291,15 +269,29 @@ new class extends Component
 
     protected function afterRoleChange(): void
     {
-        $this->user->refresh()->load(['userRoles.role', 'userProfile']);
+        $this->user->refresh()->load(['role', 'userProfile']);
+
+        // Re-pointed at the refreshed account, so the modal's boxes match what was
+        // just written rather than what was there when it opened.
+        $this->openRoleManagerState();
 
         unset(
-            $this->roles,
             $this->isAdminAccount,
             $this->activityLogs,
-            $this->adminAssignment,
             $this->gateSummary,
         );
+    }
+
+    /**
+     * Point the shared access modal at the account this page is about, without
+     * opening it. The listings call openRoleManager(); here the subject never
+     * changes, so only the state is seeded.
+     */
+    private function openRoleManagerState(): void
+    {
+        $this->roleUserId = $this->user->id;
+        $this->accountType = $this->user->type->value;
+        $this->accountRole = (string) ($this->user->role_id ?? '');
     }
 };
 ?>
@@ -317,11 +309,12 @@ new class extends Component
         </flux:button>
     </div>
 
-    @if ($this->roles->isEmpty())
+    @if ($this->isAdminAccount && ! $user->hasLiveRole())
         <flux:callout icon="exclamation-triangle" variant="warning">
-            <flux:callout.heading>This account holds no role</flux:callout.heading>
+            <flux:callout.heading>This admin cannot reach anything</flux:callout.heading>
             <flux:callout.text>
-                It cannot sign in to any workspace. Use <span class="font-medium">Manage roles</span> to grant one.
+                It has no role, or one that has been switched off, so it signs in to an empty
+                workspace. Use <span class="font-medium">Manage access</span> to put it on a live role.
             </flux:callout.text>
         </flux:callout>
     @endif
@@ -339,7 +332,10 @@ new class extends Component
                     </div>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <x-status :status="$user->status" />
-                        <x-dashboard.user-roles :roles="$this->roles" />
+                        <flux:badge size="sm" :color="$user->type->isAdmin() ? 'purple' : 'zinc'">
+                            {{ $user->type->label() }}
+                        </flux:badge>
+                        <x-dashboard.user-role :user="$user" />
                         @if ($user->hasVerifiedEmail())
                             <flux:badge size="sm" color="green">Email verified</flux:badge>
                         @else
@@ -352,7 +348,7 @@ new class extends Component
             <div class="flex flex-wrap gap-2">
                 <flux:button icon="pencil-square" variant="primary" wire:click="editAccount">Edit account</flux:button>
                 <flux:button icon="shield-check" variant="filled" wire:click="openRoleManager({{ $user->id }})">
-                    Manage roles
+                    Manage access
                 </flux:button>
                 <flux:button
                     :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
@@ -437,7 +433,7 @@ new class extends Component
 
             {{-- Workspace access. Only an administrator has any: a member's workspace
                  is not gated, so there would be nothing on this card to show. --}}
-            @if ($this->adminAssignment)
+            @if ($this->isAdminAccount)
                 <flux:card class="space-y-4">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -450,16 +446,21 @@ new class extends Component
                             variant="ghost"
                             size="sm"
                             icon="pencil-square"
-                            wire:click="openAdminGates({{ $this->adminAssignment->id }})"
+                            wire:click="openAdminGates({{ $user->id }})"
                             aria-label="Edit workspace access"
                         />
                     </div>
 
-                    @unless ($this->adminAssignment->gates)
+                    @if (! $user->role)
                         <flux:text class="text-xs">
-                            Following the {{ $this->adminAssignment->role?->name?->label() }} role throughout.
+                            No role, so nothing is reachable beyond the dashboard and this account's
+                            own profile.
                         </flux:text>
-                    @endunless
+                    @elseif (! $user->gates)
+                        <flux:text class="text-xs">
+                            Following the {{ $user->role->name }} role throughout.
+                        </flux:text>
+                    @endif
 
                     <dl class="divide-y divide-slate-100 text-sm dark:divide-slate-800">
                         @foreach ($this->gateSummary as $row)
@@ -583,7 +584,12 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
+    <x-dashboard.user-roles-modal
+        :user="$this->roleUser"
+        :roles="$this->assignableRoles"
+        :type="$this->pendingAccountType"
+        :blocked="$this->accessBlockedReason"
+    />
 
     <x-dashboard.gates-modal
         admin
@@ -605,7 +611,7 @@ new class extends Component
             {{ $user->name }} is signed out of every workspace and cannot sign back in until the
             account is reactivated.
         @else
-            {{ $user->name }} can sign in again with whatever roles the account still carries.
+            {{ $user->name }} can sign in again with whatever access the account still carries.
         @endif
     </x-dashboard.confirm-modal>
 </div>

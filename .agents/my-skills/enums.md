@@ -24,7 +24,7 @@ Every enum:
 | --- | --- | --- |
 | Lifecycle / status | `int` | `StatusDefault`, `StatusUser` |
 | Boolean-ish flag stored as a column | `int` with `YES = 1` / `NO = 0` | `StatusYes` |
-| Vocabulary / identifier | `string` | `UserRoleEnum`, `GenderEnum`, `ActivityActionEnum`, `ActivityPlatformEnum`, `NotificationTopicEnum`, `NotificationTypeEnum`, `SocialHandleEnum` |
+| Vocabulary / identifier | `string` | `UserTypeEnum`, `GenderEnum`, `ActivityActionEnum`, `ActivityPlatformEnum`, `NotificationTopicEnum`, `NotificationTypeEnum`, `SocialHandleEnum` |
 
 `StatusDefault` (`ACTIVE = 1`, `INACTIVE = 0`) is the **shared default** — use it for
 any generic on/off column rather than inventing a new enum.

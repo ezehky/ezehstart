@@ -1,4 +1,4 @@
-@props(['navigationLinks', 'dashboardLinks', 'currentRole', 'dashboardRoute'])
+@props(['navigationLinks', 'dashboardRoute'])
 
 <aside class="flex h-full w-72 flex-col border-r border-slate-200 bg-accent-foreground px-4 py-5 dark:border-slate-800 dark:bg-slate-950 lg:w-64">
     <div class="shrink-0">
@@ -81,24 +81,6 @@
             </nav>
         </div>
     </div>
-
-    @if (count($dashboardLinks) > 1)
-        <div class="mt-8">
-            <p class="px-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Switch workspace</p>
-            <div class="mt-3 space-y-1">
-                @foreach ($dashboardLinks as $role => $dashboardLink)
-                    <a href="{{ $dashboardLink['link'] }}" @class([
-                        'press flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ease-out',
-                        'bg-slate-900 text-white' => $role === $currentRole->value,
-                        'text-slate-300 hover:bg-slate-900 hover:text-white' => $role !== $currentRole->value,
-                    ])>
-                        <flux:icon name="arrows-right-left" class="size-4" />
-                        <span>{{ $dashboardLink['label'] }}</span>
-                    </a>
-                @endforeach
-            </div>
-        </div>
-    @endif
 
     <div class="mt-4 shrink-0 border-t border-lime-700 pt-4 dark:border-slate-800">
         <div class="flex items-center gap-3 px-2">

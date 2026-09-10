@@ -6,7 +6,7 @@ use App\Enums\TransactionGroupEnum;
 use App\Enums\TransactionTypeEnum;
 use App\Enums\TransactionViaEnum;
 use App\Enums\TransactionWalletEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Transaction;
 use App\Services\TransactionService;
 use Illuminate\Database\QueryException;
@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
-    $this->admin = userWithRole(UserRoleEnum::ADMIN, ['email_verified_at' => now()]);
+    $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+    $this->admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -259,7 +259,7 @@ test('a member sees their statement and nobody else', function () {
 
     $service->record($this->member, TransactionTypeEnum::CREDIT, TransactionGroupEnum::DEPOSIT, 100, 'Mine');
 
-    $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
     $service->record($stranger, TransactionTypeEnum::CREDIT, TransactionGroupEnum::DEPOSIT, 100, 'Theirs');
 
     Livewire::actingAs($this->member)

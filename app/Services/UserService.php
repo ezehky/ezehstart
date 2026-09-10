@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Models\Policy;
 use App\Models\User;
@@ -163,7 +163,7 @@ class UserService
      * request may proceed, a string to bounce the user out with, or a redirect
      * instruction array.
      */
-    public function middlewareGeneralCheck(UserRoleEnum $role): string|null|array
+    public function middlewareGeneralCheck(UserTypeEnum $type): string|null|array
     {
         // Check if the user is authenticated
         if (! auth()->check()) {
@@ -182,13 +182,13 @@ class UserService
             return 'Your account has been suspended. Please contact support.';
         }
 
-        // Check if the user has the required role
-        abort_unless($user->hasRole($role), 404);
+        // Check that this account belongs in this workspace at all
+        abort_unless($user->isType($type), 404);
 
         // Email verification check. The keys are read with defaults rather than
         // indexed: an install whose site config has not been seeded yet must still
         // serve the workspace instead of erroring on a missing key.
-        if ($role->isUser()) {
+        if ($type->isUser()) {
             $config = kSiteConfig('email-settings');
 
             $verification = (bool) data_get($config, 'verification', false);
@@ -206,34 +206,13 @@ class UserService
         // Update the last seen timestamp for the user
         app(UserService::class, ['user' => $user])->updateLastSeen();
 
-        $dashboardLinks = [];
-
-        foreach (UserRoleEnum::cases() as $availableRole) {
-            if (! $user->hasRole($availableRole)) {
-                continue;
-            }
-
-            $dashboardLinks[$availableRole->value] = match ($availableRole) {
-                UserRoleEnum::ADMIN => [
-                    'label' => 'Administration',
-                    'link' => route('admin.dashboard'),
-                ],
-                UserRoleEnum::USER => [
-                    'label' => 'Dashboard',
-                    'link' => route('user.dashboard'),
-                ],
-            };
-        }
-
-        // Share the active role navigation and available dashboards with all views.
+        // Share the workspace navigation with every view. An account has exactly one
+        // type, so there is no workspace to switch to and nothing here offers one —
+        // the sidebar renders what this type reaches and nothing else.
         View::share([
-            'dashboardRoute' => match ($role) {
-                UserRoleEnum::ADMIN => route('admin.dashboard'),
-                default => route('user.dashboard'),
-            },
-            'currentRole' => $role,
-            'navigationLinks' => kPageNavigationLinks($role->value),
-            'dashboardLinks' => $dashboardLinks,
+            'dashboardRoute' => $type->dashboardRoute(),
+            'currentType' => $type,
+            'navigationLinks' => kPageNavigationLinks($type->value),
         ]);
 
         // Return null if no issues

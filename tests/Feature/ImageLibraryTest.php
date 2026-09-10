@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\MediaVisibilityEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Image;
 use App\Models\ImageFolder;
 use App\Models\Post;
@@ -20,8 +20,8 @@ beforeEach(function () {
     // leaving files in storage/app/public.
     Storage::fake('public');
 
-    $this->member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
-    $this->admin = userWithRole(UserRoleEnum::ADMIN, ['email_verified_at' => now()]);
+    $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+    $this->admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 
     app(SiteConfigurationService::class)->update(initials: true);
 });
@@ -113,7 +113,7 @@ test('renaming changes the title and never the stored path', function () {
 test('a private image is invisible to everybody but its owner and an admin', function () {
     $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
 
-    $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     expect($image->isVisibleTo($this->member))->toBeTrue()
         ->and($image->isVisibleTo($this->admin))->toBeTrue()
@@ -128,39 +128,39 @@ test('a public image is visible to anybody', function () {
         visibility: MediaVisibilityEnum::PUBLIC
     );
 
-    $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     expect($image->isVisibleTo($stranger))->toBeTrue()
         ->and($image->isVisibleTo(null))->toBeTrue();
 });
 
-test('a role image is visible only to accounts holding that role', function () {
+test('a type image is visible only to accounts of that type', function () {
     $image = app(ImageLibraryService::class)->store(
         $this->admin,
         uploadedImage(),
-        visibility: MediaVisibilityEnum::ROLE,
-        visibleToRole: UserRoleEnum::USER,
+        visibility: MediaVisibilityEnum::TYPE,
+        visibleToType: UserTypeEnum::USER,
     );
 
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
-    expect($image->visible_to_role)->toBe(UserRoleEnum::USER)
+    expect($image->visible_to_type)->toBe(UserTypeEnum::USER)
         ->and($image->isVisibleTo($member))->toBeTrue();
 });
 
-test('leaving ROLE clears the role column so an old audience cannot come back', function () {
+test('leaving TYPE clears the type column so an old audience cannot come back', function () {
     $service = app(ImageLibraryService::class);
 
     $image = $service->store(
         $this->admin,
         uploadedImage(),
-        visibility: MediaVisibilityEnum::ROLE,
-        visibleToRole: UserRoleEnum::USER,
+        visibility: MediaVisibilityEnum::TYPE,
+        visibleToType: UserTypeEnum::USER,
     );
 
     $service->update($image, $image->title, visibility: MediaVisibilityEnum::PRIVATE);
 
-    expect($image->fresh()->visible_to_role)->toBeNull();
+    expect($image->fresh()->visible_to_type)->toBeNull();
 });
 
 test('the library query hides other people images from a member', function () {
@@ -331,7 +331,7 @@ test('detaching frees an image for deletion again', function () {
 
 test('a private folder stays out of another member folder rail', function () {
     $service = app(ImageLibraryService::class);
-    $other = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $other = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     $service->createFolder($other, 'Theirs');
     $service->createFolder($other, 'Open to all', visibility: MediaVisibilityEnum::PUBLIC);
@@ -348,8 +348,8 @@ test('a role folder reaches only the role it names', function () {
     $service->createFolder(
         $this->admin,
         'Staff only',
-        visibility: MediaVisibilityEnum::ROLE,
-        visibleToRole: UserRoleEnum::ADMIN,
+        visibility: MediaVisibilityEnum::TYPE,
+        visibleToType: UserTypeEnum::ADMIN,
     );
 
     expect($service->folderOptions($this->member)->pluck('label'))->not->toContain('Staff only')

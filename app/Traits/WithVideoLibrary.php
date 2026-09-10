@@ -3,7 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\MediaVisibilityEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Models\Video;
 use App\Models\VideoFolder;
@@ -100,7 +100,7 @@ trait WithVideoLibrary
 
     public string $visibility = 'private';
 
-    public ?string $visible_to_role = null;
+    public ?string $visible_to_type = null;
 
     // Moving a batch
     public ?int $move_folder_id = null;
@@ -116,7 +116,7 @@ trait WithVideoLibrary
 
     public string $folder_visibility = 'private';
 
-    public ?string $folder_visible_to_role = null;
+    public ?string $folder_visible_to_type = null;
 
     /**
      * Livewire calls boot{TraitName}() on every request, hydration included, so
@@ -206,7 +206,7 @@ trait WithVideoLibrary
     {
         return $this->user->isAdmin()
             ? MediaVisibilityEnum::forSelect()
-            : MediaVisibilityEnum::forSelect([MediaVisibilityEnum::ROLE->value]);
+            : MediaVisibilityEnum::forSelect([MediaVisibilityEnum::TYPE->value]);
     }
 
     /**
@@ -314,7 +314,7 @@ trait WithVideoLibrary
             $this->duration = $video->duration;
             $this->video_folder_id = $video->video_folder_id;
             $this->visibility = $video->visibility->value;
-            $this->visible_to_role = $video->visible_to_role?->value;
+            $this->visible_to_type = $video->visible_to_type?->value;
         }
 
         if ($panel === 'move') {
@@ -335,9 +335,9 @@ trait WithVideoLibrary
         $this->panel = null;
 
         $this->reset(
-            'edit_id', 'title', 'description', 'duration', 'video_folder_id', 'visibility', 'visible_to_role',
+            'edit_id', 'title', 'description', 'duration', 'video_folder_id', 'visibility', 'visible_to_type',
             'move_folder_id', 'folder_id', 'folder_name', 'folder_parent_id', 'folder_shared',
-            'folder_visibility', 'folder_visible_to_role',
+            'folder_visibility', 'folder_visible_to_type',
         );
 
         $this->resetValidation();
@@ -418,15 +418,15 @@ trait WithVideoLibrary
             'duration' => ['nullable', 'integer', 'min:1', 'max:43200'],
             'video_folder_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
             'visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
-            'visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
+            'visible_to_type' => ['nullable', Rule::enum(UserTypeEnum::class)],
         ]);
 
         $visibility = MediaVisibilityEnum::from($this->visibility);
 
         $this->respondError(
             'Choose which role should be able to see this video.',
-            $visibility->needsRole() && ! $this->visible_to_role,
-            field: 'visible_to_role'
+            $visibility->needsType() && ! $this->visible_to_type,
+            field: 'visible_to_type'
         );
 
         app(VideoLibraryService::class)->update(
@@ -434,7 +434,7 @@ trait WithVideoLibrary
             $this->title,
             $this->video_folder_id ? VideoFolder::query()->find($this->video_folder_id) : null,
             $visibility,
-            $this->visible_to_role ? UserRoleEnum::from($this->visible_to_role) : null,
+            $this->visible_to_type ? UserTypeEnum::from($this->visible_to_type) : null,
             $this->description,
             $this->duration,
         );
@@ -515,7 +515,7 @@ trait WithVideoLibrary
     {
         $this->resetValidation();
 
-        $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_role');
+        $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_type');
 
         $this->folder_parent_id = $this->folder;
         $this->folder_visibility = MediaVisibilityEnum::PRIVATE->value;
@@ -537,7 +537,7 @@ trait WithVideoLibrary
         $this->folder_parent_id = $folder->parent_id;
         $this->folder_shared = $folder->isShared();
         $this->folder_visibility = $folder->visibility->value;
-        $this->folder_visible_to_role = $folder->visible_to_role?->value;
+        $this->folder_visible_to_type = $folder->visible_to_type?->value;
 
         $this->panel = 'folder';
     }
@@ -548,18 +548,18 @@ trait WithVideoLibrary
             'folder_name' => ['required', 'string', 'max:255'],
             'folder_parent_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
             'folder_visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
-            'folder_visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
+            'folder_visible_to_type' => ['nullable', Rule::enum(UserTypeEnum::class)],
         ]);
 
         $visibility = MediaVisibilityEnum::from($this->folder_visibility);
 
         $this->respondError(
             'Choose which role should be able to browse this folder.',
-            $visibility->needsRole() && ! $this->folder_visible_to_role,
-            field: 'folder_visible_to_role'
+            $visibility->needsType() && ! $this->folder_visible_to_type,
+            field: 'folder_visible_to_type'
         );
 
-        $role = $this->folder_visible_to_role ? UserRoleEnum::from($this->folder_visible_to_role) : null;
+        $role = $this->folder_visible_to_type ? UserTypeEnum::from($this->folder_visible_to_type) : null;
         $service = app(VideoLibraryService::class);
 
         if ($this->folder_id) {

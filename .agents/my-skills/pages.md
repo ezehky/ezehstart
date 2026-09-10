@@ -344,7 +344,7 @@ public function updatedSearch(): void
 public function students()
 {
     return User::query()
-        ->carriesRole(UserRoleEnum::STUDENT)
+        ->members()
         ->with('userRoles.role')
         ->withCount([
             'admissions as enrolled_count' => fn ($query) => $query->where('status', StatusAdmission::ENROLLED),

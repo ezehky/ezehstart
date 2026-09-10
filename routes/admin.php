@@ -36,7 +36,6 @@ Route::prefix('blog')->name('blog.')->group(function () {
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');
 Route::livewire('/members', 'pages::admin.users.members')->name('members');
-Route::livewire('/unassigned', 'pages::admin.users.unassigned')->name('unassigned');
 Route::livewire('/roles', 'pages::admin.users.roles')->name('roles');
 Route::livewire('/activity-logs', 'pages::admin.users.activity-logs')->name('activity-logs');
 Route::livewire('/user/{user}', 'pages::admin.users.user-view')->name('user');

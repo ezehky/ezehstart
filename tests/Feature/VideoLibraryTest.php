@@ -3,7 +3,7 @@
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusPost;
 use App\Enums\StatusYes;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Enums\VideoProviderEnum;
 use App\Models\Post;
 use App\Models\Video;
@@ -14,8 +14,8 @@ use App\Services\VideoLibraryService;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
-    $this->admin = userWithRole(UserRoleEnum::ADMIN, ['email_verified_at' => now()]);
+    $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+    $this->admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 
     app(SiteConfigurationService::class)->update(initials: true);
 });
@@ -111,7 +111,7 @@ test('a url no provider serves is not stored', function () {
 test('a private video is invisible to everybody but its owner and an admin', function () {
     $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
 
-    $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     expect($video->isVisibleTo($this->member))->toBeTrue()
         ->and($video->isVisibleTo($this->admin))->toBeTrue()
@@ -119,12 +119,12 @@ test('a private video is invisible to everybody but its owner and an admin', fun
         ->and($video->isVisibleTo(null))->toBeFalse();
 });
 
-test('a role video reaches everybody holding that role', function () {
+test('a type video reaches everybody of that type', function () {
     $video = app(VideoLibraryService::class)->store(
         $this->admin,
         'https://youtu.be/dQw4w9WgXcQ',
-        visibility: MediaVisibilityEnum::ROLE,
-        visibleToRole: UserRoleEnum::USER,
+        visibility: MediaVisibilityEnum::TYPE,
+        visibleToType: UserTypeEnum::USER,
     );
 
     expect($video->isVisibleTo($this->member))->toBeTrue();
@@ -136,13 +136,13 @@ test('changing away from role clears the role, so it cannot be restored by accid
     $video = $service->store(
         $this->admin,
         'https://youtu.be/dQw4w9WgXcQ',
-        visibility: MediaVisibilityEnum::ROLE,
-        visibleToRole: UserRoleEnum::USER,
+        visibility: MediaVisibilityEnum::TYPE,
+        visibleToType: UserTypeEnum::USER,
     );
 
     $service->update($video, $video->title, visibility: MediaVisibilityEnum::PRIVATE);
 
-    expect($video->fresh()->visible_to_role)->toBeNull();
+    expect($video->fresh()->visible_to_type)->toBeNull();
 });
 
 test('the library query offers only what the account may see', function () {
@@ -152,7 +152,7 @@ test('the library query offers only what the account may see', function () {
     $service->store($this->admin, 'https://vimeo.com/123456789', visibility: MediaVisibilityEnum::PUBLIC);
     $service->store($this->admin, 'https://vimeo.com/987654321');
 
-    $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     // The public one only: the member's is theirs, and the admin's private one is
     // nobody else's business.

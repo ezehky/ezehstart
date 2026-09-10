@@ -15,7 +15,7 @@ belongs in `middlewareGeneralCheck()` behind a `match` on the role.
 
 namespace App\Http\Middleware;
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Services\UserService;
 use Closure;
 use Illuminate\Http\Request;
@@ -31,7 +31,7 @@ class AdminMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         // Check if the user is authenticated and has the required role
-        $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::ADMIN);
+        $result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::ADMIN);
 
         // If the result is a string, it means we need to redirect the user to a specific route with an error message
         if (\is_string($result)) {
@@ -50,7 +50,7 @@ class AdminMiddleware
 
 ### The `string|null|array` contract
 
-`middlewareGeneralCheck(UserRoleEnum $role): string|null|array`
+`middlewareGeneralCheck(UserTypeEnum $type): string|null|array`
 
 | Return | Meaning | Middleware does |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ class AdminMiddleware
 
 1. Not authenticated → `'You must be logged in to access this page.'`
 2. Suspended → log out, `'Your account has been suspended. Please contact support.'`
-3. **Wrong role → `abort_unless($user->hasRole($role), 404)`** — a 404, not a 403, so
+3. **Wrong workspace → `abort_unless($user->isType($type), 404)`** — a 404, not a 403, so
    the existence of the workspace is not confirmed
 4. Members only: strict email verification → redirect array to the verification page.
    The `email-settings` keys are read with `data_get()` defaults, so an install whose
@@ -74,7 +74,7 @@ class AdminMiddleware
 ```php
 View::share([
     'dashboardRoute' => match ($role) {
-        UserRoleEnum::ADMIN => route('admin.dashboard'),
+        UserTypeEnum::ADMIN => route('admin.dashboard'),
         default => route('user.dashboard'),
     },
     'currentRole' => $role,
@@ -181,13 +181,13 @@ The three files differ only here:
 
 ```php
 // AdminMiddleware
-$result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::ADMIN);
+$result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::ADMIN);
 
 // UserMiddleware
-$result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::USER);
+$result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::USER);
 
 // UserMiddleware
-$result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::STUDENT);
+$result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::VENDOR);
 ```
 
 ## Template
@@ -199,7 +199,7 @@ A fourth workspace (e.g. a partner portal) would be:
 
 namespace App\Http\Middleware;
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Services\UserService;
 use Closure;
 use Illuminate\Http\Request;
@@ -215,7 +215,7 @@ class PartnerMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         // Check if the user is authenticated and has the required role
-        $result = app(UserService::class)->middlewareGeneralCheck(UserRoleEnum::PARTNER);
+        $result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::PARTNER);
 
         // If the result is a string, it means we need to redirect the user to a specific route with an error message
         if (\is_string($result)) {
@@ -232,7 +232,7 @@ class PartnerMiddleware
 }
 ```
 
-Plus: a `PARTNER` case on `UserRoleEnum` (with its `isPartner()`), a `partner` branch in
+Plus: a `PARTNER` case on `UserTypeEnum` (with its `isPartner()`), a `partner` branch in
 `kPageNavigationLinks()`, a `routes/partner.php`, the `match` arms in
 `middlewareGeneralCheck()`, and the group in `bootstrap/app.php`.
 

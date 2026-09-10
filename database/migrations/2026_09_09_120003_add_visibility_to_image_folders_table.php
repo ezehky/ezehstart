@@ -22,7 +22,7 @@ return new class extends Migration
 
             // Only read when visibility is ROLE. Any other case must leave it null,
             // so changing visibility twice cannot quietly restore an old audience.
-            $table->string('visible_to_role', 20)->nullable()->index()->after('visibility'); // UserRoleEnum
+            $table->string('visible_to_type', 20)->nullable()->index()->after('visibility'); // UserTypeEnum
         });
 
         // Folders that predate this column are the platform's shared ones, and
@@ -39,7 +39,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('image_folders', function (Blueprint $table) {
-            $table->dropColumn(['visibility', 'visible_to_role']);
+            $table->dropColumn(['visibility', 'visible_to_type']);
         });
     }
 };

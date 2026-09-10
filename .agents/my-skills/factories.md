@@ -86,7 +86,7 @@ Note the factory does **not** assign a role. Roles are rows, so tests wire them
 explicitly:
 
 ```php
-$role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
+$role = app(RoleService::class)->protectedRole();
 UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
 ```
 
@@ -143,7 +143,7 @@ status. If you add it, add `HasFactory` to the model and follow the conventions 
 ```php
 beforeEach(function () {
     $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);   // factory
-    $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
+    $role = app(RoleService::class)->protectedRole();
     UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
 
     $this->actingAs($admin);

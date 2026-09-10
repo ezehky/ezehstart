@@ -59,7 +59,7 @@ Do **not** create any of them. If you think you need one, you need a **Service**
 
 ### 2. Always reuse existing services
 Before writing any business logic, check `app/Services/`. Eighteen ship with the kit:
-`ActivityLogService`, `AdminActionService`, `UserService`, `UserRoleService`,
+`ActivityLogService`, `AdminActionService`, `UserService`, `RoleService`,
 `NotificationService`, `SiteConfigurationService`, `MarkdownService`,
 `PolicyContentService`, `AccountDeletionService`, `AccountOtpService`,
 `EmailVerificationOtpService`, `PasswordlessOtpService`, `PasswordSecurityService`,
@@ -69,7 +69,7 @@ Before writing any business logic, check `app/Services/`. Eighteen ship with the
 ### 3. Follow naming conventions exactly
 See [naming.md](naming.md). The two rules people get wrong:
 - Status enums are `StatusThing` (**prefix**): `StatusCohort`, `StatusUser`.
-- Everything else is `ThingEnum` (**suffix**): `UserRoleEnum`, `TransactionTypeEnum`.
+- Everything else is `ThingEnum` (**suffix**): `UserTypeEnum`, `TransactionTypeEnum`.
 
 ### 4. Match existing formatting
 - 4-space indent, LF endings, UTF-8, final newline (`.editorconfig`).

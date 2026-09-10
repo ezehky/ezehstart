@@ -140,7 +140,7 @@ test('publishing a new version leaves existing consent outstanding', function ()
 
 test('accepting the same version twice records it once', function () {
     $policy = publishedPolicy();
-    $user = userWithoutRole();
+    $user = adminWithoutRole();
 
     app(UserService::class)->recordConsent($policy, $user);
     app(UserService::class)->recordConsent($policy, $user);
@@ -154,7 +154,7 @@ test('accepting the same version twice records it once', function () {
  */
 test('a policy somebody consented to cannot be deleted', function () {
     $policy = publishedPolicy();
-    $user = userWithoutRole();
+    $user = adminWithoutRole();
 
     app(UserService::class)->recordConsent($policy, $user);
 

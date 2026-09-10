@@ -10,7 +10,7 @@ lives in `app/Services/`. Eighteen ship with the starter:
 | `ActivityLogService` | The audit trail — `affectedColumns()` and `logActivity()` |
 | `AdminActionService` | The "waiting on you" queues on the admin dashboard |
 | `UserService` | Sessions, last-seen, profile settings, notification-preference backfill, the workspace middleware check |
-| `UserRoleService` | Granting, revoking and switching roles, and the guards on each |
+| `RoleService` | Role records, who is on which, account type, and the guards on each |
 | `NotificationService` | Database notifications behind the bell menu |
 | `SiteConfigurationService` | The site-configuration JSON file and its cache |
 | `MarkdownService` | Stored markdown → HTML, with raw HTML escaped |
@@ -217,7 +217,7 @@ class AdminActionService
 | Service | Owns |
 | --- | --- |
 | `UserService` | page access, last-seen, logout, profile defaults, consent, middleware check, workspace nav sharing |
-| `UserRoleService` | grant / revoke / switch roles, and the `*BlockedReason()` guards |
+| `RoleService` | role CRUD, `assign()`, `changeType()`, and the `*BlockedReason()` guards |
 | `TrainingService` | cohorts, enrolment, admissions, payments, refunds, status sync (1040 lines — the domain core) |
 | `TransactionService` | wallet mutations, withdrawals, charges, transaction meta |
 | `AffiliateService` | referral bonuses, commission credits |

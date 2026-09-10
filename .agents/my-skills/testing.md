@@ -41,12 +41,12 @@ app(SiteConfigurationService::class)->update(initials: true);
 
 use App\Enums\FaqTypeEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Faq;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(userWithRole(UserRoleEnum::ADMIN));
+    $this->actingAs(userOfType(UserTypeEnum::ADMIN));
 });
 
 /**
@@ -93,17 +93,20 @@ There is only a `UserFactory`, so roles are wired by two global helpers defined 
 `tests/Pest.php`:
 
 ```php
-userWithRole(UserRoleEnum::ADMIN);              // active, carrying that role
-userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
-userWithoutRole();                              // can sign in, reaches nothing
+userOfType(UserTypeEnum::ADMIN);               // active; admins land on the protected role
+userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+userOfType(UserTypeEnum::ADMIN, [], $role);    // an admin narrowed to one role
+adminWithoutRole();                            // an admin who reaches nothing
+roleWithGates('Media', ['content' => 'full']); // a role to put somebody on
 ```
 
-**A workspace is unreachable without a role**, so a plain `User::factory()->create()`
-can only ever assert a redirect or a 404. Reach for `userWithRole()` first.
+**An admin reaches no gated screen without a live role**, so a plain
+`User::factory()->create()` is a member and can only ever assert a redirect or a 404 on
+the admin side. Reach for `userOfType()` first.
 
 ```php
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
 });
 ```
 
@@ -268,12 +271,12 @@ Run the narrowest filter that proves your change.
 <?php
 
 use App\Enums\StatusInvoice;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\Invoice;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(userWithRole(UserRoleEnum::ADMIN));
+    $this->actingAs(userOfType(UserTypeEnum::ADMIN));
 });
 
 /**
@@ -330,7 +333,9 @@ Create with `php artisan make:test --pest AdminInvoiceTest`.
 ## Avoid
 
 - Re-declaring `uses(RefreshDatabase::class)` — `tests/Pest.php` already applies it.
-- Wiring a role by hand instead of calling `userWithRole()`.
+- Wiring a role by hand instead of calling `userOfType()` or `roleWithGates()`.
+- Forgetting that a lockout guard needs a *second* full-access admin around before
+  it will let a test move the first one off its role.
 - Assuming the site configuration exists. Every feature test starts from an
   unconfigured install; lay it down with `update(initials: true)` if the code under
   test reads it.

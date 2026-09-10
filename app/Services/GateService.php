@@ -4,20 +4,22 @@ namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\GateAccessEnum;
+use App\Enums\StatusDefault;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\UserRole;
 use Illuminate\Container\Attributes\Singleton;
-use Illuminate\Support\Collection;
 
 /**
  * Layer 2 of the authorization stack: which admin pages an account may open, and how
  * far it may go once inside one.
  *
  * A gate is a navigation key — 'content', or 'users.roles' for a child — mapped to a
- * GateAccessEnum. Roles hold the map everybody with that role starts from; an
- * individual assignment may override single keys on top. Nothing here is a Laravel
- * Gate: see policies.md.
+ * GateAccessEnum. Roles hold the map everybody on that role starts from; an individual
+ * administrator may override single keys on top. Nothing here is a Laravel Gate: see
+ * policies.md.
+ *
+ * Only an admin is gated. A member has no role at all, and the member workspace has no
+ * gate keys, so asking any of this about one answers NONE and means nothing.
  */
 #[Singleton]
 class GateService
@@ -35,36 +37,31 @@ class GateService
      * The gate that hands out gates.
      *
      * Lowering it everywhere would leave an install nobody can administer, so every
-     * write checks that at least one live assignment still holds FULL over it.
+     * write checks that at least one live admin still holds FULL over it.
      */
     public const ADMINISTRATION = 'users';
 
     private const LOCKOUT_REASON = 'This would leave nobody with full access to Users, so no access could ever be granted again. Give another role or administrator full access to Users first.';
 
     /**
-     * Resolved assignments, keyed by user id.
+     * Resolved gate maps, keyed by user id.
      *
      * The service is a singleton and the sidebar asks about a dozen gates per render,
-     * so the assignments are read once per request rather than once per question.
+     * so an account's map is merged once per request rather than once per question.
      *
-     * @var array<int, Collection<int, UserRole>>
+     * @var array<int, array<string, string>>
      */
-    private array $assignments = [];
+    private array $maps = [];
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // PRIVATE
 
     /**
-     * The live role assignments for an account, loaded once per request.
-     *
-     * @return Collection<int, UserRole>
+     * The gate map this account actually resolves to, merged once per request.
      */
-    private function assignmentsFor(User $user): Collection
+    private function resolvedMapFor(User $user): array
     {
-        return $this->assignments[$user->id] ??= $user->userRoles()
-            ->isActive()
-            ->with('role')
-            ->get();
+        return $this->maps[$user->id] ??= $this->mapFor($user, $user->role()->first());
     }
 
     /**
@@ -101,35 +98,47 @@ class GateService
     }
 
     /**
-     * The gate map one assignment resolves to: the role's map with the
-     * administrator's own overrides laid over it, key by key.
+     * The map one account resolves to: their role's map with their own overrides laid
+     * over it, key by key.
+     *
+     * An account with no live role resolves to nothing at all — the override included.
+     * An override is a change to what a role grants, so with no role underneath it,
+     * there is nothing for it to be a change to. That is what makes switching a role
+     * off actually revoke access rather than leave the overrides standing.
+     *
+     * The role is passed in rather than read off the user so that a *candidate* map
+     * can be tested before it is written.
      */
-    private function mapFor(UserRole $assignment): array
+    private function mapFor(User $user, ?Role $role): array
     {
+        if (! $user->type->carriesRole() || ! $role?->grantsAccess()) {
+            return [];
+        }
+
         return [
-            ...($assignment->role?->gatesArray() ?? []),
-            ...$assignment->gatesArray(),
+            ...$role->gatesArray(),
+            ...$user->gatesArray(),
         ];
     }
 
     /**
-     * Walk every live assignment in the system and ask whether at least one still
-     * holds full access to user management.
+     * Walk every admin in the system and ask whether at least one still holds full
+     * access to user management.
      *
-     * `$substitute` is handed each assignment and returns the map to test, which is
-     * how a change is checked *before* it is written.
+     * `$substitute` is handed each account and the role it is on, and returns the map
+     * to test — which is how a change is checked *before* it is written.
      *
-     * @param  callable(UserRole, ?Role): array  $substitute
+     * @param  callable(User, ?Role): array  $substitute
      */
     private function administrationSurvives(callable $substitute): bool
     {
-        $assignments = UserRole::query()
-            ->isActive()
+        $admins = User::query()
+            ->admins()
             ->with('role')
             ->get();
 
-        foreach ($assignments as $assignment) {
-            if ($this->lookup($substitute($assignment, $assignment->role), self::ADMINISTRATION)->isFull()) {
+        foreach ($admins as $admin) {
+            if ($this->lookup($substitute($admin, $admin->role), self::ADMINISTRATION)->isFull()) {
                 return true;
             }
         }
@@ -225,9 +234,9 @@ class GateService
     /**
      * How far this account may go inside one area.
      *
-     * An account holding two roles keeps the more generous of the two: roles stack in
-     * this project, and a role granted on purpose must not be quietly cancelled out
-     * by a narrower one the account also happens to carry.
+     * One role, so one map: an account is what its role says, adjusted by whatever was
+     * overridden on the account itself. The exempt keys answer FULL for everybody, so
+     * a refused administrator always has somewhere to land.
      */
     public function accessFor(User $user, string $resource): GateAccessEnum
     {
@@ -235,17 +244,7 @@ class GateService
             return GateAccessEnum::FULL;
         }
 
-        $best = GateAccessEnum::NONE;
-
-        foreach ($this->assignmentsFor($user) as $assignment) {
-            $level = $this->lookup($this->mapFor($assignment), $resource);
-
-            if ($level->rank() > $best->rank()) {
-                $best = $level;
-            }
-        }
-
-        return $best;
+        return $this->lookup($this->resolvedMapFor($user), $resource);
     }
 
     /**
@@ -292,11 +291,13 @@ class GateService
      */
     public function roleGatesBlockedReason(Role $role, array $gates): ?string
     {
+        $candidate = (clone $role)->fill(['gates' => $gates]);
+
         $survives = $this->administrationSurvives(
-            fn (UserRole $assignment, ?Role $assigned) => [
-                ...($assigned?->is($role) ? $gates : ($assigned?->gatesArray() ?? [])),
-                ...$assignment->gatesArray(),
-            ]
+            fn (User $admin, ?Role $assigned) => $this->mapFor(
+                $admin,
+                $assigned?->is($role) ? $candidate : $assigned,
+            )
         );
 
         return $survives ? null : self::LOCKOUT_REASON;
@@ -305,13 +306,52 @@ class GateService
     /**
      * Why this administrator's override cannot be changed right now, or null when it can.
      */
-    public function adminGatesBlockedReason(UserRole $assignment, ?array $gates): ?string
+    public function adminGatesBlockedReason(User $user, ?array $gates): ?string
     {
+        $candidate = (clone $user)->fill(['gates' => $gates]);
+
         $survives = $this->administrationSurvives(
-            fn (UserRole $candidate, ?Role $assigned) => [
-                ...($assigned?->gatesArray() ?? []),
-                ...($candidate->is($assignment) ? ($gates ?? []) : $candidate->gatesArray()),
-            ]
+            fn (User $admin, ?Role $assigned) => $this->mapFor(
+                $admin->is($user) ? $candidate : $admin,
+                $assigned,
+            )
+        );
+
+        return $survives ? null : self::LOCKOUT_REASON;
+    }
+
+    /**
+     * Why this account cannot be moved onto that role — or off every role, when it is
+     * null — or null when it can.
+     */
+    public function assignmentBlockedReason(User $user, ?Role $role): ?string
+    {
+        $candidate = (clone $user)->fill(['role_id' => $role?->id]);
+
+        $survives = $this->administrationSurvives(
+            fn (User $admin, ?Role $assigned) => $admin->is($user)
+                ? $this->mapFor($candidate, $role)
+                : $this->mapFor($admin, $assigned)
+        );
+
+        return $survives ? null : self::LOCKOUT_REASON;
+    }
+
+    /**
+     * Why this role cannot be switched off right now, or null when it can.
+     *
+     * Deactivating takes the role's whole map away from everybody on it, so it can
+     * empty user management just as surely as editing that map key by key would.
+     */
+    public function roleDeactivationBlockedReason(Role $role): ?string
+    {
+        $candidate = (clone $role)->fill(['status' => StatusDefault::INACTIVE]);
+
+        $survives = $this->administrationSurvives(
+            fn (User $admin, ?Role $assigned) => $this->mapFor(
+                $admin,
+                $assigned?->is($role) ? $candidate : $assigned,
+            )
         );
 
         return $survives ? null : self::LOCKOUT_REASON;
@@ -335,7 +375,7 @@ class GateService
 
         $serviceInstance->logActivity(
             ActivityActionEnum::ROLE_GATES_UPDATE,
-            " the gates on the {$role->name?->label()} role.",
+            " the gates on the {$role->name} role.",
             $affectedColumns,
             model: $role,
         );
@@ -350,26 +390,24 @@ class GateService
      * whatever its role grants — which is not the same as an empty array, and the
      * caller is expected to know the difference.
      */
-    public function updateAdminGates(UserRole $assignment, ?array $gates): bool
+    public function updateAdminGates(User $user, ?array $gates): bool
     {
-        $assignment->gates = $gates === null ? null : $this->normalize($gates, keepDenials: true);
+        $user->gates = $gates === null ? null : $this->normalize($gates, keepDenials: true);
 
-        if ($assignment->isClean()) {
+        if ($user->isClean()) {
             return false;
         }
 
         $serviceInstance = app(ActivityLogService::class);
-        $affectedColumns = $serviceInstance->affectedColumns($assignment);
+        $affectedColumns = $serviceInstance->affectedColumns($user);
 
-        $assignment->save();
-
-        $name = $assignment->user?->name ?? 'an administrator';
+        $user->save();
 
         $serviceInstance->logActivity(
             $gates === null ? ActivityActionEnum::ADMIN_GATES_RESET : ActivityActionEnum::ADMIN_GATES_UPDATE,
-            " the gates for {$name}.",
+            " the gates for {$user->name}.",
             $affectedColumns,
-            model: $assignment,
+            model: $user,
         );
 
         $this->flush();
@@ -378,11 +416,11 @@ class GateService
     }
 
     /**
-     * Drop the per-request assignment cache. Called after any write, so the screen
-     * that just changed a gate renders against the new map rather than the old one.
+     * Drop the per-request map cache. Called after any write, so the screen that just
+     * changed a gate renders against the new map rather than the old one.
      */
     public function flush(): void
     {
-        $this->assignments = [];
+        $this->maps = [];
     }
 }

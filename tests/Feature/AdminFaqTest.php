@@ -3,13 +3,13 @@
 use App\Enums\ActivityActionEnum;
 use App\Enums\FaqTypeEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\ActivityLog;
 use App\Models\Faq;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
 });
 
 /**
@@ -28,7 +28,7 @@ function seedQuestion(array $attributes = []): Faq
 }
 
 test('the screen is closed to a member', function () {
-    $this->actingAs(userWithRole(UserRoleEnum::USER))
+    $this->actingAs(userOfType(UserTypeEnum::USER))
         ->get(route('admin.config.faqs'))
         ->assertNotFound();
 });

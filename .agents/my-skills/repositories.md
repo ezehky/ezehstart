@@ -37,8 +37,8 @@ Every query starts from `Model::query()`.
 public function students()
 {
     return User::query()
-        ->carriesRole(UserRoleEnum::STUDENT)
-        ->with('userRoles.role')
+        ->members()
+        ->with('role')
         ->withCount(['admissions as enrolled_count' => fn ($query) => $query->where('status', StatusAdmission::ENROLLED)])
         ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
         ->latest()
@@ -51,21 +51,23 @@ public function students()
 ```php
 // app/Models/User.php
 #[Scope]
-protected function carriesRole(Builder $builder, UserRoleEnum $role): void
+protected function ofType(Builder $builder, UserTypeEnum $type): void
 {
-    $builder->whereHas('userRoles', fn ($query) => $query
-        ->isActive()
-        ->whereHas('role', fn ($roleQuery) => $roleQuery->where('name', $role)));
+    $builder->where('type', $type);
 }
 
 /**
- * Accounts holding no active role at all. They cannot reach any workspace until
- * one is granted, so they are surfaced on their own admin listing.
+ * Admins who cannot reach the workspace: no role, or one that is switched off.
+ * A real state — an account promoted before a role was picked, or a whole role
+ * suspended — so the admins listing can call it out rather than show a blank.
  */
 #[Scope]
-protected function carriesNoRole(Builder $builder): void
+protected function withoutLiveRole(Builder $builder): void
 {
-    $builder->whereDoesntHave('userRoles', fn ($query) => $query->isActive());
+    $builder->where('type', UserTypeEnum::ADMIN)
+        ->where(fn (Builder $query) => $query
+            ->whereNull('role_id')
+            ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));
 }
 ```
 
@@ -112,7 +114,7 @@ public function getCurrent(PolicyTypeEnum $type): ?Policy
 public function admins(?User $except = null): Collection
 {
     return User::query()
-        ->carriesRole(UserRoleEnum::ADMIN)
+        ->admins()
         ->where('status', StatusUser::ACTIVE)
         ->when($except, fn ($query) => $query->whereKeyNot($except->getKey()))
         ->get();

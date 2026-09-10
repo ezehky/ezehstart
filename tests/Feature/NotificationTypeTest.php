@@ -2,13 +2,13 @@
 
 use App\Enums\NotificationTypeEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Services\UserService;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN, ['email_verified_at' => now()]);
+    $this->admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 });
 
 test('the seeder lays down one row per enum case', function () {
@@ -55,7 +55,7 @@ test('an administrator can add a type no code knows about', function () {
 test('a custom type reaches every member on their next visit', function () {
     seededNotificationTypes();
 
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     app(UserService::class, ['user' => $member])->runNotificationPreferencesUpdate();
 
@@ -86,7 +86,7 @@ test('two types cannot share a key', function () {
 test('deleting a type takes its preference rows with it', function () {
     seededNotificationTypes();
 
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
     app(UserService::class, ['user' => $member])->runNotificationPreferencesUpdate();
 
     $type = NotificationType::query()->first();
@@ -104,7 +104,7 @@ test('deleting a type takes its preference rows with it', function () {
 test('an inactive type is not offered on the member settings page', function () {
     seededNotificationTypes();
 
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     $silenced = NotificationType::query()->first();
     $silenced->update(['status' => StatusDefault::INACTIVE]);
@@ -117,7 +117,7 @@ test('an inactive type is not offered on the member settings page', function () 
 test('a member can save their preferences', function () {
     seededNotificationTypes();
 
-    $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     $component = Livewire::actingAs($member)->test('pages::user.account.account-settings');
 

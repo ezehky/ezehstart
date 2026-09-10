@@ -1170,7 +1170,7 @@ class InvoiceTemplateSeeder extends Seeder
 
 use App\Enums\StatusInvoice;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Services\RoleService;
 use App\Models\Invoice;
 use App\Models\Role;
 use App\Models\User;
@@ -1182,7 +1182,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);
-    $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::ADMIN]);
+    $role = app(RoleService::class)->protectedRole();
     UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
 
     $this->actingAs($admin);

@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
 use App\Models\User;
 use App\Traits\WithUserRoleManager;
 use Livewire\Attributes\Computed;
@@ -39,8 +38,7 @@ new class extends Component
     public function members()
     {
         return User::query()
-            ->carriesRole(UserRoleEnum::USER)
-            ->with('userRoles.role')
+            ->members()
             ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
             ->when($this->accountStatus !== '', fn ($query) => $query->where('status', $this->accountStatus))
             ->latest()
@@ -56,7 +54,7 @@ new class extends Component
     #[Computed]
     public function metrics(): array
     {
-        $base = fn () => User::query()->carriesRole(UserRoleEnum::USER);
+        $base = fn () => User::query()->members();
 
         $total = $base()->count();
         $active = $base()->where('status', StatusUser::ACTIVE)->count();
@@ -92,7 +90,7 @@ new class extends Component
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <flux:heading level="2" size="lg">Members</flux:heading>
-                <flux:text class="mt-1">Every account carrying the member role.</flux:text>
+                <flux:text class="mt-1">Every account signed up to the member workspace.</flux:text>
             </div>
 
             <div class="flex flex-col gap-3 sm:flex-row">
@@ -115,7 +113,7 @@ new class extends Component
             <flux:table.columns>
                 <flux:table.column>Member</flux:table.column>
                 <flux:table.column>Phone</flux:table.column>
-                <flux:table.column>Roles</flux:table.column>
+                <flux:table.column>Type</flux:table.column>
                 <flux:table.column>Status</flux:table.column>
                 <flux:table.column>Joined</flux:table.column>
                 <flux:table.column>Actions</flux:table.column>
@@ -134,7 +132,7 @@ new class extends Component
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
                         <flux:table.cell>
-                            <x-dashboard.user-roles :roles="$item->activeRoles()" />
+                            <flux:badge size="sm" color="zinc">{{ $item->type->label() }}</flux:badge>
                         </flux:table.cell>
                         <flux:table.cell>
                             <x-status :status="$item->status" />
@@ -155,7 +153,7 @@ new class extends Component
                                     variant="filled"
                                     size="sm"
                                     wire:click="openRoleManager({{ $item->id }})"
-                                    title="Manage roles"
+                                    title="Manage access"
                                 />
                             </div>
                         </flux:table.cell>
@@ -175,5 +173,10 @@ new class extends Component
         </flux:table>
     </flux:card>
 
-    <x-dashboard.user-roles-modal :user="$this->roleUser" :matrix="$this->roleMatrix" :pending="$this->pendingRoleEntry" />
+    <x-dashboard.user-roles-modal
+        :user="$this->roleUser"
+        :roles="$this->assignableRoles"
+        :type="$this->pendingAccountType"
+        :blocked="$this->accessBlockedReason"
+    />
 </div>

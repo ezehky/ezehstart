@@ -3,10 +3,8 @@
 namespace App\Traits;
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\UserRoleEnum;
 use App\Mail\LoginEmail;
 use App\Models\Policy;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\EmailVerificationOtpService;
@@ -25,15 +23,9 @@ trait WithAuthWorker
 
     protected function userDashboardRedirect(array $with = [])
     {
-        $user = auth()->user();
-
-        // Admin
-        if ($user->isAdmin()) {
-            return redirect()->intended(route('admin.dashboard'))->with($with);
-        }
-
-        // Everyone else
-        return redirect()->intended(route('user.dashboard'))->with($with);
+        return redirect()
+            ->intended(auth()->user()->type->dashboardRoute())
+            ->with($with);
     }
 
     protected function logActivity(ActivityActionEnum $action, string $description = ''): void
@@ -44,9 +36,12 @@ trait WithAuthWorker
     /**
      * Register an account and everything that has to exist alongside it.
      *
-     * The user, their role and their profile are written together, so a failure
-     * halfway through cannot leave an account that can sign in but reach nothing.
-     * Mail is sent after the commit, never inside it.
+     * The user, their profile and their consent records are written together, so a
+     * failure halfway through cannot leave an account that exists without the record
+     * of what it agreed to. Mail is sent after the commit, never inside it.
+     *
+     * Self-registration only ever makes a member. Members carry no role — the type
+     * column defaults to UserTypeEnum::USER and there is nothing else to assign.
      */
     private function createUser(array $data, array $profileData = [], bool $sendOtp = true): ?User
     {
@@ -65,9 +60,6 @@ trait WithAuthWorker
                     ...$data,
                     'ip_address' => request()->ip(),
                 ]);
-
-                // Assign the default role to the user
-                $this->assignDefaultRole($user);
 
                 // Create the user profile if provided
                 $user->userProfile()->create([...$profileData, 'settings' => $userService->profileDefaultSettings()]);
@@ -237,15 +229,5 @@ trait WithAuthWorker
         $minutes = (int) kSiteFlag('security', 'login-decay-minutes', 1);
 
         return max(1, min($minutes ?: 1, 60)) * 60;
-    }
-
-    /**
-     * The role every self-registered account starts with.
-     */
-    private function assignDefaultRole(User $user): void
-    {
-        $role = Role::query()->firstOrCreate(['name' => UserRoleEnum::USER]);
-
-        $user->roles()->syncWithoutDetaching([$role->id]);
     }
 }

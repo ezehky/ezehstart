@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Enums\VideoProviderEnum;
 use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -28,7 +28,7 @@ class Video extends Model
         return [
             'provider' => VideoProviderEnum::class,
             'visibility' => MediaVisibilityEnum::class,
-            'visible_to_role' => UserRoleEnum::class,
+            'visible_to_type' => UserTypeEnum::class,
             'status' => StatusDefault::class,
         ];
     }
@@ -107,8 +107,7 @@ class Video extends Model
 
         return match (true) {
             $this->visibility->isPublic() => true,
-            $this->visibility->isRole() => $this->visible_to_role !== null
-                && $user->hasRole($this->visible_to_role),
+            $this->visibility->isType() => $this->visible_to_type === $user->type,
             default => false,
         };
     }
@@ -140,7 +139,7 @@ class Video extends Model
 
     /**
      * Everything the given account is allowed to pick from: their own videos,
-     * anything public, and anything shared with a role they hold.
+     * anything public, and anything shared with their account type.
      *
      * Administrators skip the filter entirely — the library is also the admin's
      * media manager, and one that hides rows from them is not a manager.
@@ -152,14 +151,12 @@ class Video extends Model
             return;
         }
 
-        $roles = $user->activeRoles()->map(fn (UserRoleEnum $role) => $role->value)->all();
-
         $query->where(fn (Builder $inner) => $inner
             ->where('user_id', $user->id)
             ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
-            ->orWhere(fn (Builder $roleQuery) => $roleQuery
-                ->where('visibility', MediaVisibilityEnum::ROLE)
-                ->whereIn('visible_to_role', $roles)));
+            ->orWhere(fn (Builder $typeQuery) => $typeQuery
+                ->where('visibility', MediaVisibilityEnum::TYPE)
+                ->where('visible_to_type', $user->type)));
     }
 
     /**

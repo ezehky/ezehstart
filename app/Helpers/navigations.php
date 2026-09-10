@@ -92,10 +92,6 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Members',
                         'link' => route('admin.members'),
                     ],
-                    'unassigned' => [
-                        'label' => 'Unassigned',
-                        'link' => route('admin.unassigned'),
-                    ],
                     'roles' => [
                         'label' => 'Roles',
                         'link' => route('admin.roles'),

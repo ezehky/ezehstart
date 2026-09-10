@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Services\SiteConfigurationService;
 use Livewire\Livewire;
 
@@ -35,7 +35,7 @@ use Livewire\Livewire;
 // });
 
 // test('an admin can save the site configuration', function () {
-//     $admin = userWithRole(UserRoleEnum::ADMIN);
+//     $admin = userOfType(UserTypeEnum::ADMIN);
 //     app(SiteConfigurationService::class)->update(initials: true);
 
 //     Livewire::actingAs($admin)
@@ -51,7 +51,7 @@ use Livewire\Livewire;
 // CONDITIONAL FIELDS
 
 beforeEach(function () {
-    $this->admin = userWithRole(UserRoleEnum::ADMIN);
+    $this->admin = userOfType(UserTypeEnum::ADMIN);
 
     app(SiteConfigurationService::class)->update(initials: true);
 });

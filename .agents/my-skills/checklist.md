@@ -70,7 +70,7 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Single-column indexes are declared **on the column**
       (`$table->string('slug')->unique()`), never as `$table->unique(['slug'])`
 - [ ] ✓ No hand-written index on a `constrained()` foreign key — it is already indexed
-- [ ] ✓ A new column on `user_roles` / `roles` was added to the explicit `select()` in
+- [ ] ✓ A new column on `roles` was added to the explicit `select()` in
       `User::userRoles()` / `UserRole::role()`, or it reads back null everywhere
 - [ ] ✓ Slugs are derived in `save()` behind `isDirty('name')`, never bound to an input
 

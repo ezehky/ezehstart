@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\ActivityActionEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Enums\VideoProviderEnum;
 use App\Models\User;
 use App\Models\Video;
@@ -77,7 +77,7 @@ class VideoLibraryService
         ?string $title = null,
         ?VideoFolder $folder = null,
         MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
         ?string $description = null,
         ?int $duration = null,
     ): ?Video {
@@ -112,7 +112,7 @@ class VideoLibraryService
             'video_id' => $resolved['id'],
             'description' => $description,
             'duration' => $duration,
-            ...$this->visibilityAttributes($visibility, $visibleToRole),
+            ...$this->visibilityAttributes($visibility, $visibleToType),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -149,7 +149,7 @@ class VideoLibraryService
         string $title,
         ?VideoFolder $folder = null,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
         ?string $description = null,
         ?int $duration = null,
     ): Video {
@@ -160,7 +160,7 @@ class VideoLibraryService
             'video_folder_id' => $folder?->id,
             'description' => $description,
             'duration' => $duration,
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToRole) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
         ]);
 
         $affected = $activity->affectedColumns($video);
@@ -206,7 +206,7 @@ class VideoLibraryService
         ?VideoFolder $parent = null,
         bool $shared = false,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
     ): VideoFolder {
         // A shared folder belongs to nobody and everybody browses it, so only an
         // administrator can make one.
@@ -222,7 +222,7 @@ class VideoLibraryService
             'parent_id' => $parent?->id,
             'name' => trim($name),
             'slug' => kSlug($name),
-            ...$this->visibilityAttributes($visibility, $visibleToRole),
+            ...$this->visibilityAttributes($visibility, $visibleToType),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -242,14 +242,14 @@ class VideoLibraryService
         VideoFolder $folder,
         string $name,
         ?MediaVisibilityEnum $visibility = null,
-        ?UserRoleEnum $visibleToRole = null,
+        ?UserTypeEnum $visibleToType = null,
     ): VideoFolder {
         $activity = app(ActivityLogService::class);
 
         $folder->fill([
             'name' => trim($name) ?: $folder->name,
             'slug' => kSlug(trim($name) ?: $folder->name),
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToRole) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
         ]);
 
         $affected = $activity->affectedColumns($folder);
@@ -514,11 +514,11 @@ class VideoLibraryService
      *
      * @return array<string, mixed>
      */
-    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserRoleEnum $role): array
+    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role): array
     {
         return [
             'visibility' => $visibility,
-            'visible_to_role' => $visibility->needsRole() ? $role : null,
+            'visible_to_type' => $visibility->needsType() ? $role : null,
         ];
     }
 

@@ -1,12 +1,11 @@
 <?php
 
-use App\Enums\ActivityActionEnum;
-use App\Enums\UserRoleEnum;
+use App\Enums\GateAccessEnum;
 use App\Models\Role;
-use App\Services\ActivityLogService;
 use App\Services\GateService;
-use App\Services\UserRoleService;
+use App\Services\RoleService;
 use App\Traits\WithGateManager;
+use Flux\Flux;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -14,6 +13,16 @@ use Livewire\Component;
 new class extends Component
 {
     use WithGateManager;
+
+    public ?Role $role = null;
+
+    public string $name = '';
+
+    public ?string $description = null;
+
+    public bool $active = true;
+
+    public ?int $deleteId = null;
 
     public function mount(): void
     {
@@ -25,28 +34,10 @@ new class extends Component
     public function roles(): Collection
     {
         return Role::query()
-            ->withCount([
-                'userRoles',
-                'userRoles as active_users_count' => fn ($query) => $query->isActive(),
-            ])
-            ->orderBy('id')
+            ->withCount('users')
+            ->orderByDesc('is_protected')
+            ->orderBy('name')
             ->get();
-    }
-
-    /**
-     * Role types defined in the application that have no row in the roles table yet.
-     *
-     * @return array<int, UserRoleEnum>
-     */
-    #[Computed]
-    public function missingRoles(): array
-    {
-        $existing = $this->roles->map(fn (Role $role) => $role->name)->filter();
-
-        return collect(UserRoleEnum::cases())
-            ->reject(fn (UserRoleEnum $role) => $existing->contains($role))
-            ->values()
-            ->all();
     }
 
     /**
@@ -77,50 +68,115 @@ new class extends Component
         return \count(app(GateService::class)->keys());
     }
 
+    public function create(): void
+    {
+        $this->resetRoleForm();
+
+        Flux::modal('roleModal')->show();
+    }
+
+    public function edit(Role $role): void
+    {
+        $this->resetValidation();
+
+        $this->role = $role;
+        $this->name = $role->name;
+        $this->description = $role->description;
+        $this->active = $role->status->isActive();
+
+        Flux::modal('roleModal')->show();
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'active' => ['boolean'],
+        ];
+    }
+
+    public function save(): bool
+    {
+        $this->validate();
+
+        $service = app(RoleService::class);
+
+        if (! $this->role) {
+            $role = $service->create($this->name, $this->description);
+
+            Flux::modal('roleModal')->close();
+            $this->resetRoleForm();
+
+            unset($this->roles, $this->gateCounts);
+
+            return $this->respondSuccess("The {$role->name} role has been created. Give it access next.");
+        }
+
+        // The guard's own wording, rather than a generic failure.
+        $reason = $service->updateBlockedReason($this->role, $this->active);
+        $this->respondError($reason ?? '', if: $reason !== null);
+
+        $this->respondPrimary(if: ! $service->update($this->role, $this->name, $this->description, $this->active));
+
+        Flux::modal('roleModal')->close();
+        $this->resetRoleForm();
+
+        unset($this->roles, $this->gateCounts);
+
+        return $this->respondSuccess('The role has been updated.');
+    }
+
+    public function confirmDelete(int $roleId): void
+    {
+        $this->deleteId = $roleId;
+
+        Flux::modal('deleteModal')->show();
+    }
+
+    #[Computed]
+    public function deleteBlockedReason(): ?string
+    {
+        if (! $role = Role::query()->whereKey($this->deleteId)->first()) {
+            return null;
+        }
+
+        return app(RoleService::class)->deleteBlockedReason($role);
+    }
+
+    public function delete(): bool
+    {
+        $role = Role::query()->whereKey($this->deleteId)->first();
+
+        $this->respondError('That role no longer exists.', if: ! $role);
+
+        // Re-read rather than trusted: accounts may have moved onto it since the
+        // dialog was opened, and the count in the warning is not the check.
+        $service = app(RoleService::class);
+        $reason = $service->deleteBlockedReason($role);
+        $this->respondError($reason ?? '', if: $reason !== null);
+
+        $service->delete($role);
+
+        Flux::modal('deleteModal')->close();
+
+        $this->reset('deleteId');
+
+        unset($this->roles, $this->gateCounts, $this->deleteBlockedReason);
+
+        return $this->respondSuccess('The role has been deleted.');
+    }
+
     protected function afterGateChange(): void
     {
         unset($this->roles, $this->gateCounts);
     }
 
-    public function description(UserRoleEnum $role): string
+    private function resetRoleForm(): void
     {
-        return match ($role) {
-            UserRoleEnum::ADMIN => 'Runs the administration workspace: configuration and user management.',
-            UserRoleEnum::USER => 'Reaches the member workspace and their own account settings.',
-        };
-    }
-
-    public function dashboardRoute(UserRoleEnum $role): ?string
-    {
-        return match ($role) {
-            UserRoleEnum::ADMIN => route('admin.admins'),
-            UserRoleEnum::USER => route('admin.members'),
-        };
-    }
-
-    public function syncRoles(): bool
-    {
-        $missing = $this->missingRoles;
-
-        $this->respondPrimary('Every role type already exists.', if: $missing === []);
-
-        $service = app(UserRoleService::class);
-
-        foreach ($missing as $role) {
-            $service->role($role);
-        }
-
-        $names = collect($missing)->map(fn (UserRoleEnum $role) => $role->label())->implode(', ');
-
-        app(ActivityLogService::class)->logActivity(
-            ActivityActionEnum::CREATE,
-            "Created missing role types: {$names}.",
-            prefixDescription: false,
-        );
-
-        unset($this->roles, $this->missingRoles, $this->gateCounts);
-
-        return $this->respondSuccess('Missing role types have been created.');
+        $this->resetValidation();
+        $this->reset('role', 'name', 'description', 'active');
+        $this->active = true;
     }
 };
 ?>
@@ -131,13 +187,14 @@ new class extends Component
             <div>
                 <flux:heading level="2" size="lg">Roles</flux:heading>
                 <flux:text class="mt-1">
-                    The role types an account can carry. A user may hold more than one at the same time.
+                    How the administration workspace is divided up. Members carry no role — only
+                    admin accounts do, and each one carries exactly one.
                 </flux:text>
             </div>
 
-            @if ($this->missingRoles)
-                <flux:button variant="primary" icon="plus" wire:click="syncRoles">
-                    Create {{ count($this->missingRoles) }} missing role(s)
+            @if (kGate('users.roles', GateAccessEnum::CREATE))
+                <flux:button variant="primary" icon="plus" wire:click="create">
+                    Add role
                 </flux:button>
             @endif
         </div>
@@ -147,18 +204,31 @@ new class extends Component
                 <flux:table.column>Role</flux:table.column>
                 <flux:table.column>What it can do</flux:table.column>
                 <flux:table.column>Access</flux:table.column>
-                <flux:table.column>Active users</flux:table.column>
-                <flux:table.column>Total assignments</flux:table.column>
+                <flux:table.column>Admins</flux:table.column>
                 <flux:table.column>Actions</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
                 @forelse ($this->roles as $item)
                     <flux:table.row wire:key="role-{{ $item->id }}">
                         <flux:table.cell>
-                            <x-dashboard.user-roles :roles="collect([$item->name])->filter()" />
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <flux:badge size="sm" :color="$item->is_protected ? 'purple' : 'blue'">
+                                    {{ $item->name }}
+                                </flux:badge>
+
+                                @unless ($item->status->isActive())
+                                    <flux:badge size="sm" color="amber">Off</flux:badge>
+                                @endunless
+
+                                @if ($item->is_protected)
+                                    <flux:tooltip content="Cannot be deleted or switched off — it is what keeps this install administrable.">
+                                        <flux:icon name="lock-closed" class="size-4 text-slate-400" />
+                                    </flux:tooltip>
+                                @endif
+                            </div>
                         </flux:table.cell>
                         <flux:table.cell class="max-w-md text-slate-500 dark:text-slate-400">
-                            {{ $item->name ? $this->description($item->name) : '—' }}
+                            {{ $item->description ?: '—' }}
                         </flux:table.cell>
                         <flux:table.cell>
                             @php($granted = data_get($this->gateCounts, $item->id, 0))
@@ -170,8 +240,7 @@ new class extends Component
                                 <flux:badge size="sm" color="amber">No screens</flux:badge>
                             @endif
                         </flux:table.cell>
-                        <flux:table.cell class="font-medium">{{ number_format($item->active_users_count) }}</flux:table.cell>
-                        <flux:table.cell>{{ number_format($item->user_roles_count) }}</flux:table.cell>
+                        <flux:table.cell class="font-medium">{{ number_format($item->users_count) }}</flux:table.cell>
                         <flux:table.cell>
                             <div class="flex flex-wrap gap-1">
                                 <flux:button
@@ -183,27 +252,35 @@ new class extends Component
                                     Manage access
                                 </flux:button>
 
-                                @if ($item->name)
+                                @if (kGate('users.roles', GateAccessEnum::MODIFY))
                                     <flux:button
-                                        icon="arrow-top-right-on-square"
+                                        icon="pencil-square"
                                         variant="ghost"
                                         size="sm"
-                                        :href="$this->dashboardRoute($item->name)"
-                                        wire:navigate
-                                    >
-                                        View users
-                                    </flux:button>
+                                        wire:click="edit({{ $item->id }})"
+                                        title="Edit role"
+                                    />
+                                @endif
+
+                                @if (kGate('users.roles', GateAccessEnum::FULL) && ! $item->is_protected)
+                                    <flux:button
+                                        icon="trash"
+                                        variant="ghost"
+                                        size="sm"
+                                        wire:click="confirmDelete({{ $item->id }})"
+                                        title="Delete role"
+                                    />
                                 @endif
                             </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="6">
+                        <flux:table.cell colspan="5">
                             <x-dashboard.workspace-no-record
                                 label="Roles"
                                 icon="identification"
-                                text="No role types exist yet. Create them to start assigning accounts."
+                                text="No roles exist yet. Add one to start assigning administrators."
                             />
                         </flux:table.cell>
                     </flux:table.row>
@@ -211,6 +288,59 @@ new class extends Component
             </flux:table.rows>
         </flux:table>
     </flux:card>
+
+    <flux:modal name="roleModal" class="md:w-150">
+        <form wire:submit="save" class="space-y-6">
+            <div>
+                <flux:heading size="lg">{{ $role === null ? 'Add role' : 'Edit role' }}</flux:heading>
+                <flux:text class="mt-1">
+                    {{ $role === null
+                        ? 'A new role starts with no access at all. Grant it screens from Manage access once it exists.'
+                        : 'Rename the role or switch it off. Use Manage access to change what it reaches.' }}
+                </flux:text>
+            </div>
+
+            <flux:input label="Name" wire:model="name" placeholder="e.g. Media" autofocus badge="required" />
+
+            <flux:textarea
+                label="What it can do"
+                wire:model="description"
+                rows="2"
+                placeholder="One line, for the people handing this role out."
+            />
+
+            @if ($role)
+                <flux:switch
+                    wire:model="active"
+                    label="Active role"
+                    description="Switching a role off takes its access away from everybody on it, without unpicking who holds what."
+                    :disabled="$role->is_protected"
+                />
+            @endif
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Cancel</flux:button>
+                </flux:modal.close>
+
+                <flux:button type="submit" variant="primary">Save role</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <x-dashboard.confirm-modal
+        name="deleteModal"
+        title="Delete this role?"
+        confirm="Delete role"
+        confirm-icon="trash"
+        wire:click="delete"
+    >
+        @if ($this->deleteBlockedReason)
+            {{ $this->deleteBlockedReason }}
+        @else
+            The role and its access map go for good. Nobody is on it, so no account loses access.
+        @endif
+    </x-dashboard.confirm-modal>
 
     <x-dashboard.gates-modal
         :rows="$gateRows"

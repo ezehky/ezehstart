@@ -46,9 +46,9 @@ kGate('content.blogs', GateAccessEnum::FULL)      // the delete button
 | Column | Means |
 | --- | --- |
 | `roles.gates` | What everybody holding this role starts from |
-| `user_roles.gates` | One administrator's override, laid over their role key by key |
+| `users.gates` | One administrator's override, laid over their role key by key |
 
-`user_roles.gates` being **null** means "inherit the role" and is the normal state. An
+`users.gates` being **null** means "inherit the role" and is the normal state. An
 **empty array is not the same thing** — it means somebody deliberately overrode
 everything. Keep the distinction; `updateAdminGates()` takes `null` on purpose.
 
@@ -126,12 +126,19 @@ means allowed, a string is the sentence shown to the person who tried.
 
 ### Creating a role
 
-Go through `UserRoleService::role()`, never `Role::firstOrCreate()`. A newly created
-**admin** role is seeded with `fullAccessMap()`; every other role starts closed. Build
-one with the model directly and it comes up with an empty sidebar and a 404 on every
-screen — which reads like a broken page rather than like a missing fixture. That
-applies to test fixtures too: `userWithRole()` in `tests/Pest.php` goes through the
-service for this reason.
+Go through `RoleService::create()`, never `Role::create()`. A new role starts **closed**
+— gates are granted afterwards from the access editor, which is the one place the
+lockout guard sees the whole picture.
+
+The exception is `RoleService::protectedRole()`: the one role an install cannot be left
+without. It is created with `fullAccessMap()`, marked `is_protected`, and refused to
+anybody trying to delete or switch it off. Without it there is a reachable state where
+nobody can administer anything and no screen is left to fix that from. Resolving it
+again never restores gates somebody deliberately removed.
+
+Test fixtures go through the service for the same reason: `userOfType(UserTypeEnum::ADMIN)`
+lands on the protected role, so a test that just wants "an admin" gets one who can
+actually open the screen under test.
 
 ## Why
 
@@ -144,9 +151,10 @@ service for this reason.
 - A ladder rather than a set of flags means a screen asks one question. Four booleans
   per screen is four times the storage and the first place a "can create but not view"
   contradiction gets in.
-- Per-administrator overrides live on the **assignment**, not the user, so revoking the
-  role takes the override with it rather than leaving it behind for whenever the role
-  is granted back.
+- Per-administrator overrides live on the **user**, beside the role they modify. An
+  override is a change to what a role grants, so an account with no live role resolves
+  to nothing at all — the override included. That is what makes switching a role off
+  actually revoke access rather than leave the overrides standing.
 - Resolution is memoised per request on the singleton because the sidebar asks about a
   dozen gates per render. `flush()` after every write, or the screen that just changed
   a gate renders against the map it replaced.
@@ -159,7 +167,7 @@ Resolving an account that holds a narrowed role plus an override:
 // roles.gates
 ['content' => 'view', 'users' => 'full']
 
-// user_roles.gates
+// users.gates
 ['content' => 'full', 'transactions' => 'none']
 
 // resolved
@@ -228,6 +236,8 @@ on the roles screen.
 - Treating a null override as an empty one, or an empty one as null.
 - `abort(403)` — this project returns 404.
 - A hidden button as the only guard.
-- Adding a column to `roles` or `user_roles` and forgetting that `User::userRoles()`
-  and `UserRole::role()` both carry an explicit `select()`. A column left out of those
-  lists reads back as null everywhere, which looks like data rather than like a bug.
+- Adding a column to `roles` and forgetting that `User::role()` carries an explicit
+  `select()`. A column left out of that list reads back as null everywhere, which looks
+  like data rather than like a bug.
+- Assuming an admin has a role. `users.role_id` is nullable and a stranded admin is a
+  state the workspace is built to show — `$user->role?->` , never `$user->role->`.

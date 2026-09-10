@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\StatusDefault;
 use App\Enums\StatusUser;
-use App\Enums\UserRoleEnum;
+use App\Enums\UserTypeEnum;
 use App\Services\PolicyContentService;
 use App\Traits\WithDynamicModelFormatting;
 use Database\Factories\UserFactory;
@@ -11,7 +12,9 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -27,6 +30,19 @@ class User extends Authenticatable
     use HasFactory, Notifiable, SoftDeletes, WithDynamicModelFormatting;
 
     /**
+     * The type a brand-new account starts as, matching the column default.
+     *
+     * Declared here as well because a database default is only applied on insert and
+     * never read back — an unsaved User would have a null type, and every branch that
+     * asks which workspace it belongs to would fatal on it.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'type' => UserTypeEnum::USER->value,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -38,6 +54,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'last_seen_at' => 'datetime',
             'status' => StatusUser::class,
+            'type' => UserTypeEnum::class,
+            'gates' => AsArrayObject::class,
         ];
     }
 
@@ -45,41 +63,41 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->userRoles()
-            ->isActive()
-            ->whereHas('role', fn ($query) => $query->isAdmin())
-            ->exists();
+        return $this->type->isAdmin();
     }
 
     public function isUser(): bool
     {
-        return $this->userRoles()
-            ->isActive()
-            ->whereHas('role', fn ($query) => $query->isUser())
-            ->exists();
+        return $this->type->isUser();
     }
 
-    public function hasRole(UserRoleEnum $role): bool
+    public function isType(UserTypeEnum $type): bool
     {
-        return match ($role) {
-            UserRoleEnum::ADMIN => $this->isAdmin(),
-            UserRoleEnum::USER => $this->isUser(),
-        };
+        return $this->type === $type;
     }
 
     /**
-     * The roles this user actively carries, read from the loaded relation so a
-     * listing can render them without a query per row.
+     * This administrator's own gate override as a plain array, for merging and
+     * counting.
      *
-     * @return Collection<int, UserRoleEnum>
+     * Null still means "inherit the role" and empty still means "everything was
+     * deliberately taken away" — this flattens both to `[]`, so only call it where
+     * that difference has already been decided.
      */
-    public function activeRoles(): Collection
+    public function gatesArray(): array
     {
-        return $this->userRoles
-            ->filter(fn (UserRole $userRole) => $userRole->status->isActive())
-            ->map(fn (UserRole $userRole) => $userRole->role?->name)
-            ->filter()
-            ->values();
+        return $this->gates?->toArray() ?? [];
+    }
+
+    /**
+     * Does this account reach a gated workspace at all?
+     *
+     * An admin with no role, or with one that has been deactivated, signs in and
+     * reaches nothing — which is a real state, not a broken one.
+     */
+    public function hasLiveRole(): bool
+    {
+        return $this->type->carriesRole() && (bool) $this->role?->grantsAccess();
     }
 
     public function firstName(): string
@@ -137,20 +155,17 @@ class User extends Authenticatable
         return $this->hasOne(UserProfile::class);
     }
 
-    public function roles()
+    /**
+     * The admin role, or null. Members never have one.
+     *
+     * `gates` is in the select because GateService resolves this account's access
+     * straight off the loaded role. Leave it out and every role map reads as null,
+     * which looks exactly like "granted nothing" rather than like a bug.
+     */
+    public function role(): BelongsTo
     {
-        return $this->belongsToMany(Role::class, 'user_roles')
-            ->withPivot('id', 'status')
-            ->wherePivot('status', StatusUser::ACTIVE);
-    }
-
-    public function userRoles(): HasMany
-    {
-        // `gates` is in the select because GateService resolves this account's admin
-        // access straight off the assignment. Leave it out and every override reads
-        // as null, which looks exactly like "no override" rather than like a bug.
-        return $this->hasMany(UserRole::class)
-            ->select('id', 'user_id', 'role_id', 'status', 'gates');
+        return $this->belongsTo(Role::class)
+            ->select('id', 'name', 'slug', 'gates', 'status', 'is_protected');
     }
 
     public function notificationPreferences(): HasMany
@@ -211,20 +226,39 @@ class User extends Authenticatable
     // Scopes
 
     #[Scope]
-    protected function carriesRole(Builder $builder, UserRoleEnum $role): void
+    protected function ofType(Builder $builder, UserTypeEnum $type): void
     {
-        $builder->whereHas('userRoles', fn ($query) => $query
-            ->isActive()
-            ->whereHas('role', fn ($roleQuery) => $roleQuery->where('name', $role)));
+        $builder->where('type', $type);
     }
 
     /**
-     * Accounts holding no active role at all. They cannot reach any workspace until
-     * one is granted, so they are surfaced on their own admin listing.
+     * Named for the two listings rather than for the enum cases: a scope called
+     * isAdmin() would collide with the getter of the same name, and PHP would not
+     * let the class load at all.
      */
     #[Scope]
-    protected function carriesNoRole(Builder $builder): void
+    protected function admins(Builder $builder): void
     {
-        $builder->whereDoesntHave('userRoles', fn ($query) => $query->isActive());
+        $builder->where('type', UserTypeEnum::ADMIN);
+    }
+
+    #[Scope]
+    protected function members(Builder $builder): void
+    {
+        $builder->where('type', UserTypeEnum::USER);
+    }
+
+    /**
+     * Admins who cannot reach the workspace: no role, or one that is switched off.
+     * A real state — an account promoted before a role was picked, or a whole role
+     * suspended — so the admins listing can call it out rather than show a blank.
+     */
+    #[Scope]
+    protected function withoutLiveRole(Builder $builder): void
+    {
+        $builder->where('type', UserTypeEnum::ADMIN)
+            ->where(fn (Builder $query) => $query
+                ->whereNull('role_id')
+                ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));
     }
 }

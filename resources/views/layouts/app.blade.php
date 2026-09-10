@@ -1,7 +1,7 @@
 <x-layouts.base class="min-h-screen">
     <div x-data="{ mobileSidebarOpen: false }" class="min-h-screen bg-slate-50 dark:bg-slate-950">
         <div class="fixed inset-y-0 left-0 z-30 hidden lg:block">
-            <x-dashboard.sidebar :$navigationLinks :$dashboardLinks :$currentRole :$dashboardRoute />
+            <x-dashboard.sidebar :$navigationLinks :$dashboardRoute />
         </div>
 
         <div x-cloak x-show="mobileSidebarOpen" class="relative z-50 lg:hidden" aria-modal="true" role="dialog">
@@ -21,12 +21,12 @@
                 x-transition:leave-end="-translate-x-full"
                 class="fixed inset-y-0 left-0 w-72 shadow-2xl"
             >
-                <x-dashboard.sidebar :$navigationLinks :$dashboardLinks :$currentRole :$dashboardRoute />
+                <x-dashboard.sidebar :$navigationLinks :$dashboardRoute />
             </div>
         </div>
 
         <div class="min-h-screen lg:pl-64">
-            <x-dashboard.top-navigation :current-role="$currentRole" />
+            <x-dashboard.top-navigation :current-type="$currentType" />
             <main class="mx-auto w-full max-w-[1600px] px-4 py-7 sm:px-6 lg:px-8">
                 @session('status')
                     <flux:callout color="lime" class="mt-6 text-sm">{!! session('status') !!}</flux:callout>
