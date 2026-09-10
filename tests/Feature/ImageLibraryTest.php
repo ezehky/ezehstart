@@ -5,10 +5,14 @@ use App\Enums\UserRoleEnum;
 use App\Models\Image;
 use App\Models\ImageFolder;
 use App\Models\Post;
+use App\Models\User;
 use App\Services\ImageLibraryService;
 use App\Services\SiteConfigurationService;
+use App\Traits\WithFormResponseMessage;
+use App\Traits\WithImagePicker;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Component;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -630,4 +634,245 @@ test('the page and the picker offer the same library actions', function () {
         expect(property_exists($page, $property))->toBeTrue("the page is missing {$property}")
             ->and(property_exists($picker, $property))->toBeTrue("the picker is missing {$property}");
     }
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SLOTS
+
+/**
+ * A stand-in for any screen that holds images: one slot backed by a column, one
+ * that takes several and lives only in image_usages. The real screens hold one
+ * or two, so this is where the combinations WithImagePicker promises are put
+ * through their paces.
+ */
+class SlotHolder extends Component
+{
+    use WithFormResponseMessage;
+    use WithImagePicker;
+
+    public ?int $image_id = null;
+
+    public ?int $record_id = null;
+
+    protected function imageSlots(): array
+    {
+        return [
+            'cover' => ['multiple' => false, 'property' => 'image_id'],
+            'gallery' => ['multiple' => true, 'max' => 3],
+        ];
+    }
+
+    public function loadFrom(): void
+    {
+        $this->loadImageSlots(Post::query()->findOrFail($this->record_id));
+    }
+
+    public function persist(): void
+    {
+        $this->syncImageSlots(Post::query()->findOrFail($this->record_id));
+    }
+
+    public function render()
+    {
+        return '<div></div>';
+    }
+}
+
+function slotPost(User $user): Post
+{
+    return Post::query()->create([
+        'user_id' => $user->id,
+        'title' => 'Holder '.uniqid(),
+        'slug' => 'holder-'.uniqid(),
+        'excerpt' => 'A short line.',
+        'content' => '<p>Body.</p>',
+    ]);
+}
+
+test('a slot takes only the picks addressed to it', function () {
+    $service = app(ImageLibraryService::class);
+    $cover = $service->store($this->member, uploadedImage('cover.jpg'));
+    $other = $service->store($this->member, uploadedImage('other.jpg'));
+
+    $holder = Livewire::actingAs($this->member)
+        ->test(SlotHolder::class)
+        ->dispatch('imagesSelected', ids: [$cover->id], urls: [], slot: 'cover');
+
+    // The column-backed slot keeps its column in step, so the page's own fill(),
+    // rules() and save() go on reading the property they always did.
+    expect($holder->get('image_id'))->toBe($cover->id);
+
+    // A pick for the other slot, and one for a slot this screen never declared.
+    $holder->dispatch('imagesSelected', ids: [$other->id], urls: [], slot: 'gallery')
+        ->dispatch('imagesSelected', ids: [$other->id], urls: [], slot: 'nonsense');
+
+    expect($holder->get('image_slots')['cover'])->toBe([$cover->id])
+        ->and($holder->get('image_slots')['gallery'])->toBe([$other->id])
+        ->and($holder->get('image_id'))->toBe($cover->id);
+});
+
+test('a single slot never holds more than one and a multiple slot stops at its max', function () {
+    $service = app(ImageLibraryService::class);
+    $images = collect(range(1, 4))->map(fn (int $n) => $service->store($this->member, uploadedImage("shot-{$n}.jpg")));
+
+    $holder = Livewire::actingAs($this->member)
+        ->test(SlotHolder::class)
+        // The ids arrive over the wire, so the slot has to be the thing that
+        // refuses four rather than trusting the picker to have enforced it.
+        ->dispatch('imagesSelected', ids: $images->pluck('id')->all(), urls: [], slot: 'cover')
+        ->dispatch('imagesSelected', ids: $images->pluck('id')->all(), urls: [], slot: 'gallery');
+
+    expect($holder->get('image_slots')['cover'])->toBe([$images[0]->id])
+        ->and($holder->get('image_slots')['gallery'])->toHaveCount(3);
+});
+
+test('a slot writes usage rows and reads them back in the order they were chosen', function () {
+    $service = app(ImageLibraryService::class);
+    $one = $service->store($this->member, uploadedImage('one.jpg'));
+    $two = $service->store($this->member, uploadedImage('two.jpg'));
+    $three = $service->store($this->member, uploadedImage('three.jpg'));
+
+    $post = slotPost($this->member);
+
+    Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id])
+        ->dispatch('imagesSelected', ids: [$three->id, $one->id, $two->id], urls: [], slot: 'gallery')
+        ->call('persist');
+
+    expect($service->usedImageIds($post, 'gallery'))->toBe([$three->id, $one->id, $two->id]);
+
+    // A record opened again shows what it holds, in the order it was arranged.
+    $reopened = Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id])
+        ->call('loadFrom');
+
+    expect($reopened->get('image_slots')['gallery'])->toBe([$three->id, $one->id, $two->id]);
+});
+
+test('a column-backed slot falls back to its column when no usage row was ever written', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $post = slotPost($this->member);
+
+    // A record written before the slot existed: the column holds the image and
+    // nothing ever recorded the usage.
+    $post->update(['image_id' => $image->id]);
+
+    $holder = Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id, 'image_id' => $image->id])
+        ->call('loadFrom');
+
+    expect($holder->get('image_slots')['cover'])->toBe([$image->id]);
+
+    // And saving now records it, so the delete guard can finally see it.
+    $holder->call('persist');
+
+    expect($image->fresh()->isAttached())->toBeTrue();
+});
+
+test('emptying a slot releases the image', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+    $post = slotPost($this->member);
+
+    $holder = Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id])
+        ->dispatch('imagesSelected', ids: [$image->id], urls: [], slot: 'cover')
+        ->call('persist');
+
+    expect($image->fresh()->isAttached())->toBeTrue();
+
+    $holder->call('clearImages', 'cover')->call('persist');
+
+    expect($image->fresh()->isAttached())->toBeFalse()
+        ->and($holder->get('image_id'))->toBeNull();
+});
+
+test('removing one image from a slot leaves the rest attached', function () {
+    $service = app(ImageLibraryService::class);
+    $one = $service->store($this->member, uploadedImage('one.jpg'));
+    $two = $service->store($this->member, uploadedImage('two.jpg'));
+    $post = slotPost($this->member);
+
+    Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id])
+        ->dispatch('imagesSelected', ids: [$one->id, $two->id], urls: [], slot: 'gallery')
+        ->call('removeImage', 'gallery', $one->id)
+        ->call('persist');
+
+    expect($service->usedImageIds($post, 'gallery'))->toBe([$two->id])
+        ->and($one->fresh()->isAttached())->toBeFalse()
+        ->and($two->fresh()->isAttached())->toBeTrue();
+});
+
+test('one slot on a record does not disturb another', function () {
+    $service = app(ImageLibraryService::class);
+    $cover = $service->store($this->member, uploadedImage('cover.jpg'));
+    $shot = $service->store($this->member, uploadedImage('shot.jpg'));
+    $post = slotPost($this->member);
+
+    Livewire::actingAs($this->member)
+        ->test(SlotHolder::class, ['record_id' => $post->id])
+        ->dispatch('imagesSelected', ids: [$cover->id], urls: [], slot: 'cover')
+        ->dispatch('imagesSelected', ids: [$shot->id], urls: [], slot: 'gallery')
+        ->call('persist');
+
+    // Two fields on one record are two independent claims on the library.
+    expect($service->usedImageIds($post, 'cover'))->toBe([$cover->id])
+        ->and($service->usedImageIds($post, 'gallery'))->toBe([$shot->id]);
+});
+
+test('an undeclared slot is refused rather than created', function () {
+    // The slot name arrives from the browser on every click.
+    Livewire::actingAs($this->member)
+        ->test(SlotHolder::class)
+        ->call('chooseImage', 'not-a-slot')
+        ->assertStatus(404);
+});
+
+test('the picker carries the slot that asked and leaves the editor alone', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open', false, null, 'cover')
+        ->call('toggle', $image->id)
+        ->assertDispatched('imagesSelected', ids: [$image->id], slot: 'cover')
+        // A cover chosen for a form must not also drop itself into the body being
+        // written: the tiptap editor's event only fires when nobody named a slot.
+        ->assertNotDispatched('image-picked');
+});
+
+test('reopening a multiple slot shows what it already holds', function () {
+    $service = app(ImageLibraryService::class);
+    $one = $service->store($this->member, uploadedImage('one.jpg'));
+    $two = $service->store($this->member, uploadedImage('two.jpg'));
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        // Without this, confirming would replace the pair rather than add to it.
+        ->call('open', true, 3, 'gallery', [$one->id, $two->id])
+        ->assertSet('selected', [$one->id, $two->id]);
+});
+
+test('the blog editor holds its cover through the slot', function () {
+    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage('cover.jpg'));
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit')
+        ->set('title', 'A post with a cover')
+        ->set('excerpt', 'A short line.')
+        ->set('content', '<p>Body.</p>')
+        ->assertSee('Choose from library')
+        ->dispatch('imagesSelected', ids: [$image->id], urls: [], slot: 'cover')
+        // The slot control draws what it holds and offers the way out of it.
+        ->assertSee($image->url())
+        ->assertSee('Replace')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $post = Post::query()->where('title', 'A post with a cover')->first();
+
+    expect($post->image_id)->toBe($image->id)
+        // The usage row is what stops the file being deleted out from under it.
+        ->and(app(ImageLibraryService::class)->usedImageIds($post, 'cover'))->toBe([$image->id]);
 });

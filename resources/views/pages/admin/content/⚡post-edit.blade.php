@@ -4,21 +4,18 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusPost;
 use App\Enums\StatusYes;
-use App\Models\Image;
 use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
-use App\Services\ImageLibraryService;
 use App\Traits\WithFormResponseMessage;
+use App\Traits\WithImagePicker;
 use App\Traits\WithTaxonomy;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\Computed;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithTaxonomy;
+    use WithFormResponseMessage, WithImagePicker, WithTaxonomy;
 
     public ?Post $post = null;
 
@@ -41,10 +38,20 @@ new class extends Component
     public ?string $published_at = null;
 
     /**
-     * Set while the cover slot is the thing waiting on the picker. Without it,
-     * choosing an image for the body would silently replace the cover too.
+     * The cover is the only image a post holds directly. It names image_id, so the
+     * column the posts table already carries stays the record of it and the
+     * usage row is what stops the file being deleted out from under a live post.
+     *
+     * A second slot is a line here — 'gallery' => ['multiple' => true, 'max' => 6]
+     * needs no column and no migration, because a slot with no property lives in
+     * image_usages.
      */
-    public bool $choosingCover = false;
+    protected function imageSlots(): array
+    {
+        return [
+            'cover' => ['multiple' => false, 'property' => 'image_id'],
+        ];
+    }
 
     /**
      * The post is bound by route model, so a missing one is a new post rather
@@ -68,49 +75,10 @@ new class extends Component
             $this->published_at = $this->post->published_at?->format('Y-m-d\TH:i');
 
             $this->loadTaxonomy($this->post);
+            $this->loadImageSlots($this->post);
         }
 
         kSetSiteTitle('content', 'blogs', $this->post ? 'edit post' : 'new post');
-    }
-
-    #[Computed]
-    public function coverImage(): ?Image
-    {
-        return $this->image_id ? Image::query()->find($this->image_id) : null;
-    }
-
-    /**
-     * The picker announces a choice to whatever is listening. This screen uses it
-     * for the cover image only — the editor takes its own from the same event on
-     * the browser side.
-     */
-    #[On('imageSelected')]
-    public function setCoverImage(int $imageId): void
-    {
-        // Only when the cover slot actually asked. Without the flag, choosing an
-        // image for the body would silently replace the cover as well.
-        if (! $this->choosingCover) {
-            return;
-        }
-
-        $this->image_id = $imageId;
-        $this->choosingCover = false;
-
-        unset($this->coverImage);
-    }
-
-    public function chooseCover(): void
-    {
-        $this->choosingCover = true;
-
-        $this->dispatch('open-image-picker');
-    }
-
-    public function clearCover(): void
-    {
-        $this->image_id = null;
-
-        unset($this->coverImage);
     }
 
     protected function rules(): array
@@ -125,6 +93,7 @@ new class extends Component
             'excerpt' => ['required', 'string', 'max:500'],
             'content' => ['required', 'string'],
             'image_id' => ['nullable', 'integer', Rule::exists('images', 'id')],
+            ...$this->imagePickerRules(),
             ...$this->taxonomyRules(),
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
@@ -178,9 +147,9 @@ new class extends Component
         // Taxonomy after the save, because a new post has no id before it.
         $this->syncTaxonomy($this->post);
 
-        // The cover's usage row is what stops somebody deleting an image that is
-        // on a published post.
-        app(ImageLibraryService::class)->syncSingle($this->coverImage, $this->post, 'cover');
+        // The usage rows are what stop somebody deleting an image that is on a
+        // published post. After the save, for the same reason as the taxonomy.
+        $this->syncImageSlots($this->post);
 
         $action = match (true) {
             $isNew => ActivityActionEnum::POST_CREATE,
@@ -232,26 +201,12 @@ new class extends Component
 
         <div class="space-y-6">
 
-            <flux:card class="space-y-3">
-                <flux:heading level="2" size="sm">Cover image</flux:heading>
-
-                @if ($this->coverImage)
-                    <img
-                        src="{{ $this->coverImage->url() }}"
-                        alt="{{ $this->coverImage->title }}"
-                        class="aspect-video w-full rounded-lg object-cover"
-                    />
-                    <div class="flex gap-2">
-                        <flux:button size="sm" wire:click="chooseCover" type="button">Replace</flux:button>
-                        <flux:button size="sm" variant="ghost" wire:click="clearCover" type="button">Remove</flux:button>
-                    </div>
-                @else
-                    <flux:button size="sm" icon="photo" wire:click="chooseCover" type="button" class="w-full">
-                        Choose from library
-                    </flux:button>
-                @endif
-                <flux:error name="image_id" />
-            </flux:card>
+            <x-form.image-slot
+                name="cover"
+                label="Cover image"
+                :images="$this->slotImages('cover')"
+                error="image_id"
+            />
 
             <x-form.category-field
                 wire:model="category_ids"

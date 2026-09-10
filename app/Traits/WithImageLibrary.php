@@ -57,6 +57,16 @@ trait WithImageLibrary
     /** A ceiling on a multiple selection. Null means as many as they like. */
     public ?int $max = null;
 
+    /**
+     * Which slot on the calling screen asked, echoed back with the answer.
+     *
+     * The picker announces its choice to everything listening, so this is what
+     * lets one screen hold a cover and a gallery without each pick landing in
+     * both. Null means nobody named a slot — the tiptap editor's route, which
+     * wants a URL rather than a place to put one.
+     */
+    public ?string $slot = null;
+
     /** 'library' or 'upload'. */
     public string $tab = 'library';
 

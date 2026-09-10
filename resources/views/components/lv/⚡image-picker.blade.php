@@ -12,10 +12,15 @@ use Livewire\Component;
  * Dropped once onto any screen that needs to choose an image. It answers two
  * kinds of caller:
  *
- *  - the tiptap editor, which listens for the `image-picked` browser event and
- *    only wants a URL back
- *  - a Livewire parent, which listens for `imageSelected` (one image) or
- *    `imagesSelected` (several) and wants ids so it can record the usage
+ *  - the tiptap editor, which names no slot, listens for the `image-picked`
+ *    browser event and only wants a URL back
+ *  - a Livewire parent, which names a slot and listens for `imageSelected` (one
+ *    image) or `imagesSelected` (several), wanting ids so it can record the usage
+ *
+ * The slot is echoed back with the answer and is what keeps those two apart: one
+ * screen can hold a cover and a gallery, and choosing a cover no longer drops the
+ * image into the body of whatever is being written. App\Traits\WithImagePicker is
+ * the far end of that conversation.
  *
  * It never decides what the image is *for* — that is the caller's business.
  *
@@ -39,21 +44,30 @@ new class extends Component
     }
 
     /**
-     * The caller may override the selection mode as it opens the picker, so one
-     * screen can pick a single cover image in one place and a gallery in another
-     * without mounting the component twice.
+     * The caller sets the terms as it opens the picker, so one screen can pick a
+     * single cover image in one place and a gallery in another without mounting
+     * the component twice.
+     *
+     * `$selected` is what the calling slot already holds. Reopening a gallery has
+     * to show those six ticked, or confirming would quietly replace them with
+     * whatever was chosen this time round.
+     *
+     * @param  array<int, int>|null  $selected
      */
-    public function open(?bool $multiple = null, ?int $max = null): void
+    public function open(?bool $multiple = null, ?int $max = null, ?string $slot = null, ?array $selected = null): void
     {
         $this->show = true;
         $this->tab = 'library';
         $this->multiple = $multiple ?? false;
-
-        if ($max !== null) {
-            $this->max = $max;
-        }
+        $this->max = $max;
+        $this->slot = $slot;
 
         $this->reset('selected', 'panel', 'search');
+
+        if ($this->multiple && filled($selected)) {
+            $this->selected = collect($selected)->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        }
+
         $this->resetPage();
 
         unset($this->images, $this->folders);
@@ -63,7 +77,7 @@ new class extends Component
     {
         $this->show = false;
 
-        $this->reset('search', 'folder', 'selected', 'panel');
+        $this->reset('search', 'folder', 'selected', 'panel', 'slot');
     }
 
     /**
@@ -95,14 +109,24 @@ new class extends Component
         $this->respondError('Choose an image first.', $images->isEmpty());
 
         $first = $images->first();
+        $slot = $this->slot;
 
-        // Two audiences, two events. The browser event feeds the tiptap editor;
-        // the Livewire events feed a parent that needs ids to record usages.
-        $this->dispatch('image-picked', url: $first->url(), alt: $first->alt_text ?: $first->title);
+        // Two audiences, two events. The browser event feeds the tiptap editor,
+        // and only when nobody named a slot — a cover chosen for a form must not
+        // also drop itself into the body being written. The Livewire events feed a
+        // parent that needs ids to record usages, and carry the slot that asked.
+        if ($slot === null) {
+            $this->dispatch('image-picked', url: $first->url(), alt: $first->alt_text ?: $first->title);
+        }
 
-        $this->dispatch('imageSelected', imageId: $first->id, url: $first->url());
+        $this->dispatch('imageSelected', imageId: $first->id, url: $first->url(), slot: $slot);
 
-        $this->dispatch('imagesSelected', ids: $images->pluck('id')->all(), urls: $images->map->url()->all());
+        $this->dispatch(
+            'imagesSelected',
+            ids: $images->pluck('id')->all(),
+            urls: $images->map->url()->all(),
+            slot: $slot,
+        );
 
         $this->close();
 
@@ -111,7 +135,14 @@ new class extends Component
 };
 ?>
 
-<div x-on:open-image-picker.window="$wire.open($event.detail?.multiple ?? null, $event.detail?.max ?? null)">
+<div
+    x-on:open-image-picker.window="$wire.open(
+        $event.detail?.multiple ?? null,
+        $event.detail?.max ?? null,
+        $event.detail?.slot ?? null,
+        $event.detail?.selected ?? null,
+    )"
+>
     <flux:modal wire:model="show" name="imagePicker" class="max-w-4xl">
         <div class="space-y-5">
             <div>

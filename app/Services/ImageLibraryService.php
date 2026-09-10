@@ -383,11 +383,62 @@ class ImageLibraryService
      */
     public function syncSingle(?Image $image, Model $usable, string $field = 'image'): void
     {
-        $this->detach($usable, $field);
+        $this->syncMany($image ? [$image->id] : [], $usable, $field);
+    }
 
-        if ($image) {
-            $this->attach($image, $usable, $field);
+    /**
+     * Point a field at any number of images, in the order given.
+     *
+     * Rows carry no sort column, so the order is the order they were inserted and
+     * a reordered gallery is written out again from scratch. That is cheap — a
+     * handful of rows — and it is what lets a slot be arranged without a migration.
+     * Nothing reads a usage row's created_at, so recreating one costs nothing.
+     *
+     * @param  array<int, int>  $imageIds
+     */
+    public function syncMany(array $imageIds, Model $usable, string $field = 'image'): void
+    {
+        $ids = collect($imageIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+
+        // Untouched is the common case — a post saved twice with the same cover
+        // should not churn the row the delete guard reads.
+        if ($ids->all() === $this->usedImageIds($usable, $field)) {
+            return;
         }
+
+        DB::transaction(function () use ($ids, $usable, $field): void {
+            $this->detach($usable, $field);
+
+            foreach ($ids as $id) {
+                ImageUsage::query()->create([
+                    'image_id' => $id,
+                    'usable_type' => $usable->getMorphClass(),
+                    'usable_id' => $usable->getKey(),
+                    'field' => $field,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * What a record currently holds in one field, in the order it was attached.
+     *
+     * @return array<int, int>
+     */
+    public function usedImageIds(Model $usable, string $field = 'image'): array
+    {
+        if (! $usable->exists) {
+            return [];
+        }
+
+        return ImageUsage::query()
+            ->where('usable_type', $usable->getMorphClass())
+            ->where('usable_id', $usable->getKey())
+            ->where('field', $field)
+            ->orderBy('id')
+            ->pluck('image_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
