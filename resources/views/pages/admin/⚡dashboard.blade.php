@@ -91,10 +91,11 @@ new class extends Component
     }
 
     /**
-     * Sign-ups over the last six months, scaled so the tallest bar fills the chart.
+     * Sign-ups over the last six months, handed to <x-chart> as rows.
      *
-     * Swap the model for whatever your project actually counts — the shape of the
-     * query and the bar markup stay as they are.
+     * The scaling lives in the chart engine now, so this only has to produce the
+     * numbers and the two labels the axis and tooltip read. Swap the model for
+     * whatever your project actually counts — the shape of the query stays.
      */
     #[Computed]
     public function signupsByMonth(): Collection
@@ -106,15 +107,11 @@ new class extends Component
             ->orderBy('month')
             ->get();
 
-        $highest = max(1, (int) $result->max('total'));
-
         return $result->map(fn ($item) => (object) [
             'month' => $item->month,
             'label' => Carbon::createFromFormat('Y-m', $item->month)->format('F Y'),
             'monthShort' => Carbon::createFromFormat('Y-m', $item->month)->format('M'),
             'total' => (int) $item->total,
-            'formattedTotal' => number_format($item->total),
-            'heightPercentage' => max(4, round(($item->total / $highest) * 100)),
         ]);
     }
 
@@ -188,26 +185,35 @@ new class extends Component
                 </div>
                 <flux:badge color="lime" size="sm">Live data</flux:badge>
             </div>
-            <div class="mt-7 grid h-52 grid-cols-6 items-end gap-3" role="img" aria-label="Monthly sign-up bar chart">
-                @forelse ($this->signupsByMonth as $month)
-                    <div class="flex h-full min-w-0 flex-col justify-end gap-3">
-                        <span class="sr-only">
-                            {{ $month->label }}: {{ $month->formattedTotal }}
-                        </span>
-                        <div
-                            class="min-h-1 rounded-t-md bg-emerald-500/85 transition-[height] duration-200 ease-out-strong dark:bg-lime-400"
-                            style="height: {{ $month->heightPercentage }}%"
-                        ></div>
-                        <span class="truncate text-center text-xs font-medium text-slate-500 dark:text-slate-400">
-                            {{ $month->monthShort }}
-                        </span>
-                    </div>
-                @empty
-                    <div class="col-span-6 grid h-full place-items-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        Sign-ups will appear as accounts are created.
-                    </div>
-                @endforelse
-            </div>
+            @if ($this->signupsByMonth->isEmpty())
+                <div class="mt-7 grid h-52 place-items-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    Sign-ups will appear as accounts are created.
+                </div>
+            @else
+                {{-- The gutter reserves the room the axis ticks are drawn into: 28px under the
+                     chart for the month labels, 40px to the left for the counts. --}}
+                <x-chart :value="$this->signupsByMonth" gutter="8 8 28 40" class="mt-7 h-52">
+                    <x-chart.svg>
+                        <x-chart.axis axis="y" :tick-count="4">
+                            <x-chart.axis.grid />
+                            <x-chart.axis.tick />
+                        </x-chart.axis>
+
+                        <x-chart.axis axis="x" field="monthShort">
+                            <x-chart.axis.line />
+                            <x-chart.axis.tick />
+                        </x-chart.axis>
+
+                        <x-chart.cursor type="area" />
+                        <x-chart.bar field="total" />
+                    </x-chart.svg>
+
+                    <x-chart.tooltip>
+                        <x-chart.tooltip.heading field="label" />
+                        <x-chart.tooltip.value field="total" label="Sign-ups" />
+                    </x-chart.tooltip>
+                </x-chart>
+            @endif
         </flux:card>
 
         <flux:card>

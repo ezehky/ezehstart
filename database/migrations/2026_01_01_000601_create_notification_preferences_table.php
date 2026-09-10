@@ -12,14 +12,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('notification_subscriptions', function (Blueprint $table) {
+        Schema::create('notification_preferences', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('notification_type')->index(); // NotificationTypeEnum
-            $table->string('feedback')->nullable();
+
+            // Retiring a type takes its preference rows with it. Keeping orphaned
+            // switches for something nobody can send would only leave the settings
+            // page rendering options that do nothing.
+            $table->foreignId('notification_type_id')->constrained()->cascadeOnDelete();
+
             $table->boolean('status')->default(StatusDefault::ACTIVE);
+
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+
+            // One switch per user per type. The backfill relies on this: it uses
+            // firstOrCreate, and two overlapping requests must not both win.
+            $table->unique(['user_id', 'notification_type_id']);
         });
     }
 
@@ -28,6 +38,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('notification_subscriptions');
+        Schema::dropIfExists('notification_preferences');
     }
 };

@@ -150,9 +150,9 @@ class User extends Authenticatable
             ->select('id', 'user_id', 'role_id', 'status');
     }
 
-    public function notificationSubscriptions(): HasMany
+    public function notificationPreferences(): HasMany
     {
-        return $this->hasMany(NotificationSubscription::class);
+        return $this->hasMany(NotificationPreference::class);
     }
 
     public function activityLogs(): HasMany
@@ -163,6 +163,41 @@ class User extends Authenticatable
     public function consents(): HasMany
     {
         return $this->hasMany(UserConsent::class);
+    }
+
+    public function connectedAccounts(): HasMany
+    {
+        return $this->hasMany(UserConnectedAccount::class);
+    }
+
+    /**
+     * The second-factor enrolment, if there is one. A row exists from the moment
+     * enrolment starts, so having one is not the same as having it switched on —
+     * ask twoFactor?->status->isActive() for that.
+     */
+    public function twoFactor(): HasOne
+    {
+        return $this->hasOne(UserTwoFactor::class);
+    }
+
+    public function passwordHistories(): HasMany
+    {
+        return $this->hasMany(PasswordHistory::class);
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(Image::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
     }
 
     // Scopes

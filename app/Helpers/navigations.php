@@ -41,8 +41,39 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'FAQs',
                         'link' => route('admin.config.faqs'),
                     ],
+                    'notification-types' => [
+                        'label' => 'Notification types',
+                        'link' => route('admin.config.notification-types'),
+                    ],
                 ],
                 'icon' => 'cog-6-tooth',
+            ],
+            'content' => [
+                'label' => 'Content',
+                'children' => [
+                    'blog-posts' => [
+                        'label' => 'Posts',
+                        'link' => route('admin.blog.posts'),
+                    ],
+                    'blog-categories' => [
+                        'label' => 'Categories',
+                        'link' => route('admin.blog.categories'),
+                    ],
+                    'blog-tags' => [
+                        'label' => 'Tags',
+                        'link' => route('admin.blog.tags'),
+                    ],
+                    'image-library' => [
+                        'label' => 'Image library',
+                        'link' => route('admin.image-library'),
+                    ],
+                ],
+                'icon' => 'newspaper',
+            ],
+            'transactions' => [
+                'label' => 'Transactions',
+                'link' => route('admin.transactions'),
+                'icon' => 'banknotes',
             ],
             'users' => [
                 'label' => 'Users',
@@ -99,6 +130,16 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                     ],
                 ],
                 'icon' => 'cog-6-tooth',
+            ],
+            'transactions' => [
+                'label' => 'Transactions',
+                'link' => route('user.transactions'),
+                'icon' => 'banknotes',
+            ],
+            'image-library' => [
+                'label' => 'Image library',
+                'link' => route('user.image-library'),
+                'icon' => 'photo',
             ],
             'profile' => [
                 'label' => 'Profile',

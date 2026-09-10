@@ -20,10 +20,16 @@ original developer has a specific, consistent style. Your job is to disappear in
 | Tests | Pest 5 |
 | Formatter | Laravel Pint (default `laravel` preset) |
 | Types | PHPStan / Larastan, level 1 — read the note in `phpstan.neon` before raising it |
-| Auth extras | OTP email verification, passwordless sign-in |
+| Auth extras | OTP email verification, passwordless sign-in, TOTP two-factor, social sign-in, password history, login throttle |
 
 This is a **starter kit**, not a finished application. Two workspaces — **admin** and
-**member** — plus the guest auth screens. No domain models ship with it.
+**member** — plus the guest auth screens and a public blog.
+
+The kit ships four feature areas beyond authentication, all of them things any project
+would keep: an **image library** (folders, per-image visibility, a delete guard), a
+**blog** (posts with a tiptap editor, polymorphic categories and tags), a
+**transaction ledger** (derived balances, charges, evidence, an admin queue), and
+**countries** as reference data. None of them are domain-specific.
 
 > **The examples in this library come from the project the style was extracted from**,
 > a cohort-based training platform. Cohorts, trainings, admissions and transactions
@@ -52,11 +58,13 @@ Do **not** create any of them. If you think you need one, you need a **Service**
 [policies.md](policies.md) for what this project does instead.
 
 ### 2. Always reuse existing services
-Before writing any business logic, check `app/Services/`. Eleven ship with the kit:
+Before writing any business logic, check `app/Services/`. Eighteen ship with the kit:
 `ActivityLogService`, `AdminActionService`, `UserService`, `UserRoleService`,
 `NotificationService`, `SiteConfigurationService`, `MarkdownService`,
-`AccountDeletionService`, `AccountOtpService`, `EmailVerificationOtpService`,
-`PasswordlessOtpService`. Resolve with `app(TheService::class)` — never `new`.
+`PolicyContentService`, `AccountDeletionService`, `AccountOtpService`,
+`EmailVerificationOtpService`, `PasswordlessOtpService`, `PasswordSecurityService`,
+`TwoFactorService`, `SocialAccountService`, `ImageLibraryService`, `BlogService`,
+`TransactionService`. Resolve with `app(TheService::class)` — never `new`.
 
 ### 3. Follow naming conventions exactly
 See [naming.md](naming.md). The two rules people get wrong:
@@ -142,8 +150,8 @@ Follow this order every time.
    `resources/views/pages/admin/configs/⚡site-config.blade.php`. A listing with
    filters and pagination? Open `resources/views/pages/admin/users/⚡members.blade.php`.
    A single-record view? `⚡user-view.blade.php`. Copy its shape.
-2. **Check for an existing enum** for any status/type/category field. Ten ship with
-   the kit; `StatusDefault` and `StatusYes` cover most on/off columns.
+2. **Check for an existing enum** for any status/type/category field. Twenty-four ship
+   with the kit; `StatusDefault` and `StatusYes` cover most on/off columns.
 3. **Check for an existing service** for the business logic.
 4. **Check for an existing trait** for shared page behaviour.
 5. **Check for an existing Blade component** for the UI.

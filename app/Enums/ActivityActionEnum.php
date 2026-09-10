@@ -60,6 +60,50 @@ enum ActivityActionEnum: string
     case FAQ_UPDATE = 'faq.update';
     case FAQ_DELETE = 'faq.delete';
 
+    // Two-factor authentication. Enabling and disabling are separate cases on
+    // purpose: "somebody turned the second factor off" is the line you go looking
+    // for after an account is taken over, and it must not be buried under UPDATE.
+    case TWO_FACTOR_ENABLE = 'two-factor.enable';
+    case TWO_FACTOR_DISABLE = 'two-factor.disable';
+    case TWO_FACTOR_RECOVERY_REGENERATE = 'two-factor.recovery-regenerate';
+    case TWO_FACTOR_RECOVERY_USED = 'two-factor.recovery-used';
+
+    // Connected accounts
+    case SOCIAL_ACCOUNT_LINK = 'social-account.link';
+    case SOCIAL_ACCOUNT_UNLINK = 'social-account.unlink';
+
+    // Image library
+    case IMAGE_UPLOAD = 'image.upload';
+    case IMAGE_UPDATE = 'image.update';
+    case IMAGE_DELETE = 'image.delete';
+    case IMAGE_FOLDER_CREATE = 'image-folder.create';
+    case IMAGE_FOLDER_UPDATE = 'image-folder.update';
+    case IMAGE_FOLDER_DELETE = 'image-folder.delete';
+
+    // Blog
+    case POST_CREATE = 'post.create';
+    case POST_UPDATE = 'post.update';
+    case POST_PUBLISH = 'post.publish';
+    case POST_DELETE = 'post.delete';
+    case CATEGORY_CREATE = 'category.create';
+    case CATEGORY_UPDATE = 'category.update';
+    case CATEGORY_DELETE = 'category.delete';
+    case TAG_CREATE = 'tag.create';
+    case TAG_UPDATE = 'tag.update';
+    case TAG_DELETE = 'tag.delete';
+
+    // Notification types
+    case NOTIFICATION_TYPE_CREATE = 'notification-type.create';
+    case NOTIFICATION_TYPE_UPDATE = 'notification-type.update';
+    case NOTIFICATION_TYPE_DELETE = 'notification-type.delete';
+
+    // Money. Every one of these is an administrator moving somebody else's money
+    // and each needs to be individually answerable for.
+    case TRANSACTION_CREATE = 'transaction.create';
+    case TRANSACTION_CONFIRM = 'transaction.confirm';
+    case TRANSACTION_REJECT = 'transaction.reject';
+    case TRANSACTION_REFUND = 'transaction.refund';
+
     // Methods
 
     /**
@@ -73,22 +117,53 @@ enum ActivityActionEnum: string
             self::CREATE,
             self::USER_CREATE,
             self::POLICY_CREATE,
-            self::FAQ_CREATE => 'Created new ',
+            self::FAQ_CREATE,
+            self::IMAGE_FOLDER_CREATE,
+            self::POST_CREATE,
+            self::CATEGORY_CREATE,
+            self::TAG_CREATE,
+            self::NOTIFICATION_TYPE_CREATE,
+            self::TRANSACTION_CREATE => 'Created new ',
 
             // Update
             self::UPDATE,
             self::USER_UPDATE,
             self::CONFIG_UPDATE,
             self::POLICY_UPDATE,
-            self::FAQ_UPDATE => 'Updated ',
+            self::FAQ_UPDATE,
+            self::IMAGE_UPDATE,
+            self::IMAGE_FOLDER_UPDATE,
+            self::POST_UPDATE,
+            self::CATEGORY_UPDATE,
+            self::TAG_UPDATE,
+            self::NOTIFICATION_TYPE_UPDATE => 'Updated ',
 
             // Delete
             self::DELETE,
             self::USER_DELETE,
-            self::FAQ_DELETE => 'Deleted ',
+            self::FAQ_DELETE,
+            self::IMAGE_DELETE,
+            self::IMAGE_FOLDER_DELETE,
+            self::POST_DELETE,
+            self::CATEGORY_DELETE,
+            self::TAG_DELETE,
+            self::NOTIFICATION_TYPE_DELETE => 'Deleted ',
+
+            // Uploads
+            self::IMAGE_UPLOAD => 'Uploaded ',
 
             // Legal
             self::POLICY_PUBLISH => 'Published ',
+            self::POST_PUBLISH => 'Published ',
+
+            // Connected accounts
+            self::SOCIAL_ACCOUNT_LINK => 'Connected ',
+            self::SOCIAL_ACCOUNT_UNLINK => 'Disconnected ',
+
+            // Money
+            self::TRANSACTION_CONFIRM => 'Confirmed ',
+            self::TRANSACTION_REJECT => 'Rejected ',
+            self::TRANSACTION_REFUND => 'Refunded ',
 
             // Personal
             self::PASSWORD_RESET_REQUEST => 'Requested a password reset for ',
@@ -113,6 +188,11 @@ enum ActivityActionEnum: string
             self::SETTINGS_UPDATE => 'Updated their account preferences.',
             self::ACCOUNT_ANONYMIZE => 'Deleted their account (data anonymized).',
             self::ACCOUNT_DELETE => 'Permanently deleted their account.',
+
+            self::TWO_FACTOR_ENABLE => 'Turned on two-factor authentication.',
+            self::TWO_FACTOR_DISABLE => 'Turned off two-factor authentication.',
+            self::TWO_FACTOR_RECOVERY_REGENERATE => 'Generated a new set of recovery codes.',
+            self::TWO_FACTOR_RECOVERY_USED => 'Signed in using a recovery code.',
 
             default => '',
         };

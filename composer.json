@@ -18,12 +18,16 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "bacon/bacon-qr-code": "^3.1",
         "jenssegers/agent": "^2.6",
         "laravel/framework": "^13.17",
+        "laravel/socialite": "^5.31",
         "laravel/tinker": "^3.0",
         "livewire/blaze": "^1.0",
         "livewire/flux": "^2.15",
-        "livewire/livewire": "^4.1"
+        "livewire/livewire": "^4.1",
+        "pragmarx/google2fa-laravel": "^3.0",
+        "spatie/laravel-image-optimizer": "^1.8"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
@@ -62,6 +66,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
+            "@php artisan storage:link",
             "npm install",
             "npm run build"
         ],

@@ -5,7 +5,7 @@
 **Every** status, type, category, provider, role, and vocabulary in this project is a
 backed PHP enum in `app/Enums/`. A bare string or int in a status column is a bug.
 
-Ten ship with the starter. Before adding an eleventh, check whether `StatusDefault`
+Twenty-four ship with the starter. Before adding another, check whether `StatusDefault`
 (active/inactive) or `StatusYes` (yes/no) already says what you mean — most on/off
 columns need neither a new enum nor a boolean.
 

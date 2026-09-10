@@ -2,12 +2,13 @@
 
 ## Rule
 
-Four layout surfaces.
+Five layout surfaces.
 
 | Layout | File | Used by |
 | --- | --- | --- |
 | `layouts::app` | `resources/views/layouts/app.blade.php` | **default** for every authenticated page |
 | `layouts::auth` | `resources/views/layouts/auth.blade.php` | guest pages, via `#[Layout('layouts::auth')]` |
+| `layouts::site` | `resources/views/layouts/site.blade.php` | public Livewire pages (the blog), via `#[Layout('layouts::site')]` |
 | `x-layouts.base` | `resources/views/components/layouts/base.blade.php` | the HTML document, wrapped by both above |
 | `x-layouts.site-master` | `resources/views/components/layouts/site-master.blade.php` | public marketing pages (controller-rendered) |
 | `x-layouts.email` | `resources/views/components/layouts/email.blade.php` | every Mailable view |
@@ -21,6 +22,16 @@ pages declare nothing.
 use Livewire\Attributes\Layout;
 
 new #[Layout('layouts::auth')] class extends Component
+```
+
+### Public pages
+
+A public Livewire page has no sidebar and no navigation links, so `layouts::app` cannot
+render it — it would fail on the `$navigationLinks` the sidebar expects. `layouts::site`
+is the header/footer shell those pages use instead:
+
+```php
+new #[Layout('layouts::site')] class extends Component
 ```
 
 ### `x-layouts.base` — the document

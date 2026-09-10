@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\NotificationTypeEnum;
+use App\Models\NotificationType;
 use App\Models\User;
 use App\Services\UserService;
 use App\Traits\WithFormResponseMessage;
@@ -14,7 +14,8 @@ new class extends Component
 
     public array $notifications = [];
 
-    public array $notificationTypes;
+    /** @var array<int, array{title: string, description: string|null}> keyed by notification type id */
+    public array $notificationTypes = [];
 
     public function mount(): void
     {
@@ -22,16 +23,24 @@ new class extends Component
 
         $userService = app(UserService::class, ['user' => $this->user]);
 
-        // Backfill any settings/subscriptions that don't exist yet for this user.
+        // Backfill any settings/preferences that don't exist yet for this user.
         $userService->runProfileSettingsUpdate();
-        $userService->runNotificationSubscriptionsUpdate();
+        $userService->runNotificationPreferencesUpdate();
 
-        $this->notificationTypes = NotificationTypeEnum::forSelect();
+        // Only the types still on offer. A retired type keeps its rows until the
+        // admin deletes it, and neither should appear as a switch in the meantime.
+        $types = NotificationType::query()->active()->inFlowOrder()->get();
 
-        $subscriptions = $this->user->notificationSubscriptions;
+        $preferences = $this->user->notificationPreferences;
 
-        foreach ($this->notificationTypes as $type => $label) {
-            $this->notifications[$type] = (bool) $subscriptions->firstWhere('notification_type', $type)?->status?->boolValue();
+        foreach ($types as $type) {
+            $this->notificationTypes[$type->id] = [
+                'title' => $type->title,
+                'description' => $type->description,
+            ];
+
+            $this->notifications[$type->id] = (bool) $preferences
+                ->firstWhere('notification_type_id', $type->id)?->status?->boolValue();
         }
 
         kSetSiteTitle('profile', 'settings');
@@ -48,9 +57,9 @@ new class extends Component
     {
         $this->validate();
 
-        foreach ($this->notifications as $type => $status) {
-            $this->user->notificationSubscriptions()
-                ->where('notification_type', $type)
+        foreach ($this->notifications as $typeId => $status) {
+            $this->user->notificationPreferences()
+                ->where('notification_type_id', $typeId)
                 ->update(['status' => $status]);
         }
 
@@ -75,11 +84,12 @@ new class extends Component
             </div>
 
             <div class="space-y-4">
-                @foreach ($notificationTypes as $type => $label)
+                @foreach ($notificationTypes as $typeId => $type)
                     <flux:switch
-                        wire:key="notification-{{ $type }}"
-                        wire:model="notifications.{{ $type }}"
-                        :label="$label"
+                        wire:key="notification-{{ $typeId }}"
+                        wire:model="notifications.{{ $typeId }}"
+                        :label="$type['title']"
+                        :description="$type['description']"
                     />
                 @endforeach
             </div>

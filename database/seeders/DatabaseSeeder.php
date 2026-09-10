@@ -30,6 +30,11 @@ class DatabaseSeeder extends Seeder
         $seeders = [
             ...$seeders,
             RoleSeeder::class,
+            // Before UserSeeder: the member dashboard backfills a preference row
+            // per active type, and with no types seeded it would quietly write
+            // none and look like the feature was broken.
+            NotificationTypeSeeder::class,
+            CountrySeeder::class,
             UserSeeder::class,
             // Both match on natural keys rather than ids, so re-seeding refreshes
             // the copy instead of stacking up duplicates. PolicySeeder only ever

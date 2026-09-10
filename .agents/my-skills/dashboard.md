@@ -114,10 +114,16 @@ Rendering:
 Grids: `sm:grid-cols-3` for three tiles, `sm:grid-cols-2 lg:grid-cols-3` for six.
 The `<section>` carries an `aria-label`.
 
-### Charts — CSS bars, no library
+### Charts — `<x-chart>`, still no library
 
-There is **no charting library**. A series is a `Collection` of objects carrying a
-pre-computed `heightPercentage`:
+There is **no charting library**, and there is not going to be one. A chart is an
+`<svg>` drawn by `resources/js/chart.js`: the parent measures its own box, turns a
+value into a pixel, and each nested component asks it for the shape it needs. The
+composition mirrors Flux Pro's `<flux:chart>`, which is also plain SVG — nesting a
+part is how you turn it on, and leaving it out is how you turn it off.
+
+The computed produces **rows**, nothing more. No scaling, no percentages — that is
+the engine's job now:
 
 ```php
 #[Computed]
@@ -132,27 +138,72 @@ public function revenueByMonth(): Collection
         ->orderBy('month')
         ->get();
 
-    $highestRevenue = max(1, (int) $result->max('total'));
-
     return $result->map(fn ($item) => (object) [
         'month' => $item->month,
         'label' => Carbon::createFromFormat('Y-m', $item->month)->format('F Y'),
         'monthShort' => Carbon::createFromFormat('Y-m', $item->month)->format('M'),
         'total' => $item->total / 100,
-        'formattedTotal' => kMoneyFormat($item->total / 100),
-        'heightPercentage' => max(4, round(($item->total / $highestRevenue) * 100)),
     ]);
 }
 ```
 
+```blade
+<x-chart :value="$this->revenueByMonth" gutter="8 8 28 48" class="h-52">
+    <x-chart.svg>
+        <x-chart.axis axis="y" :tick-count="4" :format="['notation' => 'compact']">
+            <x-chart.axis.grid />
+            <x-chart.axis.tick />
+        </x-chart.axis>
+
+        <x-chart.axis axis="x" field="monthShort">
+            <x-chart.axis.line />
+            <x-chart.axis.tick />
+        </x-chart.axis>
+
+        <x-chart.cursor type="area" />
+        <x-chart.bar field="total" />
+    </x-chart.svg>
+
+    <x-chart.tooltip>
+        <x-chart.tooltip.heading field="label" />
+        <x-chart.tooltip.value field="total" label="Revenue" prefix="&#8358;" />
+    </x-chart.tooltip>
+</x-chart>
+```
+
+The component set:
+
+| Component | Props | Draws |
+| --- | --- | --- |
+| `x-chart` | `value`, `gutter`, or `wire:model` | the Alpine root; `class` sets the height |
+| `x-chart.svg` | — | the canvas, and the pointer tracking |
+| `x-chart.line` | `field`, `curve`, `width` | a monotone or straight line |
+| `x-chart.area` | `field`, `curve`, `opacity` | the fill under a line |
+| `x-chart.bar` | `field`, `radius`, `width` | bars on a band scale |
+| `x-chart.point` | `field`, `radius`, `stroke-width` | dots on each row |
+| `x-chart.axis` | `axis`, `field`, `format`, `tick-count`, `tick-prefix`, `tick-suffix`, `min`, `max` | nothing — it holds the config its children read |
+| `x-chart.axis.grid` / `.line` / `.tick` | — | gridlines, the baseline, the labels |
+| `x-chart.cursor` | `type` (`line`, `area`) | the hover guide |
+| `x-chart.tooltip` + `.heading` / `.value` | `field`, `label`, `format`, `prefix`, `suffix` | the hover readout |
+
 Points:
 
-- `max(1, …)` on the divisor — never divide by zero on an empty month set.
-- `max(4, …)` on the height — a zero-height bar looks like a rendering bug.
-- Both the raw and the formatted value are carried, so the bar has a tooltip and a
-  label without re-formatting in Blade.
-- Rows are cast to `(object)` so Blade reads `$bar->label`, matching model access.
-- The driver-specific month expression is resolved once in `mount()`.
+- **Colour is `currentColor`.** `<x-chart.bar class="text-sky-500 dark:text-sky-400" />`
+  is the whole theming story. Ticks are `<text>`, which inherits `fill` and not
+  `color`, so those take a `fill-*` instead.
+- **`gutter` reserves the room the ticks are drawn into**, read as CSS shorthand
+  (`"8"`, `"8 12"`, `"8 8 28 40"`). Add a y axis and you need a left gutter, or the
+  numbers render outside the box. This is the one place the set is less automatic
+  than Flux Pro, which measures its own labels.
+- **`:value` renders once; `wire:model` entangles** and keeps the series live across
+  a round trip.
+- `format` is passed straight to `Intl.NumberFormat` / `Intl.DateTimeFormat`, so it
+  takes their option arrays.
+- Rows are still cast to `(object)` so Blade reads `$row->label`, matching model
+  access; they serialise to JSON either way.
+- The driver-specific month expression is still resolved once in `mount()`.
+- Guard the empty set with `@if ($this->rows->isEmpty())` and an empty state — an
+  axis over nothing is not worth drawing.
 
 ### Feeds — delegate to services
 
@@ -204,10 +255,14 @@ Metrics count the **whole** set, never the current page.
 
 - Computed metrics mean the counts are recomputed only when the page renders and can be
   invalidated individually after a write.
-- CSS bars instead of a chart library keep the JS bundle to Livewire + Alpine, work in
-  dark mode for free, and need no server-side rendering fallback.
-- Pre-computing `heightPercentage` in PHP keeps the Blade a plain loop with no
-  arithmetic.
+- Hand-drawn SVG instead of a chart library keeps the JS bundle to Livewire + Alpine,
+  works in dark mode for free through `currentColor`, and needs no server-side
+  rendering fallback.
+- Keeping the scaling in the engine rather than the computed means a page hands over
+  the rows it already queried and nothing else, and the same series can be drawn as
+  bars, a line or an area without touching the PHP.
+- Composing the parts rather than configuring them means the markup says what is on
+  screen: no gridlines in the Blade, no gridlines in the chart.
 - Branching the month expression by driver lets the same dashboard run against SQLite
   in tests and MySQL in production.
 - Fixing the tile shape (`label`, `value`, `icon`, `tone`, `change`) lets one component
@@ -277,7 +332,9 @@ public function metrics(): array
 
 - Assigning metrics in `mount()` — they must be `#[Computed]`.
 - Adding Chart.js, ApexCharts, or any charting dependency.
-- Dividing by a max that could be zero, or letting a bar render at 0% height.
+- Adding a chart library to get something `<x-chart>` already draws.
+- A y axis with no left `gutter` — the tick labels render outside the box.
+- Re-deriving percentages or heights in the computed; hand over the raw values.
 - Raw `sum('amount')` without `/ 100` (money is stored in minor units).
 - `{{ number_format($x) }}` in Blade — format in the computed.
 - A tone outside the six-tone palette.

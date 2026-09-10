@@ -1,7 +1,8 @@
 <?php
 
-use App\Enums\NotificationTypeEnum;
+use App\Enums\StatusDefault;
 use App\Enums\UserRoleEnum;
+use App\Models\NotificationType;
 use App\Services\SiteConfigurationService;
 use App\Services\UserService;
 
@@ -41,6 +42,8 @@ test('an unverified member is let through when the site config has not been seed
 });
 
 test('the dashboard backfills profile settings and subscriptions', function () {
+    $types = seededNotificationTypes();
+
     expect($this->member->userProfile)->toBeNull();
 
     $this->actingAs($this->member)->get(route('user.dashboard'))->assertSuccessful();
@@ -49,19 +52,54 @@ test('the dashboard backfills profile settings and subscriptions', function () {
 
     expect($fresh->userProfile)->not->toBeNull()
         ->and((array) $fresh->userProfile->settings)->toHaveKey('can-delete-account')
-        ->and($fresh->notificationSubscriptions)->toHaveCount(\count(NotificationTypeEnum::cases()));
+        ->and($fresh->notificationPreferences)->toHaveCount($types->count());
 });
 
 test('backfilling settings twice does not duplicate anything', function () {
+    $types = seededNotificationTypes();
+
     $service = app(UserService::class, ['user' => $this->member]);
 
     $service->runProfileSettingsUpdate();
-    $service->runNotificationSubscriptionsUpdate();
+    $service->runNotificationPreferencesUpdate();
     $service->runProfileSettingsUpdate();
-    $service->runNotificationSubscriptionsUpdate();
+    $service->runNotificationPreferencesUpdate();
 
     $this->assertDatabaseCount('user_profiles', 1);
-    $this->assertDatabaseCount('notification_subscriptions', \count(NotificationTypeEnum::cases()));
+    $this->assertDatabaseCount('notification_preferences', $types->count());
+});
+
+test('a notification type added later is backfilled onto existing accounts', function () {
+    seededNotificationTypes();
+
+    $service = app(UserService::class, ['user' => $this->member]);
+    $service->runNotificationPreferencesUpdate();
+
+    $before = $this->member->notificationPreferences()->count();
+
+    // The whole reason types are rows: one can be added after an account exists.
+    NotificationType::query()->create([
+        'notification_type' => 'product-updates',
+        'title' => 'Product updates',
+    ]);
+
+    $service->runNotificationPreferencesUpdate();
+
+    expect($this->member->notificationPreferences()->count())->toBe($before + 1);
+});
+
+test('an inactive notification type gets no preference row', function () {
+    seededNotificationTypes();
+
+    NotificationType::query()->create([
+        'notification_type' => 'retired-channel',
+        'title' => 'Retired channel',
+        'status' => StatusDefault::INACTIVE,
+    ]);
+
+    app(UserService::class, ['user' => $this->member])->runNotificationPreferencesUpdate();
+
+    $this->assertDatabaseCount('notification_preferences', NotificationType::query()->active()->count());
 });
 
 test('an unverified member is pushed to the verification page when strict mode is on', function () {

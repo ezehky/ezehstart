@@ -1,9 +1,13 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\SocialProviderEnum;
 use App\Models\User;
 use App\Services\AccountOtpService;
 use App\Services\ActivityLogService;
+use App\Services\PasswordSecurityService;
+use App\Services\SocialAccountService;
+use App\Services\TwoFactorService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
 use Carbon\Carbon;
@@ -88,7 +92,15 @@ new class extends Component
             'new_password' => ['required', 'string', 'confirmed', $this->passwordStrengthRule()],
         ]);
 
-        $this->user->forceFill(['password' => $this->new_password])->save();
+        // Checked after validation rather than as a rule, so somebody who typed a
+        // weak password gets told it is weak before being told it is also old.
+        $reuseError = $this->passwordReuseError($this->user, $this->new_password);
+
+        $this->respondError($reuseError, $reuseError !== null, field: 'new_password');
+
+        // Writes the new password and files the old hash away in one call — doing
+        // the two separately is how history ends up with a gap in it.
+        app(PasswordSecurityService::class)->updatePassword($this->user, $this->new_password);
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSWORD_CHANGE, model: $this->user);
 
@@ -100,6 +112,148 @@ new class extends Component
     public function passwordRestart(): void
     {
         $this->reset('passwordStep', 'current_password', 'password_otp', 'new_password', 'new_password_confirmation');
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||
+    // Two-factor authentication
+
+    public string $two_factor_code = '';
+
+    /**
+     * The QR code and secret, held only while enrolment is in progress. Both are
+     * cleared the moment it finishes — there is no reason for the secret to keep
+     * travelling to the browser on every subsequent request.
+     */
+    public ?string $twoFactorQr = null;
+
+    public ?string $twoFactorSecret = null;
+
+    /**
+     * Recovery codes are shown exactly once, right after they are generated.
+     * They are not re-readable afterwards by design: somebody who did not save
+     * them regenerates a fresh set rather than being handed the old one again.
+     */
+    public array $recoveryCodes = [];
+
+    #[Computed]
+    public function twoFactorAvailable(): bool
+    {
+        return app(TwoFactorService::class)->isAvailable();
+    }
+
+    #[Computed]
+    public function twoFactorEnabled(): bool
+    {
+        return (bool) $this->user->twoFactor?->isEnabled();
+    }
+
+    #[Computed]
+    public function recoveryCodesLeft(): int
+    {
+        return (int) $this->user->twoFactor?->remainingRecoveryCodes();
+    }
+
+    public function startTwoFactor(): void
+    {
+        abort_unless($this->twoFactorAvailable, 404);
+
+        $service = app(TwoFactorService::class);
+
+        $twoFactor = $service->beginEnrolment($this->user);
+
+        $this->twoFactorQr = $service->qrCodeSvg($this->user, $twoFactor);
+        $this->twoFactorSecret = $twoFactor->secret;
+
+        $this->user->refresh();
+        $this->reset('two_factor_code', 'recoveryCodes');
+    }
+
+    public function confirmTwoFactor(): void
+    {
+        abort_unless($this->twoFactorAvailable, 404);
+
+        $this->validate(['two_factor_code' => ['required', 'digits:6']]);
+
+        $this->respondError(
+            'That code is not valid. Check your authenticator app and try again.',
+            ! app(TwoFactorService::class)->confirm($this->user, $this->two_factor_code),
+            fn () => $this->reset('two_factor_code'),
+            'two_factor_code'
+        );
+
+        $this->user->refresh();
+
+        $this->recoveryCodes = (array) $this->user->twoFactor?->recovery_codes;
+
+        $this->reset('twoFactorQr', 'twoFactorSecret', 'two_factor_code');
+        unset($this->twoFactorEnabled, $this->recoveryCodesLeft);
+
+        $this->respondSuccess('Two-factor authentication is on. Save your recovery codes.');
+    }
+
+    public function cancelTwoFactor(): void
+    {
+        // Enrolment that was never confirmed leaves an unusable row behind, so
+        // backing out removes it rather than leaving a half-set-up secret around.
+        if (! $this->twoFactorEnabled) {
+            $this->user->twoFactor()->delete();
+            $this->user->refresh();
+        }
+
+        $this->reset('twoFactorQr', 'twoFactorSecret', 'two_factor_code');
+        $this->resetValidation();
+    }
+
+    public function regenerateRecoveryCodes(): void
+    {
+        abort_unless($this->twoFactorEnabled, 404);
+
+        $this->recoveryCodes = app(TwoFactorService::class)->regenerateRecoveryCodes($this->user);
+
+        $this->user->refresh();
+        unset($this->recoveryCodesLeft);
+
+        $this->respondSuccess('A new set of recovery codes has been generated. The old ones no longer work.');
+    }
+
+    public function disableTwoFactor(): void
+    {
+        abort_unless($this->twoFactorEnabled, 404);
+
+        app(TwoFactorService::class)->disable($this->user);
+
+        $this->user->refresh();
+        $this->reset('twoFactorQr', 'twoFactorSecret', 'two_factor_code', 'recoveryCodes');
+        unset($this->twoFactorEnabled, $this->recoveryCodesLeft);
+
+        $this->respondSuccess('Two-factor authentication has been turned off.');
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||
+    // Connected accounts
+
+    #[Computed]
+    public function socialAvailable(): bool
+    {
+        return app(SocialAccountService::class)->isAvailable();
+    }
+
+    #[Computed]
+    public function connectedAccounts(): Collection
+    {
+        return $this->user->connectedAccounts()->get()->keyBy(fn ($account) => $account->provider->value);
+    }
+
+    public function disconnectAccount(string $provider): void
+    {
+        $error = app(SocialAccountService::class)->unlink($this->user, SocialProviderEnum::from($provider));
+
+        $this->respondError($error, $error !== null);
+
+        $this->user->refresh();
+        unset($this->connectedAccounts);
+
+        $this->respondSuccess('That account has been disconnected.');
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -267,6 +421,118 @@ new class extends Component
         @endif
     </flux:card>
 
+    {{-- Two-factor authentication --}}
+    @if ($this->twoFactorAvailable)
+        <flux:card class="space-y-6">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <flux:heading level="2" size="lg">Two-factor authentication</flux:heading>
+                    <flux:text class="mt-1">
+                        Ask for a code from your authenticator app as well as your password.
+                    </flux:text>
+                </div>
+                @if ($this->twoFactorEnabled)
+                    <flux:badge size="sm" color="lime">On</flux:badge>
+                @endif
+            </div>
+
+            @if ($recoveryCodes)
+                {{-- Shown once, immediately after generating. Never re-readable. --}}
+                <flux:callout color="amber" icon="key">
+                    <flux:callout.heading>Save your recovery codes</flux:callout.heading>
+                    <flux:callout.text>
+                        Each code works once, and this is the only time they are shown. Keep them
+                        somewhere you can reach without this device.
+                    </flux:callout.text>
+                    <div class="mt-3 grid grid-cols-2 gap-2 font-mono text-sm">
+                        @foreach ($recoveryCodes as $recoveryCode)
+                            <span class="rounded bg-white/60 px-2 py-1 dark:bg-slate-900/60">{{ $recoveryCode }}</span>
+                        @endforeach
+                    </div>
+                </flux:callout>
+            @endif
+
+            @if ($twoFactorQr)
+                <div class="space-y-4">
+                    <flux:text size="sm">
+                        Scan this with your authenticator app, then enter the six-digit code it shows.
+                    </flux:text>
+
+                    <div class="inline-block rounded-lg bg-white p-3">{!! $twoFactorQr !!}</div>
+
+                    <flux:text size="sm">
+                        Cannot scan it? Enter this key by hand:
+                        <span class="font-mono select-all">{{ $twoFactorSecret }}</span>
+                    </flux:text>
+
+                    <form wire:submit="confirmTwoFactor" class="max-w-sm space-y-4">
+                        <flux:field>
+                            <flux:label>Authentication code</flux:label>
+                            <flux:otp wire:model="two_factor_code" length="6" />
+                            <flux:error name="two_factor_code" />
+                        </flux:field>
+                        <div class="flex gap-3">
+                            <flux:button type="submit" variant="primary">Turn it on</flux:button>
+                            <flux:button type="button" variant="ghost" wire:click="cancelTwoFactor">Cancel</flux:button>
+                        </div>
+                    </form>
+                </div>
+            @elseif ($this->twoFactorEnabled)
+                <div class="flex flex-wrap items-center gap-3">
+                    <flux:text size="sm" class="grow">
+                        {{ $this->recoveryCodesLeft }} recovery code(s) left.
+                    </flux:text>
+                    <flux:button size="sm" wire:click="regenerateRecoveryCodes">
+                        Generate new recovery codes
+                    </flux:button>
+                    <flux:button size="sm" variant="danger" x-on:click="$flux.modal('disableTwoFactorModal').show()">
+                        Turn off
+                    </flux:button>
+                </div>
+            @else
+                <flux:button variant="primary" icon="shield-check" wire:click="startTwoFactor">
+                    Set up two-factor authentication
+                </flux:button>
+            @endif
+        </flux:card>
+    @endif
+
+    {{-- Connected accounts --}}
+    @if ($this->socialAvailable)
+        <flux:card class="space-y-4">
+            <div>
+                <flux:heading level="2" size="lg">Connected accounts</flux:heading>
+                <flux:text class="mt-1">Sign in with an account you already have.</flux:text>
+            </div>
+
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach (app(App\Services\SocialAccountService::class)->enabledProviders() as $provider)
+                    @php($connected = $this->connectedAccounts->get($provider->value))
+                    <li wire:key="provider-{{ $provider->value }}" class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div class="flex items-center gap-3">
+                            <x-dashboard.icon-box size="sm" icon="link" :tone="$connected ? 'emerald' : 'slate'" />
+                            <div>
+                                <p class="text-sm font-semibold text-slate-950 dark:text-white">{{ $provider->label() }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    {{ $connected ? ($connected->nickname ?: 'Connected') : 'Not connected' }}
+                                </p>
+                            </div>
+                        </div>
+                        @if ($connected)
+                            <flux:button size="sm" variant="ghost" wire:click="disconnectAccount('{{ $provider->value }}')">
+                                Disconnect
+                            </flux:button>
+                        @else
+                            <flux:button size="sm" href="{{ route('social.redirect', $provider->value) }}">
+                                Connect
+                            </flux:button>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        </flux:card>
+    @endif
+
     {{-- Change email --}}
     <flux:card class="space-y-6">
         <div>
@@ -339,6 +605,18 @@ new class extends Component
             @endforeach
         </ul>
     </flux:card>
+
+    <x-dashboard.confirm-modal
+        name="disableTwoFactorModal"
+        title="Turn off two-factor authentication?"
+        icon="shield-exclamation"
+        confirm="Turn it off"
+        cancel="Keep it on"
+        wire:click="disableTwoFactor"
+    >
+        Your account goes back to being protected by your password alone, and the recovery
+        codes you saved stop working. You can set it up again at any time.
+    </x-dashboard.confirm-modal>
 
     <x-dashboard.confirm-modal
         name="sessionsModal"

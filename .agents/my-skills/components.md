@@ -12,6 +12,7 @@ with `@props([...])`.
 | Group | Purpose | Examples |
 | --- | --- | --- |
 | `dashboard/` | Authenticated workspace chrome and tiles | `avatar`, `stat-card`, `stat-pill`, `mini-stat`, `icon-box`, `progress-ring`, `item`, `sidebar`, `top-navigation`, `tab-nav`, `workspace-no-record`, `user-roles`, `user-roles-modal`, `confirm-modal` |
+| `chart/` | The SVG chart set — see [dashboard.md](dashboard.md) | `chart`, `chart.svg`, `chart.line`, `chart.area`, `chart.bar`, `chart.point`, `chart.axis`, `chart.axis.grid`, `chart.axis.line`, `chart.axis.tick`, `chart.cursor`, `chart.tooltip`, `chart.tooltip.heading`, `chart.tooltip.value` |
 | `form/` | Field wrappers Flux does not provide | `markdown-field`, `image-field`, `file-field`, `number-field`, `phone-field`, `password` |
 | `site/` | Public marketing sections | `hero`, `features`, `trainings`, `cohorts`, `trainers`, `testimonials`, `faq`, `cta`, `contact`, `footer`, `navbar`, `brand`, `reveal`, `section-heading`, `empty-state`, `legal-page`, `training-card`, `cohort-card` |
 | `training/` | Cohort/class domain widgets | `cohort-card`, `cohort-status`, `cohort-actions`, `cohort-completion`, `cohort-locked-callout`, `class-session-form`, `banner-badge`, `refund-destination`, `trainer-drop-links` |

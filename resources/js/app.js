@@ -2,11 +2,27 @@ import {
     Livewire,
     Alpine,
 } from "../../vendor/livewire/livewire/dist/livewire.esm";
+import richText from "./rich-text";
+import chart from "./chart";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
 
 // COMPONENTS
+
+/**
+ * The tiptap editor behind <x-form.rich-text>. Registered here so a Livewire
+ * re-render reuses the registration instead of booting a second editor onto the
+ * same element.
+ */
+Alpine.data("richText", richText);
+
+/**
+ * The SVG chart engine behind <x-chart> and its sub-components. Registered once
+ * here so the geometry is recomputed on a Livewire re-render rather than the
+ * component being booted a second time onto the same <svg>.
+ */
+Alpine.data("chart", chart);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance

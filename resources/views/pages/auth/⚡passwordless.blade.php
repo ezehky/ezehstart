@@ -47,6 +47,11 @@ new #[Layout('layouts::auth')] class extends Component
 
     public function mount(): void
     {
+        // The switch has to close the route, not just hide the button on the login
+        // page. A sign-in route left reachable behind a hidden link is not a
+        // disabled feature.
+        abort_unless((bool) kSiteFlag('security', 'passwordless-login', true), 404);
+
         kSetSiteTitle('Passwordless sign in');
     }
 

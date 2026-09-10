@@ -199,6 +199,30 @@ if (! function_exists('kSiteConfig')) {
     }
 }
 
+if (! function_exists('kSiteFlag')) {
+    /**
+     * Read an on/off switch out of a site-configuration group.
+     *
+     * kSiteConfig() cannot do this correctly. Its `$default` is applied whenever
+     * the value is falsy, so a switch an administrator deliberately turned *off*
+     * comes back as the default — which for a security feature means "off" reads
+     * as "on". This checks for the key's presence instead, so an unconfigured
+     * install falls back and a configured `false` is honoured.
+     *
+     * @param  string  $group  The configuration group, e.g. 'security' or 'uploads'.
+     * @param  string  $key  The key within that group.
+     * @param  mixed  $default  What an install that has never saved this uses.
+     */
+    function kSiteFlag(string $group, string $key, mixed $default = false): mixed
+    {
+        $values = kSiteConfig($group);
+
+        return \is_array($values) && \array_key_exists($key, $values)
+            ? $values[$key]
+            : $default;
+    }
+}
+
 if (! function_exists('kFluxIcons')) {
     /**
      * Every icon name `<flux:icon>` can render, read from the registered component paths.

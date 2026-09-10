@@ -10,6 +10,22 @@ Route::livewire('/site-config-set', 'pages::admin.configs.site-config')->name('s
 Route::livewire('/site-config/social-handles', 'pages::admin.configs.social-handles')->name('config.social-handles');
 Route::livewire('/site-config/policies', 'pages::admin.configs.policies')->name('config.policies');
 Route::livewire('/site-config/faqs', 'pages::admin.configs.faqs')->name('config.faqs');
+Route::livewire('/site-config/notification-types', 'pages::admin.configs.notification-types')->name('config.notification-types');
+
+// Image library. The same screen in both workspaces — the service decides what
+// each account may see, so there is nothing workspace-specific in the page.
+Route::livewire('/image-library', 'pages::shared.image-library')->name('image-library');
+
+// Money
+Route::livewire('/transactions', 'pages::admin.transactions')->name('transactions');
+
+// Blog. The editor is its own screen rather than a modal: a post is long-form,
+// and a rich-text editor inside a dialog fights the page for scroll.
+Route::livewire('/blog/posts', 'pages::admin.blog.posts')->name('blog.posts');
+Route::livewire('/blog/posts/new', 'pages::admin.blog.post-edit')->name('blog.post-create');
+Route::livewire('/blog/posts/{post}/edit', 'pages::admin.blog.post-edit')->name('blog.post-edit');
+Route::livewire('/blog/categories', 'pages::admin.blog.categories')->name('blog.categories');
+Route::livewire('/blog/tags', 'pages::admin.blog.tags')->name('blog.tags');
 
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');

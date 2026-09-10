@@ -47,6 +47,24 @@ new class extends Component
             // User
             'config.user.account-deletion' => ['required', 'boolean'],
             'config.user.account-deletion-days' => ['required', 'integer'],
+
+            // Security. Every one of these closes a route as well as hiding a
+            // button, so turning one off is a real change rather than cosmetic.
+            'config.security.strong-password' => ['required', 'boolean'],
+            'config.security.password-history' => ['required', 'boolean'],
+            'config.security.password-history-depth' => ['required', 'integer', 'min:1', 'max:24'],
+            'config.security.two-factor' => ['required', 'boolean'],
+            'config.security.socialite' => ['required', 'boolean'],
+            'config.security.passwordless-login' => ['required', 'boolean'],
+            // Bounded here as well as in the service: the service clamps whatever
+            // it reads, and this stops a silly number being saved in the first place.
+            'config.security.login-max-attempts' => ['required', 'integer', 'min:3', 'max:20'],
+            'config.security.login-decay-minutes' => ['required', 'integer', 'min:1', 'max:60'],
+
+            // Uploads
+            'config.uploads.user-image-limit' => ['required', 'integer', 'min:0', 'max:10000'],
+            'config.uploads.max-image-size' => ['required', 'integer', 'min:64', 'max:20480'],
+            'config.uploads.optimize-images' => ['required', 'boolean'],
         ];
     }
 
@@ -160,6 +178,112 @@ new class extends Component
                 </div>
             </flux:card>
         </div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Sign-in and passwords</flux:heading>
+                <flux:text class="mt-1">
+                    Each switch closes its route as well as hiding its button, so turning one
+                    off actually removes the way in.
+                </flux:text>
+            </div>
+
+            <div class="space-y-2">
+                <flux:switch
+                    wire:model="config.security.strong-password"
+                    label="Require strong passwords"
+                    description="A symbol, a number and mixed case. Eight characters is the minimum either way."
+                />
+                <flux:switch
+                    wire:model="config.security.password-history"
+                    label="Refuse reused passwords"
+                    description="Checks a new password against the ones this account has already had."
+                />
+                <x-form.number-field
+                    wire:model="config.security.password-history-depth"
+                    label="Passwords remembered"
+                    min="1"
+                    max="24"
+                />
+            </div>
+
+            <flux:separator variant="subtle" />
+
+            <div class="space-y-2">
+                <flux:switch
+                    wire:model="config.security.two-factor"
+                    label="Offer two-factor authentication"
+                    description="Members can enrol an authenticator app from their security settings."
+                />
+                <flux:switch
+                    wire:model="config.security.socialite"
+                    label="Offer social sign-in"
+                    description="Only providers with credentials in the environment are shown."
+                />
+                <flux:switch
+                    wire:model="config.security.passwordless-login"
+                    label="Offer passwordless sign-in"
+                    description="Signing in with a six-digit code sent by email."
+                />
+            </div>
+
+            <flux:separator variant="subtle" />
+
+            <div class="space-y-2">
+                <flux:heading level="3" size="sm">Sign-in throttle</flux:heading>
+                <flux:text class="mt-1">
+                    Failed attempts are counted per email and address together, so nobody can
+                    lock somebody else out by failing against their address on purpose.
+                </flux:text>
+                <x-form.number-field
+                    wire:model="config.security.login-max-attempts"
+                    label="Attempts allowed"
+                    min="3"
+                    max="20"
+                />
+                <x-form.number-field
+                    wire:model="config.security.login-decay-minutes"
+                    label="Lockout minutes"
+                    min="1"
+                    max="60"
+                />
+            </div>
+        </flux:card>
+
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Image library</flux:heading>
+                <flux:text class="mt-1">
+                    Limits applied to members. Administrators upload against the filesystem,
+                    not against a quota.
+                </flux:text>
+            </div>
+
+            <div class="space-y-2">
+                <x-form.number-field
+                    wire:model="config.uploads.user-image-limit"
+                    label="Images per member"
+                    min="0"
+                    max="10000"
+                />
+                <flux:text size="sm">Zero means no limit.</flux:text>
+
+                <x-form.number-field
+                    wire:model="config.uploads.max-image-size"
+                    label="Maximum file size (KB)"
+                    min="64"
+                    max="20480"
+                />
+
+                <flux:switch
+                    wire:model="config.uploads.optimize-images"
+                    label="Optimise uploads"
+                    description="Needs jpegoptim, optipng and pngquant on the server. Where they are missing this does nothing rather than failing."
+                />
+            </div>
+        </flux:card>
     </div>
 
     <flux:card class="space-y-6">

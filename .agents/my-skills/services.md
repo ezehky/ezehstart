@@ -3,21 +3,28 @@
 ## Rule
 
 All business logic that is shared, transactional, or spans more than one aggregate
-lives in `app/Services/`. Eleven ship with the starter:
+lives in `app/Services/`. Eighteen ship with the starter:
 
 | Service | Owns |
 | --- | --- |
 | `ActivityLogService` | The audit trail — `affectedColumns()` and `logActivity()` |
 | `AdminActionService` | The "waiting on you" queues on the admin dashboard |
-| `UserService` | Sessions, last-seen, profile settings, the workspace middleware check |
+| `UserService` | Sessions, last-seen, profile settings, notification-preference backfill, the workspace middleware check |
 | `UserRoleService` | Granting, revoking and switching roles, and the guards on each |
 | `NotificationService` | Database notifications behind the bell menu |
 | `SiteConfigurationService` | The site-configuration JSON file and its cache |
 | `MarkdownService` | Stored markdown → HTML, with raw HTML escaped |
+| `PolicyContentService` | Compiling a policy's markdown into its numbered sections |
 | `AccountDeletionService` | Anonymising or hard-deleting an account |
 | `AccountOtpService` | Codes confirming a sensitive account change |
 | `EmailVerificationOtpService` | Welcome mail and email-verification codes |
 | `PasswordlessOtpService` | Sign-in codes keyed by address, with throttle and attempt limits |
+| `PasswordSecurityService` | The strength rule and the reuse history — the only place a password is written |
+| `TwoFactorService` | TOTP secrets, QR codes, recovery codes, remembered devices |
+| `SocialAccountService` | Resolving a provider identity to a local account, and linking/unlinking |
+| `ImageLibraryService` | Uploads, folders, visibility, the delete guard, usage tracking |
+| `BlogService` | Post HTML sanitising, tag resolution, publishing, the public feed |
+| `TransactionService` | The ledger: balances, settling, charges, manual adjustments |
 
 ```php
 <?php

@@ -42,6 +42,41 @@ class SiteConfigurationService
                 'account-deletion' => true,
                 'account-deletion-days' => 30,
             ],
+
+            // Every switch here turns a whole sign-in feature on or off, so the
+            // screens that read them must treat a false as "this does not exist"
+            // rather than "hide the button" — a route left reachable behind a
+            // hidden button is not a disabled feature.
+            'security' => [
+                // Enforces the length, mixed-case, digit and symbol rules in
+                // WithPasswordTools rather than Laravel's default minimum.
+                'strong-password' => true,
+
+                // Refuse a password the user has already had. Depth is how many
+                // previous hashes are kept and compared; every hash past it is
+                // pruned, because holding them forever is a liability with no
+                // matching benefit.
+                'password-history' => true,
+                'password-history-depth' => 5,
+
+                'two-factor' => false,
+                'socialite' => false,
+                'passwordless-login' => true,
+
+                // The login throttle. Deliberately configurable so a site under a
+                // live attack can be tightened without a deploy — but the defaults
+                // are the values to keep unless there is a reason not to.
+                'login-max-attempts' => 5,
+                'login-decay-minutes' => 1,
+            ],
+
+            // Limits applied to members only. Administrators upload against the
+            // filesystem, not against a quota.
+            'uploads' => [
+                'user-image-limit' => 50,
+                'max-image-size' => 2048, // kilobytes
+                'optimize-images' => true,
+            ],
         ];
     }
 

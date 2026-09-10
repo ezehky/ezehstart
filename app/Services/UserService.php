@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\NotificationTypeEnum;
 use App\Enums\UserRoleEnum;
+use App\Models\NotificationType;
 use App\Models\Policy;
 use App\Models\User;
 use App\Models\UserConsent;
@@ -137,11 +137,22 @@ class UserService
         $profile->save();
     }
 
-    // Notification Subscriptions
-    public function runNotificationSubscriptionsUpdate(): void
+    // Notification Preferences
+
+    /**
+     * Give this account a switch for every notification type that is currently
+     * offered. Types live in a table now, so the set can grow after an account was
+     * created — this is what backfills the gap on the next page load.
+     *
+     * Retired types are deliberately not removed here: the preference row goes
+     * when the type row does, by foreign key.
+     */
+    public function runNotificationPreferencesUpdate(): void
     {
-        foreach (NotificationTypeEnum::cases() as $type) {
-            $this->user->notificationSubscriptions()->firstOrCreate(['notification_type' => $type]);
+        $types = NotificationType::query()->active()->pluck('id');
+
+        foreach ($types as $typeId) {
+            $this->user->notificationPreferences()->firstOrCreate(['notification_type_id' => $typeId]);
         }
     }
 

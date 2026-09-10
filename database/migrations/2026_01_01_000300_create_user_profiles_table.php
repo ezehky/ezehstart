@@ -15,6 +15,12 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+
+            // Null on delete rather than cascade: removing a country from the
+            // reference list must not take somebody's profile with it, and the
+            // city they typed stays true either way.
+            $table->foreignId('country_id')->nullable()->constrained()->nullOnDelete();
+
             $table->string('gender', 10)->nullable(); // GenderEnum
 
             $table->string('city')->nullable();

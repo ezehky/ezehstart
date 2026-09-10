@@ -55,6 +55,22 @@ an administrator has actually saved a configuration, read the stored file instea
 app(SiteConfigurationService::class)->getConfigs(raw: true)
 ```
 
+**Never read an on/off switch with `kSiteConfig()`.** Its `$default` is applied whenever
+the value is *falsy*, so a switch an administrator deliberately turned **off** comes back
+as the default — which for anything defaulting to true means "off" silently reads as
+"on". Use `kSiteFlag()`, which checks whether the key is present:
+
+```php
+// Wrong: an admin who turned two-factor off still gets true.
+kSiteConfig('security', keys: ['two-factor'], default: true);
+
+// Right: unset falls back, a stored false is honoured.
+kSiteFlag('security', 'two-factor', true);
+```
+
+Security switches default to the **strict** value, so an install nobody has configured
+yet is the safe one rather than the permissive one.
+
 `kMoneyFormat()` returns an **HTML entity**, so Blade must use `{!! !!}`.
 Pass `decodeHtml: true` when the string goes somewhere HTML is not rendered (a
 plain-text email subject, an aria-label, JSON).
@@ -68,6 +84,7 @@ plain-text email subject, an aria-label, JSON).
 | `kDeleteFile` | `(?string $file = null, string $disk = 'public'): bool` | Delete, null-safe |
 | `kDatetimeConverter` | `(Carbon\|string\|null $datetime, ?User $user = null, bool $dateFormat = false, bool $dtFormat = false, bool $diffForHumans = false, bool $compareGT = false, bool $compareLT = false, bool $showTZ = false, ?string $timezone = null, ?string $format = null, bool $addDaySymbol = false): bool\|Carbon\|string` | **The** date function. Timezone-aware, returns `-` for null |
 | `kSiteConfig` | `(string $key = '', array $keys = [], mixed $default = [])` | Read site configuration |
+| `kSiteFlag` | `(string $group, string $key, mixed $default = false)` | Read an on/off switch out of a config group |
 | `kStoreComparePrice` | `(float $price, ?float $compare_price = 0): float` | Returns the higher of the two |
 
 ### `navigations.php`

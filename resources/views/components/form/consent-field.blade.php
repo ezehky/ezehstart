@@ -15,18 +15,20 @@
 <flux:field variant="inline">
     <flux:checkbox wire:model="{{ $model }}" />
 
-    <flux:label>
+    <flux:label class="">
         @if ($policies->isEmpty())
             I agree to the terms of service and privacy policy.
         @else
-            I agree to the
-            @foreach ($policies as $policy)
-                <flux:link
-                    href="{{ $policy->policy_type->url() }}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >{{ $policy->title }}</flux:link>@if (! $loop->last)@if ($loop->remaining === 1) and @else, @endif @endif
-            @endforeach.
+            <span>
+                I agree to the
+                @foreach ($policies as $policy)
+                    <flux:link
+                        href="{{ $policy->policy_type->url() }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >{{ $policy->title }}</flux:link>@if (! $loop->last)@if ($loop->remaining === 1) and @else, @endif @endif
+                @endforeach
+            </span>
         @endif
     </flux:label>
 

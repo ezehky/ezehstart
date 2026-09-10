@@ -35,4 +35,37 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Social sign-in
+    |--------------------------------------------------------------------------
+    |
+    | One block per SocialProviderEnum case, keyed by the case value so the enum
+    | can check whether a provider is configured without a lookup table. A
+    | provider with no client id is never offered — SocialProviderEnum::isConfigured()
+    | reads exactly this.
+    |
+    | The redirect defaults to the named callback route, so the only thing an
+    | install has to put in .env is the id and the secret.
+    |
+    */
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI', '/auth/facebook/callback'),
+    ],
+
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI', '/auth/github/callback'),
+    ],
+
 ];

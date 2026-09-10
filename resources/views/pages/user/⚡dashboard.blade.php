@@ -15,11 +15,11 @@ new class extends Component
     {
         $this->user = auth()->user();
 
-        // Backfill any preference switch or subscription this account never had
-        // written, so the settings pages always have a complete set to render.
+        // Backfill any preference switch this account never had written, so the
+        // settings pages always have a complete set to render.
         $service = app(UserService::class, ['user' => $this->user]);
         $service->runProfileSettingsUpdate();
-        $service->runNotificationSubscriptionsUpdate();
+        $service->runNotificationPreferencesUpdate();
 
         kSetSiteTitle('dashboard');
     }

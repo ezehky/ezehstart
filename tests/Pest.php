@@ -6,11 +6,14 @@ use App\Enums\StatusPolicy;
 use App\Enums\StatusUser;
 use App\Enums\StatusYes;
 use App\Enums\UserRoleEnum;
+use App\Models\NotificationType;
 use App\Models\Policy;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRole;
+use Database\Seeders\NotificationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -127,4 +130,20 @@ function userWithoutRole(array $attributes = []): User
         'status' => StatusUser::ACTIVE,
         ...$attributes,
     ]);
+}
+
+/**
+ * Lay down the notification types the seeder ships.
+ *
+ * RefreshDatabase does not seed, and the preference backfill writes one row per
+ * *active type row* — with none, it correctly writes nothing. Any test asserting
+ * that a member ends up with switches has to put the types there first.
+ *
+ * @return Collection<int, NotificationType>
+ */
+function seededNotificationTypes(): Collection
+{
+    (new NotificationTypeSeeder)->run();
+
+    return NotificationType::query()->inFlowOrder()->get();
 }
