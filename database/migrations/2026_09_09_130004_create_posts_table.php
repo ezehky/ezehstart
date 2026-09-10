@@ -50,9 +50,6 @@ return new class extends Migration
 
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
-
-            // The public feed is "published, newest first" on every page of it.
-            $table->index(['status', 'published_at']);
         });
     }
 

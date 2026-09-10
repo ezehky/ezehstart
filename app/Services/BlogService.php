@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\CategoryGroupEnum;
-use App\Enums\StatusDefault;
 use App\Enums\StatusPost;
 use App\Models\Category;
 use App\Models\Post;
@@ -57,35 +55,6 @@ class BlogService
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // TAXONOMY
 
-    /**
-     * Turn a comma-separated tag box into tag rows, making any that are new.
-     *
-     * Matched on the slug rather than the name, so "Skin Care" and "skin care"
-     * are the same tag rather than two that look identical in a list.
-     *
-     * @return Collection<int, Tag>
-     */
-    public function resolveTags(string $input): Collection
-    {
-        return collect(explode(',', $input))
-            ->map(fn (string $name) => trim($name))
-            ->filter()
-            ->unique(fn (string $name) => kSlug($name))
-            ->map(fn (string $name) => Tag::query()->firstOrCreate(
-                ['slug' => kSlug($name)],
-                ['name' => $name, 'status' => StatusDefault::ACTIVE]
-            ))
-            ->values();
-    }
-
-    /**
-     * @return Collection<int, Category>
-     */
-    public function categoriesFor(CategoryGroupEnum $group): Collection
-    {
-        return Category::query()->active()->inGroup($group)->inFlowOrder()->get();
-    }
-
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // PUBLISHING
 
@@ -118,8 +87,7 @@ class BlogService
             ->when($category, fn (Builder $query) => $query->inCategory($category))
             ->when($tag, fn (Builder $query) => $query->taggedWith($tag))
             ->when($search, fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('title', 'like', '%'.$search.'%')
-                ->orWhere('excerpt', 'like', '%'.$search.'%')))
+                ->searchMacro(['title', 'excerpt'], $search)))
             ->newestFirst();
     }
 

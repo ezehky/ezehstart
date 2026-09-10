@@ -4,6 +4,7 @@ use App\Enums\CategoryGroupEnum;
 use App\Models\Category;
 use App\Models\Tag;
 use App\Services\BlogService;
+use App\Services\CategoryService;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -57,7 +58,7 @@ new #[Layout('layouts::site')] class extends Component
     #[Computed]
     public function categories(): Collection
     {
-        return app(BlogService::class)->categoriesFor(CategoryGroupEnum::BLOG);
+        return app(CategoryService::class)->categoriesFor(CategoryGroupEnum::BLOG);
     }
 
     public function updatedSearch(): void

@@ -8,7 +8,9 @@ use App\Models\Image;
 use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
+use App\Services\CategoryService;
 use App\Services\ImageLibraryService;
+use App\Services\TagService;
 use App\Traits\WithFormResponseMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -22,13 +24,11 @@ new class extends Component
 
     public ?Post $post = null;
 
-    public string $title = '';
+    public string $title;
 
-    public string $slug = '';
+    public string $excerpt;
 
-    public string $excerpt = '';
-
-    public string $content = '';
+    public string $content;
 
     public ?int $image_id = null;
 
@@ -36,13 +36,13 @@ new class extends Component
 
     public string $tags_input = '';
 
-    public string $meta_title = '';
+    public ?string $meta_title = null;
 
-    public string $meta_description = '';
+    public ?string $meta_description = null;
 
     public bool $is_featured = false;
 
-    public int $status = 0;
+    public StatusPost $status = StatusPost::DRAFT;
 
     public ?string $published_at = null;
 
@@ -56,23 +56,23 @@ new class extends Component
      * The post is bound by route model, so a missing one is a new post rather
      * than a 404 — the same screen writes both.
      */
-    public function mount(?Post $post = null): void
+    public function mount(): void
     {
-        if ($post?->exists) {
-            $this->post = $post;
+        if ($this->post?->exists) {
 
-            $this->fill($post->only(['title', 'slug', 'excerpt', 'content', 'image_id', 'meta_title', 'meta_description']));
+            $this->fill($this->post->only([
+                'title', 'excerpt', 'content', 'image_id',
+                'meta_title', 'meta_description',
+                'status',
+            ]));
 
-            $this->meta_title = (string) $post->meta_title;
-            $this->meta_description = (string) $post->meta_description;
-            $this->is_featured = $post->is_featured->boolValue();
-            $this->status = $post->status->value;
-            $this->published_at = $post->published_at?->format('Y-m-d\TH:i');
-            $this->category_ids = $post->categories->pluck('id')->all();
-            $this->tags_input = $post->tags->pluck('name')->implode(', ');
+            $this->is_featured = $this->post->is_featured->boolValue();
+            $this->published_at = $this->post->published_at?->format('Y-m-d\TH:i');
+            $this->category_ids = $this->post->categories->pluck('id')->all();
+            $this->tags_input = $this->post->tags->pluck('name')->implode(', ');
         }
 
-        kSetSiteTitle('content', 'blog-posts', $this->post ? 'edit post' : 'new post');
+        kSetSiteTitle('content', 'blogs', $this->post ? 'edit post' : 'new post');
     }
 
     /**
@@ -81,7 +81,7 @@ new class extends Component
     #[Computed]
     public function categories(): Collection
     {
-        return app(BlogService::class)->categoriesFor(CategoryGroupEnum::BLOG);
+        return app(CategoryService::class)->categoriesFor(CategoryGroupEnum::BLOG);
     }
 
     #[Computed]
@@ -124,26 +124,14 @@ new class extends Component
         unset($this->coverImage);
     }
 
-    /**
-     * Typed titles get a slug for free, but only until somebody edits the slug or
-     * the post goes live — changing a published URL breaks every link to it.
-     */
-    public function updatedTitle(string $value): void
-    {
-        if (! $this->post || $this->post->status->isDraft()) {
-            $this->slug = kSlug($value);
-        }
-    }
-
     protected function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
-            'slug' => [
+            'title' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique(Post::class, 'slug')->ignore($this->post?->id),
+                Rule::unique(Post::class, 'title')->ignore($this->post?->id),
             ],
             'excerpt' => ['required', 'string', 'max:500'],
             'content' => ['required', 'string'],
@@ -171,11 +159,8 @@ new class extends Component
 
         $this->post ??= Post::make(['user_id' => auth()->id()]);
 
-        $status = StatusPost::from($this->status);
-
         $this->post->fill([
             'title' => $this->title,
-            'slug' => kSlug($this->slug),
             'excerpt' => $this->excerpt,
             // Editor HTML is untrusted however trusted the author is.
             'content' => $blog->sanitize($this->content),
@@ -187,7 +172,7 @@ new class extends Component
 
         $this->post->read_minutes = Post::estimateReadMinutes($this->post->content);
 
-        $blog->applyStatus($this->post, $status);
+        $blog->applyStatus($this->post, $this->status);
 
         // An explicit date wins over the automatic stamp, which is what makes
         // scheduling and back-dating possible.
@@ -197,11 +182,15 @@ new class extends Component
 
         $affected = $activity->affectedColumns($this->post);
 
+        if ($this->post->isDirty('title')) {
+            $this->post->slug = kSlug($this->title);
+        }
+
         $this->post->save();
 
         // Taxonomy after the save, because a new post has no id before it.
         $this->post->categories()->sync($this->category_ids);
-        $this->post->tags()->sync(app(BlogService::class)->resolveTags($this->tags_input)->pluck('id'));
+        $this->post->tags()->sync(app(TagService::class)->resolveTags($this->tags_input)->pluck('id'));
 
         // The cover's usage row is what stops somebody deleting an image that is
         // on a published post.
@@ -209,7 +198,7 @@ new class extends Component
 
         $action = match (true) {
             $isNew => ActivityActionEnum::POST_CREATE,
-            $status->isPublished() && ! $wasPublished => ActivityActionEnum::POST_PUBLISH,
+            $this->status->isPublished() && ! $wasPublished => ActivityActionEnum::POST_PUBLISH,
             default => ActivityActionEnum::POST_UPDATE,
         };
 
@@ -234,9 +223,14 @@ new class extends Component
     <form wire:submit="save" class="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div class="space-y-6">
             <flux:card class="space-y-4">
-                <flux:input wire:model.blur="title" label="Title" placeholder="What is this post about?" />
-                <flux:input wire:model="slug" label="URL slug" description="Changing this on a published post breaks existing links." />
-                <flux:textarea wire:model="excerpt" label="Excerpt" rows="2" description="Shown on cards and in search results." />
+                <flux:input wire:model.live.blur="title" label="Title" placeholder="What is this post about?" />
+                <flux:textarea
+                    wire:model="excerpt"
+                    label="Excerpt"
+                    rows="2"
+                    description="Shown on cards and in search results."
+                    placeholder="Type..."
+                />
             </flux:card>
 
             <flux:card>
@@ -251,26 +245,6 @@ new class extends Component
         </div>
 
         <div class="space-y-6">
-            <flux:card class="space-y-4">
-                <flux:heading level="2" size="sm">Publishing</flux:heading>
-
-                <flux:select wire:model="status" label="Status">
-                    @foreach (StatusPost::cases() as $case)
-                        <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-
-                <flux:input
-                    type="datetime-local"
-                    wire:model="published_at"
-                    label="Publish at"
-                    description="Leave empty to publish the moment you set the status to published."
-                />
-
-                <flux:switch wire:model="is_featured" label="Feature this post" />
-
-                <flux:button type="submit" variant="primary" icon="check" class="w-full">Save post</flux:button>
-            </flux:card>
 
             <flux:card class="space-y-3">
                 <flux:heading level="2" size="sm">Cover image</flux:heading>
@@ -306,7 +280,11 @@ new class extends Component
                 @empty
                     <flux:text size="sm">
                         No categories yet.
-                        <flux:link href="{{ route('admin.blog.categories') }}">Add one</flux:link>.
+                        <flux:link
+                            href="{{ route('admin.categories', ['category_group' => CategoryGroupEnum::BLOG]) }}"
+                        >
+                            Add one
+                        </flux:link>.
                     </flux:text>
                 @endforelse
             </flux:card>
@@ -318,6 +296,26 @@ new class extends Component
                     placeholder="skincare, routine, winter"
                     description="Separate with commas. New tags are created as you use them."
                 />
+            </flux:card>
+            <flux:card class="space-y-4">
+                <flux:heading level="2" size="sm">Publishing</flux:heading>
+
+                <flux:select wire:model="status" label="Status">
+                    @foreach (StatusPost::cases() as $case)
+                        <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <flux:input
+                    type="datetime-local"
+                    wire:model="published_at"
+                    label="Publish at"
+                    description="Leave empty to publish the moment you set the status to published."
+                />
+
+                <flux:switch wire:model="is_featured" label="Feature this post" />
+
+                <flux:button type="submit" variant="primary" icon="check" class="w-full">Save post</flux:button>
             </flux:card>
         </div>
     </form>

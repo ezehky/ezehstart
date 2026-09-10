@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
 use App\Services\BlogService;
+use App\Services\TagService;
 use Illuminate\Database\QueryException;
 use Livewire\Livewire;
 
@@ -106,7 +107,7 @@ test('categories and tags attach to a post polymorphically', function () {
 });
 
 test('tags typed into the box are created and reused case-insensitively', function () {
-    $service = app(BlogService::class);
+    $service = app(TagService::class);
 
     $first = $service->resolveTags('Skincare, Winter');
     $second = $service->resolveTags('skincare, summer');
@@ -118,7 +119,7 @@ test('tags typed into the box are created and reused case-insensitively', functi
 });
 
 test('an empty tag box creates nothing', function () {
-    expect(app(BlogService::class)->resolveTags(' , , '))->toBeEmpty()
+    expect(app(TagService::class)->resolveTags(' , , '))->toBeEmpty()
         ->and(Tag::query()->count())->toBe(0);
 });
 
@@ -223,7 +224,15 @@ test('filtering by category narrows the feed', function () {
 // THE ADMIN SCREENS
 
 test('an admin can open every blog screen', function (string $route) {
-    $this->actingAs($this->admin)->get(route($route))->assertSuccessful();
+    // The two screens that need a subject: the editor binds a post, and the
+    // category screen is one screen per group rather than one per table.
+    $parameters = match ($route) {
+        'admin.blog.edit' => [blogPost(['user_id' => $this->admin->id])],
+        'admin.categories' => [CategoryGroupEnum::BLOG],
+        default => [],
+    };
+
+    $this->actingAs($this->admin)->get(route($route, $parameters))->assertSuccessful();
 })->with([
     'admin.blog.blogs',
     'admin.blog.create',
@@ -242,7 +251,7 @@ test('writing a post through the editor saves it with its taxonomy', function ()
     $category = blogCategory();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.edit')
+        ->test('pages::admin.content.post-edit')
         ->set('title', 'My first post')
         ->set('slug', 'my-first-post')
         ->set('excerpt', 'A short line.')
@@ -264,7 +273,7 @@ test('writing a post through the editor saves it with its taxonomy', function ()
 
 test('the editor sanitises what it stores', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.edit')
+        ->test('pages::admin.content.post-edit')
         ->set('title', 'Nasty')
         ->set('slug', 'nasty')
         ->set('excerpt', 'Short.')
@@ -280,7 +289,7 @@ test('two posts cannot share a slug', function () {
     blogPost(['user_id' => $this->admin->id, 'slug' => 'taken']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.edit')
+        ->test('pages::admin.content.post-edit')
         ->set('title', 'Another')
         ->set('slug', 'taken')
         ->set('excerpt', 'Short.')
