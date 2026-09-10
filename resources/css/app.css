@@ -327,6 +327,24 @@
         @apply my-8 border-slate-200 dark:border-white/10;
     }
 
+    /* A video embed. aspect-ratio rather than the old padding-top wrapper, so the
+       iframe is the whole element and nothing has to wrap it — which is what lets
+       the stored HTML stay a bare <iframe> and the sanitiser rebuild it whole. */
+    .rich-prose iframe {
+        @apply aspect-video w-full rounded-xl border-0 bg-slate-900;
+    }
+
+    /* Inside the editor the frame must not take the click that selects the node,
+       or a video could be added and never removed. On the public page it is a
+       player again, so this is scoped to ProseMirror rather than to .rich-prose. */
+    .ProseMirror iframe {
+        @apply pointer-events-none;
+    }
+
+    .ProseMirror .ProseMirror-selectednode {
+        @apply outline-2 outline-offset-2 outline-lime-500;
+    }
+
     /* tiptap's Placeholder extension marks the empty first node; without a rule
        the placeholder text never renders. */
     .rich-prose p.is-editor-empty:first-child::before {

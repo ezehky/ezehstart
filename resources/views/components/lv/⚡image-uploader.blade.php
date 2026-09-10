@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\ImageVisibilityEnum;
+use App\Enums\MediaVisibilityEnum;
 use App\Models\ImageFolder;
 use App\Models\User;
 use App\Rules\ImageRule;
@@ -111,7 +111,7 @@ new class extends Component
             $this->user,
             $this->imagesUpload,
             $folder,
-            $folder?->visibility ?? ImageVisibilityEnum::PRIVATE,
+            $folder?->visibility ?? MediaVisibilityEnum::PRIVATE,
             $folder?->visible_to_role,
         );
 

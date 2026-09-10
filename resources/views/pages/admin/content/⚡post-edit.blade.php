@@ -7,6 +7,7 @@ use App\Enums\StatusYes;
 use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
+use App\Services\VideoLibraryService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithImagePicker;
 use App\Traits\WithTaxonomy;
@@ -151,6 +152,12 @@ new class extends Component
         // published post. After the save, for the same reason as the taxonomy.
         $this->syncImageSlots($this->post);
 
+        // Videos embedded in the body are claimed the same way, but read back out
+        // of the saved HTML rather than from a slot: the editor drops them in
+        // freely, so the finished content is the only thing that actually knows
+        // what the post ended up embedding.
+        app(VideoLibraryService::class)->syncFromHtml($this->post->content, $this->post, 'body');
+
         $action = match (true) {
             $isNew => ActivityActionEnum::POST_CREATE,
             $this->status->isPublished() && ! $wasPublished => ActivityActionEnum::POST_PUBLISH,
@@ -240,4 +247,8 @@ new class extends Component
     </form>
 
     <livewire:lv.image-picker />
+
+    {{-- The editor's video button opens this. It names no slot, so it answers with
+         a browser event carrying a player URL rather than with ids. --}}
+    <livewire:lv.video-picker />
 </div>

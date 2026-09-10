@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\StatusPost;
+use App\Enums\VideoProviderEnum;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
@@ -23,7 +24,7 @@ class BlogService
      * however trusted the person typing it is — an author account is exactly what
      * an attacker would go for to get a script onto every reader's page.
      */
-    private const ALLOWED_TAGS = '<p><br><strong><b><em><i><u><s><a><ul><ol><li><h2><h3><h4><blockquote><code><pre><img><hr><figure><figcaption><table><thead><tbody><tr><th><td>';
+    private const ALLOWED_TAGS = '<p><br><strong><b><em><i><u><s><a><ul><ol><li><h2><h3><h4><blockquote><code><pre><img><hr><figure><figcaption><table><thead><tbody><tr><th><td><iframe>';
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // CONTENT
@@ -49,7 +50,48 @@ class BlogService
             $clean
         ) ?? '';
 
+        // Last, so nothing above can rewrite what it produces.
+        $clean = $this->rebuildEmbeds($clean);
+
         return trim($clean);
+    }
+
+    /**
+     * Replace every iframe with one this application built.
+     *
+     * strip_tags keeps the attributes on a tag it allows, and an iframe is the one
+     * element where that is not survivable: a src nobody checked is a frame on our
+     * page pointing at someone else's, and sandbox, allow and referrerpolicy are
+     * all attributes an author could otherwise set for us.
+     *
+     * So none of the author's markup survives. The src is run back through
+     * VideoProviderEnum, which yields a provider and an id or nothing at all, and
+     * the tag is written again from those. An iframe pointing anywhere else — any
+     * host with no case in that enum — is dropped rather than cleaned, because
+     * there is no version of it we can vouch for.
+     */
+    private function rebuildEmbeds(string $html): string
+    {
+        return preg_replace_callback(
+            '/<iframe\b[^>]*>.*?<\/iframe>|<iframe\b[^>]*\/?>/is',
+            function (array $match): string {
+                preg_match('/\ssrc\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $match[0], $src);
+
+                $url = $src[2] ?? $src[3] ?? $src[4] ?? null;
+                $resolved = VideoProviderEnum::resolve($url === null ? null : html_entity_decode($url, ENT_QUOTES));
+
+                if ($resolved === null) {
+                    return '';
+                }
+
+                $embed = $resolved['provider']->embedUrl($resolved['id']);
+
+                return '<iframe src="'.e($embed).'" loading="lazy" allowfullscreen'
+                    .' referrerpolicy="strict-origin-when-cross-origin"'
+                    .' allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>';
+            },
+            $html
+        ) ?? '';
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

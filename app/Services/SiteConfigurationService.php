@@ -76,6 +76,10 @@ class SiteConfigurationService
                 'user-image-limit' => 50,
                 'max-image-size' => 2048, // kilobytes
                 'optimize-images' => true,
+
+                // A video costs no disk, so the ceiling is lower for a different
+                // reason: a library nobody can find anything in is not a library.
+                'user-video-limit' => 25,
             ],
         ];
     }

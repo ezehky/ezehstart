@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\ImageVisibilityEnum;
+use App\Enums\MediaVisibilityEnum;
 use App\Enums\UserRoleEnum;
 use App\Models\Image;
 use App\Models\ImageFolder;
@@ -125,7 +125,7 @@ test('a public image is visible to anybody', function () {
     $image = app(ImageLibraryService::class)->store(
         $this->member,
         uploadedImage(),
-        visibility: ImageVisibilityEnum::PUBLIC
+        visibility: MediaVisibilityEnum::PUBLIC
     );
 
     $stranger = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
@@ -138,7 +138,7 @@ test('a role image is visible only to accounts holding that role', function () {
     $image = app(ImageLibraryService::class)->store(
         $this->admin,
         uploadedImage(),
-        visibility: ImageVisibilityEnum::ROLE,
+        visibility: MediaVisibilityEnum::ROLE,
         visibleToRole: UserRoleEnum::USER,
     );
 
@@ -154,11 +154,11 @@ test('leaving ROLE clears the role column so an old audience cannot come back', 
     $image = $service->store(
         $this->admin,
         uploadedImage(),
-        visibility: ImageVisibilityEnum::ROLE,
+        visibility: MediaVisibilityEnum::ROLE,
         visibleToRole: UserRoleEnum::USER,
     );
 
-    $service->update($image, $image->title, visibility: ImageVisibilityEnum::PRIVATE);
+    $service->update($image, $image->title, visibility: MediaVisibilityEnum::PRIVATE);
 
     expect($image->fresh()->visible_to_role)->toBeNull();
 });
@@ -334,7 +334,7 @@ test('a private folder stays out of another member folder rail', function () {
     $other = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
 
     $service->createFolder($other, 'Theirs');
-    $service->createFolder($other, 'Open to all', visibility: ImageVisibilityEnum::PUBLIC);
+    $service->createFolder($other, 'Open to all', visibility: MediaVisibilityEnum::PUBLIC);
 
     $labels = $service->folderOptions($this->member)->pluck('label');
 
@@ -348,7 +348,7 @@ test('a role folder reaches only the role it names', function () {
     $service->createFolder(
         $this->admin,
         'Staff only',
-        visibility: ImageVisibilityEnum::ROLE,
+        visibility: MediaVisibilityEnum::ROLE,
         visibleToRole: UserRoleEnum::ADMIN,
     );
 
@@ -360,14 +360,14 @@ test('a role folder reaches only the role it names', function () {
 test('tightening a folder does not move the images inside it', function () {
     $service = app(ImageLibraryService::class);
 
-    $folder = $service->createFolder($this->member, 'Mixed', visibility: ImageVisibilityEnum::PUBLIC);
-    $image = $service->store($this->member, uploadedImage(), folder: $folder, visibility: ImageVisibilityEnum::PUBLIC);
+    $folder = $service->createFolder($this->member, 'Mixed', visibility: MediaVisibilityEnum::PUBLIC);
+    $image = $service->store($this->member, uploadedImage(), folder: $folder, visibility: MediaVisibilityEnum::PUBLIC);
 
-    $service->updateFolder($folder, 'Mixed', ImageVisibilityEnum::PRIVATE);
+    $service->updateFolder($folder, 'Mixed', MediaVisibilityEnum::PRIVATE);
 
     // The folder closed; the image kept the audience it was given. Permissions
     // that move when a file is refiled are permissions nobody can reason about.
-    expect($image->fresh()->visibility)->toBe(ImageVisibilityEnum::PUBLIC);
+    expect($image->fresh()->visibility)->toBe(MediaVisibilityEnum::PUBLIC);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -465,7 +465,7 @@ test('the picker refuses to delete an image that is still in use', function () {
 });
 
 test('the picker will not let a member delete somebody else image', function () {
-    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage(), visibility: ImageVisibilityEnum::PUBLIC);
+    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage(), visibility: MediaVisibilityEnum::PUBLIC);
 
     Livewire::actingAs($this->member)
         ->test('lv.image-picker')
@@ -500,7 +500,7 @@ test('an upload takes the visibility of the folder it lands in', function () {
     $folder = app(ImageLibraryService::class)->createFolder(
         $this->member,
         'Public shelf',
-        visibility: ImageVisibilityEnum::PUBLIC,
+        visibility: MediaVisibilityEnum::PUBLIC,
     );
 
     Livewire::actingAs($this->member)
@@ -511,7 +511,7 @@ test('an upload takes the visibility of the folder it lands in', function () {
 
     // The folder is where a new image starts. It keeps that setting afterwards
     // wherever it is refiled.
-    expect($this->member->images()->first()->visibility)->toBe(ImageVisibilityEnum::PUBLIC);
+    expect($this->member->images()->first()->visibility)->toBe(MediaVisibilityEnum::PUBLIC);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -597,7 +597,7 @@ test('a member cannot edit somebody else image on either screen', function () {
     $image = app(ImageLibraryService::class)->store(
         $this->admin,
         uploadedImage(),
-        visibility: ImageVisibilityEnum::PUBLIC,
+        visibility: MediaVisibilityEnum::PUBLIC,
     );
 
     // Visible to them, but not theirs to change, so the panel refuses to open.

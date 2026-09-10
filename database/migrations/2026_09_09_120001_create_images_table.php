@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\ImageVisibilityEnum;
+use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -44,7 +44,7 @@ return new class extends Migration
 
             $table->string('alt_text', 500)->nullable();
 
-            $table->string('visibility', 20)->default(ImageVisibilityEnum::PRIVATE)->index();
+            $table->string('visibility', 20)->default(MediaVisibilityEnum::PRIVATE)->index();
 
             // Only read when visibility is ROLE. Any other case must leave it null,
             // so changing visibility twice cannot quietly restore an old audience.

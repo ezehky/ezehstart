@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Unguarded]
-class ImageFolder extends Model
+class VideoFolder extends Model
 {
     use WithDynamicModelFormatting;
 
@@ -40,9 +40,9 @@ class ImageFolder extends Model
     /**
      * Whether this account may browse the folder.
      *
-     * This gates the folder, not the images in it. An image carries its own
+     * This gates the folder, not the videos in it. A video carries its own
      * visibility and keeps it wherever it is filed, so a folder somebody may not
-     * browse can still hold an image they are allowed to see through the library
+     * browse can still hold a video they are allowed to see through the library
      * root — which is the intended behaviour, not a leak.
      */
     public function isVisibleTo(User $user): bool
@@ -97,9 +97,9 @@ class ImageFolder extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    public function images(): HasMany
+    public function videos(): HasMany
     {
-        return $this->hasMany(Image::class);
+        return $this->hasMany(Video::class);
     }
 
     // Scopes

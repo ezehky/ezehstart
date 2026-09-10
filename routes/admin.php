@@ -16,6 +16,10 @@ Route::livewire('/site-config/notification-types', 'pages::admin.configs.notific
 // each account may see, so there is nothing workspace-specific in the page.
 Route::livewire('/image-library', 'pages::shared.image-library')->name('image-library');
 
+// Video library. Embeds rather than uploads, but the same screen in both
+// workspaces for the same reason — the service decides what each account sees.
+Route::livewire('/video-library', 'pages::shared.video-library')->name('video-library');
+
 // Money
 Route::livewire('/transactions', 'pages::admin.transactions')->name('transactions');
 

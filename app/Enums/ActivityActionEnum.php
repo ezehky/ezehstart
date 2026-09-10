@@ -80,6 +80,15 @@ enum ActivityActionEnum: string
     case IMAGE_FOLDER_UPDATE = 'image-folder.update';
     case IMAGE_FOLDER_DELETE = 'image-folder.delete';
 
+    // Video library. ADD rather than UPLOAD: nothing is uploaded, a video row is
+    // a reference to somebody else's file on somebody else's host.
+    case VIDEO_ADD = 'video.add';
+    case VIDEO_UPDATE = 'video.update';
+    case VIDEO_DELETE = 'video.delete';
+    case VIDEO_FOLDER_CREATE = 'video-folder.create';
+    case VIDEO_FOLDER_UPDATE = 'video-folder.update';
+    case VIDEO_FOLDER_DELETE = 'video-folder.delete';
+
     // Blog
     case POST_CREATE = 'post.create';
     case POST_UPDATE = 'post.update';
@@ -119,6 +128,7 @@ enum ActivityActionEnum: string
             self::POLICY_CREATE,
             self::FAQ_CREATE,
             self::IMAGE_FOLDER_CREATE,
+            self::VIDEO_FOLDER_CREATE,
             self::POST_CREATE,
             self::CATEGORY_CREATE,
             self::TAG_CREATE,
@@ -133,6 +143,8 @@ enum ActivityActionEnum: string
             self::FAQ_UPDATE,
             self::IMAGE_UPDATE,
             self::IMAGE_FOLDER_UPDATE,
+            self::VIDEO_UPDATE,
+            self::VIDEO_FOLDER_UPDATE,
             self::POST_UPDATE,
             self::CATEGORY_UPDATE,
             self::TAG_UPDATE,
@@ -144,6 +156,8 @@ enum ActivityActionEnum: string
             self::FAQ_DELETE,
             self::IMAGE_DELETE,
             self::IMAGE_FOLDER_DELETE,
+            self::VIDEO_DELETE,
+            self::VIDEO_FOLDER_DELETE,
             self::POST_DELETE,
             self::CATEGORY_DELETE,
             self::TAG_DELETE,
@@ -151,6 +165,9 @@ enum ActivityActionEnum: string
 
             // Uploads
             self::IMAGE_UPLOAD => 'Uploaded ',
+
+            // Video library. Nothing is uploaded, so the verb is not 'Uploaded'.
+            self::VIDEO_ADD => 'Added ',
 
             // Legal
             self::POLICY_PUBLISH => 'Published ',

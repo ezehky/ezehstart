@@ -190,6 +190,11 @@ class User extends Authenticatable
         return $this->hasMany(Image::class);
     }
 
+    public function videos(): HasMany
+    {
+        return $this->hasMany(Video::class);
+    }
+
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);

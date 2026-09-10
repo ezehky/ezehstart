@@ -32,6 +32,7 @@
         wire:ignore
         x-data="{ content: @entangle($wireModel), ...richText(@js($placeholder)) }"
         x-on:image-picked.window="insertImage($event.detail.url, $event.detail.alt)"
+        x-on:video-picked.window="insertVideo($event.detail.url)"
         class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
     >
         {{-- Toolbar --}}
@@ -59,6 +60,10 @@
             {{-- Opens the library picker. The picker dispatches a URL back, so
                  the editor never talks to the upload endpoint itself. --}}
             <flux:button size="xs" type="button" icon="photo" variant="ghost" x-on:click="requestImage()" />
+
+            {{-- The same, for the video library. The picker hands back a player URL
+                 the server built, which is the only kind the sanitiser keeps. --}}
+            <flux:button size="xs" type="button" icon="film" variant="ghost" x-on:click="requestVideo()" />
 
             <flux:button size="xs" type="button" icon="arrow-uturn-left" variant="ghost" x-on:click="run('undo')" />
             <flux:button size="xs" type="button" icon="arrow-uturn-right" variant="ghost" x-on:click="run('redo')" />

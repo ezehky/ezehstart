@@ -7,6 +7,68 @@ All notable changes to this starter kit are recorded here. The format follows
 A minor release may add tables, enum cases and route names. It will not rename the
 ones already there — that is what a major is for.
 
+## [Unreleased]
+
+### Added
+
+#### Video library
+
+A second media library, deliberately shaped like the first. Same folder tree, same
+visibility rules, same usage-backed delete guard — a screen that already knows
+`x-form.image-slot` needs nothing new to learn `x-form.video-slot`.
+
+- **`videos`, `video_folders`, `video_usages`.** A video row is a *reference*, not a
+  file: nothing is uploaded, nothing lands on a disk, and removing a video at the
+  provider removes it here. That is why the table is so much narrower than `images` —
+  no path, no mime type, no size, no optimiser.
+- **`VideoProviderEnum` is an allowlist, not a convenience.** YouTube and Vimeo. The
+  row stores a provider and the provider's own id, never a URL, and the player URL is
+  rebuilt from those two every time it is rendered. There is no author-supplied URL
+  left in the row to be trusted later.
+- **`BlogService::sanitize()` now rebuilds every iframe rather than cleaning it.**
+  `strip_tags` keeps the attributes on a tag it allows, and an iframe is the one
+  element where that is not survivable — `sandbox`, `srcdoc`, `allow` and
+  `referrerpolicy` are all things an author would otherwise be setting for us. The
+  `src` is run back through `VideoProviderEnum`, and the tag is written again from
+  what came out. An iframe pointing at any other host is dropped rather than cleaned,
+  because there is no version of it we can vouch for.
+- **Body embeds claim their videos from the saved HTML**, not from a slot
+  (`VideoLibraryService::syncFromHtml()`). The editor drops iframes in freely, so the
+  finished content is the only thing that actually knows what the post embedded.
+- **`config.uploads.user-video-limit`**, default 25. Not a storage limit — a video
+  costs no disk — but a library nobody can find anything in is not a library.
+- The tiptap editor gained a video button, and `/video-library` is in both workspaces.
+
+### Changed
+
+- **`ImageVisibilityEnum` is now `MediaVisibilityEnum`.** Both libraries answer "who
+  may see this" identically, and two copies would drift the first time either gained a
+  case. Stored values are untouched — `private`, `role`, `public` — so this is a rename
+  in code only, with no migration. `description()` takes the noun to use, because
+  "Only you and administrators can see this image" is wrong on a video screen.
+
+### Fixed
+
+- **The rich-text editor applied nothing.** `x-data` passes its object through Vue's
+  `reactive()`, which deep-proxies a class instance, so `this.editor = new Editor(...)`
+  put the whole ProseMirror instance behind a proxy. Commands still ran and the toolbar
+  still lit up, but ProseMirror tracks nodes and decorations by object identity and the
+  view stopped repainting — bold "worked" and the text never went bold. The editor now
+  lives in the factory's closure, outside the reactive tree.
+- **Rich-text content was unstyled.** The editor and the public post body both asked
+  for `prose prose-slate dark:prose-invert`, but `@tailwindcss/typography` is not a
+  dependency of this kit, so there were no `.prose` rules at all and preflight flattened
+  every heading, list and quote. Replaced with a `.rich-prose` block alongside the
+  existing `.markdown-prose`, which also gives the Placeholder extension the
+  `is-editor-empty` rule it needs to show at all.
+- **The link button no longer opens a `window.prompt`.** An inline bar in the toolbar
+  instead — seeded with the existing href so a link is edited rather than retyped,
+  Enter to apply, Escape to dismiss.
+- **Editor content could be lost by clicking Save straight from the editor.** The
+  documented `rich-text:flush` event had no dispatcher anywhere. The editor now pushes
+  on every change; the entanglement is deferred and the wrapper is `wire:ignore`, so
+  that costs no request per keystroke.
+
 ## [1.2.0] - 2026-09-09
 
 ### Added

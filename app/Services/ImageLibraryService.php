@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
-use App\Enums\ImageVisibilityEnum;
+use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
 use App\Enums\UserRoleEnum;
 use App\Models\Image;
@@ -89,7 +89,7 @@ class ImageLibraryService
         mixed $file,
         ?string $title = null,
         ?ImageFolder $folder = null,
-        ImageVisibilityEnum $visibility = ImageVisibilityEnum::PRIVATE,
+        MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE,
         ?UserRoleEnum $visibleToRole = null,
     ): ?Image {
         $remaining = $this->remainingUploadsFor($user);
@@ -139,7 +139,7 @@ class ImageLibraryService
      * @param  array<int, mixed>  $files
      * @return array{stored: Collection<int, Image>, skipped: int}
      */
-    public function storeMany(User $user, array $files, ?ImageFolder $folder = null, ImageVisibilityEnum $visibility = ImageVisibilityEnum::PRIVATE, ?UserRoleEnum $visibleToRole = null): array
+    public function storeMany(User $user, array $files, ?ImageFolder $folder = null, MediaVisibilityEnum $visibility = MediaVisibilityEnum::PRIVATE, ?UserRoleEnum $visibleToRole = null): array
     {
         $stored = collect();
         $skipped = 0;
@@ -167,7 +167,7 @@ class ImageLibraryService
         Image $image,
         string $title,
         ?ImageFolder $folder = null,
-        ?ImageVisibilityEnum $visibility = null,
+        ?MediaVisibilityEnum $visibility = null,
         ?UserRoleEnum $visibleToRole = null,
         ?string $altText = null,
     ): Image {
@@ -224,7 +224,7 @@ class ImageLibraryService
         string $name,
         ?ImageFolder $parent = null,
         bool $shared = false,
-        ?ImageVisibilityEnum $visibility = null,
+        ?MediaVisibilityEnum $visibility = null,
         ?UserRoleEnum $visibleToRole = null,
     ): ImageFolder {
         // A shared folder belongs to nobody and everybody browses it, so only an
@@ -234,7 +234,7 @@ class ImageLibraryService
         // A platform folder nobody may browse is a folder nobody can use, so
         // sharing one implies public unless the caller says otherwise. An
         // administrator who wants a restricted shared folder passes ROLE.
-        $visibility ??= $ownerId === null ? ImageVisibilityEnum::PUBLIC : ImageVisibilityEnum::PRIVATE;
+        $visibility ??= $ownerId === null ? MediaVisibilityEnum::PUBLIC : MediaVisibilityEnum::PRIVATE;
 
         $folder = ImageFolder::query()->create([
             'user_id' => $ownerId,
@@ -260,7 +260,7 @@ class ImageLibraryService
     public function updateFolder(
         ImageFolder $folder,
         string $name,
-        ?ImageVisibilityEnum $visibility = null,
+        ?MediaVisibilityEnum $visibility = null,
         ?UserRoleEnum $visibleToRole = null,
     ): ImageFolder {
         $activity = app(ActivityLogService::class);
@@ -481,7 +481,7 @@ class ImageLibraryService
      *
      * @return array<string, mixed>
      */
-    private function visibilityAttributes(ImageVisibilityEnum $visibility, ?UserRoleEnum $role): array
+    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserRoleEnum $role): array
     {
         return [
             'visibility' => $visibility,

@@ -3,6 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
+import VideoEmbed from "./video-embed";
 
 /**
  * The tiptap editor behind <x-form.rich-text>.
@@ -44,6 +45,12 @@ export default (placeholder = "") => {
          */
         awaitingImage: false,
 
+        /**
+         * The same, for the video picker. Two flags rather than one: a page can
+         * hold two editors, and either could be waiting on either picker.
+         */
+        awaitingVideo: false,
+
         /** The inline link bar: open while it is being filled in, plus its value. */
         linkOpen: false,
         linkUrl: "",
@@ -56,6 +63,7 @@ export default (placeholder = "") => {
                         heading: { levels: [2, 3, 4] },
                     }),
                     Image.configure({ inline: false, allowBase64: false }),
+                    VideoEmbed,
                     TextAlign.configure({ types: ["heading", "paragraph"] }),
                     Placeholder.configure({ placeholder }),
                 ],
@@ -207,6 +215,31 @@ export default (placeholder = "") => {
             this.awaitingImage = false;
 
             editor.chain().focus().setImage({ src: url, alt }).run();
+            this.push();
+        },
+
+        /**
+         * Ask the video picker for an embed. As with images, the editor never
+         * resolves a URL itself — it receives a player URL the server built from
+         * the provider and id on a library row, which is the only kind of src the
+         * sanitiser will keep.
+         */
+        requestVideo() {
+            this.awaitingVideo = true;
+
+            this.$dispatch("open-video-picker");
+        },
+
+        /**
+         * Called when the video picker announces a choice. Only the editor that
+         * asked for one takes it.
+         */
+        insertVideo(url) {
+            if (!this.awaitingVideo || !url) return;
+
+            this.awaitingVideo = false;
+
+            editor.chain().focus().setVideoEmbed(url).run();
             this.push();
         },
     };

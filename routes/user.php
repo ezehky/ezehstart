@@ -16,3 +16,7 @@ Route::livewire('/transactions', 'pages::user.transactions')->name('transactions
 // Image library. Same screen as the admin workspace; the library query is what
 // keeps one member's uploads out of another's picker.
 Route::livewire('/image-library', 'pages::shared.image-library')->name('image-library');
+
+// Video library. Embeds rather than uploads, but the same screen in both
+// workspaces for the same reason — the service decides what each account sees.
+Route::livewire('/video-library', 'pages::shared.video-library')->name('video-library');

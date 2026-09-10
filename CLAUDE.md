@@ -27,6 +27,7 @@ project.
 | --- | --- |
 | Auth | Password, passwordless OTP, social sign-in (Socialite), TOTP two-factor with recovery codes, password history, login throttle |
 | Image library | Folders, multiple upload, per-image visibility, rename-without-changing-the-URL, a delete guard backed by `image_usages` |
+| Video library | The same again for embeds — folders, per-video visibility, a delete guard backed by `video_usages`. A row is a **reference** (provider + id), never a file; the player URL is rebuilt from the pair on every render |
 | Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages |
 | Money | `transactions` plus gateways, metas, evidence, balances and charges; balances derived from confirmed rows, never stored |
 | Reference | 250 countries seeded from `database/data/countries.json` — no network call at seed time |
@@ -110,3 +111,9 @@ Change it before the kit becomes a real project.
   not installed it does nothing rather than failing — uploads still work, unoptimised.
 - Post HTML is sanitised on the way **in** by `BlogService::sanitize()`. That is what
   makes `{!! $post->content !!}` safe on the public page; do not bypass it.
+- **`sanitize()` rebuilds every `<iframe>` rather than cleaning it.** `strip_tags` keeps
+  attributes on tags it allows, so the src is re-resolved through `VideoProviderEnum`
+  and the tag written again from the provider and id that came out. An iframe pointing
+  anywhere else is dropped. Adding a host means a case in that enum — nowhere else.
+- Rich-text content is styled by `.rich-prose` in `app.css`, **not** by `prose`.
+  `@tailwindcss/typography` is not a dependency, so `prose` classes compile to nothing.

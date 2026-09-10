@@ -69,6 +69,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Image library',
                         'link' => route('admin.image-library'),
                     ],
+                    'video-library' => [
+                        'label' => 'Video library',
+                        'link' => route('admin.video-library'),
+                    ],
                 ],
                 'icon' => 'newspaper',
             ],
@@ -142,6 +146,11 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 'label' => 'Image library',
                 'link' => route('user.image-library'),
                 'icon' => 'photo',
+            ],
+            'video-library' => [
+                'label' => 'Video library',
+                'link' => route('user.video-library'),
+                'icon' => 'film',
             ],
             'profile' => [
                 'label' => 'Profile',

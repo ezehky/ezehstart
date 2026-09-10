@@ -4,10 +4,11 @@ namespace App\Traits;
 
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\UserRoleEnum;
-use App\Models\Image;
-use App\Models\ImageFolder;
 use App\Models\User;
-use App\Services\ImageLibraryService;
+use App\Models\Video;
+use App\Models\VideoFolder;
+use App\Rules\VideoUrlRule;
+use App\Services\VideoLibraryService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -16,16 +17,20 @@ use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 
 /**
- * Everything a screen needs to browse and tidy the image library.
+ * Everything a screen needs to browse and tidy the video library.
  *
- * Two screens want all of it — the full-page library and the picker that opens
- * over whatever somebody is writing — and they must not drift apart again. The
- * behaviour lives here; each screen supplies only its own chrome, and the shared
- * markup lives in the `lv._library` partial they both include.
+ * The sibling of WithImageLibrary, and the same bargain: two screens want all of
+ * it — the full-page library and the picker that opens over whatever somebody is
+ * writing — and they must not drift apart. The behaviour lives here; each screen
+ * supplies only its own chrome.
+ *
+ * The one real difference from the image trait is the second tab. There is no
+ * upload: a video is added by pasting a link, which is a form rather than a file
+ * queue, and it can fail for a reason a file cannot — a host we do not allow.
  *
  * Requires WithFormResponseMessage on the using component.
  */
-trait WithImageLibrary
+trait WithVideoLibrary
 {
     use WithPagination;
 
@@ -41,7 +46,7 @@ trait WithImageLibrary
     public string $sort = 'newest';
 
     /**
-     * Chosen images, by id. The picker hands these back to its caller; the page
+     * Chosen videos, by id. The picker hands these back to its caller; the page
      * uses them as the target of move, edit and delete.
      *
      * @var array<int, int>
@@ -49,7 +54,7 @@ trait WithImageLibrary
     public array $selected = [];
 
     /**
-     * How many images may be chosen at once. A page manages in bulk by default;
+     * How many videos may be chosen at once. A page manages in bulk by default;
      * a picker is told what its caller wants.
      */
     public bool $multiple = true;
@@ -61,26 +66,37 @@ trait WithImageLibrary
      * Which slot on the calling screen asked, echoed back with the answer.
      *
      * The picker announces its choice to everything listening, so this is what
-     * lets one screen hold a cover and a gallery without each pick landing in
+     * lets one screen hold a trailer and a playlist without each pick landing in
      * both. Null means nobody named a slot — the tiptap editor's route, which
      * wants a URL rather than a place to put one.
      */
     public ?string $slot = null;
 
-    /** 'library' or 'upload'. */
+    /** 'library' or 'add'. */
     public string $tab = 'library';
 
     /** Which inline panel is open: null, 'edit', 'move', 'delete' or 'folder'. */
     public ?string $panel = null;
 
-    // Editing one image
+    // Adding one video
+    public string $video_url = '';
+
+    public string $new_title = '';
+
+    // Editing one video
     public ?int $edit_id = null;
 
     public string $title = '';
 
-    public ?string $alt_text = null;
+    public ?string $description = null;
 
-    public ?int $image_folder_id = null;
+    /**
+     * Seconds. Typed rather than fetched — nothing here calls out to a provider
+     * API, so a length nobody entered stays unknown and the tile simply omits it.
+     */
+    public ?int $duration = null;
+
+    public ?int $video_folder_id = null;
 
     public string $visibility = 'private';
 
@@ -106,7 +122,7 @@ trait WithImageLibrary
      * Livewire calls boot{TraitName}() on every request, hydration included, so
      * neither screen has to remember to set the account in its own mount().
      */
-    public function bootWithImageLibrary(): void
+    public function bootWithVideoLibrary(): void
     {
         $this->user = auth()->user();
     }
@@ -115,21 +131,21 @@ trait WithImageLibrary
     // READS
 
     /**
-     * @return LengthAwarePaginator<int, Image>
+     * @return LengthAwarePaginator<int, Video>
      */
     #[Computed]
-    public function images(): LengthAwarePaginator
+    public function videos(): LengthAwarePaginator
     {
-        return app(ImageLibraryService::class)
+        return app(VideoLibraryService::class)
             ->libraryQuery($this->user, $this->currentFolder, $this->search ?: null, $this->sort)
             ->paginate($this->perPage());
     }
 
     #[Computed]
-    public function currentFolder(): ?ImageFolder
+    public function currentFolder(): ?VideoFolder
     {
         return $this->folder
-            ? ImageFolder::query()->browsableBy($this->user)->whereKey($this->folder)->first()
+            ? VideoFolder::query()->browsableBy($this->user)->whereKey($this->folder)->first()
             : null;
     }
 
@@ -139,15 +155,15 @@ trait WithImageLibrary
     #[Computed]
     public function folders(): Collection
     {
-        return app(ImageLibraryService::class)->folderOptions($this->user);
+        return app(VideoLibraryService::class)->folderOptions($this->user);
     }
 
     /**
-     * The images behind the current selection, filtered to the ones this account
+     * The videos behind the current selection, filtered to the ones this account
      * may actually change. Edit, move and delete all read this, so it is the one
      * place ownership is decided.
      *
-     * @return Collection<int, Image>
+     * @return Collection<int, Video>
      */
     #[Computed]
     public function manageableSelection(): Collection
@@ -156,10 +172,10 @@ trait WithImageLibrary
             return collect();
         }
 
-        return Image::query()
+        return Video::query()
             ->whereKey($this->selected)
             ->get()
-            ->filter(fn (Image $image) => $this->canManage($image))
+            ->filter(fn (Video $video) => $this->canManage($video))
             ->values();
     }
 
@@ -169,19 +185,13 @@ trait WithImageLibrary
     #[Computed]
     public function sortOptions(): array
     {
-        return app(ImageLibraryService::class)->sortOptions();
-    }
-
-    #[Computed]
-    public function maxSize(): int
-    {
-        return app(ImageLibraryService::class)->maxImageSize();
+        return app(VideoLibraryService::class)->sortOptions();
     }
 
     #[Computed]
     public function remaining(): ?int
     {
-        return app(ImageLibraryService::class)->remainingUploadsFor($this->user);
+        return app(VideoLibraryService::class)->remainingFor($this->user);
     }
 
     /**
@@ -228,12 +238,12 @@ trait WithImageLibrary
 
         $this->resetPage();
 
-        unset($this->images, $this->currentFolder);
+        unset($this->videos, $this->currentFolder);
     }
 
     public function switchTab(string $tab): void
     {
-        $this->tab = \in_array($tab, ['library', 'upload'], true) ? $tab : 'library';
+        $this->tab = \in_array($tab, ['library', 'add'], true) ? $tab : 'library';
 
         $this->panel = null;
     }
@@ -241,34 +251,34 @@ trait WithImageLibrary
     // ||||||||||||||||||||||||||||||||||||||||||||||||
     // SELECTING
 
-    public function toggle(int $imageId): void
+    public function toggle(int $videoId): void
     {
-        $image = Image::query()->whereKey($imageId)->first();
+        $video = Video::query()->whereKey($videoId)->first();
 
-        abort_unless($image && $image->isVisibleTo($this->user), 404);
+        abort_unless($video && $video->isVisibleTo($this->user), 404);
 
         // A single-pick caller gets its answer on the click; there is nothing to
-        // confirm when only one image can win.
+        // confirm when only one video can win.
         if (! $this->multiple) {
-            $this->selected = [$imageId];
+            $this->selected = [$videoId];
 
             $this->pickedSingle();
 
             return;
         }
 
-        if (\in_array($imageId, $this->selected, true)) {
-            $this->selected = array_values(array_diff($this->selected, [$imageId]));
+        if (\in_array($videoId, $this->selected, true)) {
+            $this->selected = array_values(array_diff($this->selected, [$videoId]));
 
             return;
         }
 
         $this->respondError(
-            "You can choose up to {$this->max} image(s).",
+            "You can choose up to {$this->max} video(s).",
             $this->max !== null && \count($this->selected) >= $this->max,
         );
 
-        $this->selected[] = $imageId;
+        $this->selected[] = $videoId;
     }
 
     public function clearSelection(): void
@@ -278,7 +288,7 @@ trait WithImageLibrary
     }
 
     /**
-     * What a screen does when one image is picked and the picking is over. The
+     * What a screen does when one video is picked and the picking is over. The
      * page has nowhere to send it, so by default this is nothing.
      */
     protected function pickedSingle(): void
@@ -294,26 +304,27 @@ trait WithImageLibrary
         $this->resetValidation();
 
         if ($panel === 'edit') {
-            $this->respondError('Choose one image to edit.', $this->manageableSelection->count() !== 1);
+            $this->respondError('Choose one video to edit.', $this->manageableSelection->count() !== 1);
 
-            $image = $this->manageableSelection->first();
+            $video = $this->manageableSelection->first();
 
-            $this->edit_id = $image->id;
-            $this->title = $image->title;
-            $this->alt_text = $image->alt_text;
-            $this->image_folder_id = $image->image_folder_id;
-            $this->visibility = $image->visibility->value;
-            $this->visible_to_role = $image->visible_to_role?->value;
+            $this->edit_id = $video->id;
+            $this->title = $video->title;
+            $this->description = $video->description;
+            $this->duration = $video->duration;
+            $this->video_folder_id = $video->video_folder_id;
+            $this->visibility = $video->visibility->value;
+            $this->visible_to_role = $video->visible_to_role?->value;
         }
 
         if ($panel === 'move') {
-            $this->respondError('Choose an image to move.', $this->manageableSelection->isEmpty());
+            $this->respondError('Choose a video to move.', $this->manageableSelection->isEmpty());
 
             $this->move_folder_id = $this->folder;
         }
 
         if ($panel === 'delete') {
-            $this->respondError('Choose an image to delete.', $this->manageableSelection->isEmpty());
+            $this->respondError('Choose a video to delete.', $this->manageableSelection->isEmpty());
         }
 
         $this->panel = $panel;
@@ -324,7 +335,7 @@ trait WithImageLibrary
         $this->panel = null;
 
         $this->reset(
-            'edit_id', 'title', 'alt_text', 'image_folder_id', 'visibility', 'visible_to_role',
+            'edit_id', 'title', 'description', 'duration', 'video_folder_id', 'visibility', 'visible_to_role',
             'move_folder_id', 'folder_id', 'folder_name', 'folder_parent_id', 'folder_shared',
             'folder_visibility', 'folder_visible_to_role',
         );
@@ -333,24 +344,79 @@ trait WithImageLibrary
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||
-    // IMAGE WRITES
+    // ADDING
 
     /**
-     * The title changes; the stored path never does. Renaming the file would
-     * break every page, post and email already pointing at the old URL, which is
-     * exactly why the two are separate columns.
+     * Add one video from a pasted link.
+     *
+     * The URL is checked by VideoUrlRule so the form can say which hosts are
+     * allowed, and checked again inside the service, which is what actually
+     * decides — a rule only speaks for requests that came through this form.
      */
-    public function saveImage(): bool
+    public function addVideo(): bool
     {
-        $image = Image::query()->whereKey($this->edit_id)->first();
+        $this->validate([
+            'video_url' => ['required', 'string', 'max:2048', new VideoUrlRule],
+            'new_title' => ['nullable', 'string', 'max:255'],
+        ]);
 
-        abort_unless((bool) $image, 404);
-        abort_unless($this->canManage($image), 403);
+        $service = app(VideoLibraryService::class);
+        $remaining = $service->remainingFor($this->user);
+
+        $this->respondError(
+            'You have reached your video limit. Delete one you no longer need first.',
+            $remaining !== null && $remaining < 1,
+        );
+
+        $video = $service->store(
+            $this->user,
+            $this->video_url,
+            $this->new_title ?: null,
+            $this->currentFolder,
+            MediaVisibilityEnum::PRIVATE,
+        );
+
+        $this->respondError('That video could not be added.', $video === null);
+
+        $this->reset('video_url', 'new_title');
+
+        // Landing back on the grid with the new video already ticked is the whole
+        // point of adding from in here.
+        $this->selected = $this->multiple
+            ? array_values(array_unique([...$this->selected, $video->id]))
+            : [$video->id];
+
+        $this->tab = 'library';
+
+        $this->resetPage();
+
+        unset($this->videos, $this->remaining);
+
+        return $this->respondSuccess('The video has been added to your library.');
+    }
+
+    // ||||||||||||||||||||||||||||||||||||||||||||||||
+    // VIDEO WRITES
+
+    /**
+     * The title, folder and visibility change; the provider and the video id never
+     * do. Repointing a row at a different video would silently change what every
+     * post already embedding it shows.
+     */
+    public function saveVideo(): bool
+    {
+        $video = Video::query()->whereKey($this->edit_id)->first();
+
+        abort_unless((bool) $video, 404);
+        abort_unless($this->canManage($video), 403);
 
         $this->validate([
             'title' => ['required', 'string', 'max:255'],
-            'alt_text' => ['nullable', 'string', 'max:500'],
-            'image_folder_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
+            'description' => ['nullable', 'string', 'max:2000'],
+            // Twelve hours. Not a real ceiling on video, just one that keeps a
+            // typo out of a column the grid reads.
+            'duration' => ['nullable', 'integer', 'min:1', 'max:43200'],
+            'video_folder_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
             'visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
             'visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
         ]);
@@ -358,76 +424,77 @@ trait WithImageLibrary
         $visibility = MediaVisibilityEnum::from($this->visibility);
 
         $this->respondError(
-            'Choose which role should be able to see this image.',
+            'Choose which role should be able to see this video.',
             $visibility->needsRole() && ! $this->visible_to_role,
             field: 'visible_to_role'
         );
 
-        app(ImageLibraryService::class)->update(
-            $image,
+        app(VideoLibraryService::class)->update(
+            $video,
             $this->title,
-            $this->image_folder_id ? ImageFolder::query()->find($this->image_folder_id) : null,
+            $this->video_folder_id ? VideoFolder::query()->find($this->video_folder_id) : null,
             $visibility,
             $this->visible_to_role ? UserRoleEnum::from($this->visible_to_role) : null,
-            $this->alt_text,
+            $this->description,
+            $this->duration,
         );
 
         $this->closePanel();
-        unset($this->images);
+        unset($this->videos);
 
-        return $this->respondSuccess('The image has been updated. Its URL has not changed.');
+        return $this->respondSuccess('The video has been updated.');
     }
 
     public function moveSelected(): bool
     {
         $this->validate([
-            'move_folder_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
+            'move_folder_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
         ]);
 
-        $images = $this->manageableSelection;
+        $videos = $this->manageableSelection;
 
-        $this->respondError('Choose an image to move.', $images->isEmpty());
+        $this->respondError('Choose a video to move.', $videos->isEmpty());
 
         $folder = $this->move_folder_id
-            ? ImageFolder::query()->browsableBy($this->user)->whereKey($this->move_folder_id)->first()
+            ? VideoFolder::query()->browsableBy($this->user)->whereKey($this->move_folder_id)->first()
             : null;
 
         // A folder they cannot browse is a folder they cannot file into, or the
-        // image would vanish from their own library the moment it moved.
+        // video would vanish from their own library the moment it moved.
         $this->respondError('That folder is not available to you.', $this->move_folder_id && ! $folder);
 
-        $moved = app(ImageLibraryService::class)->moveImages($images, $folder);
+        $moved = app(VideoLibraryService::class)->moveVideos($videos, $folder);
 
         $this->closePanel();
-        unset($this->images);
+        unset($this->videos);
 
-        return $this->respondSuccess("{$moved} image(s) moved to ".($folder?->name ?? 'the library root').'.');
+        return $this->respondSuccess("{$moved} video(s) moved to ".($folder?->name ?? 'the library root').'.');
     }
 
     /**
-     * An attached image is refused rather than deleted. The database would refuse
+     * An attached video is refused rather than deleted. The database would refuse
      * it anyway; failing here gives somebody a sentence instead of a foreign key
      * error, and a batch reports what it could not take.
      */
     public function deleteSelected(): bool
     {
-        $images = $this->manageableSelection;
+        $videos = $this->manageableSelection;
 
-        $this->respondError('Choose an image to delete.', $images->isEmpty());
+        $this->respondError('Choose a video to delete.', $videos->isEmpty());
 
-        $service = app(ImageLibraryService::class);
+        $service = app(VideoLibraryService::class);
         $deleted = 0;
         $refused = [];
 
-        foreach ($images as $image) {
-            $error = $service->delete($image);
+        foreach ($videos as $video) {
+            $error = $service->delete($video);
 
-            $error === null ? $deleted++ : $refused[] = $image->title;
+            $error === null ? $deleted++ : $refused[] = $video->title;
         }
 
         $this->selected = [];
         $this->closePanel();
-        unset($this->images, $this->remaining);
+        unset($this->videos, $this->remaining);
 
         $this->respondError(
             'Still in use somewhere: '.implode(', ', $refused).'. Remove it from there first.',
@@ -435,10 +502,10 @@ trait WithImageLibrary
         );
 
         if (filled($refused)) {
-            return $this->respondSuccess("{$deleted} image(s) deleted. Still in use: ".implode(', ', $refused).'.');
+            return $this->respondSuccess("{$deleted} video(s) deleted. Still in use: ".implode(', ', $refused).'.');
         }
 
-        return $this->respondSuccess("{$deleted} image(s) deleted.");
+        return $this->respondSuccess("{$deleted} video(s) deleted.");
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -458,7 +525,7 @@ trait WithImageLibrary
 
     public function editFolder(int $folderId): void
     {
-        $folder = ImageFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
+        $folder = VideoFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
         abort_unless($this->canManageFolder($folder), 403);
@@ -479,7 +546,7 @@ trait WithImageLibrary
     {
         $this->validate([
             'folder_name' => ['required', 'string', 'max:255'],
-            'folder_parent_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
+            'folder_parent_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
             'folder_visibility' => ['required', Rule::enum(MediaVisibilityEnum::class)],
             'folder_visible_to_role' => ['nullable', Rule::enum(UserRoleEnum::class)],
         ]);
@@ -493,10 +560,10 @@ trait WithImageLibrary
         );
 
         $role = $this->folder_visible_to_role ? UserRoleEnum::from($this->folder_visible_to_role) : null;
-        $service = app(ImageLibraryService::class);
+        $service = app(VideoLibraryService::class);
 
         if ($this->folder_id) {
-            $folder = ImageFolder::query()->whereKey($this->folder_id)->first();
+            $folder = VideoFolder::query()->whereKey($this->folder_id)->first();
 
             abort_unless((bool) $folder, 404);
             abort_unless($this->canManageFolder($folder), 403);
@@ -506,7 +573,7 @@ trait WithImageLibrary
             $service->createFolder(
                 $this->user,
                 $this->folder_name,
-                $this->folder_parent_id ? ImageFolder::query()->find($this->folder_parent_id) : null,
+                $this->folder_parent_id ? VideoFolder::query()->find($this->folder_parent_id) : null,
                 $this->folder_shared,
                 $visibility,
                 $role,
@@ -514,69 +581,43 @@ trait WithImageLibrary
         }
 
         $this->closePanel();
-        unset($this->folders, $this->images);
+        unset($this->folders, $this->videos);
 
         return $this->respondSuccess('The folder has been saved.');
     }
 
     public function deleteFolder(int $folderId): bool
     {
-        $folder = ImageFolder::query()->whereKey($folderId)->first();
+        $folder = VideoFolder::query()->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
         abort_unless($this->canManageFolder($folder), 403);
 
-        app(ImageLibraryService::class)->deleteFolder($folder);
+        app(VideoLibraryService::class)->deleteFolder($folder);
 
         if ($this->folder === $folderId) {
             $this->folder = null;
         }
 
         $this->closePanel();
-        unset($this->folders, $this->images, $this->currentFolder);
+        unset($this->folders, $this->videos, $this->currentFolder);
 
-        return $this->respondSuccess('The folder has been deleted. Its images moved to the root.');
-    }
-
-    // ||||||||||||||||||||||||||||||||||||||||||||||||
-    // UPLOAD
-
-    /**
-     * The uploader announces what it stored. Landing back on the grid with the
-     * new images already ticked is the whole point of uploading from in here.
-     *
-     * @param  array<int, int>  $ids
-     */
-    public function afterUpload(array $ids): void
-    {
-        if (blank($ids)) {
-            return;
-        }
-
-        $this->selected = $this->multiple
-            ? array_values(array_unique([...$this->selected, ...$ids]))
-            : [(int) $ids[0]];
-
-        $this->tab = 'library';
-
-        $this->resetPage();
-
-        unset($this->images, $this->remaining);
+        return $this->respondSuccess('The folder has been deleted. Its videos moved to the root.');
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||
     // GUARDS
 
     /**
-     * Seeing an image is not the same as being allowed to change it. A public
-     * image is visible to everybody and editable only by its owner.
+     * Seeing a video is not the same as being allowed to change it. A public video
+     * is visible to everybody and editable only by its owner.
      */
-    protected function canManage(Image $image): bool
+    protected function canManage(Video $video): bool
     {
-        return $this->user->isAdmin() || $image->user_id === $this->user->id;
+        return $this->user->isAdmin() || $video->user_id === $this->user->id;
     }
 
-    protected function canManageFolder(ImageFolder $folder): bool
+    protected function canManageFolder(VideoFolder $folder): bool
     {
         return $this->user->isAdmin() || $folder->user_id === $this->user->id;
     }

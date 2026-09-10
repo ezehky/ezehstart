@@ -65,6 +65,7 @@ new class extends Component
             'config.uploads.user-image-limit' => ['required', 'integer', 'min:0', 'max:10000'],
             'config.uploads.max-image-size' => ['required', 'integer', 'min:64', 'max:20480'],
             'config.uploads.optimize-images' => ['required', 'boolean'],
+            'config.uploads.user-video-limit' => ['required', 'integer', 'min:0', 'max:10000'],
         ];
     }
 
@@ -281,6 +282,16 @@ new class extends Component
                     wire:model="config.uploads.optimize-images"
                     label="Optimise uploads"
                     description="Needs jpegoptim, optipng and pngquant on the server. Where they are missing this does nothing rather than failing."
+                />
+
+                {{-- A video costs no disk, so this is not a storage limit. It is
+                     there because a library nobody can find anything in is not a
+                     library. --}}
+                <x-form.number-field
+                    wire:model="config.uploads.user-video-limit"
+                    label="Videos per member"
+                    min="0"
+                    max="10000"
                 />
             </div>
         </flux:card>
