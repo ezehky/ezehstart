@@ -43,17 +43,7 @@ class Image extends Model
      */
     public function readableSize(): string
     {
-        $bytes = (int) $this->size;
-
-        foreach (['B', 'KB', 'MB', 'GB'] as $unit) {
-            if ($bytes < 1024) {
-                return round($bytes, $unit === 'B' ? 0 : 1).' '.$unit;
-            }
-
-            $bytes /= 1024;
-        }
-
-        return round($bytes, 1).' TB';
+        return kFileSize((int) $this->size);
     }
 
     public function dimensions(): ?string

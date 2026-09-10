@@ -138,9 +138,9 @@ return [
             'replace_placeholders' => true,
         ],
 
-        'code' => [
+        'ezeh' => [
             'driver' => 'single',
-            'path' => storage_path('logs/code.log'),
+            'path' => storage_path('logs/ezeh.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],

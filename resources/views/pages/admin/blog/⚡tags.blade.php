@@ -33,7 +33,7 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('blog', 'tags');
+        kSetSiteTitle('content', 'blog-tags');
     }
 
     #[Computed]

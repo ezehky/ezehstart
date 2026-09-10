@@ -18,7 +18,7 @@ new class extends Component
 
     public ?Category $category = null;
 
-    public string $category_group = 'blog';
+    public CategoryGroupEnum $category_group = CategoryGroupEnum::BLOG;
 
     public string $name = '';
 
@@ -37,7 +37,7 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('blog', 'categories');
+        kSetSiteTitle('content', 'blog-categories');
     }
 
     /**
@@ -66,17 +66,17 @@ new class extends Component
     public function parentOptions(): Collection
     {
         return Category::query()
-            ->inGroup(CategoryGroupEnum::from($this->category_group))
+            ->inGroup($this->category_group)
             ->when($this->category, fn ($query) => $query->whereKeyNot($this->category->id))
             ->orderBy('name')
             ->get();
     }
 
-    public function create(string $group): void
+    public function create(CategoryGroupEnum $group): void
     {
         $this->resetForm();
 
-        $this->category_group = CategoryGroupEnum::from($group)->value;
+        $this->category_group = $group;
         $this->flow_order = (int) Category::query()->where('category_group', $group)->max('flow_order') + 1;
 
         Flux::modal('categoryModal')->show();
@@ -87,8 +87,7 @@ new class extends Component
         $this->resetForm();
 
         $this->category = $category;
-        $this->fill($category->only(['name', 'slug', 'parent_id', 'description', 'flow_order']));
-        $this->category_group = $category->category_group->value;
+        $this->fill($category->only(['name', 'slug', 'category_group', 'parent_id', 'description', 'flow_order']));
         $this->status = $category->status->isActive();
 
         Flux::modal('categoryModal')->show();
@@ -134,7 +133,7 @@ new class extends Component
             $action = ActivityActionEnum::CATEGORY_CREATE;
         }
 
-        $this->category->category_group = CategoryGroupEnum::from($this->category_group);
+        $this->category->category_group = $this->category_group;
         $this->category->name = $this->name;
         $this->category->slug = kSlug($this->slug);
         $this->category->parent_id = $this->parent_id;
@@ -193,7 +192,7 @@ new class extends Component
 
     private function resetForm(): void
     {
-        $this->reset('category', 'name', 'slug', 'parent_id', 'description', 'flow_order', 'status');
+        $this->reset('category', 'name', 'category_group', 'slug', 'parent_id', 'description', 'flow_order', 'status');
         $this->resetValidation();
     }
 };

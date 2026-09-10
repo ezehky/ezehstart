@@ -323,6 +323,194 @@ test('detaching frees an image for deletion again', function () {
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
+// FOLDER VISIBILITY
+
+test('a private folder stays out of another member folder rail', function () {
+    $service = app(ImageLibraryService::class);
+    $other = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
+
+    $service->createFolder($other, 'Theirs');
+    $service->createFolder($other, 'Open to all', visibility: ImageVisibilityEnum::PUBLIC);
+
+    $labels = $service->folderOptions($this->member)->pluck('label');
+
+    expect($labels)->toContain('Open to all')
+        ->and($labels)->not->toContain('Theirs');
+});
+
+test('a role folder reaches only the role it names', function () {
+    $service = app(ImageLibraryService::class);
+
+    $service->createFolder(
+        $this->admin,
+        'Staff only',
+        visibility: ImageVisibilityEnum::ROLE,
+        visibleToRole: UserRoleEnum::ADMIN,
+    );
+
+    expect($service->folderOptions($this->member)->pluck('label'))->not->toContain('Staff only')
+        // The admin sees everything anyway: the library is the site's media manager.
+        ->and($service->folderOptions($this->admin)->pluck('label'))->toContain('Staff only');
+});
+
+test('tightening a folder does not move the images inside it', function () {
+    $service = app(ImageLibraryService::class);
+
+    $folder = $service->createFolder($this->member, 'Mixed', visibility: ImageVisibilityEnum::PUBLIC);
+    $image = $service->store($this->member, uploadedImage(), folder: $folder, visibility: ImageVisibilityEnum::PUBLIC);
+
+    $service->updateFolder($folder, 'Mixed', ImageVisibilityEnum::PRIVATE);
+
+    // The folder closed; the image kept the audience it was given. Permissions
+    // that move when a file is refiled are permissions nobody can reason about.
+    expect($image->fresh()->visibility)->toBe(ImageVisibilityEnum::PUBLIC);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// MOVING
+
+test('images move between folders and back to the root', function () {
+    $service = app(ImageLibraryService::class);
+
+    $folder = $service->createFolder($this->member, 'Banners');
+    $images = collect([
+        $service->store($this->member, uploadedImage('one.jpg')),
+        $service->store($this->member, uploadedImage('two.jpg')),
+    ]);
+
+    expect($service->moveImages($images, $folder))->toBe(2)
+        ->and($images->first()->fresh()->image_folder_id)->toBe($folder->id);
+
+    $service->moveImages($images, null);
+
+    expect($images->first()->fresh()->image_folder_id)->toBeNull();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// THE PICKER
+
+test('the picker picks one image and hands it straight back', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open')
+        ->call('toggle', $image->id)
+        // The single-pick contract the blog editor already depends on.
+        ->assertDispatched('imageSelected', imageId: $image->id)
+        ->assertDispatched('image-picked')
+        ->assertSet('show', false);
+});
+
+test('the picker holds several images until the choice is confirmed', function () {
+    $service = app(ImageLibraryService::class);
+    $one = $service->store($this->member, uploadedImage('one.jpg'));
+    $two = $service->store($this->member, uploadedImage('two.jpg'));
+
+    $picker = Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open', true)
+        ->call('toggle', $one->id)
+        ->call('toggle', $two->id)
+        // Nothing is handed back while the person is still choosing.
+        ->assertSet('show', true);
+
+    expect($picker->get('selected'))->toHaveCount(2);
+
+    $picker->call('toggle', $one->id);
+    expect($picker->get('selected'))->toHaveCount(1);
+
+    $picker->call('toggle', $one->id)->call('confirmSelection')->assertDispatched('imagesSelected');
+});
+
+test('a multiple selection stops at the ceiling the caller set', function () {
+    $service = app(ImageLibraryService::class);
+    $one = $service->store($this->member, uploadedImage('one.jpg'));
+    $two = $service->store($this->member, uploadedImage('two.jpg'));
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open', true, 1)
+        ->call('toggle', $one->id)
+        ->call('toggle', $two->id)
+        ->assertHasErrors();
+});
+
+test('the picker refuses to delete an image that is still in use', function () {
+    $service = app(ImageLibraryService::class);
+    $image = $service->store($this->member, uploadedImage('busy.jpg'));
+
+    $post = Post::query()->create([
+        'user_id' => $this->member->id,
+        'title' => 'Something',
+        'slug' => 'something',
+        'excerpt' => 'A short line.',
+        'content' => '<p>Body.</p>',
+    ]);
+
+    $service->attach($image, $post, 'cover');
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open')
+        ->set('selected', [$image->id])
+        ->call('deleteSelected');
+
+    // Refused, not deleted — the row and the file both survive.
+    expect(Image::query()->whereKey($image->id)->exists())->toBeTrue();
+});
+
+test('the picker will not let a member delete somebody else image', function () {
+    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage(), visibility: ImageVisibilityEnum::PUBLIC);
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-picker')
+        ->call('open')
+        // Visible to them, but not theirs to manage, so it never reaches the batch.
+        ->set('selected', [$image->id])
+        ->call('deleteSelected')
+        ->assertHasErrors();
+
+    expect(Image::query()->whereKey($image->id)->exists())->toBeTrue();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// THE UPLOADER
+
+test('the uploader stages files before it stores any of them', function () {
+    $uploader = Livewire::actingAs($this->member)
+        ->test('lv.image-uploader')
+        ->set('imagesUpload', [uploadedImage('one.jpg'), uploadedImage('two.jpg')]);
+
+    // Staged, not stored: somebody who dragged in a wrong file can still drop it.
+    expect($this->member->images()->count())->toBe(0);
+
+    $uploader->call('removeStaged', 0);
+    expect($uploader->get('imagesUpload'))->toHaveCount(1);
+
+    $uploader->call('uploadImages')->assertHasNoErrors()->assertDispatched('imagesUploaded');
+    expect($this->member->images()->count())->toBe(1);
+});
+
+test('an upload takes the visibility of the folder it lands in', function () {
+    $folder = app(ImageLibraryService::class)->createFolder(
+        $this->member,
+        'Public shelf',
+        visibility: ImageVisibilityEnum::PUBLIC,
+    );
+
+    Livewire::actingAs($this->member)
+        ->test('lv.image-uploader', ['folder' => $folder->id])
+        ->set('imagesUpload', [uploadedImage()])
+        ->call('uploadImages')
+        ->assertHasNoErrors();
+
+    // The folder is where a new image starts. It keeps that setting afterwards
+    // wherever it is refiled.
+    expect($this->member->images()->first()->visibility)->toBe(ImageVisibilityEnum::PUBLIC);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
 // THE SCREEN
 
 test('both workspaces can open the library', function () {
@@ -330,14 +518,18 @@ test('both workspaces can open the library', function () {
     $this->actingAs($this->admin)->get(route('admin.image-library'))->assertSuccessful();
 });
 
-test('uploading through the screen works', function () {
-    Livewire::actingAs($this->member)
-        ->test('pages::shared.image-library')
-        ->set('imagesUpload', [uploadedImage()])
-        ->call('uploadImages')
-        ->assertHasNoErrors();
+test('the page picks up what the uploader stored', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage('fresh.jpg'));
 
-    expect($this->member->images()->count())->toBe(1);
+    $page = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->dispatch('imagesUploaded', ids: [$image->id]);
+
+    // Same handoff as the picker: uploading lands you back on the grid with the
+    // new image ticked.
+    expect($page->get('selected'))->toBe([$image->id]);
+
+    $page->assertSet('tab', 'library')->assertSee('fresh');
 });
 
 test('the screen sorts on request', function () {
@@ -352,19 +544,20 @@ test('the screen sorts on request', function () {
         ->assertSeeInOrder([$alpha->title, $zulu->title]);
 });
 
-test('the picker uploads without leaving the page it sits on', function () {
-    $component = Livewire::actingAs($this->member)
+test('what the uploader stores comes back selected in the picker', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage('fresh.jpg'));
+
+    $picker = Livewire::actingAs($this->member)
         ->test('lv.image-picker')
-        ->call('open')
-        ->set('imagesUpload', [uploadedImage('from-the-picker.jpg')])
-        ->call('uploadImages')
-        ->assertHasNoErrors();
+        ->call('open', true)
+        // The uploader announces what it stored; the picker is listening.
+        ->dispatch('imagesUploaded', ids: [$image->id]);
 
-    // The upload has to land in the grid straight away — the whole point of the
-    // picker is not having to leave the post you are writing.
-    $component->assertSee('from-the-picker');
+    // Back on the grid with the new upload already ticked — the whole point of
+    // uploading from inside a picker is not having to go and find it again.
+    expect($picker->get('selected'))->toBe([$image->id]);
 
-    expect($this->member->images()->count())->toBe(1);
+    $picker->assertSet('tab', 'library')->assertSee('fresh');
 });
 
 test('no upload action is named after a $wire alias', function () {
@@ -377,6 +570,7 @@ test('no upload action is named after a $wire alias', function () {
     $components = [
         'resources/views/pages/shared/⚡image-library.blade.php',
         'resources/views/components/lv/⚡image-picker.blade.php',
+        'resources/views/components/lv/⚡image-uploader.blade.php',
     ];
 
     foreach ($components as $component) {
@@ -395,11 +589,45 @@ test('no upload action is named after a $wire alias', function () {
     }
 });
 
-test('a member cannot edit somebody else image through the screen', function () {
-    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage());
+test('a member cannot edit somebody else image on either screen', function () {
+    $image = app(ImageLibraryService::class)->store(
+        $this->admin,
+        uploadedImage(),
+        visibility: ImageVisibilityEnum::PUBLIC,
+    );
 
-    Livewire::actingAs($this->member)
-        ->test('pages::shared.image-library')
-        ->call('edit', $image->id)
-        ->assertStatus(404);
+    // Visible to them, but not theirs to change, so the panel refuses to open.
+    foreach (['pages::shared.image-library', 'lv.image-picker'] as $screen) {
+        Livewire::actingAs($this->member)
+            ->test($screen)
+            ->set('selected', [$image->id])
+            ->call('openPanel', 'edit')
+            ->assertHasErrors();
+    }
+});
+
+test('the page and the picker offer the same library actions', function () {
+    // These two drifted apart once. Everything they both do now lives in
+    // WithImageLibrary, and this is what stops one of them growing a feature the
+    // other does not have.
+    $actions = [
+        'selectFolder', 'switchTab', 'toggle', 'clearSelection',
+        'openPanel', 'closePanel', 'saveImage', 'moveSelected', 'deleteSelected',
+        'newFolder', 'editFolder', 'saveFolder', 'deleteFolder', 'afterUpload',
+    ];
+
+    $state = ['search', 'folder', 'sort', 'selected', 'multiple', 'max', 'tab', 'panel'];
+
+    $page = Livewire::actingAs($this->member)->test('pages::shared.image-library')->instance();
+    $picker = Livewire::actingAs($this->member)->test('lv.image-picker')->instance();
+
+    foreach ($actions as $action) {
+        expect(method_exists($page, $action))->toBeTrue("the page is missing {$action}()")
+            ->and(method_exists($picker, $action))->toBeTrue("the picker is missing {$action}()");
+    }
+
+    foreach ($state as $property) {
+        expect(property_exists($page, $property))->toBeTrue("the page is missing {$property}")
+            ->and(property_exists($picker, $property))->toBeTrue("the picker is missing {$property}");
+    }
 });

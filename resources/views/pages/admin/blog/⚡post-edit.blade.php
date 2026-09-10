@@ -72,7 +72,7 @@ new class extends Component
             $this->tags_input = $post->tags->pluck('name')->implode(', ');
         }
 
-        kSetSiteTitle('blog', $this->post ? 'edit post' : 'new post');
+        kSetSiteTitle('content', 'blog-posts', $this->post ? 'edit post' : 'new post');
     }
 
     /**

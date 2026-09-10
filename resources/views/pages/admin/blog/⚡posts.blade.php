@@ -28,7 +28,7 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('blog', 'posts');
+        kSetSiteTitle('content', 'blog-posts');
     }
 
     #[Computed]

@@ -101,6 +101,30 @@ if (! function_exists('kDeleteFile')) {
         return $file ? Storage::disk($disk)->delete($file) : false;
     }
 }
+if (! function_exists('kFileSize')) {
+    /**
+     * A byte count as somebody would say it out loud.
+     *
+     * Bytes are shown whole; everything above them gets one decimal, because
+     * "2.9 MB" tells a person what they need and "2.9138 MB" does not.
+     *
+     * @param  int|null  $bytes  Size in bytes.
+     */
+    function kFileSize(?int $bytes = 0): string
+    {
+        $bytes = max(0, (int) $bytes);
+
+        foreach (['B', 'KB', 'MB', 'GB'] as $unit) {
+            if ($bytes < 1024) {
+                return round($bytes, $unit === 'B' ? 0 : 1).' '.$unit;
+            }
+
+            $bytes /= 1024;
+        }
+
+        return round($bytes, 1).' TB';
+    }
+}
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 // DATETIME

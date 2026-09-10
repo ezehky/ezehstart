@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\ImageVisibilityEnum;
 use App\Enums\StatusDefault;
+use App\Enums\UserRoleEnum;
 use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -19,6 +21,8 @@ class ImageFolder extends Model
     protected function casts(): array
     {
         return [
+            'visibility' => ImageVisibilityEnum::class,
+            'visible_to_role' => UserRoleEnum::class,
             'status' => StatusDefault::class,
         ];
     }
@@ -31,6 +35,28 @@ class ImageFolder extends Model
     public function isShared(): bool
     {
         return $this->user_id === null;
+    }
+
+    /**
+     * Whether this account may browse the folder.
+     *
+     * This gates the folder, not the images in it. An image carries its own
+     * visibility and keeps it wherever it is filed, so a folder somebody may not
+     * browse can still hold an image they are allowed to see through the library
+     * root — which is the intended behaviour, not a leak.
+     */
+    public function isVisibleTo(User $user): bool
+    {
+        if ($user->isAdmin() || $this->user_id === $user->id) {
+            return true;
+        }
+
+        return match ($this->visibility) {
+            ImageVisibilityEnum::PUBLIC => true,
+            ImageVisibilityEnum::ROLE => $this->visible_to_role !== null
+                && $user->activeRoles()->contains($this->visible_to_role),
+            default => false,
+        };
     }
 
     /**
@@ -94,13 +120,25 @@ class ImageFolder extends Model
     }
 
     /**
-     * The folders this user may browse: their own, plus the platform's shared ones.
+     * The folders this user may browse: their own, plus anything whose visibility
+     * lets them in. An administrator browses the lot — the library is also the
+     * site's media manager, and hiding folders from the person maintaining the
+     * site hides the site from them.
      */
     #[Scope]
     protected function browsableBy(Builder $query, User $user): void
     {
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        $roles = $user->activeRoles()->map(fn (UserRoleEnum $role) => $role->value)->all();
+
         $query->where(fn (Builder $inner) => $inner
             ->where('user_id', $user->id)
-            ->orWhereNull('user_id'));
+            ->orWhere('visibility', ImageVisibilityEnum::PUBLIC)
+            ->orWhere(fn (Builder $role) => $role
+                ->where('visibility', ImageVisibilityEnum::ROLE)
+                ->whereIn('visible_to_role', $roles)));
     }
 }

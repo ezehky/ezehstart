@@ -14,6 +14,7 @@ use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\LaravelImageOptimizer\Facades\ImageOptimizer;
@@ -218,17 +219,29 @@ class ImageLibraryService
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // FOLDERS
 
-    public function createFolder(User $user, string $name, ?ImageFolder $parent = null, bool $shared = false): ImageFolder
-    {
+    public function createFolder(
+        User $user,
+        string $name,
+        ?ImageFolder $parent = null,
+        bool $shared = false,
+        ?ImageVisibilityEnum $visibility = null,
+        ?UserRoleEnum $visibleToRole = null,
+    ): ImageFolder {
         // A shared folder belongs to nobody and everybody browses it, so only an
         // administrator can make one.
         $ownerId = ($shared && $user->isAdmin()) ? null : $user->id;
+
+        // A platform folder nobody may browse is a folder nobody can use, so
+        // sharing one implies public unless the caller says otherwise. An
+        // administrator who wants a restricted shared folder passes ROLE.
+        $visibility ??= $ownerId === null ? ImageVisibilityEnum::PUBLIC : ImageVisibilityEnum::PRIVATE;
 
         $folder = ImageFolder::query()->create([
             'user_id' => $ownerId,
             'parent_id' => $parent?->id,
             'name' => trim($name),
             'slug' => kSlug($name),
+            ...$this->visibilityAttributes($visibility, $visibleToRole),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -237,11 +250,26 @@ class ImageLibraryService
         return $folder;
     }
 
-    public function renameFolder(ImageFolder $folder, string $name): ImageFolder
-    {
+    /**
+     * Rename a folder and reset who may browse it.
+     *
+     * Only the folder moves. The images inside keep the visibility they were
+     * given, so tightening a folder never quietly hides an image somebody was
+     * deliberately allowed to see, and loosening one never exposes anything.
+     */
+    public function updateFolder(
+        ImageFolder $folder,
+        string $name,
+        ?ImageVisibilityEnum $visibility = null,
+        ?UserRoleEnum $visibleToRole = null,
+    ): ImageFolder {
         $activity = app(ActivityLogService::class);
 
-        $folder->fill(['name' => trim($name), 'slug' => kSlug($name)]);
+        $folder->fill([
+            'name' => trim($name) ?: $folder->name,
+            'slug' => kSlug(trim($name) ?: $folder->name),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToRole) : []),
+        ]);
 
         $affected = $activity->affectedColumns($folder);
 
@@ -263,6 +291,38 @@ class ImageLibraryService
         $folder->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::IMAGE_FOLDER_DELETE, $name);
+    }
+
+    /**
+     * Refile a batch of images.
+     *
+     * Passing null moves them to the root. The caller has already decided which
+     * of these the account may manage; this only does the move, and returns how
+     * many actually landed so the screen can say so.
+     *
+     * @param  Collection<int, Image>  $images
+     */
+    public function moveImages(Collection $images, ?ImageFolder $folder): int
+    {
+        if ($images->isEmpty()) {
+            return 0;
+        }
+
+        $activity = app(ActivityLogService::class);
+
+        DB::transaction(function () use ($images, $folder, $activity): void {
+            foreach ($images as $image) {
+                $image->fill(['image_folder_id' => $folder?->id]);
+
+                $affected = $activity->affectedColumns($image);
+
+                $image->save();
+
+                $activity->logActivity(ActivityActionEnum::IMAGE_UPDATE, $image->title, $affected, $image);
+            }
+        });
+
+        return $images->count();
     }
 
     /**
