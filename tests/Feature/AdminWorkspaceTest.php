@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusUser;
 use App\Enums\UserRoleEnum;
 use App\Models\User;
@@ -10,7 +11,10 @@ beforeEach(function () {
 });
 
 test('an admin can open every workspace page', function (string $route) {
-    $this->actingAs($this->admin)->get(route($route))->assertSuccessful();
+    // The category screen is one screen per vocabulary rather than one per table.
+    $parameters = $route === 'admin.categories' ? [CategoryGroupEnum::BLOG] : [];
+
+    $this->actingAs($this->admin)->get(route($route, $parameters))->assertSuccessful();
 })->with([
     'admin.dashboard',
     'admin.profile',

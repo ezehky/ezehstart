@@ -4,6 +4,7 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\StatusDefault;
 use App\Models\Tag;
 use App\Services\ActivityLogService;
+use App\Services\TagService;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,13 @@ new class extends Component
     public string $name = '';
 
     public bool $status = true;
+
+    /**
+     * The bulk box. Tags arrive in handfuls — off the back of a content plan, or
+     * pasted from wherever the last site kept them — and one modal per name is a
+     * chore nobody does.
+     */
+    public string $bulk_names = '';
 
     #[Url]
     public string $search = '';
@@ -50,6 +58,46 @@ new class extends Component
         $this->resetForm();
 
         Flux::modal('tagModal')->show();
+    }
+
+    public function createMany(): void
+    {
+        $this->reset('bulk_names');
+        $this->resetValidation();
+
+        Flux::modal('tagBulkModal')->show();
+    }
+
+    /**
+     * Add a pasted list in one go.
+     *
+     * TagService already turns a comma-separated string into rows for the post
+     * editor, matching on the slug and leaving anything that exists alone, which
+     * is exactly what this screen wants — so it is the same call, not a second
+     * implementation of it.
+     */
+    public function saveMany(): bool
+    {
+        $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
+
+        $tags = app(TagService::class)->resolveTags($this->bulk_names);
+
+        // firstOrCreate flags the rows it actually inserted, and that is the only
+        // way to tell the admin how many of the pasted names were new.
+        $created = $tags->filter(fn (Tag $item) => $item->wasRecentlyCreated);
+
+        $this->respondPrimary('Every one of those already exists.', if: $created->isEmpty());
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::TAG_CREATE,
+            ' tags: '.$created->pluck('name')->implode(', '),
+        );
+
+        Flux::modal('tagBulkModal')->close();
+        $this->reset('bulk_names');
+        unset($this->tags);
+
+        return $this->respondSuccess(kPluralize('tag', $created->count()).' added.');
     }
 
     public function edit(Tag $tag): void
@@ -165,6 +213,7 @@ new class extends Component
                     placeholder="Search tags"
                     icon="magnifying-glass"
                 />
+                <flux:button variant="filled" icon="queue-list" wire:click="createMany">Add many</flux:button>
                 <flux:button variant="primary" icon="plus" wire:click="create">New tag</flux:button>
             </div>
         </div>
@@ -211,6 +260,27 @@ new class extends Component
                     <flux:button variant="ghost" type="button">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Save</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal name="tagBulkModal" class="modal-sm">
+        <form wire:submit="saveMany" class="space-y-4">
+            <flux:heading size="lg">Add many tags</flux:heading>
+
+            <flux:textarea
+                wire:model="bulk_names"
+                label="Names"
+                rows="4"
+                placeholder="skincare, routine, winter"
+                description="Separate them with commas. Names that already exist are left as they are."
+            />
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary">Add them</flux:button>
             </div>
         </form>
     </flux:modal>

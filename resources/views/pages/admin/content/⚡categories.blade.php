@@ -5,6 +5,7 @@ use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusDefault;
 use App\Models\Category;
 use App\Services\ActivityLogService;
+use App\Services\CategoryService;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -29,6 +30,12 @@ new class extends Component
     public int $flow_order = 0;
 
     public bool $status = true;
+
+    /**
+     * The bulk box. Setting up a group means typing out its whole vocabulary at
+     * once, and one modal per name is a chore nobody does.
+     */
+    public string $bulk_names = '';
 
     public function mount(): void
     {
@@ -78,6 +85,45 @@ new class extends Component
             ->max('flow_order') + 1;
 
         Flux::modal('categoryModal')->show();
+    }
+
+    public function createMany(): void
+    {
+        $this->reset('bulk_names');
+        $this->resetValidation();
+
+        Flux::modal('categoryBulkModal')->show();
+    }
+
+    /**
+     * Add a pasted list in one go.
+     *
+     * Everything a bulk row does not carry — parent, description — is what the
+     * edit modal is for afterwards. The names and their order are the part worth
+     * typing once.
+     */
+    public function saveMany(): bool
+    {
+        $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
+
+        $categories = app(CategoryService::class)->resolveCategories($this->bulk_names, $this->category_group);
+
+        // firstOrCreate flags the rows it actually inserted, and that is the only
+        // way to tell the admin how many of the pasted names were new.
+        $created = $categories->filter(fn (Category $item) => $item->wasRecentlyCreated);
+
+        $this->respondPrimary('Every one of those is already in this group.', if: $created->isEmpty());
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::CATEGORY_CREATE,
+            ' categories: '.$created->pluck('name')->implode(', '),
+        );
+
+        Flux::modal('categoryBulkModal')->close();
+        $this->reset('bulk_names');
+        unset($this->categories, $this->parentOptions);
+
+        return $this->respondSuccess(kPluralize('category', $created->count()).' added.');
     }
 
     public function edit(Category $category): void
@@ -152,7 +198,7 @@ new class extends Component
 
         Flux::modal('categoryModal')->close();
         $this->resetForm();
-        unset($this->grouped);
+        unset($this->categories, $this->parentOptions);
 
         return $this->respondSuccess('The category has been saved.');
     }
@@ -194,7 +240,7 @@ new class extends Component
 
         Flux::modal('deleteCategoryModal')->close();
         $this->resetForm();
-        unset($this->grouped);
+        unset($this->categories, $this->parentOptions);
 
         return $this->respondSuccess('The category has been deleted.');
     }
@@ -216,7 +262,10 @@ new class extends Component
                     Manage your {{ $this->category_group->label(true) }} categories.
                 </flux:text>
             </div>
-            <flux:button size="sm" icon="plus" wire:click="create">Add</flux:button>
+            <div class="flex gap-3">
+                <flux:button size="sm" variant="filled" icon="queue-list" wire:click="createMany">Add many</flux:button>
+                <flux:button size="sm" icon="plus" wire:click="create">Add</flux:button>
+            </div>
         </div>
 
         <flux:table class="space-y-4">
@@ -282,6 +331,27 @@ new class extends Component
                     <flux:button variant="ghost" type="button">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Save</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal name="categoryBulkModal" class="modal-sm">
+        <form wire:submit="saveMany" class="space-y-4">
+            <flux:heading size="lg">Add many {{ $category_group->label(true) }} categories</flux:heading>
+
+            <flux:textarea
+                wire:model="bulk_names"
+                label="Names"
+                rows="4"
+                placeholder="Skincare, Routine, Winter"
+                description="Separate them with commas. They are added in the order typed, and names already in this group are left as they are."
+            />
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary">Add them</flux:button>
             </div>
         </form>
     </flux:modal>

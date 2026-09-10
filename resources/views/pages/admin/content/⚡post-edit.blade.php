@@ -8,11 +8,9 @@ use App\Models\Image;
 use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
-use App\Services\CategoryService;
 use App\Services\ImageLibraryService;
-use App\Services\TagService;
 use App\Traits\WithFormResponseMessage;
-use Illuminate\Support\Collection;
+use App\Traits\WithTaxonomy;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -20,7 +18,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithFormResponseMessage, WithTaxonomy;
 
     public ?Post $post = null;
 
@@ -31,10 +29,6 @@ new class extends Component
     public string $content;
 
     public ?int $image_id = null;
-
-    public array $category_ids = [];
-
-    public string $tags_input = '';
 
     public ?string $meta_title = null;
 
@@ -58,6 +52,10 @@ new class extends Component
      */
     public function mount(): void
     {
+        // Which vocabulary the category picker offers. WithTaxonomy leaves it unset
+        // on purpose, so every screen using the trait has to say what it edits.
+        $this->category_group = CategoryGroupEnum::BLOG;
+
         if ($this->post?->exists) {
 
             $this->fill($this->post->only([
@@ -68,20 +66,11 @@ new class extends Component
 
             $this->is_featured = $this->post->is_featured->boolValue();
             $this->published_at = $this->post->published_at?->format('Y-m-d\TH:i');
-            $this->category_ids = $this->post->categories->pluck('id')->all();
-            $this->tags_input = $this->post->tags->pluck('name')->implode(', ');
+
+            $this->loadTaxonomy($this->post);
         }
 
         kSetSiteTitle('content', 'blogs', $this->post ? 'edit post' : 'new post');
-    }
-
-    /**
-     * @return Collection<int, App\Models\Category>
-     */
-    #[Computed]
-    public function categories(): Collection
-    {
-        return app(CategoryService::class)->categoriesFor(CategoryGroupEnum::BLOG);
     }
 
     #[Computed]
@@ -136,9 +125,7 @@ new class extends Component
             'excerpt' => ['required', 'string', 'max:500'],
             'content' => ['required', 'string'],
             'image_id' => ['nullable', 'integer', Rule::exists('images', 'id')],
-            'category_ids' => ['array'],
-            'category_ids.*' => ['integer', Rule::exists('categories', 'id')],
-            'tags_input' => ['nullable', 'string', 'max:500'],
+            ...$this->taxonomyRules(),
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
             'is_featured' => ['boolean'],
@@ -189,8 +176,7 @@ new class extends Component
         $this->post->save();
 
         // Taxonomy after the save, because a new post has no id before it.
-        $this->post->categories()->sync($this->category_ids);
-        $this->post->tags()->sync(app(TagService::class)->resolveTags($this->tags_input)->pluck('id'));
+        $this->syncTaxonomy($this->post);
 
         // The cover's usage row is what stops somebody deleting an image that is
         // on a published post.
@@ -267,36 +253,14 @@ new class extends Component
                 <flux:error name="image_id" />
             </flux:card>
 
-            <flux:card class="space-y-3">
-                <flux:heading level="2" size="sm">Categories</flux:heading>
+            <x-form.category-field
+                wire:model="category_ids"
+                :categories="$this->categoryOptions"
+                :empty-href="route('admin.categories', ['category_group' => $category_group])"
+            />
 
-                @forelse ($this->categories as $category)
-                    <flux:checkbox
-                        wire:key="category-{{ $category->id }}"
-                        wire:model="category_ids"
-                        value="{{ $category->id }}"
-                        :label="$category->name"
-                    />
-                @empty
-                    <flux:text size="sm">
-                        No categories yet.
-                        <flux:link
-                            href="{{ route('admin.categories', ['category_group' => CategoryGroupEnum::BLOG]) }}"
-                        >
-                            Add one
-                        </flux:link>.
-                    </flux:text>
-                @endforelse
-            </flux:card>
+            <x-form.tag-field wire:model="tag_names" :tags="$this->tagOptions" />
 
-            <flux:card class="space-y-3">
-                <flux:heading level="2" size="sm">Tags</flux:heading>
-                <flux:input
-                    wire:model="tags_input"
-                    placeholder="skincare, routine, winter"
-                    description="Separate with commas. New tags are created as you use them."
-                />
-            </flux:card>
             <flux:card class="space-y-4">
                 <flux:heading level="2" size="sm">Publishing</flux:heading>
 

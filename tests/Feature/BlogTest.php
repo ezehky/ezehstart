@@ -3,6 +3,7 @@
 use App\Enums\CategoryGroupEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusPost;
+use App\Enums\StatusYes;
 use App\Enums\UserRoleEnum;
 use App\Models\Category;
 use App\Models\Post;
@@ -34,6 +35,9 @@ function blogPost(array $attributes = []): Post
         'slug' => 'a-post-about-things',
         'excerpt' => 'The short version.',
         'content' => '<p>The long version.</p>',
+        // The column is NOT NULL with a default, so a real row always has one —
+        // create() would leave the in-memory model without it.
+        'is_featured' => StatusYes::NO,
         'status' => StatusPost::PUBLISHED,
         'published_at' => now()->subDay(),
         ...$attributes,
@@ -253,11 +257,10 @@ test('writing a post through the editor saves it with its taxonomy', function ()
     Livewire::actingAs($this->admin)
         ->test('pages::admin.content.post-edit')
         ->set('title', 'My first post')
-        ->set('slug', 'my-first-post')
         ->set('excerpt', 'A short line.')
         ->set('content', '<p>Body text goes here.</p>')
         ->set('category_ids', [$category->id])
-        ->set('tags_input', 'winter, skincare')
+        ->set('tag_names', ['winter', 'skincare'])
         ->set('status', StatusPost::PUBLISHED->value)
         ->call('save')
         ->assertHasNoErrors();
@@ -275,7 +278,6 @@ test('the editor sanitises what it stores', function () {
     Livewire::actingAs($this->admin)
         ->test('pages::admin.content.post-edit')
         ->set('title', 'Nasty')
-        ->set('slug', 'nasty')
         ->set('excerpt', 'Short.')
         ->set('content', '<p>Fine</p><script>alert(1)</script>')
         ->set('status', StatusPost::DRAFT->value)
@@ -285,16 +287,195 @@ test('the editor sanitises what it stores', function () {
     expect(Post::query()->where('slug', 'nasty')->value('content'))->not->toContain('<script');
 });
 
-test('two posts cannot share a slug', function () {
-    blogPost(['user_id' => $this->admin->id, 'slug' => 'taken']);
+test('two posts cannot share a title', function () {
+    // The slug is derived from the title now, so the title is what has to be unique.
+    blogPost(['user_id' => $this->admin->id, 'title' => 'Taken', 'slug' => 'taken']);
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.content.post-edit')
-        ->set('title', 'Another')
-        ->set('slug', 'taken')
+        ->set('title', 'Taken')
         ->set('excerpt', 'Short.')
         ->set('content', '<p>Body.</p>')
         ->set('status', StatusPost::DRAFT->value)
         ->call('save')
-        ->assertHasErrors('slug');
+        ->assertHasErrors('title');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// ADDING IN BULK
+
+test('a pasted list adds every tag at once', function () {
+    Tag::query()->create(['name' => 'Winter', 'slug' => 'winter', 'status' => StatusDefault::ACTIVE]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->set('bulk_names', 'Skincare, winter, Routine')
+        ->call('saveMany')
+        ->assertHasNoErrors();
+
+    // "winter" was already there, matched on its slug rather than its spelling.
+    expect(Tag::query()->count())->toBe(3)
+        ->and(Tag::query()->pluck('name')->all())->toContain('Skincare', 'Routine');
+});
+
+test('a pasted list of tags that all exist writes nothing', function () {
+    Tag::query()->create(['name' => 'Winter', 'slug' => 'winter', 'status' => StatusDefault::ACTIVE]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->set('bulk_names', 'winter, WINTER')
+        ->call('saveMany');
+
+    expect(Tag::query()->count())->toBe(1);
+});
+
+test('an empty bulk box is refused', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->set('bulk_names', '')
+        ->call('saveMany')
+        ->assertHasErrors('bulk_names');
+});
+
+test('a pasted list adds every category to the group, in the order typed', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.categories', ['category_group' => CategoryGroupEnum::BLOG])
+        ->set('bulk_names', 'Skincare, Routine, Winter')
+        ->call('saveMany')
+        ->assertHasNoErrors();
+
+    expect(Category::query()->inGroup(CategoryGroupEnum::BLOG)->count())->toBe(3)
+        // Pasted order beats alphabetical: it is the order the admin meant.
+        ->and(Category::query()->inFlowOrder()->pluck('name')->all())->toBe(['Skincare', 'Routine', 'Winter']);
+});
+
+test('a bulk category lands after whatever the group already held', function () {
+    blogCategory('Existing');
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.categories', ['category_group' => CategoryGroupEnum::BLOG])
+        ->set('bulk_names', 'Newcomer')
+        ->call('saveMany')
+        ->assertHasNoErrors();
+
+    expect(Category::query()->where('name', 'Newcomer')->value('flow_order'))->toBe(1);
+});
+
+test('the same category name in another group is still its own row', function () {
+    blogCategory('Skincare', CategoryGroupEnum::PRODUCT);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.categories', ['category_group' => CategoryGroupEnum::BLOG])
+        ->set('bulk_names', 'Skincare')
+        ->call('saveMany')
+        ->assertHasNoErrors();
+
+    expect(Category::query()->where('name', 'Skincare')->count())->toBe(2);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// THE TAXONOMY PICKERS
+
+test('the pickers open with what the post already carries', function () {
+    $post = blogPost(['user_id' => $this->admin->id]);
+    $category = blogCategory();
+    $tag = Tag::query()->create(['name' => 'Winter', 'slug' => 'winter', 'status' => StatusDefault::ACTIVE]);
+
+    $post->categories()->attach($category);
+    $post->tags()->attach($tag);
+
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit', ['post' => $post]);
+
+    expect($component->get('category_ids'))->toBe([$category->id])
+        ->and($component->get('tag_names'))->toBe(['Winter']);
+});
+
+test('the tag picker shows the library plus whatever was typed on the screen', function () {
+    Tag::query()->create(['name' => 'Winter', 'slug' => 'winter', 'status' => StatusDefault::ACTIVE]);
+
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit')
+        ->set('new_tag', 'Skincare')
+        ->call('addTag');
+
+    // Ticked first: the picker collapses a long list, and what the post carries
+    // has to stay above the fold.
+    expect($component->instance()->tagOptions->all())->toBe(['Skincare', 'Winter'])
+        ->and($component->get('tag_names'))->toBe(['Skincare'])
+        ->and($component->get('new_tag'))->toBe('')
+        // Nothing is written until the post is, so an abandoned form leaves no orphans.
+        ->and(Tag::query()->count())->toBe(1);
+});
+
+test('typing a tag that already exists ticks it rather than adding a twin', function () {
+    Tag::query()->create(['name' => 'Winter', 'slug' => 'winter', 'status' => StatusDefault::ACTIVE]);
+
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit')
+        ->set('new_tag', 'winter')
+        ->call('addTag');
+
+    // Matched on the slug, so the library's spelling wins over what was typed.
+    expect($component->get('tag_names'))->toBe(['Winter'])
+        ->and($component->instance()->tagOptions)->toHaveCount(1);
+});
+
+test('a long tag library collapses behind a show more', function () {
+    // Fifteen against the component's default limit of twelve.
+    foreach (range(1, 15) as $number) {
+        Tag::query()->create([
+            'name' => "Tag {$number}",
+            'slug' => "tag-{$number}",
+            'status' => StatusDefault::ACTIVE,
+        ]);
+    }
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.blog.create'))
+        ->assertSuccessful()
+        ->assertSee('Show 3 more');
+});
+
+test('the tags already on a post lead the picker, whatever the alphabet says', function () {
+    $post = blogPost(['user_id' => $this->admin->id]);
+
+    foreach (['Alpha', 'Winter'] as $name) {
+        $tag = Tag::query()->create(['name' => $name, 'slug' => kSlug($name), 'status' => StatusDefault::ACTIVE]);
+
+        if ($name === 'Winter') {
+            $post->tags()->attach($tag);
+        }
+    }
+
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit', ['post' => $post]);
+
+    // "Alpha" sorts first in the library; "Winter" is on the post, so it leads.
+    expect($component->instance()->tagOptions->all())->toBe(['Winter', 'Alpha']);
+});
+
+test('adding an empty tag does nothing', function () {
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit')
+        ->set('new_tag', '   ')
+        ->call('addTag');
+
+    expect($component->get('tag_names'))->toBeEmpty();
+});
+
+test('a category from another group cannot be posted onto a blog post', function () {
+    $product = blogCategory('Gadgets', CategoryGroupEnum::PRODUCT);
+
+    // The ids come from the browser, so the group is enforced in the rules rather
+    // than trusted from the form.
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.post-edit')
+        ->set('title', 'Wrong group')
+        ->set('excerpt', 'Short.')
+        ->set('content', '<p>Body.</p>')
+        ->set('category_ids', [$product->id])
+        ->set('status', StatusPost::DRAFT->value)
+        ->call('save')
+        ->assertHasErrors('category_ids.0');
 });

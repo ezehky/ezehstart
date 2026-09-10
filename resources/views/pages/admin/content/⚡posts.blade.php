@@ -17,18 +17,17 @@ new class extends Component
 {
     use WithFormResponseMessage, WithPagination;
 
+    public ?Post $post = null;
+
     #[Url]
     public string $search = '';
 
     #[Url]
     public string $status = '';
 
-    /** The post queued for deletion, held while the dialog asks. */
-    public ?int $deleteId = null;
-
     public function mount(): void
     {
-        kSetSiteTitle('content', 'blog-posts');
+        kSetSiteTitle('content', 'blogs');
     }
 
     #[Computed]
@@ -36,7 +35,7 @@ new class extends Component
     {
         return Post::query()
             ->with(['user', 'image', 'categories'])
-            ->when($this->search, fn (Builder $query) => $query->where('title', 'like', '%'.$this->search.'%'))
+            ->when($this->search, fn (Builder $query) => $query->searchMacro('title', $this->search))
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
             ->orderByDesc('id')
             ->paginate(15);
@@ -80,34 +79,32 @@ new class extends Component
         $this->resetPage();
     }
 
-    public function confirmDelete(int $postId): void
+    public function confirmDelete(Post $post): void
     {
-        $this->deleteId = $postId;
+        $this->post = $post;
 
         Flux::modal('deletePostModal')->show();
     }
 
     public function delete(): bool
     {
-        $post = Post::query()->whereKey($this->deleteId)->first();
-
-        abort_unless((bool) $post, 404);
+        $this->respondError('Select a post to delete first.', ! $this->post);
 
         // Captured before the row goes, so the log line still says what went.
-        $description = " post: {$post->title}";
+        $description = " post: {$this->post->title}";
 
         // Release the cover image first, or the usage row's restrict rule refuses
         // the delete and the administrator gets a foreign key error.
-        app(ImageLibraryService::class)->detach($post, 'cover');
+        app(ImageLibraryService::class)->detach($this->post, 'cover');
 
-        $post->categories()->detach();
-        $post->tags()->detach();
-        $post->delete();
+        $this->post->categories()->detach();
+        $this->post->tags()->detach();
+        $this->post->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::POST_DELETE, $description);
 
         Flux::modal('deletePostModal')->close();
-        $this->reset('deleteId');
+        $this->reset('post');
         unset($this->posts, $this->metrics);
 
         return $this->respondSuccess('The post has been deleted.');
