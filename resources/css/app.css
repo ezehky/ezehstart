@@ -345,6 +345,38 @@
         @apply outline-2 outline-offset-2 outline-lime-500;
     }
 
+    /* A resizable image in the editor. The wrapper is the node view's root and
+       hugs the picture, so the handles sit on the image's corners rather than on
+       the column's — an image dragged narrow would otherwise leave its handles
+       stranded out at the text margin. */
+    .ProseMirror .rich-image {
+        @apply relative w-fit;
+    }
+    .ProseMirror .rich-image img {
+        @apply block rounded-xl;
+    }
+
+    /* Shown only while the node is selected: four permanent dots on every image
+       would turn a page of pictures into a page of dots. */
+    .ProseMirror .rich-image-handle {
+        @apply absolute z-10 hidden size-3 rounded-full border-2 border-white bg-lime-500 shadow-sm dark:border-slate-900;
+    }
+    .ProseMirror .ProseMirror-selectednode .rich-image-handle {
+        @apply block;
+    }
+    .ProseMirror .rich-image-handle-nw {
+        @apply -start-1.5 -top-1.5 cursor-nwse-resize;
+    }
+    .ProseMirror .rich-image-handle-ne {
+        @apply -end-1.5 -top-1.5 cursor-nesw-resize;
+    }
+    .ProseMirror .rich-image-handle-sw {
+        @apply -bottom-1.5 -start-1.5 cursor-nesw-resize;
+    }
+    .ProseMirror .rich-image-handle-se {
+        @apply -bottom-1.5 -end-1.5 cursor-nwse-resize;
+    }
+
     /* tiptap's Placeholder extension marks the empty first node; without a rule
        the placeholder text never renders. */
     .rich-prose p.is-editor-empty:first-child::before {

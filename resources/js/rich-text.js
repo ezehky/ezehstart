@@ -1,6 +1,6 @@
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import ResizableImage from "./resizable-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 import VideoEmbed from "./video-embed";
@@ -62,7 +62,10 @@ export default (placeholder = "") => {
                     StarterKit.configure({
                         heading: { levels: [2, 3, 4] },
                     }),
-                    Image.configure({ inline: false, allowBase64: false }),
+                    ResizableImage.configure({
+                        inline: false,
+                        allowBase64: false,
+                    }),
                     VideoEmbed,
                     TextAlign.configure({ types: ["heading", "paragraph"] }),
                     Placeholder.configure({ placeholder }),

@@ -26,6 +26,18 @@ class BlogService
      */
     private const ALLOWED_TAGS = '<p><br><strong><b><em><i><u><s><a><ul><ol><li><h2><h3><h4><blockquote><code><pre><img><hr><figure><figcaption><table><thead><tbody><tr><th><td><iframe>';
 
+    /**
+     * The range a stored image width is allowed to fall in.
+     *
+     * The editor already clamps a drag to the column it is dragged in, but the
+     * width arrives as an attribute on submitted HTML like any other, so it is
+     * clamped again here rather than trusted. Anything outside the range, or not
+     * a number at all, loses the attribute and renders at its natural size.
+     */
+    private const MIN_IMAGE_WIDTH = 80;
+
+    private const MAX_IMAGE_WIDTH = 2000;
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // CONTENT
 
@@ -50,10 +62,50 @@ class BlogService
             $clean
         ) ?? '';
 
+        $clean = $this->normalizeImages($clean);
+
         // Last, so nothing above can rewrite what it produces.
         $clean = $this->rebuildEmbeds($clean);
 
         return trim($clean);
+    }
+
+    /**
+     * Hold every image's width to something a reader can be served.
+     *
+     * The width is the one thing the editor lets an author set on an image, and
+     * strip_tags hands attributes through untouched on a tag it keeps — so this is
+     * the only place a hand-edited `width="99999"` gets caught. The attribute is
+     * stripped and written again from the clamped integer rather than patched in
+     * place, which is also what drops a width carrying units, a percentage, or
+     * anything else that is not a plain number.
+     */
+    private function normalizeImages(string $html): string
+    {
+        return preg_replace_callback(
+            '/<img\b[^>]*>/i',
+            function (array $match): string {
+                preg_match('/\swidth\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $match[0], $width);
+
+                $value = $width[2] ?? $width[3] ?? $width[4] ?? null;
+
+                // Rebuilt without the attribute rather than patched in place, so the
+                // numeric case below is adding one back to a tag that has none.
+                $tag = rtrim(rtrim(
+                    preg_replace('/\swidth\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $match[0]) ?? $match[0],
+                    '>'
+                ), ' /');
+
+                if ($value === null || ! is_numeric(trim($value))) {
+                    return $tag.'>';
+                }
+
+                $clamped = max(self::MIN_IMAGE_WIDTH, min((int) $value, self::MAX_IMAGE_WIDTH));
+
+                return $tag.' width="'.$clamped.'">';
+            },
+            $html
+        ) ?? '';
     }
 
     /**

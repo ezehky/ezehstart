@@ -79,6 +79,35 @@ test('the formatting a writer actually uses survives', function () {
         ->and($clean)->toContain('<img');
 });
 
+test('an image keeps the width the editor gave it', function () {
+    $clean = app(BlogService::class)->sanitize('<img src="/x.png" width="420">');
+
+    expect($clean)->toContain('width="420"');
+});
+
+test('an oversized width is clamped rather than dropped', function () {
+    // The attribute survives strip_tags untouched, so a hand-edited width is the
+    // one thing an author can put on an image that nothing else checks.
+    $clean = app(BlogService::class)->sanitize('<img src="/x.png" width="99999">');
+
+    expect($clean)->toContain('width="2000"');
+});
+
+test('a width that is not a plain number loses the attribute', function () {
+    $clean = app(BlogService::class)->sanitize('<img src="/x.png" width="80%">');
+
+    expect($clean)->toContain('<img')
+        ->and($clean)->not->toContain('width');
+});
+
+test('an image with no width is left alone', function () {
+    $clean = app(BlogService::class)->sanitize('<img src="/x.png" alt="A cat">');
+
+    expect($clean)->toContain('src="/x.png"')
+        ->and($clean)->toContain('alt="A cat"')
+        ->and($clean)->not->toContain('width');
+});
+
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // TAXONOMY
 
