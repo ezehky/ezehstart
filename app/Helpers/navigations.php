@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\CategoryGroupEnum;
+
 /**
  * Get page navigation links for a given key.
  *
@@ -51,17 +53,17 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
             'content' => [
                 'label' => 'Content',
                 'children' => [
-                    'blog-posts' => [
+                    'blogs' => [
                         'label' => 'Posts',
-                        'link' => route('admin.blog.posts'),
+                        'link' => route('admin.blog.blogs'),
                     ],
-                    'blog-categories' => [
+                    'categories' => [
                         'label' => 'Categories',
-                        'link' => route('admin.blog.categories'),
+                        'link' => route('admin.categories', ['category_group' => CategoryGroupEnum::BLOG]),
                     ],
-                    'blog-tags' => [
+                    'tags' => [
                         'label' => 'Tags',
-                        'link' => route('admin.blog.tags'),
+                        'link' => route('admin.tags'),
                     ],
                     'image-library' => [
                         'label' => 'Image library',

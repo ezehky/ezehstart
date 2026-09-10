@@ -24,10 +24,10 @@ return new class extends Migration
 
             $table->foreignId('image_id')->nullable()->constrained()->nullOnDelete();
 
-            $table->string('category_group', 30)->index(); // CategoryGroupEnum
+            $table->string('category_group', 30)->unique(); // CategoryGroupEnum
 
             $table->string('name')->index();
-            $table->string('slug');
+            $table->string('slug')->unique();
 
             $table->text('description')->nullable();
 
@@ -36,11 +36,6 @@ return new class extends Migration
 
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
-
-            // Unique per group rather than globally: "skincare" may legitimately be
-            // both a blog category and a product category, and they are not the
-            // same row.
-            $table->unique(['category_group', 'slug']);
         });
     }
 

@@ -22,11 +22,6 @@ class Tag extends Model
         ];
     }
 
-    public function getRouteKeyName(): string
-    {
-        return 'slug';
-    }
-
     // Getters
 
     public function label(): string

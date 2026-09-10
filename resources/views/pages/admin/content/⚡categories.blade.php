@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Services\ActivityLogService;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -18,11 +18,9 @@ new class extends Component
 
     public ?Category $category = null;
 
-    public CategoryGroupEnum $category_group = CategoryGroupEnum::BLOG;
+    public CategoryGroupEnum $category_group;
 
     public string $name = '';
-
-    public string $slug = '';
 
     public ?int $parent_id = null;
 
@@ -32,28 +30,28 @@ new class extends Component
 
     public bool $status = true;
 
-    /** The category queued for deletion, held while the dialog asks. */
-    public ?int $deleteId = null;
-
     public function mount(): void
     {
-        kSetSiteTitle('content', 'blog-categories');
+        kSetSiteTitle($this->category_group->parentTitle(), 'categories');
     }
 
     /**
-     * Grouped by what they categorise, because a blog category and a product
-     * category are not the same list even when they share a name.
-     *
      * @return Collection<string, Collection<int, Category>>
      */
     #[Computed]
-    public function grouped(): Collection
+    public function categories(): Collection
     {
         return Category::query()
-            ->withCount('posts')
+            ->withCount($this->category_group->morphName())
             ->inFlowOrder()
+            ->where('category_group', $this->category_group)
             ->get()
-            ->groupBy(fn (Category $category) => $category->category_group->value);
+            ->map(function ($item) {
+                $morphName = $this->category_group->morphName();
+                $item->attached_count = $item->getAttribute("{$morphName}_count");
+
+                return $item;
+            });
     }
 
     /**
@@ -72,12 +70,12 @@ new class extends Component
             ->get();
     }
 
-    public function create(CategoryGroupEnum $group): void
+    public function create(): void
     {
         $this->resetForm();
-
-        $this->category_group = $group;
-        $this->flow_order = (int) Category::query()->where('category_group', $group)->max('flow_order') + 1;
+        $this->flow_order = (int) Category::query()
+            ->where('category_group', $this->category_group)
+            ->max('flow_order') + 1;
 
         Flux::modal('categoryModal')->show();
     }
@@ -87,31 +85,23 @@ new class extends Component
         $this->resetForm();
 
         $this->category = $category;
-        $this->fill($category->only(['name', 'slug', 'category_group', 'parent_id', 'description', 'flow_order']));
+        $this->fill($category->only(['name', 'parent_id', 'description', 'flow_order']));
         $this->status = $category->status->isActive();
 
         Flux::modal('categoryModal')->show();
-    }
-
-    public function updatedName(string $value): void
-    {
-        if (! $this->category) {
-            $this->slug = kSlug($value);
-        }
     }
 
     protected function rules(): array
     {
         return [
             'category_group' => ['required', Rule::enum(CategoryGroupEnum::class)],
-            'name' => ['required', 'string', 'max:255'],
-            'slug' => [
+            'name' => [
                 'required',
                 'string',
                 'max:255',
                 // Unique per group, not globally — "skincare" may legitimately be
                 // both a blog category and a product one.
-                Rule::unique(Category::class, 'slug')
+                Rule::unique(Category::class, 'name')
                     ->where('category_group', $this->category_group)
                     ->ignore($this->category?->id),
             ],
@@ -135,7 +125,6 @@ new class extends Component
 
         $this->category->category_group = $this->category_group;
         $this->category->name = $this->name;
-        $this->category->slug = kSlug($this->slug);
         $this->category->parent_id = $this->parent_id;
         $this->category->description = $this->description;
         $this->category->flow_order = $this->flow_order;
@@ -146,6 +135,12 @@ new class extends Component
         $serviceInstance = app(ActivityLogService::class);
         $affectedColumns = $serviceInstance->affectedColumns($this->category);
 
+        // If the name changed, we need to update the slug too. The slug is not
+        if ($this->category->isDirty('name')) {
+            $this->category->slug = kSlug("{$this->name} {$this->category_group->value}");
+        }
+
+        // Save
         $this->category->save();
 
         $serviceInstance->logActivity(
@@ -162,29 +157,43 @@ new class extends Component
         return $this->respondSuccess('The category has been saved.');
     }
 
-    public function confirmDelete(int $categoryId): void
+    public function confirmDelete(Category $category): void
     {
-        $this->deleteId = $categoryId;
+        // The category is held in a property so the modal can show its name while the
+        $this->category = $category;
 
         Flux::modal('deleteCategoryModal')->show();
     }
 
     public function delete(): bool
     {
-        $category = Category::query()->whereKey($this->deleteId)->first();
+        $this->respondError('Select a category to delete first.', if: ! $this->category);
 
-        abort_unless((bool) $category, 404);
+        // Nothing may be left filed under a category that is about to go — nor
+        // under one of its children, which survive the delete with their
+        // parent_id nulled and would carry their posts up to the top level.
+        $morphName = $this->category_group->morphName();
 
-        $description = " category: {$category->name}";
+        $inUse = Category::query()
+            ->whereHas($morphName)
+            ->where(fn ($query) => $query->whereKey($this->category->id)->orWhere('parent_id', $this->category->id))
+            ->exists();
+
+        $this->respondError(
+            "This category, or one of its sub-categories, still has {$morphName} attached. Move them first.",
+            if: $inUse,
+        );
+
+        $description = " category: {$this->category->name}";
 
         // The pivot rows go by cascade and the children are promoted by the
         // nulling foreign key, so there is nothing to unpick here by hand.
-        $category->delete();
+        $this->category->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::CATEGORY_DELETE, $description);
 
         Flux::modal('deleteCategoryModal')->close();
-        $this->reset('deleteId');
+        $this->resetForm();
         unset($this->grouped);
 
         return $this->respondSuccess('The category has been deleted.');
@@ -192,76 +201,65 @@ new class extends Component
 
     private function resetForm(): void
     {
-        $this->reset('category', 'name', 'category_group', 'slug', 'parent_id', 'description', 'flow_order', 'status');
+        $this->reset('category', 'name', 'parent_id', 'description', 'flow_order', 'status');
         $this->resetValidation();
     }
 };
 ?>
 
 <div class="space-y-6">
-    <div>
-        <flux:heading level="1" size="xl">Categories</flux:heading>
-        <flux:text class="mt-1">
-            One table serves every kind of category. The group is what keeps a blog category
-            out of a product picker.
-        </flux:text>
-    </div>
-
-    @foreach (CategoryGroupEnum::cases() as $group)
-        <flux:card class="space-y-4">
-            <div class="flex items-center justify-between">
-                <flux:heading level="2" size="lg">{{ $group->label() }}</flux:heading>
-                <flux:button size="sm" icon="plus" wire:click="create('{{ $group->value }}')">Add</flux:button>
+    <flux:card>
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <flux:heading level="1" size="xl">Categories: {{ $this->category_group->label() }}</flux:heading>
+                <flux:text class="mt-1">
+                    Manage your {{ $this->category_group->label(true) }} categories.
+                </flux:text>
             </div>
+            <flux:button size="sm" icon="plus" wire:click="create">Add</flux:button>
+        </div>
 
-            @php($rows = $this->grouped->get($group->value))
+        <flux:table :pagination="$this->categories" class="space-y-4">
+            <flux:table.columns>
+                <flux:table.column>Name</flux:table.column>
+                <flux:table.column>Parent</flux:table.column>
+                <flux:table.column>Attached</flux:table.column>
+                <flux:table.column>Status</flux:table.column>
+                <flux:table.column />
+            </flux:table.columns>
 
-            @if (! $rows || $rows->isEmpty())
-                <x-dashboard.workspace-no-record
-                    icon="tag"
-                    label="Nothing here"
-                    text="Add the first {{ mb_strtolower($group->label()) }} category."
-                />
-            @else
-                <flux:table>
-                    <flux:table.columns>
-                        <flux:table.column>Name</flux:table.column>
-                        <flux:table.column>Parent</flux:table.column>
-                        <flux:table.column>Posts</flux:table.column>
-                        <flux:table.column>Status</flux:table.column>
-                        <flux:table.column />
-                    </flux:table.columns>
+            <flux:table.rows>
+                @forelse ($this->categories as $item)
+                    <flux:table.row wire:key="category-{{ $item->id }}">
+                        <flux:table.cell>{{ $item->name }}</flux:table.cell>
+                        <flux:table.cell>{{ $item->parentName() }}</flux:table.cell>
+                        <flux:table.cell>{{ $item->attached_count }}</flux:table.cell>
+                        <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                        <flux:table.cell class="flex justify-end gap-1">
+                            <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                            <flux:button size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
+                        </flux:table.cell>
+                    </flux:table.row>
+                @empty
+                    <flux:table.row>
+                        <flux:table.cell colspan="5">
+                            <x-dashboard.workspace-no-record
+                                icon="tag"
+                                label="Nothing here"
+                                text="Add the first {{ $this->category_group->label(true) }} category."
+                            />
+                        </flux:table.cell>
+                    </flux:table.row>
+                @endforelse
+            </flux:table.rows>
+        </flux:table>
+    </flux:card>
 
-                    <flux:table.rows>
-                        @foreach ($rows as $item)
-                            <flux:table.row wire:key="category-{{ $item->id }}">
-                                <flux:table.cell>
-                                    <p class="font-medium text-slate-950 dark:text-white">{{ $item->name }}</p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">/{{ $item->slug }}</p>
-                                </flux:table.cell>
-                                <flux:table.cell>{{ $item->parent?->name ?? '—' }}</flux:table.cell>
-                                <flux:table.cell>{{ $item->posts_count }}</flux:table.cell>
-                                <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
-                                <flux:table.cell>
-                                    <div class="flex justify-end gap-1">
-                                        <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                        <flux:button size="sm" variant="ghost" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
-                                    </div>
-                                </flux:table.cell>
-                            </flux:table.row>
-                        @endforeach
-                    </flux:table.rows>
-                </flux:table>
-            @endif
-        </flux:card>
-    @endforeach
-
-    <flux:modal name="categoryModal" class="max-w-lg">
+    <flux:modal name="categoryModal" class="modal-sm">
         <form wire:submit="save" class="space-y-4">
             <flux:heading size="lg">{{ $category ? 'Edit category' : 'New category' }}</flux:heading>
 
-            <flux:input wire:model.blur="name" label="Name" />
-            <flux:input wire:model="slug" label="Slug" description="Unique within its group." />
+            <flux:input wire:model="name" label="Name" placeholder="Category" />
 
             <flux:select wire:model="parent_id" label="Parent">
                 <flux:select.option value="">Top level</flux:select.option>
@@ -270,11 +268,14 @@ new class extends Component
                 @endforeach
             </flux:select>
 
-            <flux:textarea wire:model="description" label="Description" rows="2" />
-            <flux:input type="number" wire:model="flow_order" label="Order" />
-            <flux:switch wire:model="status" label="Active" />
+            <flux:textarea wire:model="description" label="Description" rows="2" placeholder="Type..." />
+            <x-form.number-field wire:model="flow_order" label="Order" />
 
             <div class="flex justify-end gap-3">
+                <div class="flex items-center">
+                    <flux:switch wire:model="status" label="Active" />
+                </div>
+
                 <flux:modal.close>
                     <flux:button variant="ghost" type="button">Cancel</flux:button>
                 </flux:modal.close>
@@ -291,7 +292,7 @@ new class extends Component
         cancel="Keep it"
         wire:click="delete"
     >
-        Posts in it keep their other categories and are not deleted. Any sub-categories move
-        up to the top level.
+        A category with {{ $category_group->label(true) }} attached to it or to one of its sub-categories cannot be
+        deleted. Otherwise, any sub-categories move up to the top level.
     </x-dashboard.confirm-modal>
 </div>

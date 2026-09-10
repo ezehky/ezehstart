@@ -35,11 +35,6 @@ class Transaction extends Model
         ];
     }
 
-    public function getRouteKeyName(): string
-    {
-        return 'reference';
-    }
-
     // Getters
 
     /**

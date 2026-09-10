@@ -13,7 +13,7 @@
     'tone' => 'rose',
 ])
 
-<flux:modal :name="$name" class="md:w-110">
+<flux:modal :name="$name" class="modal-confirm">
     <div class="space-y-6">
         <div class="flex items-start gap-4">
             <x-dashboard.icon-box size="xs" :icon="$icon" :tone="$tone" />

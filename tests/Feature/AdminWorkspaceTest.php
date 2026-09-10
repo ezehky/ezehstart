@@ -24,9 +24,9 @@ test('an admin can open every workspace page', function (string $route) {
     'admin.config.notification-types',
     'admin.image-library',
     'admin.transactions',
-    'admin.blog.posts',
-    'admin.blog.categories',
-    'admin.blog.tags',
+    'admin.blog.blogs',
+    'admin.categories',
+    'admin.tags',
 ]);
 
 test('an admin can open a single account', function () {

@@ -21,11 +21,13 @@ Route::livewire('/transactions', 'pages::admin.transactions')->name('transaction
 
 // Blog. The editor is its own screen rather than a modal: a post is long-form,
 // and a rich-text editor inside a dialog fights the page for scroll.
-Route::livewire('/blog/posts', 'pages::admin.blog.posts')->name('blog.posts');
-Route::livewire('/blog/posts/new', 'pages::admin.blog.post-edit')->name('blog.post-create');
-Route::livewire('/blog/posts/{post}/edit', 'pages::admin.blog.post-edit')->name('blog.post-edit');
-Route::livewire('/blog/categories', 'pages::admin.blog.categories')->name('blog.categories');
-Route::livewire('/blog/tags', 'pages::admin.blog.tags')->name('blog.tags');
+Route::livewire('/categories/{category_group}', 'pages::admin.content.categories')->name('categories');
+Route::livewire('/tags', 'pages::admin.content.tags')->name('tags');
+Route::prefix('blog')->name('blog.')->group(function () {
+    Route::livewire('/posts', 'pages::admin.content.posts')->name('blogs');
+    Route::livewire('/posts/new', 'pages::admin.content.post-edit')->name('create');
+    Route::livewire('/posts/{post}/edit', 'pages::admin.content.post-edit')->name('edit');
+});
 
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');

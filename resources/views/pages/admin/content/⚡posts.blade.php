@@ -147,7 +147,7 @@ new class extends Component
                         <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                     @endforeach
                 </flux:select>
-                <flux:button href="{{ route('admin.blog.post-create') }}" variant="primary" icon="plus">
+                <flux:button href="{{ route('admin.blog.create') }}" variant="primary" icon="plus">
                     New post
                 </flux:button>
             </div>
@@ -206,7 +206,7 @@ new class extends Component
                                     <flux:menu>
                                         <flux:menu.item
                                             icon="pencil-square"
-                                            href="{{ route('admin.blog.post-edit', $item) }}"
+                                            href="{{ route('admin.blog.edit', $item) }}"
                                         >
                                             Edit
                                         </flux:menu.item>

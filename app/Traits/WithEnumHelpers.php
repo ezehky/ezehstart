@@ -4,9 +4,9 @@ namespace App\Traits;
 
 trait WithEnumHelpers
 {
-    public function label(): string
+    public function label(bool $lowercase = false): string
     {
-        return kBreakText($this->name);
+        return kBreakText($this->name, lowercase: $lowercase);
     }
 
     public static function values(): array

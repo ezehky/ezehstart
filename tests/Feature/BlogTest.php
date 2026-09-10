@@ -225,23 +225,24 @@ test('filtering by category narrows the feed', function () {
 test('an admin can open every blog screen', function (string $route) {
     $this->actingAs($this->admin)->get(route($route))->assertSuccessful();
 })->with([
-    'admin.blog.posts',
-    'admin.blog.post-create',
-    'admin.blog.categories',
-    'admin.blog.tags',
+    'admin.blog.blogs',
+    'admin.blog.create',
+    'admin.blog.edit',
+    'admin.categories',
+    'admin.tags',
 ]);
 
 test('a member cannot reach the blog admin', function () {
     $member = userWithRole(UserRoleEnum::USER, ['email_verified_at' => now()]);
 
-    $this->actingAs($member)->get(route('admin.blog.posts'))->assertNotFound();
+    $this->actingAs($member)->get(route('admin.blog.blogs'))->assertNotFound();
 });
 
 test('writing a post through the editor saves it with its taxonomy', function () {
     $category = blogCategory();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.post-edit')
+        ->test('pages::admin.blog.edit')
         ->set('title', 'My first post')
         ->set('slug', 'my-first-post')
         ->set('excerpt', 'A short line.')
@@ -263,7 +264,7 @@ test('writing a post through the editor saves it with its taxonomy', function ()
 
 test('the editor sanitises what it stores', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.post-edit')
+        ->test('pages::admin.blog.edit')
         ->set('title', 'Nasty')
         ->set('slug', 'nasty')
         ->set('excerpt', 'Short.')
@@ -279,7 +280,7 @@ test('two posts cannot share a slug', function () {
     blogPost(['user_id' => $this->admin->id, 'slug' => 'taken']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.blog.post-edit')
+        ->test('pages::admin.blog.edit')
         ->set('title', 'Another')
         ->set('slug', 'taken')
         ->set('excerpt', 'Short.')

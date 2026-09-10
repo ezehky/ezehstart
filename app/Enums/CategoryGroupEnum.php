@@ -28,4 +28,23 @@ enum CategoryGroupEnum: string
     {
         return $this === self::PRODUCT;
     }
+
+    // Get the title for the parent of a category in this group.
+    public function parentTitle()
+    {
+        return match ($this) {
+            self::BLOG => 'content',
+            self::PRODUCT => 'product',
+        };
+    }
+
+    // Get the morph name for a category in this group. This is used to determine
+    // the relationship name for the polymorphic relation.
+    public function morphName()
+    {
+        return match ($this) {
+            self::BLOG => 'posts',
+            self::PRODUCT => 'products',
+        };
+    }
 }

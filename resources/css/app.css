@@ -181,6 +181,21 @@
 }
 
 @layer components {
+    /* Flux's modal component is a bit opinionated about its width. We want to be able to
+       set a custom width for our modals, so we override the default. */
+    .modal-sm {
+        @apply w-[calc(100vw-2rem)] md:w-96;
+    }
+    .modal-md {
+        @apply w-[calc(100vw-2rem)] md:w-150!;
+    }
+    .modal-lg {
+        @apply w-[calc(100vw-2rem)] md:w-[calc(100vw-4rem)]! md:max-w-[calc(100vw-4rem)]!;
+    }
+    .modal-confirm {
+        @apply w-[calc(100vw-2rem)] md:w-110!;
+    }
+
     /* Rendered admin-authored markdown (policy pages, FAQ answers). The HTML is
        produced by MarkdownService, so it cannot carry utility classes of its own. */
     .markdown-prose > * + * {

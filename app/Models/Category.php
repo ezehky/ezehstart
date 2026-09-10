@@ -26,21 +26,16 @@ class Category extends Model
         ];
     }
 
-    /**
-     * Route binding is by slug, but a slug is only unique within its group — so
-     * every route that binds a category has to scope the group itself. The public
-     * blog routes do that by constraining the query, not by relying on this.
-     */
-    public function getRouteKeyName(): string
-    {
-        return 'slug';
-    }
-
     // Getters
 
     public function label(): string
     {
         return $this->name;
+    }
+
+    public function parentName(): string
+    {
+        return $this->parent?->name ?? 'Top level';
     }
 
     // Relationships

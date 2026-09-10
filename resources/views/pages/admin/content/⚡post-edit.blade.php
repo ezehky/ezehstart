@@ -217,7 +217,7 @@ new class extends Component
 
         $this->respondSuccess('The post has been saved.');
 
-        return $this->redirectRoute('admin.blog.posts', navigate: true);
+        return $this->redirectRoute('admin.blog.blogs', navigate: true);
     }
 };
 ?>
@@ -228,7 +228,7 @@ new class extends Component
             <flux:heading level="1" size="xl">{{ $post ? 'Edit post' : 'New post' }}</flux:heading>
             <flux:text class="mt-1">Write it, tag it, publish when it is ready.</flux:text>
         </div>
-        <flux:button href="{{ route('admin.blog.posts') }}" variant="ghost" icon="arrow-left">Back to posts</flux:button>
+        <flux:button href="{{ route('admin.blog.blogs') }}" variant="ghost" icon="arrow-left">Back to blogs</flux:button>
     </div>
 
     <form wire:submit="save" class="grid gap-6 lg:grid-cols-[1fr_20rem]">
