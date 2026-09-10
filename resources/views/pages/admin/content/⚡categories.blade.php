@@ -128,7 +128,7 @@ new class extends Component
         $this->category->parent_id = $this->parent_id;
         $this->category->description = $this->description;
         $this->category->flow_order = $this->flow_order;
-        $this->category->status = StatusDefault::from((int) $this->status);
+        $this->category->status = StatusDefault::tryFrom((int) $this->status);
 
         $this->respondPrimary(if: $this->category->isClean());
 
@@ -219,7 +219,7 @@ new class extends Component
             <flux:button size="sm" icon="plus" wire:click="create">Add</flux:button>
         </div>
 
-        <flux:table :pagination="$this->categories" class="space-y-4">
+        <flux:table class="space-y-4">
             <flux:table.columns>
                 <flux:table.column>Name</flux:table.column>
                 <flux:table.column>Parent</flux:table.column>
@@ -261,15 +261,17 @@ new class extends Component
 
             <flux:input wire:model="name" label="Name" placeholder="Category" />
 
-            <flux:select wire:model="parent_id" label="Parent">
-                <flux:select.option value="">Top level</flux:select.option>
-                @foreach ($this->parentOptions as $option)
-                    <flux:select.option value="{{ $option->id }}">{{ $option->name }}</flux:select.option>
-                @endforeach
-            </flux:select>
+            <div class="grid grid-cols-2 gap-4">
+                <flux:select wire:model="parent_id" label="Parent">
+                    <flux:select.option value="">Top level</flux:select.option>
+                    @foreach ($this->parentOptions as $option)
+                        <flux:select.option value="{{ $option->id }}">{{ $option->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+                <x-form.number-field wire:model="flow_order" label="Order" />
+            </div>
 
             <flux:textarea wire:model="description" label="Description" rows="2" placeholder="Type..." />
-            <x-form.number-field wire:model="flow_order" label="Order" />
 
             <div class="flex justify-end gap-3">
                 <div class="flex items-center">

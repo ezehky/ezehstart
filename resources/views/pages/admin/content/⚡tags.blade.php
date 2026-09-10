@@ -21,27 +21,21 @@ new class extends Component
 
     public string $name = '';
 
-    public string $slug = '';
-
     public bool $status = true;
 
     #[Url]
     public string $search = '';
 
-    /** The tag queued for deletion, held while the dialog asks. */
-    public ?int $deleteId = null;
-
     public function mount(): void
     {
-        kSetSiteTitle('content', 'blog-tags');
+        kSetSiteTitle('content', 'tags');
     }
 
     #[Computed]
     public function tags()
     {
         return Tag::query()
-            ->withCount('posts')
-            ->when($this->search, fn (Builder $query) => $query->where('name', 'like', '%'.$this->search.'%'))
+            ->when($this->search, fn (Builder $query) => $query->searchMacro('name', $this->search))
             ->alphabetical()
             ->paginate(20);
     }
@@ -63,24 +57,21 @@ new class extends Component
         $this->resetForm();
 
         $this->tag = $tag;
-        $this->fill($tag->only(['name', 'slug']));
+        $this->name = $tag->name;
         $this->status = $tag->status->isActive();
 
         Flux::modal('tagModal')->show();
     }
 
-    public function updatedName(string $value): void
-    {
-        if (! $this->tag) {
-            $this->slug = kSlug($value);
-        }
-    }
-
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', Rule::unique(Tag::class, 'name')->ignore($this->tag?->id)],
-            'slug' => ['required', 'string', 'max:255', Rule::unique(Tag::class, 'slug')->ignore($this->tag?->id)],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique(Tag::class, 'name')->ignore($this->tag?->id),
+            ],
             'status' => ['boolean'],
         ];
     }
@@ -97,13 +88,16 @@ new class extends Component
         }
 
         $this->tag->name = $this->name;
-        $this->tag->slug = kSlug($this->slug);
-        $this->tag->status = StatusDefault::from((int) $this->status);
+        $this->tag->status = StatusDefault::tryFrom((int) $this->status);
 
         $this->respondPrimary(if: $this->tag->isClean());
 
         $serviceInstance = app(ActivityLogService::class);
         $affectedColumns = $serviceInstance->affectedColumns($this->tag);
+
+        if ($this->tag->isDirty('name')) {
+            $this->tag->slug = kSlug($this->name);
+        }
 
         $this->tag->save();
 
@@ -121,28 +115,25 @@ new class extends Component
         return $this->respondSuccess('The tag has been saved.');
     }
 
-    public function confirmDelete(int $tagId): void
+    public function confirmDelete(Tag $tag): void
     {
-        $this->deleteId = $tagId;
+        $this->tag = $tag;
 
         Flux::modal('deleteTagModal')->show();
     }
 
     public function delete(): bool
     {
-        $tag = Tag::query()->whereKey($this->deleteId)->first();
+        $this->respondError('Select a tag to delete first.', if: ! $this->tag);
 
-        abort_unless((bool) $tag, 404);
+        $description = " tag: {$this->tag->name}";
 
-        $description = " tag: {$tag->name}";
-
-        // The taggables rows go by cascade; posts keep everything else.
-        $tag->delete();
+        $this->tag->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::TAG_DELETE, $description);
 
         Flux::modal('deleteTagModal')->close();
-        $this->reset('deleteId');
+        $this->resetForm();
         unset($this->tags);
 
         return $this->respondSuccess('The tag has been deleted.');
@@ -150,7 +141,7 @@ new class extends Component
 
     private function resetForm(): void
     {
-        $this->reset('tag', 'name', 'slug', 'status');
+        $this->reset('tag', 'name', 'status');
         $this->resetValidation();
     }
 };
@@ -188,7 +179,6 @@ new class extends Component
             <flux:table :paginate="$this->tags">
                 <flux:table.columns>
                     <flux:table.column>Name</flux:table.column>
-                    <flux:table.column>Posts</flux:table.column>
                     <flux:table.column>Status</flux:table.column>
                     <flux:table.column />
                 </flux:table.columns>
@@ -196,17 +186,11 @@ new class extends Component
                 <flux:table.rows>
                     @foreach ($this->tags as $item)
                         <flux:table.row wire:key="tag-{{ $item->id }}">
-                            <flux:table.cell>
-                                <p class="font-medium text-slate-950 dark:text-white">{{ $item->name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">/{{ $item->slug }}</p>
-                            </flux:table.cell>
-                            <flux:table.cell>{{ $item->posts_count }}</flux:table.cell>
+                            <flux:table.cell>{{ $item->name }}</flux:table.cell>
                             <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
-                            <flux:table.cell>
-                                <div class="flex justify-end gap-1">
-                                    <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                    <flux:button size="sm" variant="ghost" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
-                                </div>
+                            <flux:table.cell class="flex justify-end gap-1">
+                                <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                                <flux:button size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
                             </flux:table.cell>
                         </flux:table.row>
                     @endforeach
@@ -215,12 +199,11 @@ new class extends Component
         @endif
     </flux:card>
 
-    <flux:modal name="tagModal" class="max-w-md">
+    <flux:modal name="tagModal" class="modal-sm">
         <form wire:submit="save" class="space-y-4">
             <flux:heading size="lg">{{ $tag ? 'Edit tag' : 'New tag' }}</flux:heading>
 
-            <flux:input wire:model.blur="name" label="Name" />
-            <flux:input wire:model="slug" label="Slug" />
+            <flux:input wire:model.blur="name" label="Name" placeholder="Tag" />
             <flux:switch wire:model="status" label="Active" />
 
             <div class="flex justify-end gap-3">
@@ -240,6 +223,6 @@ new class extends Component
         cancel="Keep it"
         wire:click="delete"
     >
-        It is removed from every post that carries it. The posts themselves are untouched.
+        It is removed from everywhere that carries it. The owners themselves are untouched.
     </x-dashboard.confirm-modal>
 </div>
