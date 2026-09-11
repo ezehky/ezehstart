@@ -4,6 +4,7 @@ import {
 } from "../../vendor/livewire/livewire/dist/livewire.esm";
 import richText from "./rich-text";
 import chart from "./chart";
+import countdownTimer from "./countdown-timer";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
@@ -23,6 +24,13 @@ Alpine.data("richText", richText);
  * component being booted a second time onto the same <svg>.
  */
 Alpine.data("chart", chart);
+
+/**
+ * The clock behind <x-util.countdown>. Registered once here so the numbers pick
+ * up where they belong after a Livewire re-render rather than a second timer
+ * being started on the same element.
+ */
+Alpine.data("countdownTimer", countdownTimer);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance
