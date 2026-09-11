@@ -27,6 +27,13 @@ class PasswordSecurityService
         return (bool) kSiteFlag('security', 'strong-password', true);
     }
 
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // PASSWORD LENGTH
+    public function passwordLength(): int
+    {
+        return (int) kSiteConfig('security.password-min-length', default: 5);
+    }
+
     /**
      * The rule every new password is validated against.
      *
@@ -36,7 +43,7 @@ class PasswordSecurityService
      */
     public function strengthRule(): Password
     {
-        $rule = Password::min(8);
+        $rule = Password::min($this->passwordLength());
 
         return $this->strongPasswordEnabled()
             ? $rule->symbols()->mixedCase()->numbers()
@@ -49,9 +56,11 @@ class PasswordSecurityService
      */
     public function note(): string
     {
+        $passwordLength = $this->passwordLength();
+
         return $this->strongPasswordEnabled()
-            ? 'Password min 8 chars, a symbol, a number, with both uppercase and lowercase chars.'
-            : 'Password must be at least 8 characters.';
+            ? "Password min {$passwordLength} chars, a symbol, a number, with both uppercase and lowercase chars."
+            : "Password must be at least {$passwordLength} characters.";
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

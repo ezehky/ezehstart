@@ -9,6 +9,8 @@ trait WithFormResponseMessage
 {
     private $errorExceptionCatchStopper = '';
 
+    public array $overrideValidationAttributes = [];
+
     public function respondPrimary(
         string $message = 'You have made no changes to save!!',
         bool $if = false,
@@ -88,13 +90,24 @@ trait WithFormResponseMessage
         return true;
     }
 
-    protected function createAttributes(array $rules): array
+    private function getFieldLastWord(string $field)
     {
+        $ex = explode('.', $field);
+
+        return kBreakText(end($ex), lowercase: true);
+    }
+
+    protected function validationAttributes(): array
+    {
+        $rules = collect($this->getRules())->keys()->toArray();
+
         $attributes = [];
-        foreach (collect($rules)->keys()->toArray() as $value) {
-            $ex = explode('.', $value);
-            $str = kBreakText(end($ex));
-            $attributes[$value] = str($str)->lower();
+        foreach ($rules as $value) {
+            $attributes[$value] = $this->getFieldLastWord($value);
+        }
+        // Overrides
+        foreach ($this->overrideValidationAttributes as $key => $value) {
+            $attributes[$key] = $value;
         }
 
         return $attributes;

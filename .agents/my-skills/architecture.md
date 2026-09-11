@@ -110,17 +110,17 @@ no code at all.
 
 ## Example
 
-The full path of one feature that ships — the admin members listing:
+The full path of one feature that ships — the admin users listing:
 
 ```
 routes/admin.php
-  Route::livewire('/members', 'pages::admin.users.members')->name('members');
+  Route::livewire('/users', 'pages::admin.users.users')->name('users');
 
 app/Helpers/navigations.php
-  'users' => ['children' => ['members' => ['label' => 'Members', 'link' => route('admin.members')]]]
+  'users' => ['children' => ['users' => ['label' => 'users', 'link' => route('admin.users')]]]
 
-resources/views/pages/admin/users/⚡members.blade.php    ← the page (class + Blade)
-app/Models/User.php                                      ← casts, members() scope
+resources/views/pages/admin/users/⚡users.blade.php    ← the page (class + Blade)
+app/Models/User.php                                      ← casts, users() scope
 app/Enums/UserTypeEnum.php                               ← the workspace vocabulary
 app/Enums/StatusUser.php                                 ← status
 app/Models/Role.php                                      ← an admin role, as a row

@@ -6,7 +6,7 @@ use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithPagination;
+    use WithGateProps, WithPagination;
 
     #[Url]
     public string $search = '';
@@ -47,7 +47,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('transactions');
-        kPageGate('transactions');
+        $this->setPageGate('transactions');
     }
 
     #[Computed]
@@ -123,10 +123,7 @@ new class extends Component
 
     public function confirmSettle(int $transactionId, int $status): void
     {
-        $this->respondError(
-            'You do not have access to settle transactions.',
-            if: ! kGate('transactions', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate();
 
         $this->settleId = $transactionId;
         $this->settleStatus = $status;
@@ -138,10 +135,7 @@ new class extends Component
     public function settle(): bool
     {
         // The menu row is hidden, which stops nobody who can open a console.
-        $this->respondError(
-            'You do not have access to settle transactions.',
-            if: ! kGate('transactions', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate();
 
         $transaction = Transaction::query()->whereKey($this->settleId)->first();
 
@@ -169,10 +163,7 @@ new class extends Component
     {
         // An adjustment writes a new row in the ledger, so it asks for CREATE rather
         // than for the MODIFY that settling an existing one needs.
-        $this->respondError(
-            'You do not have access to post adjustments.',
-            if: ! kGate('transactions', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $this->validate([
             'adjust_user_id' => ['required', 'integer', Rule::exists('users', 'id')],
@@ -232,8 +223,8 @@ new class extends Component
                     @endforeach
                 </flux:select>
                 <x-dashboard.gate.button
-                    gate="transactions"
-                    level="create"
+                    :gate="$pageGate"
+                    :level="$gateCreate"
                     variant="primary"
                     icon="plus"
                     x-on:click="$flux.modal('adjustModal').show()"
@@ -294,16 +285,16 @@ new class extends Component
                                         <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                         <flux:menu>
                                             <x-dashboard.gate.menu-item
-                                                gate="transactions"
-                                                level="modify"
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
                                                 icon="check"
                                                 wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::CONFIRMED->value }})"
                                             >
                                                 Confirm
                                             </x-dashboard.gate.menu-item>
                                             <x-dashboard.gate.menu-item
-                                                gate="transactions"
-                                                level="modify"
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
                                                 icon="x-mark"
                                                 variant="danger"
                                                 wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::REJECTED->value }})"

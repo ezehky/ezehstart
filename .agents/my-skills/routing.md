@@ -25,13 +25,13 @@ then: function (Application $app) {
 ### `Route::livewire()` — the only way to route a page
 
 ```php
-Route::livewire('/members', 'pages::admin.users.members')->name('members');
+Route::livewire('/users', 'pages::admin.users.users')->name('users');
 ```
 
 - The component string is the `pages::` namespace path with **dots**, no `⚡`, no
   extension.
 - The name is **relative** — the group prefix is applied automatically. Writing
-  `->name('admin.members')` inside `routes/admin.php` produces `admin.admin.members`.
+  `->name('admin.users')` inside `routes/admin.php` produces `admin.admin.users`.
 
 ### Route model binding
 

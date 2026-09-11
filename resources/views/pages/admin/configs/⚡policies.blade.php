@@ -8,7 +8,7 @@ use App\Enums\StatusYes;
 use App\Models\Policy;
 use App\Services\ActivityLogService;
 use App\Services\PolicyContentService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithGateProps;
 
     public ?Policy $policy = null;
 
@@ -42,7 +42,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'policies');
-        kPageGate('config.policies');
+        $this->setPageGate('config.policies');
     }
 
     /**
@@ -83,10 +83,7 @@ new class extends Component
 
     public function create(string $type): void
     {
-        $this->respondError(
-            'You do not have access to add policy versions.',
-            if: ! kGate('config.policies', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $policyType = PolicyTypeEnum::from($type);
 
@@ -110,10 +107,7 @@ new class extends Component
 
     public function edit(Policy $policy): void
     {
-        $this->respondError(
-            'You do not have access to edit policies.',
-            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         // Published text is what people consented to. It is superseded, never
         // edited — checked here as well as hidden in the markup, because a
@@ -154,10 +148,7 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save policies.',
-            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->validate();
 
@@ -205,10 +196,7 @@ new class extends Component
      */
     public function confirmPublish(int $policyId): void
     {
-        $this->respondError(
-            'You do not have access to publish policies.',
-            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->publishId = $policyId;
 
@@ -220,10 +208,7 @@ new class extends Component
      */
     public function publish(): bool
     {
-        $this->respondError(
-            'You do not have access to publish policies.',
-            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $policy = Policy::query()->whereKey($this->publishId)->first();
 
@@ -285,7 +270,14 @@ new class extends Component
                         </flux:text>
                     </div>
 
-                    <x-dashboard.gate.button gate="config.policies" level="create" class="press" size="sm" icon="plus" wire:click="create('{{ $policyType->value }}')">
+                    <x-dashboard.gate.button
+                        :gate="$pageGate"
+                        :level="$gateCreate"
+                        class="press"
+                        size="sm"
+                        icon="plus"
+                        wire:click="create('{{ $policyType->value }}')"
+                    >
                         New version
                     </x-dashboard.gate.button>
                 </div>
@@ -312,12 +304,22 @@ new class extends Component
                                         <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
                                         <flux:menu>
                                             @if ($item->canEdit())
-                                                <x-dashboard.gate.menu-item gate="config.policies" level="modify" icon="pencil-square" wire:click="edit({{ $item->id }})">
+                                                <x-dashboard.gate.menu-item
+                                                    :gate="$pageGate"
+                                                    :level="$gateModify"
+                                                    icon="pencil-square"
+                                                    wire:click="edit({{ $item->id }})"
+                                                >
                                                     Edit draft
                                                 </x-dashboard.gate.menu-item>
                                             @endif
                                             @if ($item->canPublish())
-                                                <x-dashboard.gate.menu-item gate="config.policies" level="modify" icon="rocket-launch" wire:click="confirmPublish({{ $item->id }})">
+                                                <x-dashboard.gate.menu-item
+                                                    :gate="$pageGate"
+                                                    :level="$gateModify"
+                                                    icon="rocket-launch"
+                                                    wire:click="confirmPublish({{ $item->id }})"
+                                                >
                                                     Publish
                                                 </x-dashboard.gate.menu-item>
                                             @endif

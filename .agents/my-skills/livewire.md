@@ -293,7 +293,7 @@ Non-page SFCs live in `resources/views/components/lv/⚡name.blade.php` and are 
 
 ## Example
 
-The complete minimum viable page (`resources/views/pages/user/membership/⚡communities.blade.php`
+The complete minimum viable page (`resources/views/pages/user/usership/⚡communities.blade.php`
 is the shortest in the project at 27 lines):
 
 ```php

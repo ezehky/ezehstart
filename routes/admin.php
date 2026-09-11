@@ -6,11 +6,14 @@ Route::livewire('/', 'pages::admin.dashboard')->name('dashboard');
 Route::livewire('/profile', 'pages::shared.profile')->name('profile');
 
 // Site Configuration
-Route::livewire('/site-config-set', 'pages::admin.configs.site-config')->name('site-config');
-Route::livewire('/site-config/social-handles', 'pages::admin.configs.social-handles')->name('config.social-handles');
-Route::livewire('/site-config/policies', 'pages::admin.configs.policies')->name('config.policies');
-Route::livewire('/site-config/faqs', 'pages::admin.configs.faqs')->name('config.faqs');
-Route::livewire('/site-config/notification-types', 'pages::admin.configs.notification-types')->name('config.notification-types');
+Route::prefix('/site-config')->name('config.')->group(function () {
+    Route::livewire('/info', 'pages::admin.configs.site-config')->name('site');
+    Route::livewire('/security', 'pages::admin.configs.security')->name('security');
+    Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
+    Route::livewire('/policies', 'pages::admin.configs.policies')->name('policies');
+    Route::livewire('/faqs', 'pages::admin.configs.faqs')->name('faqs');
+    Route::livewire('/notification-types', 'pages::admin.configs.notification-types')->name('notification-types');
+});
 
 // Image library. The same screen in both workspaces — the service decides what
 // each account may see, so there is nothing workspace-specific in the page.
@@ -35,7 +38,7 @@ Route::prefix('blog')->name('blog.')->group(function () {
 
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');
-Route::livewire('/members', 'pages::admin.users.members')->name('members');
+Route::livewire('/users', 'pages::admin.users.users')->name('users');
 Route::livewire('/roles', 'pages::admin.users.roles')->name('roles');
 Route::livewire('/activity-logs', 'pages::admin.users.activity-logs')->name('activity-logs');
 Route::livewire('/user/{user}', 'pages::admin.users.user-view')->name('user');

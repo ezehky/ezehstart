@@ -40,7 +40,7 @@ trait WithAuthWorker
      * failure halfway through cannot leave an account that exists without the record
      * of what it agreed to. Mail is sent after the commit, never inside it.
      *
-     * Self-registration only ever makes a member. Members carry no role — the type
+     * Self-registration only ever makes a member. users carry no role — the type
      * column defaults to UserTypeEnum::USER and there is nothing else to assign.
      */
     private function createUser(array $data, array $profileData = [], bool $sendOtp = true): ?User

@@ -48,7 +48,7 @@
         @else
             <flux:callout icon="information-circle" color="zinc">
                 <flux:callout.text>
-                    Members carry no roles. The member workspace is not gated — an account reaches
+                    users carry no roles. The member workspace is not gated — an account reaches
                     its own records and nothing else.
                 </flux:callout.text>
             </flux:callout>

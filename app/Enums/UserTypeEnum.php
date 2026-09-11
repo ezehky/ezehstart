@@ -67,7 +67,7 @@ enum UserTypeEnum: string
     {
         return match ($this) {
             self::ADMIN => route('admin.admins'),
-            self::USER => route('admin.members'),
+            self::USER => route('admin.users'),
         };
     }
 }

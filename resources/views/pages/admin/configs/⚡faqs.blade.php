@@ -7,7 +7,7 @@ use App\Enums\StatusDefault;
 use App\Models\Faq;
 use App\Services\ActivityLogService;
 use App\Services\MarkdownService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -16,7 +16,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithGateProps;
 
     public ?Faq $faq = null;
 
@@ -39,7 +39,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'faqs');
-        kPageGate('config.faqs');
+        $this->setPageGate('config.faqs');
     }
 
     /**
@@ -76,10 +76,7 @@ new class extends Component
 
     public function create(string $type): void
     {
-        $this->respondError(
-            'You do not have access to add questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $faqType = FaqTypeEnum::from($type);
 
@@ -96,10 +93,7 @@ new class extends Component
 
     public function edit(Faq $faq): void
     {
-        $this->respondError(
-            'You do not have access to edit questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->resetForm();
 
@@ -129,10 +123,7 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->validate();
 
@@ -178,10 +169,7 @@ new class extends Component
      */
     public function toggleStatus(Faq $faq): bool
     {
-        $this->respondError(
-            'You do not have access to show or hide questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $faq->status = $faq->status->isActive() ? StatusDefault::INACTIVE : StatusDefault::ACTIVE;
 
@@ -206,10 +194,7 @@ new class extends Component
 
     public function confirmDelete(int $faqId): void
     {
-        $this->respondError(
-            'You do not have delete access to questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL);
 
         $this->deleteId = $faqId;
 
@@ -218,10 +203,7 @@ new class extends Component
 
     public function delete(): bool
     {
-        $this->respondError(
-            'You do not have delete access to questions.',
-            if: ! kGate('config.faqs', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL);
 
         $faq = Faq::query()->whereKey($this->deleteId)->first();
 
@@ -268,7 +250,14 @@ new class extends Component
                         <flux:text class="mt-0.5 text-sm">{{ $faqType->description() }}</flux:text>
                     </div>
 
-                    <x-dashboard.gate.button gate="config.faqs" level="create" class="press" size="sm" icon="plus" wire:click="create('{{ $faqType->value }}')">
+                    <x-dashboard.gate.button
+                        :gate="$pageGate"
+                        :level="$gateCreate"
+                        class="press"
+                        size="sm"
+                        icon="plus"
+                        wire:click="create('{{ $faqType->value }}')"
+                    >
                         Add question
                     </x-dashboard.gate.button>
                 </div>
@@ -292,16 +281,25 @@ new class extends Component
                                     <flux:dropdown position="right" align="start">
                                         <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
                                         <flux:menu>
-                                            <x-dashboard.gate.menu-item gate="config.faqs" level="modify" icon="pencil-square" wire:click="edit({{ $item->id }})">
+                                            <x-dashboard.gate.menu-item
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
+                                                icon="pencil-square"
+                                                wire:click="edit({{ $item->id }})"
+                                            >
                                                 Edit
                                             </x-dashboard.gate.menu-item>
-                                            <x-dashboard.gate.menu-item gate="config.faqs" level="modify"
+                                            <x-dashboard.gate.menu-item
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
                                                 :icon="$item->status->isActive() ? 'eye-slash' : 'eye'"
                                                 wire:click="toggleStatus({{ $item->id }})"
                                             >
                                                 {{ $item->status->isActive() ? 'Hide from site' : 'Show on site' }}
                                             </x-dashboard.gate.menu-item>
-                                            <x-dashboard.gate.menu-item gate="config.faqs" level="full"
+                                            <x-dashboard.gate.menu-item
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
                                                 icon="trash"
                                                 variant="danger"
                                                 wire:click="confirmDelete({{ $item->id }})"

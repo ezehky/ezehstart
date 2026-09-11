@@ -23,7 +23,7 @@ switch that closes its route, not just its button.
 title without ever changing the stored URL, and set who can see each image: private, a
 role, or everybody. Deletion is guarded by an `image_usages` table with a restricting
 foreign key, so an image on a published post refuses to go rather than leaving a broken
-picture behind. Members have a configurable quota; administrators do not. Uploads run
+picture behind. users have a configurable quota; administrators do not. Uploads run
 through `spatie/laravel-image-optimizer` where its binaries are installed.
 
 **Blog** — posts written in a tiptap editor that inserts images straight from the

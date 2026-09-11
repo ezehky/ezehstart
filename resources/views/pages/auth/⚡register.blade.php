@@ -108,20 +108,31 @@ new #[Layout('layouts::auth')] class extends Component
 </x-slot:extra>
 
 <form wire:submit.throttle.500ms="register" class="mt-8 space-y-5">
-    <flux:input wire:model="name" autocomplete="name" autofocus placeholder="Enter your full name" />
-    <flux:error name="name" />
-    <flux:input wire:model="email" type="email" autocomplete="email" placeholder="Enter your email address: example@mail.com" />
-    <flux:error name="email" />
-
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-        <flux:field>
-            <flux:label>Password</flux:label>
-            <x-form.password wire:model="password" :label="null" />
-        </flux:field>
-        <x-form.password label="Confirm password" wire:model="password_confirmation" />
+    <div>
+        <flux:input wire:model="name" autocomplete="name" autofocus placeholder="Enter your full name" />
+        <flux:error name="name" />
     </div>
-    <flux:error name="password" />
-    <flux:text class="text-xs">{!! $passwordNote !!}</flux:text>
+    <div>
+        <flux:input
+            wire:model="email"
+            type="email"
+            autocomplete="email"
+            placeholder="example@mail.com"
+        />
+        <flux:error name="email" />
+    </div>
+
+    <div>
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+            <flux:field>
+                <flux:label>Password</flux:label>
+                <x-form.password wire:model="password" :label="null" />
+            </flux:field>
+            <x-form.password label="Confirm password" wire:model="password_confirmation" />
+        </div>
+        <flux:error name="password" />
+        <flux:text class="text-xs mt-1 font-semibold">{!! $passwordNote !!}</flux:text>
+    </div>
 
     <x-form.consent-field />
 

@@ -97,7 +97,7 @@ User::where('active', false)->chunkById(200, function ($users) {
 });
 ```
 
-For read-only, attribute-only iteration, `cursor()` hydrates models individually from one query, although some database drivers still buffer raw results. Use `lazy()` when relationships must be eager loaded in chunks, and use `lazyById()` or `chunkById()` when updates can affect query membership. See the collection rules for detailed tradeoffs.
+For read-only, attribute-only iteration, `cursor()` hydrates models individually from one query, although some database drivers still buffer raw results. Use `lazy()` when relationships must be eager loaded in chunks, and use `lazyById()` or `chunkById()` when updates can affect query usership. See the collection rules for detailed tradeoffs.
 
 ## Add Indexes for Measured Query Patterns
 

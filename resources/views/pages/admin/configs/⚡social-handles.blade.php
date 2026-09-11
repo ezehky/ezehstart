@@ -3,14 +3,15 @@
 use App\Enums\GateAccessEnum;
 use App\Enums\SocialHandleEnum;
 use App\Services\SiteConfigurationService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
+use App\Traits\WithSiteConfigProcessor;
 use Flux\Flux;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithGateProps, WithSiteConfigProcessor;
 
     public array $socialHandles = [];
 
@@ -26,10 +27,10 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'social-handles');
-        kPageGate('config.social-handles');
+        $this->setPageGate('config.social-handles');
+        $this->setConfigInitial();
 
-        $this->socialHandles = app(SiteConfigurationService::class)
-            ->getConfigs('social-handles', default: [], raw: true);
+        $this->socialHandles = data_get($this->config, 'social-handles', []);
     }
 
     protected function rules(): array
@@ -42,10 +43,7 @@ new class extends Component
 
     public function create(): void
     {
-        $this->respondError(
-            'You do not have access to add social handles.',
-            if: ! kGate('config.social-handles', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $this->resetValidation();
         $this->reset('editingIndex');
@@ -59,10 +57,7 @@ new class extends Component
 
     public function edit(int $index): void
     {
-        $this->respondError(
-            'You do not have access to edit social handles.',
-            if: ! kGate('config.social-handles', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate();
 
         $this->resetValidation();
         $this->editingIndex = $index;
@@ -73,18 +68,15 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save social handles.',
-            if: ! kGate('config.social-handles', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate();
 
         $this->validate();
 
         $this->respondPrimary(
-            if: collect($this->socialHandles)
+            'This social platform has already been added.',
+            collect($this->socialHandles)
                 ->except($this->editingIndex === null ? [] : [$this->editingIndex])
-                ->contains('platform', $this->socialHandle['platform']),
-            message: 'This social platform has already been added.'
+                ->contains('platform', $this->socialHandle['platform'])
         );
 
         if ($this->editingIndex === null) {
@@ -94,6 +86,9 @@ new class extends Component
         }
 
         $this->persistSocialHandles();
+
+        $this->resetValidation();
+        $this->reset('editingIndex');
 
         Flux::modal('socialHandleModal')->close();
 
@@ -116,10 +111,7 @@ new class extends Component
 
     public function delete(): bool
     {
-        $this->respondError(
-            'You do not have delete access to social handles.',
-            if: ! kGate('config.social-handles', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL);
 
         $this->respondError(
             'That social handle is no longer there.',
@@ -137,11 +129,8 @@ new class extends Component
 
     private function persistSocialHandles(): void
     {
-        $service = app(SiteConfigurationService::class);
-        $config = $service->getConfigs(raw: true);
-        $config['social-handles'] = $this->socialHandles;
-
-        $service->update($config);
+        $this->config['social-handles'] = $this->socialHandles;
+        $this->saveConfig(true);
     }
 };
 ?>
@@ -154,7 +143,13 @@ new class extends Component
                 <flux:text class="mt-1">Manage the social links displayed across your site.</flux:text>
             </div>
 
-            <x-dashboard.gate.button gate="config.social-handles" level="create" variant="primary" icon="plus" wire:click="create">
+            <x-dashboard.gate.button
+                :gate="$pageGate"
+                :level="$gateCreate"
+                variant="primary"
+                icon="plus"
+                wire:click="create"
+            >
                 Add social handle
             </x-dashboard.gate.button>
         </div>
@@ -172,19 +167,30 @@ new class extends Component
                     <flux:table.row wire:key="social-handle-{{ $index }}">
                         <flux:table.cell>{{ $platform?->label() ?? $handle['platform'] }}</flux:table.cell>
                         <flux:table.cell>
-                            <a href="{{ $handle['url'] }}" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">
+                            <flux:link href="{{ $handle['url'] }}" target="_blank" rel="noopener noreferrer">
                                 {{ $handle['url'] }}
-                            </a>
+                            </flux:link>
                         </flux:table.cell>
                         <flux:table.cell>
                             <div class="flex justify-end gap-1">
-                                <flux:tooltip content="Edit social handle">
-                                    <x-dashboard.gate.button gate="config.social-handles" level="modify" variant="ghost" size="sm" icon="pencil-square" wire:click="edit({{ $index }})" />
-                                </flux:tooltip>
-
-                                <flux:tooltip content="Delete social handle">
-                                    <x-dashboard.gate.button gate="config.social-handles" level="full" variant="ghost" size="sm" icon="trash" wire:click="confirmDelete({{ $index }})" />
-                                </flux:tooltip>
+                                <x-dashboard.gate.button
+                                    :gate="$pageGate"
+                                    :level="$gateModify"
+                                    variant="ghost"
+                                    size="sm"
+                                    icon="pencil-square"
+                                    wire:click="edit({{ $index }})"
+                                    tooltip="Edit social handle"
+                                />
+                                <x-dashboard.gate.button
+                                    :gate="$pageGate"
+                                    :level="$gateFull"
+                                    variant="ghost"
+                                    size="sm"
+                                    icon="trash"
+                                    wire:click="confirmDelete({{ $index }})"
+                                    tooltip="Delete social handle"
+                                />
                             </div>
                         </flux:table.cell>
                     </flux:table.row>

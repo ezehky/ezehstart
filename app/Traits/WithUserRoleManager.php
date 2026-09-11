@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 
 /**
- * Drives the "account access" modal shared by the admins list, the members list and
+ * Drives the "account access" modal shared by the admins list, the users list and
  * the user view.
  *
  * Type and roles are edited together because they are one decision. A type is which

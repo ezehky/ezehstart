@@ -186,7 +186,7 @@ class User extends Authenticatable
     }
 
     /**
-     * The admin roles this account carries. Members never have any.
+     * The admin roles this account carries. users never have any.
      *
      * Many rather than one: an administrator can be Media *and* Support, and the
      * maps are merged — see GateService::mapFor(). Nothing here decides what that
@@ -278,7 +278,7 @@ class User extends Authenticatable
     }
 
     #[Scope]
-    protected function members(Builder $builder): void
+    protected function users(Builder $builder): void
     {
         $builder->where('user_type', UserTypeEnum::USER);
     }

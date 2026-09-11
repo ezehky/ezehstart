@@ -5,6 +5,7 @@ use App\Enums\StatusUser;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\AdminActionService;
+use App\Traits\WithGateProps;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,8 @@ use Livewire\Component;
 
 new class extends Component
 {
+    use WithGateProps;
+
     public User $user;
 
     /**
@@ -25,6 +28,7 @@ new class extends Component
     {
         $this->user = auth()->user();
         kSetSiteTitle('dashboard');
+        $this->setPageGate('dashboard');
 
         $this->monthExpression = match (DB::connection()->getDriverName()) {
             'sqlite' => "strftime('%Y-%m', created_at)",
@@ -38,7 +42,7 @@ new class extends Component
     {
         $usersCount = User::query()->count();
         $adminsCount = User::query()->admins()->count();
-        $membersCount = User::query()->members()->count();
+        $usersCount = User::query()->users()->count();
         $suspendedCount = User::query()->where('status', StatusUser::SUSPENDED)->count();
         $unverifiedCount = User::query()->whereNull('email_verified_at')->count();
         $strandedCount = User::query()->withoutLiveRole()->count();
@@ -51,9 +55,9 @@ new class extends Component
                 'change' => 'All registered accounts',
                 'tone' => 'sky',
             ],
-            'members' => [
-                'label' => 'Members',
-                'value' => number_format($membersCount),
+            'users' => [
+                'label' => 'users',
+                'value' => number_format($usersCount),
                 'icon' => 'user-group',
                 'change' => 'Accounts in the member workspace',
                 'tone' => 'emerald',

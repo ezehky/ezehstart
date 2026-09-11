@@ -61,7 +61,7 @@ in code. A **role** is a row in `roles` an administrator creates from the dashbo
 divides up the admin workspace only, and **only an admin has any**. An admin carries
 **any number of them** — the assignment is the `role_user` pivot, and the gate maps
 merge with the highest access winning each key, so a second role only ever widens what
-somebody reaches. Members carry no role at all.
+somebody reaches. users carry no role at all.
 
 ## Commands
 

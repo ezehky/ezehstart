@@ -223,7 +223,7 @@ new class extends Component
             <div>
                 <flux:heading level="2" size="lg">Roles</flux:heading>
                 <flux:text class="mt-1">
-                    How the administration workspace is divided up. Members carry no role — only
+                    How the administration workspace is divided up. users carry no role — only
                     admin accounts do, and one account can hold several. Their access adds up.
                 </flux:text>
             </div>

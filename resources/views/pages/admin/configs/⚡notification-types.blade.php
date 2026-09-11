@@ -5,7 +5,7 @@ use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\NotificationType;
 use App\Services\ActivityLogService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -14,7 +14,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithGateProps;
 
     public ?NotificationType $notificationType = null;
 
@@ -34,7 +34,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('config', 'notification types');
-        kPageGate('config.notification-types');
+        $this->setPageGate('config.notification-types');
     }
 
     /**
@@ -51,10 +51,7 @@ new class extends Component
 
     public function create(): void
     {
-        $this->respondError(
-            'You do not have access to add notification types.',
-            if: ! kGate('config.notification-types', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $this->resetForm();
 
@@ -65,10 +62,7 @@ new class extends Component
 
     public function edit(NotificationType $notificationType): void
     {
-        $this->respondError(
-            'You do not have access to edit notification types.',
-            if: ! kGate('config.notification-types', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->resetForm();
 
@@ -107,10 +101,7 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save notification types.',
-            if: ! kGate('config.notification-types', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->validate();
 
@@ -150,10 +141,7 @@ new class extends Component
 
     public function confirmDelete(int $typeId): void
     {
-        $this->respondError(
-            'You do not have delete access to notification types.',
-            if: ! kGate('config.notification-types', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL);
 
         $this->deleteId = $typeId;
 
@@ -162,10 +150,7 @@ new class extends Component
 
     public function delete(): bool
     {
-        $this->respondError(
-            'You do not have delete access to notification types.',
-            if: ! kGate('config.notification-types', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL);
 
         $type = NotificationType::query()->whereKey($this->deleteId)->first();
 
@@ -201,13 +186,15 @@ new class extends Component
             <div>
                 <flux:heading level="2" size="lg">Notification types</flux:heading>
                 <flux:text class="mt-1">
-                    What members can opt in and out of. These are rows rather than code, so a
+                    What users can opt in and out of. These are rows rather than code, so a
                     new one can be added without a deploy — every account picks up a switch
                     for it on their next visit.
                 </flux:text>
             </div>
 
-            <x-dashboard.gate.button gate="config.notification-types" level="create" variant="primary" icon="plus" wire:click="create">New type</x-dashboard.gate.button>
+            <x-dashboard.gate.button :gate="$pageGate" :level="$gateCreate" variant="primary" icon="plus" wire:click="create">
+                New type
+            </x-dashboard.gate.button>
         </div>
 
         @if ($this->types->isEmpty())
@@ -242,11 +229,22 @@ new class extends Component
                             </flux:table.cell>
                             <flux:table.cell>{{ number_format($item->notification_preferences_count) }}</flux:table.cell>
                             <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
-                            <flux:table.cell>
-                                <div class="flex justify-end gap-1">
-                                    <x-dashboard.gate.button gate="config.notification-types" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                    <x-dashboard.gate.button gate="config.notification-types" level="full" size="sm" variant="ghost" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
-                                </div>
+                            <flux:table.cell class="flex justify-end gap-1">
+                                <x-dashboard.gate.button
+                                    :gate="$pageGate"
+                                    :level="$gateModify"
+                                    size="sm"
+                                    variant="ghost"
+                                    icon="pencil-square" wire:click="edit({{ $item->id }})"
+                                />
+                                <x-dashboard.gate.button
+                                    :gate="$pageGate"
+                                    :level="$gateFull"
+                                    size="sm"
+                                    variant="ghost"
+                                    icon="trash"
+                                    wire:click="confirmDelete({{ $item->id }})"
+                                />
                             </flux:table.cell>
                         </flux:table.row>
                     @endforeach
@@ -267,7 +265,7 @@ new class extends Component
             />
             <flux:textarea wire:model="description" label="Description" rows="2" description="Shown under the switch on the member's settings page." />
             <flux:input type="number" wire:model="flow_order" label="Order" />
-            <flux:switch wire:model="status" label="Offered to members" description="Turning this off silences the type for everybody, whatever their own switch says." />
+            <flux:switch wire:model="status" label="Offered to users" description="Turning this off silences the type for everybody, whatever their own switch says." />
 
             <div class="flex justify-end gap-3">
                 <flux:modal.close>

@@ -51,6 +51,7 @@ class SiteConfigurationService
                 // Enforces the length, mixed-case, digit and symbol rules in
                 // WithPasswordTools rather than Laravel's default minimum.
                 'strong-password' => true,
+                'password-min-length' => 5,
 
                 // Refuse a password the user has already had. Depth is how many
                 // previous hashes are kept and compared; every hash past it is
@@ -70,7 +71,7 @@ class SiteConfigurationService
                 'login-decay-minutes' => 1,
             ],
 
-            // Limits applied to members only. Administrators upload against the
+            // Limits applied to users only. Administrators upload against the
             // filesystem, not against a quota.
             'uploads' => [
                 'user-image-limit' => 50,

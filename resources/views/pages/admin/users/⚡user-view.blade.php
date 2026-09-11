@@ -9,6 +9,7 @@ use App\Services\ActivityLogService;
 use App\Services\GateService;
 use App\Services\UserService;
 use App\Traits\WithGateManager;
+use App\Traits\WithGateProps;
 use App\Traits\WithUserRoleManager;
 use Flux\Flux;
 use Illuminate\Support\Collection;
@@ -18,7 +19,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithGateManager, WithUserRoleManager;
+    use WithGateManager, WithGateProps, WithUserRoleManager;
 
     public User $user;
 
@@ -43,7 +44,7 @@ new class extends Component
         $this->openRoleManagerState();
 
         kSetSiteTitle('users', $this->listKey(), $this->user->name, format: false);
-        kPageGate('users');
+        $this->setPageGate('users');
     }
 
     /**
@@ -108,14 +109,14 @@ new class extends Component
      */
     public function listKey(): string
     {
-        return $this->user->user_type->isAdmin() ? 'admins' : 'members';
+        return $this->user->user_type->isAdmin() ? 'admins' : 'users';
     }
 
     /**
      * The gate this account's own screens sit behind.
      *
      * The page itself only asks for 'users', because one screen serves both listings.
-     * Every write on it asks for the narrower key, so somebody granted Members alone
+     * Every write on it asks for the narrower key, so somebody granted users alone
      * cannot edit an administrator through the account view.
      */
     public function gateKey(): string
@@ -318,7 +319,6 @@ new class extends Component
     {
         $this->user->refresh()->load(['roles', 'userProfile']);
 
-
         // Re-pointed at the refreshed account, so the modal's boxes match what was
         // just written rather than what was there when it opened.
         $this->openRoleManagerState();
@@ -398,7 +398,7 @@ new class extends Component
             <div class="flex flex-wrap gap-2">
                 <x-dashboard.gate.button
                     :gate="$this->gateKey()"
-                    level="modify"
+                    :level="$gateModify"
                     icon="pencil-square"
                     variant="primary"
                     wire:click="editAccount"
@@ -409,8 +409,8 @@ new class extends Component
                 {{-- Handing out roles is handing out access, so this one asks for full
                      access to Users — the same gate the lockout guard protects. --}}
                 <x-dashboard.gate.button
-                    gate="users"
-                    level="full"
+                    :gate="$pageGate"
+                    :level="$gateFull"
                     icon="shield-check"
                     variant="filled"
                     wire:click="openRoleManager({{ $user->id }})"
@@ -420,7 +420,7 @@ new class extends Component
 
                 <x-dashboard.gate.button
                     :gate="$this->gateKey()"
-                    level="modify"
+                    :level="$gateModify"
                     :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
                     :variant="$user->status->isActive() ? 'danger' : 'filled'"
                     x-on:click="$flux.modal('statusModal').show()"

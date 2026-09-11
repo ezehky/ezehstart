@@ -284,7 +284,7 @@ class PolicySeeder extends Seeder
         | Session cookie | Identifies your browsing session, so the site knows one request came from the same browser as the last. Also carries your reported time zone, so timestamps show in your local time before your account has a saved one. | Until you close your browser, or two hours of inactivity |
         | `XSRF-TOKEN` | Proves a form submission came from a page we served, which is what stops another site submitting forms as you. | Same as the session |
         | `remember_web_…` | Set only if you ask to be remembered when you sign in. Keeps you signed in on this device. | Up to five years, or until you sign out |
-        | Appearance preference | Remembers whether you chose the light or dark theme. Stored in your browser rather than sent to us. | Until you clear your browser storage |
+        | Appearance preference | Reusers whether you chose the light or dark theme. Stored in your browser rather than sent to us. | Until you clear your browser storage |
 
         The first three are strictly necessary: the Service cannot function without them, and they are not used to track you across other websites.
 

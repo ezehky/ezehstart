@@ -2,6 +2,7 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Models\ActivityLog;
+use App\Traits\WithGateProps;
 use Flux\Flux;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -10,7 +11,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination;
+    use WithGateProps, WithPagination;
 
     public ?int $selectedLogId = null;
 
@@ -29,7 +30,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('users', 'activity-logs');
-        kPageGate('users.activity-logs');
+        $this->setPageGate('users.activity-logs');
     }
 
     public function updatedSearch(): void

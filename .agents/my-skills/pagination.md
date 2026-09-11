@@ -124,8 +124,8 @@ A metrics strip above a paginated table counts the **whole** set, not the page:
 #[Computed]
 public function metrics(): array
 {
-    $total = User::query()->members()->count();
-    $active = User::query()->members()->where('status', StatusUser::ACTIVE)->count();
+    $total = User::query()->users()->count();
+    $active = User::query()->users()->where('status', StatusUser::ACTIVE)->count();
 
     return [
         ['label' => 'Total students', 'value' => number_format($total), 'icon' => 'academic-cap', 'tone' => 'sky'],
@@ -173,7 +173,7 @@ public function updatedSearch(): void
 public function students()
 {
     return User::query()
-        ->members()
+        ->users()
         ->with('userRoles.role')
         ->withCount([…])
         ->withSum([…], 'amount_paid')

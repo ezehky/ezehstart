@@ -149,7 +149,7 @@ Follow this order every time.
 1. **Locate the closest sibling.** Find the file in the project that does the most
    similar thing. A settings form? Open
    `resources/views/pages/admin/configs/⚡site-config.blade.php`. A listing with
-   filters and pagination? Open `resources/views/pages/admin/users/⚡members.blade.php`.
+   filters and pagination? Open `resources/views/pages/admin/users/⚡users.blade.php`.
    A single-record view? `⚡user-view.blade.php`. Copy its shape.
 2. **Check for an existing enum** for any status/type/category field. Twenty-four ship
    with the kit; `StatusDefault` and `StatusYes` cover most on/off columns.
@@ -221,6 +221,6 @@ Follow this order every time.
 
 1. Grep the codebase for the closest analogue and copy it.
 2. If two existing patterns conflict, prefer the one the shipped starter files use —
-   `⚡members.blade.php` for a listing, `⚡user-view.blade.php` for a single record,
+   `⚡users.blade.php` for a listing, `⚡user-view.blade.php` for a single record,
    `⚡site-config.blade.php` for a settings form.
 3. If still unsure, ask. Do not invent.

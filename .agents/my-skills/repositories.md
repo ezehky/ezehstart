@@ -37,7 +37,7 @@ Every query starts from `Model::query()`.
 public function students()
 {
     return User::query()
-        ->members()
+        ->users()
         ->with('role')
         ->withCount(['admissions as enrolled_count' => fn ($query) => $query->where('status', StatusAdmission::ENROLLED)])
         ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))

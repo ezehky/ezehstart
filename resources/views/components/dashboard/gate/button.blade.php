@@ -1,4 +1,4 @@
-@props(['gate', 'level' => 'modify'])
+@props(['gate', 'level' => 'modify', 'tooltip' => null])
 
 {{-- An action button that is simply not there unless the account reaches the level it
      asks for.
@@ -22,5 +22,11 @@
      </x-dashboard.gate.button> --}}
 
 @if (kGateAction($gate, $level))
+     @if ($tooltip)
+        <flux:tooltip :content="$tooltip">
+     @endif
     <flux:button {{ $attributes }}>{{ $slot }}</flux:button>
+    @if ($tooltip)
+        </flux:tooltip>
+    @endif
 @endif

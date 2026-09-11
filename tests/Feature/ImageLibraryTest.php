@@ -573,8 +573,8 @@ test('no upload action is named after a $wire alias', function () {
 
     $components = [
         'resources/views/pages/shared/⚡image-library.blade.php',
-        'resources/views/components/lv/⚡image-picker.blade.php',
-        'resources/views/components/lv/⚡image-uploader.blade.php',
+        'resources/views/components/livewire/library/⚡image-picker.blade.php',
+        'resources/views/components/livewire/library/⚡image-uploader.blade.php',
     ];
 
     foreach ($components as $component) {

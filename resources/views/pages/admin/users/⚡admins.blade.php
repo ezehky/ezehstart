@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\RoleService;
+use App\Traits\WithGateProps;
 use App\Traits\WithUserRoleManager;
 use Flux\Flux;
 use Illuminate\Support\Collection;
@@ -19,7 +20,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination, WithUserRoleManager;
+    use WithGateProps, WithPagination, WithUserRoleManager;
 
     public ?User $admin = null;
 
@@ -59,7 +60,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('users', 'admins');
-        kPageGate('users.admins');
+        $this->setPageGate('users.admins');
     }
 
     public function updatedSearch(): void
@@ -109,22 +110,9 @@ new class extends Component
         return StatusUser::forSelect();
     }
 
-    /**
-     * How far this account may go on this screen, asked once and read by every
-     * button and every write.
-     */
-    #[Computed]
-    public function access(): GateAccessEnum
-    {
-        return kGateAccess('users.admins');
-    }
-
     public function create(): void
     {
-        $this->respondError(
-            'You do not have access to add admin accounts.',
-            if: ! $this->access->covers(GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE);
 
         $this->resetAdminForm();
 
@@ -133,10 +121,7 @@ new class extends Component
 
     public function edit(User $admin): void
     {
-        $this->respondError(
-            'You do not have access to edit admin accounts.',
-            if: ! $this->access->covers(GateAccessEnum::MODIFY),
-        );
+        $this->checkGate();
 
         $this->resetValidation();
 
@@ -172,10 +157,7 @@ new class extends Component
     public function save(): bool
     {
         // The button is hidden either way, which stops nobody who can open a console.
-        $this->respondError(
-            'You do not have access to save admin accounts.',
-            if: ! $this->access->covers($this->admin ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE),
-        );
+        $this->checkGate($this->admin ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
 
         $this->validate();
 
@@ -284,7 +266,13 @@ new class extends Component
                 </flux:text>
             </div>
 
-            <x-dashboard.gate.button gate="users.admins" level="create" variant="primary" icon="plus" wire:click="create">
+            <x-dashboard.gate.button
+                :gate="$pageGate"
+                :level="$gateCreate"
+                variant="primary"
+                icon="plus"
+                wire:click="create"
+            >
                 Add admin
             </x-dashboard.gate.button>
         </div>
@@ -355,37 +343,35 @@ new class extends Component
                         <flux:table.cell>
                             {{ $item->last_seen_at ? $item->lastSeenAtDiffForHumans() : 'Never' }}
                         </flux:table.cell>
-                        <flux:table.cell>
-                            <div class="flex gap-2">
-                                <flux:button
-                                    icon="eye"
-                                    variant="ghost"
-                                    size="sm"
-                                    :href="route('admin.user', $item)"
-                                    wire:navigate
-                                    title="View profile"
-                                />
-                                <x-dashboard.gate.button
-                                    gate="users.admins"
-                                    level="modify"
-                                    icon="pencil-square"
-                                    variant="primary"
-                                    size="sm"
-                                    wire:click="edit({{ $item->id }})"
-                                    title="Edit admin"
-                                />
-                                {{-- Handing out roles is handing out access, so this one asks for full
-                                     access to Users — the same gate the lockout guard protects. --}}
-                                <x-dashboard.gate.button
-                                    gate="users"
-                                    level="full"
-                                    icon="shield-check"
-                                    variant="filled"
-                                    size="sm"
-                                    wire:click="openRoleManager({{ $item->id }})"
-                                    title="Manage access"
-                                />
-                            </div>
+                        <flux:table.cell class="flex gap-2">
+                            <flux:button
+                                icon="eye"
+                                variant="ghost"
+                                size="sm"
+                                :href="route('admin.user', $item)"
+                                wire:navigate
+                                title="View profile"
+                            />
+                            <x-dashboard.gate.button
+                                :gate="$pageGate"
+                                :level="$gateModify"
+                                icon="pencil-square"
+                                variant="primary"
+                                size="sm"
+                                wire:click="edit({{ $item->id }})"
+                                title="Edit admin"
+                            />
+                            {{-- Handing out roles is handing out access, so this one asks for full
+                                    access to Users — the same gate the lockout guard protects. --}}
+                            <x-dashboard.gate.button
+                                gate="users"
+                                :level="$gateFull"
+                                icon="shield-check"
+                                variant="filled"
+                                size="sm"
+                                wire:click="openRoleManager({{ $item->id }})"
+                                title="Manage access"
+                            />
                         </flux:table.cell>
                     </flux:table.row>
                 @empty

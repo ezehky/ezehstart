@@ -212,7 +212,7 @@ test('the access modal moves an account between workspaces', function () {
     $role = roleWithGates('Media');
 
     Livewire::actingAs($admin)
-        ->test('pages::admin.users.members')
+        ->test('pages::admin.users.users')
         ->call('openRoleManager', $member->id)
         ->set('accountType', UserTypeEnum::ADMIN->value)
         ->set('accountRoles', [(string) $role->id])
@@ -293,7 +293,7 @@ test('the roles screen creates a role', function () {
         ->test('pages::admin.users.roles')
         ->call('create')
         ->set('name', 'Support')
-        ->set('description', 'Answers to members.')
+        ->set('description', 'Answers to users.')
         ->call('save');
 
     $this->assertDatabaseHas('roles', ['slug' => 'support', 'name' => 'Support']);

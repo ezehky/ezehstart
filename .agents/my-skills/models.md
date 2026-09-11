@@ -163,7 +163,7 @@ public function schedules(): HasMany
 }
 
 /**
- * The admin role, or null. Members never have one.
+ * The admin role, or null. users never have one.
  *
  * The explicit select() is load-bearing: GateService resolves access straight off
  * the loaded role, and a column left out of this list reads back as null.
@@ -228,7 +228,7 @@ protected function withoutLiveRole(Builder $builder): void
 ```
 
 Common scope names in the project: `active()`, `inFlowOrder()`, `isActive()`,
-`admins()`, `members()`, `ofType()`, `withoutLiveRole()`, `holdingRole()`, `live()`.
+`admins()`, `users()`, `ofType()`, `withoutLiveRole()`, `holdingRole()`, `live()`.
 
 Note `admins()` rather than `isAdmin()` on `User`: a scope and a getter of the same
 name are two methods with one name, and PHP will not load the class at all.

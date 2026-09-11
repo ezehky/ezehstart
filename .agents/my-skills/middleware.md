@@ -64,7 +64,7 @@ class AdminMiddleware
 2. Suspended → log out, `'Your account has been suspended. Please contact support.'`
 3. **Wrong workspace → `abort_unless($user->isType($type), 404)`** — a 404, not a 403, so
    the existence of the workspace is not confirmed
-4. Members only: strict email verification → redirect array to the verification page.
+4. users only: strict email verification → redirect array to the verification page.
    The `email-settings` keys are read with `data_get()` defaults, so an install whose
    site config has not been seeded still serves the workspace
 5. `updateLastSeen()` (throttled to once a minute)

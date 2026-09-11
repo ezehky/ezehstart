@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * starter ships no opinion about which ones a project needs beyond the one protected
  * role that keeps the install administrable.
  *
- * Members never have one. What kind of account this is lives on users.user_type, and
+ * users never have one. What kind of account this is lives on users.user_type, and
  * a role only ever hangs off an admin — see UserTypeEnum.
  *
  * An admin carries any number of them. Two roles that both speak about a screen are

@@ -49,7 +49,7 @@ Query scopes:
 
 ```php
 User::query()->admins();            // type = admin
-User::query()->members();           // type = user
+User::query()->users();           // type = user
 User::query()->ofType($type);
 User::query()->withoutLiveRole();   // admins with no live role at all
 User::query()->holdingRole($role);  // admins holding one specific role

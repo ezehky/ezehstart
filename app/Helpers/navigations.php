@@ -27,9 +27,13 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
             'config' => [
                 'label' => 'Configuration',
                 'children' => [
-                    'site-config' => [
-                        'label' => 'Site configuration',
-                        'link' => route('admin.site-config'),
+                    'site-info' => [
+                        'label' => 'Site info',
+                        'link' => route('admin.config.site'),
+                    ],
+                    'security' => [
+                        'label' => 'Security',
+                        'link' => route('admin.config.security'),
                     ],
                     'social-handles' => [
                         'label' => 'Social handles',
@@ -88,9 +92,9 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Admins',
                         'link' => route('admin.admins'),
                     ],
-                    'members' => [
-                        'label' => 'Members',
-                        'link' => route('admin.members'),
+                    'users-list' => [
+                        'label' => 'Users List',
+                        'link' => route('admin.users'),
                     ],
                     'roles' => [
                         'label' => 'Roles',
@@ -422,6 +426,66 @@ function kUpdateSiteTitle(...$rest): void
 function kPauseSiteTitle(): void
 {
     config(['_setups.show-title' => false]);
+}
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+// BREADCRUMB
+
+/**
+ * The trail of the current page, read back out of the site title.
+ *
+ * kSetSiteTitle() already names where a page sits — "Users / users" — and the
+ * sidebar tree already knows what each of those segments links to. This walks the
+ * one against the other rather than asking a page to declare its ancestry twice,
+ * which is what keeps a renamed menu entry from leaving a stale crumb behind.
+ *
+ * A segment that matches nothing in the tree still appears, unlinked. That is the
+ * common case for a record's own name — "Users / users / Ada Lovelace" — and it
+ * is also the graceful failure when a title segment and a nav key drift apart.
+ *
+ * @param  string|null  $key  Workspace tree to resolve against. Defaults to the one
+ *                            the current route belongs to.
+ * @return array<int, array{label: string, link: string|null, icon: string|null}>
+ */
+function kBreadcrumbTrail(?string $key = null): array
+{
+    $segments = kDestructSiteTitle();
+
+    if (! $segments) {
+        return [];
+    }
+
+    $key ??= str_starts_with((string) request()->route()?->getName(), 'admin.') ? 'admin' : 'user';
+
+    // Unfiltered: a crumb is a description of where the page is, and the page has
+    // already been gated on the way in. Running the strict filter here would drop
+    // the parent of a screen reached by a direct link and orphan the trail.
+    $branch = kPageNavigationLinks($key, strict: false);
+
+    $trail = [];
+
+    foreach ($segments as $segment) {
+        $slug = kSlug($segment);
+
+        // The tree is keyed by slug, but a label that was written out in full —
+        // "Activity logs" against a key of "activity-logs" — matches either way.
+        $match = data_get($branch, $slug) ?: collect($branch)
+            ->first(fn ($entry) => is_array($entry) && kTextCompare(kSlug($entry['label'] ?? ''), $slug));
+
+        $trail[] = [
+            'label' => $segment,
+            'link' => data_get($match, 'link'),
+            'icon' => data_get($match, 'icon'),
+        ];
+
+        // Descend, so "users" is looked for under "users" rather than at the root.
+        $branch = data_get($match, 'children', []);
+    }
+
+    // The page you are on is not somewhere to navigate to.
+    $trail[array_key_last($trail)]['link'] = null;
+
+    return $trail;
 }
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

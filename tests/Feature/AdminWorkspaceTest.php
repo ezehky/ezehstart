@@ -21,7 +21,7 @@ test('an admin can open every workspace page', function (string $route) {
     'admin.site-config',
     'admin.config.social-handles',
     'admin.admins',
-    'admin.members',
+    'admin.users',
     'admin.roles',
     'admin.activity-logs',
     'admin.config.notification-types',
@@ -41,12 +41,12 @@ test('an admin can open a single account', function () {
         ->assertSee($account->name);
 });
 
-test('the members listing only shows member accounts', function () {
+test('the users listing only shows member accounts', function () {
     $member = userOfType(UserTypeEnum::USER, ['name' => 'Ada Member']);
     $stranger = adminWithoutRole(['name' => 'Grace Unassigned']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.users.members')
+        ->test('pages::admin.users.users')
         ->assertSee($member->name)
         ->assertDontSee($stranger->name);
 });
@@ -64,12 +64,12 @@ test('the admins listing can be narrowed to those with no live role', function (
         ->assertDontSee($this->admin->name);
 });
 
-test('the members listing can be searched', function () {
+test('the users listing can be searched', function () {
     userOfType(UserTypeEnum::USER, ['name' => 'Ada Lovelace']);
     userOfType(UserTypeEnum::USER, ['name' => 'Grace Hopper']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.users.members')
+        ->test('pages::admin.users.users')
         ->set('search', 'Lovelace')
         ->assertSee('Ada Lovelace')
         ->assertDontSee('Grace Hopper');

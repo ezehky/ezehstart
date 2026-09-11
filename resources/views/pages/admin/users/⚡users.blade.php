@@ -2,6 +2,7 @@
 
 use App\Enums\StatusUser;
 use App\Models\User;
+use App\Traits\WithGateProps;
 use App\Traits\WithUserRoleManager;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -10,7 +11,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination, WithUserRoleManager;
+    use WithGateProps, WithPagination, WithUserRoleManager;
 
     #[Url(as: 'q')]
     public string $search = '';
@@ -20,8 +21,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('users', 'members');
-        kPageGate('users.members');
+        kSetSiteTitle('users', 'users-list');
+        $this->setPageGate('users.users-list');
     }
 
     public function updatedSearch(): void
@@ -35,10 +36,10 @@ new class extends Component
     }
 
     #[Computed]
-    public function members()
+    public function users()
     {
         return User::query()
-            ->members()
+            ->users()
             ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
             ->when($this->accountStatus !== '', fn ($query) => $query->where('status', $this->accountStatus))
             ->latest()
@@ -54,14 +55,14 @@ new class extends Component
     #[Computed]
     public function metrics(): array
     {
-        $base = fn () => User::query()->members();
+        $base = fn () => User::query()->users();
 
         $total = $base()->count();
         $active = $base()->where('status', StatusUser::ACTIVE)->count();
         $unverified = $base()->whereNull('email_verified_at')->count();
 
         return [
-            ['label' => 'Total members', 'value' => number_format($total), 'icon' => 'users', 'tone' => 'sky'],
+            ['label' => 'Total users', 'value' => number_format($total), 'icon' => 'users', 'tone' => 'sky'],
             ['label' => 'Active accounts', 'value' => number_format($active), 'icon' => 'check-badge', 'tone' => 'emerald'],
             ['label' => 'Unverified email', 'value' => number_format($unverified), 'icon' => 'envelope', 'tone' => 'slate'],
         ];
@@ -69,7 +70,7 @@ new class extends Component
 
     protected function afterRoleChange(): void
     {
-        unset($this->members, $this->metrics);
+        unset($this->users, $this->metrics);
     }
 };
 ?>
@@ -89,7 +90,7 @@ new class extends Component
     <flux:card class="space-y-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <flux:heading level="2" size="lg">Members</flux:heading>
+                <flux:heading level="2" size="lg">users</flux:heading>
                 <flux:text class="mt-1">Every account signed up to the member workspace.</flux:text>
             </div>
 
@@ -109,7 +110,7 @@ new class extends Component
             </div>
         </div>
 
-        <flux:table :paginate="$this->members">
+        <flux:table :paginate="$this->users">
             <flux:table.columns>
                 <flux:table.column>Member</flux:table.column>
                 <flux:table.column>Phone</flux:table.column>
@@ -119,7 +120,7 @@ new class extends Component
                 <flux:table.column>Actions</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
-                @forelse ($this->members as $item)
+                @forelse ($this->users as $item)
                     <flux:table.row wire:key="member-{{ $item->id }}">
                         <flux:table.cell>
                             <div class="flex items-center gap-3">
@@ -138,38 +139,36 @@ new class extends Component
                             <x-util.status :status="$item->status" />
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->createdAtHuman() }}</flux:table.cell>
-                        <flux:table.cell>
-                            <div class="flex gap-2">
-                                <flux:button
-                                    icon="eye"
-                                    variant="primary"
-                                    size="sm"
-                                    :href="route('admin.user', $item)"
-                                    wire:navigate
-                                    title="View profile"
-                                />
-                                {{-- Moving an account between workspaces is handing out access, so
-                                     this asks for full access to Users — the gate the lockout
-                                     guard protects. --}}
-                                <x-dashboard.gate.button
-                                    gate="users"
-                                    level="full"
-                                    icon="shield-check"
-                                    variant="filled"
-                                    size="sm"
-                                    wire:click="openRoleManager({{ $item->id }})"
-                                    title="Manage access"
-                                />
-                            </div>
+                        <flux:table.cell class="flex gap-2">
+                            <flux:button
+                                icon="eye"
+                                variant="primary"
+                                size="sm"
+                                :href="route('admin.user', $item)"
+                                wire:navigate
+                                title="View profile"
+                            />
+                            {{-- Moving an account between workspaces is handing out access, so
+                                    this asks for full access to Users — the gate the lockout
+                                    guard protects. --}}
+                            <x-dashboard.gate.button
+                                gate="users"
+                                :level="$gateFull"
+                                icon="shield-check"
+                                variant="filled"
+                                size="sm"
+                                wire:click="openRoleManager({{ $item->id }})"
+                                title="Manage access"
+                            />
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row>
                         <flux:table.cell colspan="6">
                             <x-dashboard.workspace-no-record
-                                label="Members"
+                                label="users"
                                 icon="users"
-                                text="No members match the current filters."
+                                text="No users match the current filters."
                             />
                         </flux:table.cell>
                     </flux:table.row>

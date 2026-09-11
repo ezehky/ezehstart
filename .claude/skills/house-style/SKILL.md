@@ -50,7 +50,7 @@ If you read nothing else before starting:
 Follow this order every time:
 
 1. **Find the closest sibling** already in the repo and copy its shape. A new admin
-   listing? Open `resources/views/pages/admin/users/⚡members.blade.php`. A new single
+   listing? Open `resources/views/pages/admin/users/⚡users.blade.php`. A new single
    record view? `⚡user-view.blade.php`. A new form? `⚡site-config.blade.php`.
 2. Check `app/Enums/` for an existing enum before adding a status vocabulary.
 3. Check `app/Services/` before writing business logic.

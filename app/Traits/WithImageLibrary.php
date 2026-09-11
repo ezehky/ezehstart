@@ -187,7 +187,7 @@ trait WithImageLibrary
 
     /**
      * Role visibility is only meaningful to somebody who can see more than their
-     * own role, so members get the two simple options and administrators get all
+     * own role, so users get the two simple options and administrators get all
      * three.
      *
      * @return array<string, string>
