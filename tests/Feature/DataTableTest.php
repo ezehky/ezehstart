@@ -203,6 +203,56 @@ test('the header checkbox takes the rows on the page', function () {
     expect($component->get('selected'))->toBe([]);
 });
 
+test('the header checkbox takes the rows the table is showing, not a second query of its own', function () {
+    // Two pages of them on purpose. tableQuery() carries the filters but not the
+    // ordering, so a re-query with an offset agrees with the screen on page one by
+    // luck and picks a different five rows on page two.
+    collect(range(1, 25))->each(fn (int $amount) => ledgerRow($amount * 10));
+
+    $component = ledger()->call('gotoPage', 2)->set('selectPage', true);
+
+    $onScreen = collect($component->get('transactions')->items())
+        ->map(fn ($transaction) => (string) $transaction->id)
+        ->all();
+
+    expect($component->get('selected'))->toBe($onScreen);
+});
+
+test('the header checkbox lets go of a row unticked by hand, and takes the last one back', function () {
+    $first = ledgerRow(100);
+    $second = ledgerRow(200);
+
+    $component = ledger()->set('selectPage', true);
+
+    expect($component->get('selectPage'))->toBeTrue();
+
+    // One row put back, so this is no longer the whole page.
+    $component->set('selected', [(string) $first->id]);
+
+    expect($component->get('selectPage'))->toBeFalse();
+
+    // And the last outstanding row ticked by hand is the whole page again.
+    $component->set('selected', [(string) $first->id, (string) $second->id]);
+
+    expect($component->get('selectPage'))->toBeTrue();
+});
+
+test('touching a single row drops "everything that matches"', function () {
+    $first = ledgerRow(100);
+    ledgerRow(200);
+
+    $component = ledger()->call('selectAllMatching');
+
+    expect($component->get('selectMatching'))->toBeTrue();
+
+    $component->set('selected', [(string) $first->id]);
+
+    // Hand-picking is the opposite of the whole filtered result, and a bulk delete
+    // that quietly kept working off the query would take both rows.
+    expect($component->get('selectMatching'))->toBeFalse()
+        ->and($component->get('selectedCount'))->toBe(1);
+});
+
 test('selecting everything that matches counts the whole filtered result', function () {
     ledgerRow(100, '2026-01-10 10:00:00');
     ledgerRow(200, '2026-02-10 10:00:00');

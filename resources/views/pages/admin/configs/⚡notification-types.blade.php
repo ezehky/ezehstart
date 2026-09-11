@@ -5,8 +5,9 @@ use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\NotificationType;
 use App\Services\ActivityLogService;
-use App\Traits\WithGateProps;
+use App\Traits\WithDataTable;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithGateProps;
+    use WithDataTable;
 
     public ?NotificationType $notificationType = null;
 
@@ -40,13 +41,44 @@ new class extends Component
     /**
      * @return Collection<int, NotificationType>
      */
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'title' => ['label' => 'Type', 'locked' => true, 'sortable' => true],
+            'notification_type' => ['label' => 'Key', 'sortable' => true],
+            'notification_preferences_count' => ['label' => 'Subscribed', 'exportable' => false],
+            'flow_order' => ['label' => 'Order', 'sortable' => true],
+            'status' => ['label' => 'Status', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        return NotificationType::query()->withCount('notificationPreferences');
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'notification types';
+    }
+
+    /**
+     * Every type is on the page at once, so the header checkbox takes all of them.
+     *
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->types;
+    }
+
     #[Computed]
     public function types(): Collection
     {
-        return NotificationType::query()
-            ->withCount('notificationPreferences')
-            ->inFlowOrder()
-            ->get();
+        return $this->applySort($this->tableQuery(), 'flow_order', 'asc')->get();
     }
 
     public function create(): void
@@ -205,31 +237,35 @@ new class extends Component
             />
         @else
             <flux:table>
-                <flux:table.columns>
-                    <flux:table.column>Type</flux:table.column>
-                    <flux:table.column>Key</flux:table.column>
-                    <flux:table.column>Subscribed</flux:table.column>
-                    <flux:table.column>Status</flux:table.column>
-                    <flux:table.column />
-                </flux:table.columns>
+                <x-table.columns
+                    :columns="$this->tableColumnList"
+                    :sort="$sortColumn"
+                    :direction="$sortDirection"
+                    actions
+                    actions-label=""
+                />
 
-                <flux:table.rows>
-                    @foreach ($this->types as $item)
+                <x-table.rows :columns="$this->tableColumnList">
+                    @forelse ($this->types as $item)
                         <flux:table.row wire:key="type-{{ $item->id }}">
-                            <flux:table.cell>
+                            <x-table.cell column="title">
                                 <p class="font-medium text-slate-950 dark:text-white">{{ $item->title }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->description }}</p>
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="notification_type">
                                 <span class="font-mono text-xs">{{ $item->notification_type }}</span>
                                 @unless ($item->knownType())
                                     {{-- Added by an administrator: no code refers to it by name. --}}
                                     <flux:badge size="sm" color="amber" inset="top bottom">Custom</flux:badge>
                                 @endunless
-                            </flux:table.cell>
-                            <flux:table.cell>{{ number_format($item->notification_preferences_count) }}</flux:table.cell>
-                            <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
-                            <flux:table.cell class="flex justify-end gap-1">
+                            </x-table.cell>
+
+                            <x-table.cell column="notification_preferences_count">{{ number_format($item->notification_preferences_count) }}</x-table.cell>
+                            <x-table.cell column="flow_order"><span class="tabular-nums">{{ $item->flow_order }}</span></x-table.cell>
+                            <x-table.cell column="status"><x-util.status :status="$item->status" /></x-table.cell>
+
+                            <x-table.cell class="flex justify-end gap-1">
                                 <x-dashboard.gate.button
                                     :gate="$pageGate"
                                     :level="$gateModify"
@@ -245,10 +281,18 @@ new class extends Component
                                     icon="trash"
                                     wire:click="confirmDelete({{ $item->id }})"
                                 />
-                            </flux:table.cell>
+                            </x-table.cell>
                         </flux:table.row>
-                    @endforeach
-                </flux:table.rows>
+                    @empty
+                        <x-table.empty
+                            :columns="$this->tableColumnList"
+                            actions
+                            label="Notification types"
+                            icon="bell"
+                            text="No type has been added yet."
+                        />
+                    @endforelse
+                </x-table.rows>
             </flux:table>
         @endif
     </flux:card>

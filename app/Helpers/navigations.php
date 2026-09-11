@@ -472,9 +472,23 @@ function kBreadcrumbTrail(?string $key = null): array
         $match = data_get($branch, $slug) ?: collect($branch)
             ->first(fn ($entry) => is_array($entry) && kTextCompare(kSlug($entry['label'] ?? ''), $slug));
 
+        $link = data_get($match, 'link');
+
+        // A parent has no screen of its own — "Users" is a heading over Admins, Roles
+        // and the rest — and a crumb that cannot be clicked is a crumb that looks
+        // broken. It goes where the sidebar entry goes: the first of its children this
+        // account can actually open, taken from the gated tree so it never points at a
+        // page that would answer 404.
+        if (! $link && data_get($match, 'children')) {
+            $link = collect(data_get(kPageNavigationLinks($key, strict: true), "{$slug}.children", []))
+                ->pluck('link')
+                ->filter()
+                ->first();
+        }
+
         $trail[] = [
             'label' => $segment,
-            'link' => data_get($match, 'link'),
+            'link' => $link,
             'icon' => data_get($match, 'icon'),
         ];
 

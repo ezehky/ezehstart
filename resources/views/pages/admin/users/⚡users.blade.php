@@ -2,8 +2,10 @@
 
 use App\Enums\StatusUser;
 use App\Models\User;
-use App\Traits\WithGateProps;
+use App\Traits\WithDataTable;
 use App\Traits\WithUserRoleManager;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -11,7 +13,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithGateProps, WithPagination, WithUserRoleManager;
+    use WithDataTable, WithPagination, WithUserRoleManager;
 
     #[Url(as: 'q')]
     public string $search = '';
@@ -25,25 +27,78 @@ new class extends Component
         $this->setPageGate('users.users-list');
     }
 
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'name' => ['label' => 'Member', 'locked' => true, 'sortable' => true],
+            'email' => ['label' => 'Email'],
+            'phone_number' => ['label' => 'Phone'],
+            'user_type' => ['label' => 'Type'],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'created_at' => ['label' => 'Joined', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        $query = User::query()
+            ->users()
+            ->when($this->search !== '', fn (Builder $inner) => $inner->searchMacro(['name', 'email', 'phone_number'], $this->search))
+            ->when($this->accountStatus !== '', fn (Builder $inner) => $inner->where('status', $this->accountStatus));
+
+        return $this->applyDateRange($query);
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'members';
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'created_at' => $item->createdAtHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
+    protected function afterBulkAction(): void
+    {
+        unset($this->users, $this->metrics);
+    }
+
+    protected function tablePerPage(): int
+    {
+        return 12;
+    }
+
     public function updatedSearch(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function updatedAccountStatus(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     #[Computed]
     public function users()
     {
-        return User::query()
-            ->users()
-            ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
-            ->when($this->accountStatus !== '', fn ($query) => $query->where('status', $this->accountStatus))
-            ->latest()
-            ->paginate(12);
+        return $this->applySort($this->tableQuery(), 'created_at')->paginate($this->tablePerPage());
+    }
+
+    /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->users;
     }
 
     #[Computed]
@@ -90,7 +145,7 @@ new class extends Component
     <flux:card class="space-y-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <flux:heading level="2" size="lg">users</flux:heading>
+                <flux:heading level="2" size="lg">Members</flux:heading>
                 <flux:text class="mt-1">Every account signed up to the member workspace.</flux:text>
             </div>
 
@@ -110,19 +165,38 @@ new class extends Component
             </div>
         </div>
 
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <x-form.date-field
+                mode="range"
+                wire:model.live="dateFrom"
+                end-model="dateTo"
+                with-presets
+                label="Joined between"
+                class="sm:max-w-md"
+            />
+
+            <x-table.column-manager :columns="$this->tableColumnList" />
+        </div>
+
+        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="members" />
+
         <flux:table :paginate="$this->users">
-            <flux:table.columns>
-                <flux:table.column>Member</flux:table.column>
-                <flux:table.column>Phone</flux:table.column>
-                <flux:table.column>Type</flux:table.column>
-                <flux:table.column>Status</flux:table.column>
-                <flux:table.column>Joined</flux:table.column>
-                <flux:table.column>Actions</flux:table.column>
-            </flux:table.columns>
-            <flux:table.rows>
+            <x-table.columns
+                :columns="$this->tableColumnList"
+                :sort="$sortColumn"
+                :direction="$sortDirection"
+                selectable
+                actions
+            />
+
+            <x-table.rows :columns="$this->tableColumnList">
                 @forelse ($this->users as $item)
                     <flux:table.row wire:key="member-{{ $item->id }}">
-                        <flux:table.cell>
+                        <x-table.select :id="$item->id" />
+
+                        {{-- The member's own row opens their record, so the name is
+                             the link rather than a button at the far end of it. --}}
+                        <x-table.cell column="name" :href="route('admin.user', $item)">
                             <div class="flex items-center gap-3">
                                 <x-dashboard.avatar :user="$item" />
                                 <div class="min-w-0">
@@ -130,16 +204,22 @@ new class extends Component
                                     <div class="text-xs text-slate-500">{{ $item->email }}</div>
                                 </div>
                             </div>
-                        </flux:table.cell>
-                        <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="email">{{ $item->email }}</x-table.cell>
+                        <x-table.cell column="phone_number">{{ $item->phone_number ?: '—' }}</x-table.cell>
+
+                        <x-table.cell column="user_type">
                             <flux:badge size="sm" color="zinc">{{ $item->user_type->label() }}</flux:badge>
-                        </flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="status">
                             <x-util.status :status="$item->status" />
-                        </flux:table.cell>
-                        <flux:table.cell>{{ $item->createdAtHuman() }}</flux:table.cell>
-                        <flux:table.cell class="flex gap-2">
+                        </x-table.cell>
+
+                        <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
+
+                        <x-table.cell class="flex gap-2">
                             <flux:button
                                 icon="eye"
                                 variant="primary"
@@ -160,20 +240,19 @@ new class extends Component
                                 wire:click="openRoleManager({{ $item->id }})"
                                 title="Manage access"
                             />
-                        </flux:table.cell>
+                        </x-table.cell>
                     </flux:table.row>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="6">
-                            <x-dashboard.workspace-no-record
-                                label="users"
-                                icon="users"
-                                text="No users match the current filters."
-                            />
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <x-table.empty
+                        :columns="$this->tableColumnList"
+                        selectable
+                        actions
+                        label="Members"
+                        icon="users"
+                        text="No members match the current filters."
+                    />
                 @endforelse
-            </flux:table.rows>
+            </x-table.rows>
         </flux:table>
     </flux:card>
 

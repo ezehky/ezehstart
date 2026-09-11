@@ -11,7 +11,14 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the application's database with what an install cannot start without.
+     *
+     * The policies and the FAQs used to run from here. They are placeholder copy with
+     * the site's name dropped into it, and an install that publishes that as its own
+     * terms is worse off than one with no terms yet — so they moved to DemoSeeder,
+     * alongside the invented people and the invented ledger:
+     *
+     *     php artisan db:seed --class=DemoSeeder
      */
     public function run(): void
     {
@@ -36,12 +43,6 @@ class DatabaseSeeder extends Seeder
             NotificationTypeSeeder::class,
             CountrySeeder::class,
             UserSeeder::class,
-            // Both match on natural keys rather than ids, so re-seeding refreshes
-            // the copy instead of stacking up duplicates. PolicySeeder only ever
-            // writes version 1.0 — once a real 2.0 is published it stops being
-            // what the public page shows.
-            PolicySeeder::class,
-            FaqSeeder::class,
         ];
 
         $this->call($seeders);

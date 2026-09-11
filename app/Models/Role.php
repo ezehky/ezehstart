@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Services\GateService;
+use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,6 +30,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[Unguarded]
 class Role extends Model
 {
+    use WithDynamicModelFormatting;
+
     protected function casts(): array
     {
         return [

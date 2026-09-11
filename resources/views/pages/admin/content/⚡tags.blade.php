@@ -102,6 +102,14 @@ new class extends Component
         return $this->applySort($this->tableQuery(), 'name', 'asc')->paginate($this->tablePerPage());
     }
 
+    /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->tags;
+    }
+
     public function updatedSearch(): void
     {
         $this->clearSelection();
@@ -386,6 +394,7 @@ new class extends Component
                 mode="range"
                 wire:model.live="dateFrom"
                 end-model="dateTo"
+                with-presets
                 label="Added between"
                 class="sm:max-w-md"
             />

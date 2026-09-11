@@ -24,7 +24,8 @@ use Symfony\Component\HttpFoundation\Response;
  * where it renders them, and bulk delete only where tableDeletable() says so. Nothing
  * appears on a screen that did not ask for it.
  *
- * The page supplies two things — what the columns are, and what the query is:
+ * The page supplies three things — what the columns are, what the query is, and what
+ * it ended up rendering:
  *
  *     use WithDataTable, WithPagination;
  *
@@ -40,6 +41,11 @@ use Symfony\Component\HttpFoundation\Response;
  *     protected function tableQuery(): Builder
  *     {
  *         return Transaction::query()->when(...);
+ *     }
+ *
+ *     protected function tableRows(): iterable
+ *     {
+ *         return $this->transactions;
  *     }
  *
  * @property-read array<string, array<string, mixed>> $tableColumnList
@@ -253,6 +259,30 @@ trait WithDataTable
         $this->selectMatching = false;
 
         $this->selected = $value ? $this->tablePageKeys() : [];
+
+        unset($this->selectedCount);
+    }
+
+    /**
+     * A row checkbox, ticked or unticked by hand.
+     *
+     * The header box is derived from the rows rather than driving them: unticking one
+     * row of twenty has to let go of "the whole page", and ticking the last outstanding
+     * row has to take it back, or the header ends up saying something the table is not.
+     * Without this the header stays ticked over a half-chosen page, which is also the
+     * state that makes "select everything that matches" read as already done.
+     */
+    public function updatedSelected(): void
+    {
+        // Hand-picking rows is the opposite of "everything the filters match", so the
+        // wider selection is dropped the moment one row is touched.
+        $this->selectMatching = false;
+
+        $keys = $this->tablePageKeys();
+
+        $this->selectPage = $keys !== [] && array_diff($keys, $this->selected) === [];
+
+        unset($this->selectedCount);
     }
 
     /**
@@ -320,14 +350,31 @@ trait WithDataTable
 
         $this->respondError('Choose the rows to delete first.', if: $count === 0);
 
+        $deleted = 0;
+        $blocked = [];
+
         // Deleted through the models rather than with one delete statement: a model
         // with a delete guard, a soft delete or children to cascade has to be given
         // the chance to run, and a bulk button is exactly where that gets forgotten.
-        $this->selectionQuery()->get()->each(fn (Model $item) => $item->delete());
+        $this->selectionQuery()->get()->each(function (Model $item) use (&$deleted, &$blocked) {
+            if ($reason = $this->tableDeleteBlocked($item)) {
+                $blocked[] = $reason;
+
+                return;
+            }
+
+            $item->delete();
+            $deleted++;
+        });
+
+        $this->respondError(
+            'Nothing was deleted. '.reset($blocked),
+            if: $deleted === 0 && $blocked !== [],
+        );
 
         app(ActivityLogService::class)->logActivity(
             $this->tableDeleteAction(),
-            ' '.number_format($count).' '.$this->tableSubject(),
+            ' '.number_format($deleted).' '.$this->tableSubject(),
         );
 
         Flux::modal('bulkDeleteModal')->close();
@@ -335,7 +382,15 @@ trait WithDataTable
         $this->clearSelection();
         $this->afterBulkAction();
 
-        return $this->respondSuccess(number_format($count).' '.$this->tableSubject().' deleted.');
+        $message = number_format($deleted).' '.$this->tableSubject().' deleted.';
+
+        // A row that was refused has to be said out loud. A count that quietly comes
+        // up short reads as a bug, and the administrator would go looking for one.
+        if ($blocked !== []) {
+            $message .= ' '.count($blocked).' left alone: '.reset($blocked);
+        }
+
+        return $this->respondSuccess($message);
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -460,6 +515,22 @@ trait WithDataTable
     abstract protected function tableQuery(): Builder;
 
     /**
+     * The rows the page has on screen — its paginator, or its collection where the
+     * whole listing fits on one page:
+     *
+     *     protected function tableRows(): iterable
+     *     {
+     *         return $this->transactions;
+     *     }
+     *
+     * Abstract rather than derived, because the trait cannot know a page's ordering
+     * and a guess at it silently ticks the wrong rows.
+     *
+     * @return iterable<int, Model>
+     */
+    abstract protected function tableRows(): iterable;
+
+    /**
      * Where this screen's arrangement is filed.
      *
      * The component's own name — "pages::admin.transactions" — rather than the route.
@@ -505,6 +576,19 @@ trait WithDataTable
     }
 
     /**
+     * Why this particular row cannot go, or null if it can.
+     *
+     * The guard a single-row delete does by hand has to hold here too, or a bulk
+     * button becomes the way round it — a category with posts filed under it is
+     * refused one at a time and would otherwise sail through in a selection of
+     * twenty. Blocked rows are left where they are and named in the toast.
+     */
+    protected function tableDeleteBlocked(Model $item): ?string
+    {
+        return null;
+    }
+
+    /**
      * One cell on the way into a file. The default reads the column off the model,
      * which is right for a plain column; a page overrides it for the ones that are a
      * relationship, an enum label or a formatted amount.
@@ -547,18 +631,29 @@ trait WithDataTable
     }
 
     /**
-     * The keys on the page being shown. A page whose listing is not a paginator of
-     * models overrides this.
+     * The keys on the page being shown, read off what the page actually rendered.
+     *
+     * Never a second query. tableQuery() carries the filters but not the ordering —
+     * each page applies its own sort and fallback in the computed it paginates — so
+     * running it again with a forPage() offset asks the database for "the first
+     * twenty" of an unordered result. That is a different twenty rows from the ones
+     * on screen, which is how the header checkbox came to tick rows nobody could see
+     * and leave rows in plain sight untouched.
      *
      * @return array<int, string>
      */
     protected function tablePageKeys(): array
     {
-        return $this->tableQuery()
-            ->forPage($this->getPage(), $this->tablePerPage())
-            ->get()
-            ->map(fn (Model $item) => (string) $item->getKey())
-            ->all();
+        $keys = [];
+
+        // Iterated rather than collect()'d. A paginator is Arrayable, and collect()
+        // reads that before it reads Traversable — so it would take toArray(), which
+        // is the page metadata with the rows buried in a 'data' key, not the rows.
+        foreach ($this->tableRows() as $item) {
+            $keys[] = (string) $item->getKey();
+        }
+
+        return $keys;
     }
 
     protected function tablePerPage(): int

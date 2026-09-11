@@ -2,8 +2,10 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Models\ActivityLog;
-use App\Traits\WithGateProps;
+use App\Traits\WithDataTable;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -11,7 +13,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithGateProps, WithPagination;
+    use WithDataTable, WithPagination;
 
     public ?int $selectedLogId = null;
 
@@ -21,11 +23,6 @@ new class extends Component
     #[Url]
     public string $action = '';
 
-    #[Url]
-    public string $from = '';
-
-    #[Url]
-    public string $to = '';
 
     public function mount(): void
     {
@@ -33,41 +30,75 @@ new class extends Component
         $this->setPageGate('users.activity-logs');
     }
 
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'user' => ['label' => 'User', 'locked' => true],
+            'activity_log_action' => ['label' => 'Action', 'sortable' => true],
+            'description' => ['label' => 'Description'],
+            'origin' => ['label' => 'Origin'],
+            'created_at' => ['label' => 'When', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        $query = ActivityLog::query()
+            ->with('user:id,name,email,avatar')
+            ->when($this->search !== '', fn (Builder $inner) => $inner
+                ->where(fn (Builder $nested) => $nested
+                    ->where('description', 'like', "%{$this->search}%")
+                    ->orWhere('ip_address', 'like', "%{$this->search}%")
+                    ->orWhereHas('user', fn (Builder $user) => $user->searchMacro(['name', 'email'], $this->search))))
+            ->when($this->action !== '', fn (Builder $inner) => $inner->where('activity_log_action', $this->action));
+
+        return $this->applyDateRange($query);
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'activity logs';
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'user' => $item->user?->name ?? 'Deleted user',
+            // Three facts about one request, which is one column on screen and one
+            // column in the file.
+            'origin' => trim(($item->browser ?: 'Unknown browser').' · '.($item->os ?: 'Unknown OS').' · '.$item->ip_address),
+            'created_at' => $item->createdAtDatetimeHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
     public function updatedSearch(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function updatedAction(): void
     {
-        $this->resetPage();
-    }
-
-    public function updatedFrom(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedTo(): void
-    {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     #[Computed]
     public function logs()
     {
-        return ActivityLog::query()
-            ->with('user:id,name,email,avatar')
-            ->when($this->search !== '', fn ($query) => $query
-                ->where(fn ($inner) => $inner
-                    ->where('description', 'like', "%{$this->search}%")
-                    ->orWhere('ip_address', 'like', "%{$this->search}%")
-                    ->orWhereHas('user', fn ($user) => $user->searchMacro(['name', 'email'], $this->search))))
-            ->when($this->action !== '', fn ($query) => $query->where('activity_log_action', $this->action))
-            ->when($this->from !== '', fn ($query) => $query->whereDate('created_at', '>=', $this->from))
-            ->when($this->to !== '', fn ($query) => $query->whereDate('created_at', '<=', $this->to))
-            ->latest()
-            ->paginate(20);
+        return $this->applySort($this->tableQuery(), 'created_at')->paginate($this->tablePerPage());
+    }
+
+    /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->logs;
     }
 
     #[Computed]
@@ -95,7 +126,8 @@ new class extends Component
 
     public function clearFilters(): void
     {
-        $this->reset('search', 'action', 'from', 'to');
+        $this->reset('search', 'action', 'dateFrom', 'dateTo');
+        $this->clearSelection();
         $this->resetPage();
     }
 
@@ -143,25 +175,40 @@ new class extends Component
             </div>
         </div>
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <flux:input type="date" label="From" wire:model.live="from" />
-            <flux:input type="date" label="To" wire:model.live="to" />
-            <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Clear filters</flux:button>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <x-form.date-field
+                    mode="range"
+                    wire:model.live="dateFrom"
+                    end-model="dateTo"
+                    with-presets
+                    label="Between"
+                    class="sm:max-w-md"
+                />
+                <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Clear filters</flux:button>
+            </div>
+
+            <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
+        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="activity logs" />
+
         <flux:table :paginate="$this->logs">
-            <flux:table.columns>
-                <flux:table.column>User</flux:table.column>
-                <flux:table.column>Action</flux:table.column>
-                <flux:table.column>Description</flux:table.column>
-                <flux:table.column>Origin</flux:table.column>
-                <flux:table.column>When</flux:table.column>
-                <flux:table.column>Details</flux:table.column>
-            </flux:table.columns>
-            <flux:table.rows>
+            <x-table.columns
+                :columns="$this->tableColumnList"
+                :sort="$sortColumn"
+                :direction="$sortDirection"
+                selectable
+                actions
+                actions-label="Details"
+            />
+
+            <x-table.rows :columns="$this->tableColumnList">
                 @forelse ($this->logs as $item)
                     <flux:table.row wire:key="activity-{{ $item->id }}">
-                        <flux:table.cell>
+                        <x-table.select :id="$item->id" />
+
+                        <x-table.cell column="user">
                             @if ($item->user)
                                 <div class="flex items-center gap-3">
                                     <x-dashboard.avatar :user="$item->user" />
@@ -179,17 +226,22 @@ new class extends Component
                             @else
                                 <span class="text-slate-400">Deleted user</span>
                             @endif
-                        </flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="activity_log_action">
                             <flux:badge size="sm">{{ $item->activity_log_action->label() }}</flux:badge>
-                        </flux:table.cell>
-                        <flux:table.cell class="max-w-sm truncate">{{ $item->description }}</flux:table.cell>
-                        <flux:table.cell class="text-xs text-slate-500">
+                        </x-table.cell>
+
+                        <x-table.cell column="description" class="max-w-sm truncate">{{ $item->description }}</x-table.cell>
+
+                        <x-table.cell column="origin" class="text-xs text-slate-500">
                             <div>{{ $item->browser ?: 'Unknown browser' }} · {{ $item->os ?: 'Unknown OS' }}</div>
                             <div class="font-mono">{{ $item->ip_address }}</div>
-                        </flux:table.cell>
-                        <flux:table.cell>{{ $item->createdAtDatetimeHuman() }}</flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="created_at">{{ $item->createdAtDatetimeHuman() }}</x-table.cell>
+
+                        <x-table.cell>
                             <flux:button
                                 icon="eye"
                                 variant="ghost"
@@ -197,20 +249,19 @@ new class extends Component
                                 wire:click="show({{ $item->id }})"
                                 title="View log entry"
                             />
-                        </flux:table.cell>
+                        </x-table.cell>
                     </flux:table.row>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="6">
-                            <x-dashboard.workspace-no-record
-                                label="Activity logs"
-                                icon="clock"
-                                text="No activity matches the current filters."
-                            />
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <x-table.empty
+                        :columns="$this->tableColumnList"
+                        selectable
+                        actions
+                        label="Activity logs"
+                        icon="clock"
+                        text="No activity matches the current filters."
+                    />
                 @endforelse
-            </flux:table.rows>
+            </x-table.rows>
         </flux:table>
     </flux:card>
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Enums\UserTypeEnum;
 use Illuminate\Support\Facades\Blade;
 
@@ -24,9 +25,11 @@ test('the trail follows the site title through the navigation tree', function ()
     expect($trail[0]['label'])->toBe('Users');
     expect($trail[1]['label'])->toBe('Roles');
 
-    // "Users" is a parent with children and no screen of its own, and the page you
-    // are already on is not somewhere to navigate to.
-    expect($trail[0]['link'])->toBeNull();
+    // "Users" is a parent with no screen of its own, so it goes where its sidebar
+    // entry goes — the first child this account can open.
+    expect($trail[0]['link'])->toBe(route('admin.admins'));
+
+    // The page you are already on is not somewhere to navigate to.
     expect($trail[1]['link'])->toBeNull();
 });
 
@@ -180,4 +183,43 @@ test('a back arrow leads the label and a forward arrow trails it', function () {
     $forward = Blade::render('<x-dashboard.page-header :breadcrumb="false" />');
 
     expect(strpos($forward, 'Continue to roles'))->toBeLessThan(strpos($forward, 'data-flux-icon'));
+});
+
+test('a parent crumb points past a child the account cannot open', function () {
+    $restricted = adminWithRoles(roleWithGates('Support', ['users.roles' => GateAccessEnum::VIEW->value]));
+
+    $this->actingAs($restricted);
+
+    kSetSiteTitle('users', 'roles');
+
+    // Admins is the first child in the tree, but this account does not hold it, so
+    // the crumb lands on the first one it can actually open.
+    expect(kBreadcrumbTrail('admin')[0]['link'])->toBe(route('admin.roles'));
+});
+
+// |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+// THE DATE FIELD
+
+test('a date field offers no presets unless it is asked for them', function () {
+    $html = Blade::render('<x-form.date-field wire:model="from" label="Dated" />');
+
+    // Js::from() escapes its quotes, so the needle is the encoded form.
+    expect($html)->toContain('\u0022presets\u0022:[]');
+});
+
+test('with-presets carries the usual set, and a range gets the longer one', function () {
+    $single = Blade::render('<x-form.date-field wire:model="from" with-presets />');
+    $range = Blade::render('<x-form.date-field mode="range" wire:model="from" end-model="to" with-presets />');
+
+    expect($single)->toContain('today')->toContain('lastMonth')
+        // "All time" clears a range; on a single date there is nothing for it to say.
+        ->not->toContain('allTime');
+
+    expect($range)->toContain('last7Days')->toContain('allTime');
+});
+
+test('a named list is taken in the order it was written', function () {
+    $html = Blade::render('<x-form.date-field mode="range" wire:model="from" end-model="to" presets="thisMonth today" />');
+
+    expect($html)->toContain('\u0022presets\u0022:[\u0022thisMonth\u0022,\u0022today\u0022]');
 });

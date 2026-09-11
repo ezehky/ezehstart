@@ -10,6 +10,7 @@ use App\Traits\WithDataTable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -128,6 +129,14 @@ new class extends Component
     }
 
     /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->transactions;
+    }
+
+    /**
      * @return array<int, array{label: string, value: string, icon: string, tone: string}>
      */
     #[Computed]
@@ -153,13 +162,65 @@ new class extends Component
                 'value' => kMoneyFormat($confirmedIn, decodeHtml: true),
                 'icon' => 'banknotes',
                 'tone' => 'emerald',
+                'trend' => $this->ledgerTrends['deposits'],
             ],
             [
                 'label' => 'All transactions',
                 'value' => number_format(Transaction::query()->count()),
                 'icon' => 'receipt-percent',
                 'tone' => 'sky',
+                'trend' => $this->ledgerTrends['all'],
             ],
+        ];
+    }
+
+    /**
+     * The last six months of the ledger, a month at a time, for the sparklines under
+     * the figures. A total says where the ledger stands; the line says whether it got
+     * there steadily or in one week.
+     *
+     * Every month in the window is present whether anything moved in it or not — a
+     * gap would draw a line climbing through months that never happened.
+     *
+     * @return array<string, array<int, object>>
+     */
+    #[Computed]
+    public function ledgerTrends(): array
+    {
+        $expression = match (DB::connection()->getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', created_at)",
+            'pgsql' => "to_char(created_at, 'YYYY-MM')",
+            default => "date_format(created_at, '%Y-%m')",
+        };
+
+        $rows = Transaction::query()
+            ->selectRaw("{$expression} as month, transaction_group, status, count(*) as total, sum(amount) as amount")
+            ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
+            ->groupBy('month', 'transaction_group', 'status')
+            ->get();
+
+        $months = collect(range(5, 0))->map(fn (int $back) => now()->subMonths($back)->format('Y-m'));
+
+        return [
+            'all' => $months
+                ->map(fn (string $month) => (object) [
+                    'month' => $month,
+                    'total' => (int) $rows->where('month', $month)->sum('total'),
+                ])
+                ->all(),
+
+            // Money confirmed in, in major units — the raw sum is minor, and it is
+            // divided exactly once, here.
+            'deposits' => $months
+                ->map(fn (string $month) => (object) [
+                    'month' => $month,
+                    'total' => (float) $rows
+                        ->where('month', $month)
+                        ->where('transaction_group', TransactionGroupEnum::DEPOSIT->value)
+                        ->where('status', StatusTransaction::CONFIRMED->value)
+                        ->sum('amount') / 100,
+                ])
+                ->all(),
         ];
     }
 
@@ -261,6 +322,7 @@ new class extends Component
                 :value="$metric['value']"
                 :icon="$metric['icon']"
                 :tone="$metric['tone']"
+                :trend="$metric['trend'] ?? null"
             />
         @endforeach
     </section>
@@ -304,6 +366,7 @@ new class extends Component
                 mode="range"
                 wire:model.live="dateFrom"
                 end-model="dateTo"
+                with-presets
                 label="Dated between"
                 class="sm:max-w-md"
             />

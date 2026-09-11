@@ -27,6 +27,8 @@
     'weekStart' => 0,
     'format' => 'medium',
     'clearable' => true,
+    'presets' => null,
+    'withPresets' => false,
 ])
 
 @php
@@ -77,6 +79,19 @@
     // the width.
     $months = (int) ($months ?? ($mode === 'range' ? 2 : 1));
 
+    // `with-presets` takes the usual set; `presets="today thisMonth"` names its own,
+    // in the order it wants them. Written as a space-separated string because that is
+    // how the field is written in markup, and an array is accepted for the caller
+    // building the list in PHP.
+    $presetList = match (true) {
+        is_array($presets) => $presets,
+        is_string($presets) => preg_split('/[\s,]+/', trim($presets), flags: PREG_SPLIT_NO_EMPTY),
+        (bool) $withPresets => $mode === 'range'
+            ? ['today', 'yesterday', 'thisWeek', 'last7Days', 'last30Days', 'thisMonth', 'lastMonth', 'yearToDate', 'allTime']
+            : ['today', 'yesterday', 'lastWeek', 'lastMonth'],
+        default => [],
+    };
+
     $picker = \Illuminate\Support\Js::from([
         'mode' => $mode,
         'min' => $bound($min),
@@ -84,6 +99,7 @@
         'weekStart' => (int) $weekStart,
         'months' => $months,
         'format' => $format,
+        'presets' => array_values($presetList),
     ]);
 @endphp
 
@@ -138,60 +154,86 @@
             x-cloak
             x-show="open"
             x-transition.origin.top
-            class="absolute z-40 mt-2 rounded-xl border border-slate-200 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-slate-900"
+            class="absolute z-40 mt-2 w-max max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-slate-900"
         >
-            <div class="mb-3 flex items-center justify-between gap-2">
-                <flux:button icon="chevron-left" variant="ghost" size="sm" type="button" x-on:click="shiftMonth(-1)" title="Previous month" />
+            <div class="flex flex-col gap-4 sm:flex-row">
+                @if ($presetList !== [])
+                    {{-- The rail sits beside the months rather than above them: a range
+                         is picked from here far more often than it is clicked out day by
+                         day, and it should not be the thing you scroll past. --}}
+                    <div class="flex shrink-0 flex-row flex-wrap gap-1 sm:w-40 sm:flex-col sm:border-e sm:border-slate-200 sm:pe-3 dark:sm:border-white/10">
+                        <template x-for="preset in presetList" :key="preset.key">
+                            <button
+                                type="button"
+                                class="rounded-lg px-3 py-1.5 text-start text-sm transition"
+                                x-text="preset.label"
+                                x-on:click="applyPreset(preset.key)"
+                                x-bind:class="isPreset(preset.key)
+                                    ? 'bg-lime-600 font-medium text-white dark:bg-lime-500'
+                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'"
+                            ></button>
+                        </template>
+                    </div>
+                @endif
 
-                <div class="flex flex-1 justify-around gap-4">
-                    <template x-for="panel in panels" :key="panel.label">
-                        <span class="font-heading text-sm font-semibold text-slate-900 dark:text-white" x-text="panel.label"></span>
-                    </template>
-                </div>
+                <div>
+                    <div class="mb-3 flex items-center justify-between gap-2">
+                        <flux:button icon="chevron-left" variant="ghost" size="sm" type="button" x-on:click="shiftMonth(-1)" title="Previous month" />
 
-                <flux:button icon="chevron-right" variant="ghost" size="sm" type="button" x-on:click="shiftMonth(1)" title="Next month" />
-            </div>
-
-            <div @class(['flex gap-4', 'flex-col sm:flex-row' => $months > 1])>
-                <template x-for="panel in panels" :key="panel.label">
-                    <div>
-                        <div class="grid grid-cols-7 gap-1">
-                            <template x-for="day in weekdays" :key="day">
-                                <span class="grid size-9 place-items-center text-[11px] font-medium uppercase text-slate-400 dark:text-slate-500" x-text="day"></span>
+                        <div class="flex flex-1 justify-around gap-4">
+                            <template x-for="panel in panels" :key="panel.label">
+                                <span class="font-heading whitespace-nowrap text-sm font-semibold text-slate-900 dark:text-white" x-text="panel.label"></span>
                             </template>
                         </div>
 
-                        <div class="mt-1 grid grid-cols-7 gap-1" x-on:mouseleave="hovering = null">
-                            <template x-for="(cell, index) in panel.cells" :key="index">
-                                <div>
-                                    {{-- A blank pads the week out. It is not a button,
-                                         so there is nothing there to mis-click. --}}
-                                    <template x-if="! cell">
-                                        <span class="block size-9"></span>
-                                    </template>
+                        <flux:button icon="chevron-right" variant="ghost" size="sm" type="button" x-on:click="shiftMonth(1)" title="Next month" />
+                    </div>
 
-                                    <template x-if="cell">
-                                        <button
-                                            type="button"
-                                            class="grid size-9 place-items-center rounded-lg text-sm transition"
-                                            x-text="cell.getDate()"
-                                            x-bind:disabled="disabled(cell)"
-                                            x-on:click="select(cell)"
-                                            x-on:mouseenter="hovering = toISO(cell)"
-                                            x-bind:class="{
-                                                'bg-lime-600 font-semibold text-white dark:bg-lime-500': isSelected(cell),
-                                                'bg-lime-50 dark:bg-lime-400/10': ! isSelected(cell) && inRange(cell),
-                                                'font-semibold text-lime-700 dark:text-lime-300': ! isSelected(cell) && isToday(cell),
-                                                'cursor-not-allowed opacity-30': disabled(cell),
-                                                'hover:bg-slate-100 dark:hover:bg-white/10': ! isSelected(cell) && ! disabled(cell),
-                                            }"
-                                        ></button>
+                    <div @class(['flex gap-4', 'flex-col sm:flex-row' => $months > 1])>
+                        <template x-for="panel in panels" :key="panel.label">
+                            <div>
+                                {{-- Fixed 2.25rem tracks, not grid-cols-7: Tailwind writes that
+                                     one as minmax(0, 1fr), and a column allowed to collapse to
+                                     zero runs the size-9 cells sitting in it into each other. --}}
+                                <div class="grid grid-cols-[repeat(7,2.25rem)] gap-1">
+                                    <template x-for="day in weekdays" :key="day">
+                                        <span class="grid size-9 place-items-center text-[11px] font-medium uppercase text-slate-400 dark:text-slate-500" x-text="day"></span>
                                     </template>
                                 </div>
-                            </template>
-                        </div>
+
+                                <div class="mt-1 grid grid-cols-[repeat(7,2.25rem)] gap-1" x-on:mouseleave="hovering = null">
+                                    <template x-for="(cell, index) in panel.cells" :key="index">
+                                        <div>
+                                            {{-- A blank pads the week out. It is not a button,
+                                                 so there is nothing there to mis-click. --}}
+                                            <template x-if="! cell">
+                                                <span class="block size-9"></span>
+                                            </template>
+
+                                            <template x-if="cell">
+                                                <button
+                                                    type="button"
+                                                    class="grid size-9 place-items-center rounded-lg text-sm transition"
+                                                    x-text="cell.getDate()"
+                                                    x-bind:disabled="disabled(cell)"
+                                                    x-on:click="select(cell)"
+                                                    x-on:mouseenter="hovering = toISO(cell)"
+                                                    x-bind:class="{
+                                                        'bg-lime-600 font-semibold text-white dark:bg-lime-500': isSelected(cell),
+                                                        'bg-lime-50 dark:bg-lime-400/10': ! isSelected(cell) && inRange(cell),
+                                                        'font-semibold text-lime-700 dark:text-lime-300': ! isSelected(cell) && isToday(cell),
+                                                        'cursor-not-allowed opacity-30': disabled(cell),
+                                                        'hover:bg-slate-100 dark:hover:bg-white/10': ! isSelected(cell) && ! disabled(cell),
+                                                    }"
+                                                ></button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </div>
-                </template>
+                </div>
             </div>
         </div>
     </div>

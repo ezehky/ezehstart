@@ -151,3 +151,62 @@ test('every write is recorded in the activity log', function () {
         // Captured before the row went, so the line still says what was deleted.
         ->and(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::FAQ_DELETE)->exists())->toBeTrue();
 });
+
+// |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+// IMPORT
+
+test('a file of questions and answers becomes a FAQ list', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('importFile', csvUpload("question,answer,order\nHow do I sign in?,With your email address.,1\nWhere is my receipt?,On the transaction.,2\n"))
+        ->call('import')
+        ->assertHasNoErrors();
+
+    expect(Faq::query()->count())->toBe(2)
+        ->and(Faq::query()->where('question', 'How do I sign in?')->first()->answer)
+        ->toBe('With your email address.');
+});
+
+test('a question with no answer is named rather than written blank', function () {
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('importFile', csvUpload("question,answer\nHow do I sign in?,\nWhere is my receipt?,On the transaction.\n"))
+        ->call('import');
+
+    expect(Faq::query()->count())->toBe(1)
+        ->and($component->get('importSkipped'))->toHaveCount(1)
+        ->and($component->get('importSkipped')[0])->toContain('answer is blank');
+});
+
+test('a question already on the list is left where it is', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('importFile', csvUpload("question,answer\nHow do I sign in?,With your email address.\n"))
+        ->call('import');
+
+    $component = Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('importFile', csvUpload("question,answer\nHow do I sign in?,Something else entirely.\n"))
+        ->call('import');
+
+    expect(Faq::query()->count())->toBe(1)
+        ->and(Faq::query()->first()->answer)->toBe('With your email address.')
+        ->and($component->get('importedCount'))->toBe(0);
+});
+
+test('questions are cleared out in bulk', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('importFile', csvUpload("question,answer\nOne?,Yes.\nTwo?,No.\n"))
+        ->call('import');
+
+    $ids = Faq::query()->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.faqs')
+        ->set('selected', $ids)
+        ->call('bulkDelete')
+        ->assertHasNoErrors();
+
+    expect(Faq::query()->count())->toBe(0);
+});

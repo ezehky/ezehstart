@@ -8,8 +8,10 @@ use App\Enums\StatusYes;
 use App\Models\Policy;
 use App\Services\ActivityLogService;
 use App\Services\PolicyContentService;
-use App\Traits\WithGateProps;
+use App\Traits\WithDataTable;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -17,7 +19,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithGateProps;
+    use WithDataTable;
 
     public ?Policy $policy = null;
 
@@ -52,6 +54,55 @@ new class extends Component
     public function policyCases(): array
     {
         return PolicyTypeEnum::cases();
+    }
+
+    /**
+     * The columns, for WithDataTable.
+     *
+     * This screen draws one table per policy type rather than one table, but that is
+     * how it is laid out rather than what it holds — the columns and the export are
+     * about every version on the page.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'version' => ['label' => 'Version', 'locked' => true, 'sortable' => true],
+            'title' => ['label' => 'Title'],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'requires_consent' => ['label' => 'Consent'],
+            'consents_count' => ['label' => 'Accepted by', 'exportable' => false],
+            'effective_at' => ['label' => 'In force from', 'sortable' => true],
+            'updated_at' => ['label' => 'Updated', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        return Policy::query()->withCount('consents');
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'policy versions';
+    }
+
+    /**
+     * Every version is on the page at once, so the header checkbox takes all of them.
+     *
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->grouped->flatten();
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'effective_at' => $item->effective_at?->format('Y-m-d') ?? '',
+            'updated_at' => $item->updatedAtHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
     }
 
     /**
@@ -283,23 +334,25 @@ new class extends Component
                 </div>
 
                 <flux:table>
-                    <flux:table.columns>
-                        <flux:table.column>Version</flux:table.column>
-                        <flux:table.column>Status</flux:table.column>
-                        <flux:table.column>Consent</flux:table.column>
-                        <flux:table.column>Accepted by</flux:table.column>
-                        <flux:table.column>Updated</flux:table.column>
-                        <flux:table.column>Actions</flux:table.column>
-                    </flux:table.columns>
-                    <flux:table.rows>
+                    <x-table.columns
+                        :columns="$this->tableColumnList"
+                        :sort="$sortColumn"
+                        :direction="$sortDirection"
+                        actions
+                    />
+
+                    <x-table.rows :columns="$this->tableColumnList">
                         @forelse ($versions as $item)
                             <flux:table.row wire:key="policy-{{ $item->id }}">
-                                <flux:table.cell class="font-medium">v{{ $item->version }}</flux:table.cell>
-                                <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
-                                <flux:table.cell><x-util.status :status="$item->requires_consent" /></flux:table.cell>
-                                <flux:table.cell><span class="tabular-nums">{{ number_format($item->consents_count) }}</span></flux:table.cell>
-                                <flux:table.cell>{{ $item->updatedAtHuman() }}</flux:table.cell>
-                                <flux:table.cell>
+                                <x-table.cell column="version" class="font-medium">v{{ $item->version }}</x-table.cell>
+                                <x-table.cell column="title">{{ $item->title }}</x-table.cell>
+                                <x-table.cell column="status"><x-util.status :status="$item->status" /></x-table.cell>
+                                <x-table.cell column="requires_consent"><x-util.status :status="$item->requires_consent" /></x-table.cell>
+                                <x-table.cell column="consents_count"><span class="tabular-nums">{{ number_format($item->consents_count) }}</span></x-table.cell>
+                                <x-table.cell column="effective_at">{{ $item->effective_at ? $item->effectiveAtHuman() : '—' }}</x-table.cell>
+                                <x-table.cell column="updated_at">{{ $item->updatedAtHuman() }}</x-table.cell>
+
+                                <x-table.cell>
                                     <flux:dropdown position="right" align="start">
                                         <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
                                         <flux:menu>
@@ -332,20 +385,18 @@ new class extends Component
                                             </flux:menu.item>
                                         </flux:menu>
                                     </flux:dropdown>
-                                </flux:table.cell>
+                                </x-table.cell>
                             </flux:table.row>
                         @empty
-                            <flux:table.row>
-                                <flux:table.cell colspan="6">
-                                    <x-dashboard.workspace-no-record
-                                        label="Versions"
-                                        icon="document-text"
-                                        text="No version of this policy has been written yet."
-                                    />
-                                </flux:table.cell>
-                            </flux:table.row>
+                            <x-table.empty
+                                :columns="$this->tableColumnList"
+                                actions
+                                label="Versions"
+                                icon="document-text"
+                                text="No version of this policy has been written yet."
+                            />
                         @endforelse
-                    </flux:table.rows>
+                    </x-table.rows>
                 </flux:table>
             </div>
         @endforeach

@@ -5,7 +5,9 @@ use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
+use App\Traits\WithDataTable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -13,7 +15,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination;
+    use WithDataTable, WithPagination;
 
     public User $user;
 
@@ -30,15 +32,88 @@ new class extends Component
         kSetSiteTitle('transactions');
     }
 
+    /**
+     * The listing as a table, for WithDataTable.
+     *
+     * No page gate is named: kPageGate() lets a non-admin route through, and gates
+     * divide up the admin workspace only. The scoping that matters here is the
+     * relationship the query is built on.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
+            'description' => ['label' => 'Description'],
+            'amount' => ['label' => 'Amount', 'sortable' => true, 'summary' => 'sum', 'money' => true],
+            'balance' => ['label' => 'Balance after', 'exportable' => false],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'created_at' => ['label' => 'Date', 'sortable' => true],
+        ];
+    }
+
+    /**
+     * Built off the account's own relationship, so every re-run — the totals, the
+     * export, the selection — is the same narrow question rather than the ledger.
+     */
+    protected function tableQuery(): Builder
+    {
+        // Transaction::query() rather than the relationship: a HasMany is not an
+        // Eloquent\Builder, and every re-run of this — the totals, the export, the
+        // selection — hands it to the trait as one.
+        $query = Transaction::query()
+            ->where('user_id', $this->user->id)
+            ->with(['charges', 'balance'])
+            ->when($this->group !== '', fn (Builder $inner) => $inner->where('transaction_group', $this->group))
+            ->when($this->status !== '', fn (Builder $inner) => $inner->where('status', (int) $this->status));
+
+        return $this->applyDateRange($query);
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'transactions';
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'amount' => $item->signedAmount(),
+            'created_at' => $item->createdDatetimeHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
+    protected function tablePerPage(): int
+    {
+        return 15;
+    }
+
+    public function updatedGroup(): void
+    {
+        $this->clearSelection();
+        $this->resetPage();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->clearSelection();
+        $this->resetPage();
+    }
+
     #[Computed]
     public function transactions()
     {
-        return $this->user->transactions()
-            ->with(['charges', 'balance'])
-            ->when($this->group !== '', fn (Builder $query) => $query->where('transaction_group', $this->group))
-            ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
-            ->newestFirst()
-            ->paginate(15);
+        return $this->applySort($this->tableQuery(), 'created_at')
+            ->orderByDesc('id')
+            ->paginate($this->tablePerPage());
+    }
+
+    /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->transactions;
     }
 
     #[Computed]
@@ -78,16 +153,6 @@ new class extends Component
                 'tone' => $pending > 0 ? 'amber' : 'slate',
             ],
         ];
-    }
-
-    public function updatedGroup(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedStatus(): void
-    {
-        $this->resetPage();
     }
 };
 ?>
@@ -134,27 +199,52 @@ new class extends Component
                 text="Once money moves on your account, every movement shows up on this page."
             />
         @else
-            <flux:table :paginate="$this->transactions">
-                <flux:table.columns>
-                    <flux:table.column>Reference</flux:table.column>
-                    <flux:table.column>Description</flux:table.column>
-                    <flux:table.column>Amount</flux:table.column>
-                    <flux:table.column>Balance after</flux:table.column>
-                    <flux:table.column>Status</flux:table.column>
-                </flux:table.columns>
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <x-form.date-field
+                    mode="range"
+                    wire:model.live="dateFrom"
+                    end-model="dateTo"
+                    with-presets
+                    label="Dated between"
+                    class="sm:max-w-md"
+                />
 
-                <flux:table.rows>
-                    @foreach ($this->transactions as $item)
+                <x-table.column-manager :columns="$this->tableColumnList" />
+            </div>
+
+            {{-- Export only: a member takes a copy of their own statement, and there
+                 is nothing on this screen for them to delete. --}}
+            <x-table.bulk-bar
+                class="mb-5"
+                :count="$this->selectedCount"
+                :matching="$selectMatching"
+                subject="transactions"
+            />
+
+            <flux:table :paginate="$this->transactions">
+                <x-table.columns
+                    :columns="$this->tableColumnList"
+                    :sort="$sortColumn"
+                    :direction="$sortDirection"
+                    selectable
+                />
+
+                <x-table.rows :columns="$this->tableColumnList">
+                    @forelse ($this->transactions as $item)
                         <flux:table.row wire:key="txn-{{ $item->id }}">
-                            <flux:table.cell>
+                            <x-table.select :id="$item->id" />
+
+                            <x-table.cell column="reference">
                                 <p class="font-mono text-xs">{{ $item->reference }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->createdDatetimeHuman() }}</p>
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="description">
                                 <p class="text-slate-950 dark:text-white">{{ $item->description }}</p>
                                 <flux:badge size="sm" inset="top bottom">{{ $item->transaction_group->label() }}</flux:badge>
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="amount">
                                 <span @class([
                                     'font-medium',
                                     'text-red-600 dark:text-red-400' => $item->transaction_type->isDebit(),
@@ -167,16 +257,34 @@ new class extends Component
                                         incl. {!! kMoneyFormat($item->totalCharges()) !!} charges
                                     </p>
                                 @endif
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="balance">
                                 {!! $item->balance ? kMoneyFormat($item->balance->balance_after) : '—' !!}
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="status">
                                 <x-util.status :status="$item->status" />
-                            </flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
                         </flux:table.row>
-                    @endforeach
-                </flux:table.rows>
+                    @empty
+                        <x-table.empty
+                            :columns="$this->tableColumnList"
+                            selectable
+                            label="No transactions"
+                            icon="receipt-percent"
+                            text="Nothing matches the current filters."
+                        />
+                    @endforelse
+
+                    <x-table.summary
+                        :columns="$this->tableColumnList"
+                        :summary="$this->tableSummary"
+                        selectable
+                    />
+                </x-table.rows>
             </flux:table>
         @endif
     </flux:card>

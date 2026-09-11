@@ -30,6 +30,85 @@ const MONTHS = [
 ];
 
 /** A local Date from YYYY-MM-DD, or null for anything that is not one. */
+/**
+ * The ranges a preset stands for, and what each is called.
+ *
+ * Keys match the ones Flux Pro's picker uses, so a field written against its
+ * documentation reads the same here.
+ */
+const PRESET_LABELS = {
+    today: "Today",
+    yesterday: "Yesterday",
+    thisWeek: "This week",
+    lastWeek: "Last week",
+    last7Days: "Last 7 days",
+    last30Days: "Last 30 days",
+    thisMonth: "This month",
+    lastMonth: "Last month",
+    thisQuarter: "This quarter",
+    thisYear: "This year",
+    yearToDate: "Year to date",
+    allTime: "All time",
+};
+
+/** A date with the time stripped, so every comparison here is day-to-day. */
+function atMidnight(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date, by) {
+    const shifted = atMidnight(date);
+
+    shifted.setDate(shifted.getDate() + by);
+
+    return shifted;
+}
+
+function startOfWeek(date, weekStart = 0) {
+    return addDays(date, -((date.getDay() - weekStart + 7) % 7));
+}
+
+/**
+ * The two ends a preset resolves to, as [from, to]. "All time" is the one that
+ * answers with nothing, because no range at all is exactly what it means.
+ */
+export function presetRange(key, weekStart = 0, today = new Date()) {
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    switch (key) {
+        case "today":
+            return [atMidnight(today), atMidnight(today)];
+        case "yesterday":
+            return [addDays(today, -1), addDays(today, -1)];
+        case "thisWeek":
+            return [startOfWeek(today, weekStart), atMidnight(today)];
+        case "lastWeek": {
+            const start = addDays(startOfWeek(today, weekStart), -7);
+
+            return [start, addDays(start, 6)];
+        }
+        case "last7Days":
+            return [addDays(today, -6), atMidnight(today)];
+        case "last30Days":
+            return [addDays(today, -29), atMidnight(today)];
+        case "thisMonth":
+            return [new Date(year, month, 1), atMidnight(today)];
+        case "lastMonth":
+            // Day zero of a month is the last day of the one before it.
+            return [new Date(year, month - 1, 1), new Date(year, month, 0)];
+        case "thisQuarter":
+            return [new Date(year, Math.floor(month / 3) * 3, 1), atMidnight(today)];
+        case "thisYear":
+        case "yearToDate":
+            return [new Date(year, 0, 1), atMidnight(today)];
+        case "allTime":
+            return [null, null];
+        default:
+            return null;
+    }
+}
+
 export function parseISO(value) {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         return null;
@@ -90,6 +169,7 @@ export default function datePicker({
     weekStart = 0,
     months = 1,
     format = "medium",
+    presets = [],
 }) {
     return {
         open: false,
@@ -161,6 +241,66 @@ export default function datePicker({
 
         get hasValue() {
             return Boolean(this.start || this.end);
+        },
+
+        /** The presets this field was given, in the order they were asked for. */
+        get presetList() {
+            return presets
+                .filter((key) => PRESET_LABELS[key])
+                .map((key) => ({ key, label: PRESET_LABELS[key] }));
+        },
+
+        /**
+         * Jump the selection to a named range.
+         *
+         * A single-date field takes the near end of it and closes; a range takes
+         * both and stays open, so the choice can be nudged by hand afterwards.
+         */
+        applyPreset(key) {
+            const range = presetRange(key, weekStart);
+
+            if (!range) {
+                return;
+            }
+
+            const [from, to] = range;
+
+            if (!from) {
+                this.clear();
+
+                return;
+            }
+
+            this.start = toISO(from);
+            this.end = mode === "range" ? toISO(to) : "";
+            this.hovering = null;
+
+            this.commit();
+            this.syncViewToSelection();
+
+            if (mode !== "range") {
+                this.open = false;
+            }
+        },
+
+        /** Whether what is currently picked is exactly what a preset stands for. */
+        isPreset(key) {
+            const range = presetRange(key, weekStart);
+
+            if (!range) {
+                return false;
+            }
+
+            const [from, to] = range;
+
+            if (!from) {
+                return !this.hasValue;
+            }
+
+            return (
+                this.start === toISO(from) &&
+                (mode === "range" ? this.end === toISO(to) : true)
+            );
         },
 
         formatted(value) {

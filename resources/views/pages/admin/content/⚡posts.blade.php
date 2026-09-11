@@ -7,9 +7,10 @@ use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
 use App\Services\ImageLibraryService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithDataTable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -17,7 +18,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithPagination;
+    use WithDataTable, WithPagination;
 
     public ?Post $post = null;
 
@@ -30,7 +31,7 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'blogs');
-        kPageGate('content.blogs');
+        $this->setPageGate('content.blogs');
     }
 
     /**
@@ -53,16 +54,91 @@ new class extends Component
         return app(BlogService::class)->authorRestricted(auth()->user());
     }
 
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'title' => ['label' => 'Post', 'locked' => true, 'sortable' => true],
+            'categories' => ['label' => 'Categories'],
+            'user' => ['label' => 'Author'],
+            'views' => ['label' => 'Reads', 'sortable' => true, 'summary' => 'sum'],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'published_at' => ['label' => 'Published', 'sortable' => true],
+        ];
+    }
+
+    /**
+     * Author-scoped, like everything else on this screen: an export that quietly
+     * handed an author the whole archive would be a way around the rule the listing
+     * is enforcing.
+     */
+    protected function tableQuery(): Builder
+    {
+        $query = app(BlogService::class)
+            ->authorScope(Post::query(), auth()->user())
+            ->with(['user', 'image', 'categories'])
+            ->when($this->search, fn (Builder $inner) => $inner->searchMacro('title', $this->search))
+            ->when($this->status !== '', fn (Builder $inner) => $inner->where('status', (int) $this->status));
+
+        return $this->applyDateRange($query, 'published_at');
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'posts';
+    }
+
+    protected function tableDateColumn(): string
+    {
+        return 'published_at';
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'categories' => $item->categories->pluck('name')->implode(', '),
+            'user' => $item->authorName(),
+            'published_at' => $item->published_at?->format('Y-m-d') ?? '',
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
+    protected function afterBulkAction(): void
+    {
+        unset($this->posts, $this->metrics);
+    }
+
+    protected function tablePerPage(): int
+    {
+        return 15;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->clearSelection();
+        $this->resetPage();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->clearSelection();
+        $this->resetPage();
+    }
+
     #[Computed]
     public function posts()
     {
-        return app(BlogService::class)
-            ->authorScope(Post::query(), auth()->user())
-            ->with(['user', 'image', 'categories'])
-            ->when($this->search, fn (Builder $query) => $query->searchMacro('title', $this->search))
-            ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
-            ->orderByDesc('id')
-            ->paginate(15);
+        return $this->applySort($this->tableQuery(), 'id')->paginate($this->tablePerPage());
+    }
+
+    /**
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->posts;
     }
 
     /**
@@ -96,16 +172,6 @@ new class extends Component
                 'tone' => 'sky',
             ],
         ];
-    }
-
-    public function updatedSearch(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedStatus(): void
-    {
-        $this->resetPage();
     }
 
     public function confirmDelete(Post $post): void
@@ -215,19 +281,37 @@ new class extends Component
                 text="Write the first one and it will show up here."
             />
         @else
-            <flux:table :paginate="$this->posts">
-                <flux:table.columns>
-                    <flux:table.column>Post</flux:table.column>
-                    <flux:table.column>Categories</flux:table.column>
-                    <flux:table.column>Reads</flux:table.column>
-                    <flux:table.column>Status</flux:table.column>
-                    <flux:table.column />
-                </flux:table.columns>
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <x-form.date-field
+                    mode="range"
+                    wire:model.live="dateFrom"
+                    end-model="dateTo"
+                    with-presets
+                    label="Published between"
+                    class="sm:max-w-md"
+                />
 
-                <flux:table.rows>
-                    @foreach ($this->posts as $item)
+                <x-table.column-manager :columns="$this->tableColumnList" />
+            </div>
+
+            <x-table.bulk-bar class="mb-5" :count="$this->selectedCount" :matching="$selectMatching" subject="posts" />
+
+            <flux:table :paginate="$this->posts">
+                <x-table.columns
+                    :columns="$this->tableColumnList"
+                    :sort="$sortColumn"
+                    :direction="$sortDirection"
+                    selectable
+                    actions
+                    actions-label=""
+                />
+
+                <x-table.rows :columns="$this->tableColumnList">
+                    @forelse ($this->posts as $item)
                         <flux:table.row wire:key="post-{{ $item->id }}">
-                            <flux:table.cell>
+                            <x-table.select :id="$item->id" />
+
+                            <x-table.cell column="title">
                                 <div class="flex items-center gap-3">
                                     @if ($item->image)
                                         <img src="{{ $item->image->url() }}" alt="" class="size-10 rounded object-cover" />
@@ -241,8 +325,9 @@ new class extends Component
                                         </p>
                                     </div>
                                 </div>
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="categories">
                                 <div class="flex flex-wrap gap-1">
                                     @forelse ($item->categories as $category)
                                         <flux:badge size="sm" inset="top bottom">{{ $category->name }}</flux:badge>
@@ -250,12 +335,20 @@ new class extends Component
                                         <flux:text size="sm">—</flux:text>
                                     @endforelse
                                 </div>
-                            </flux:table.cell>
-                            <flux:table.cell>{{ number_format($item->views) }}</flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="user">{{ $item->authorName() }}</x-table.cell>
+                            <x-table.cell column="views">{{ number_format($item->views) }}</x-table.cell>
+
+                            <x-table.cell column="status">
                                 <x-util.status :status="$item->status" />
-                            </flux:table.cell>
-                            <flux:table.cell>
+                            </x-table.cell>
+
+                            <x-table.cell column="published_at">
+                                {{ $item->published_at ? $item->publishedAtHuman() : '—' }}
+                            </x-table.cell>
+
+                            <x-table.cell>
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                     <flux:menu>
@@ -286,10 +379,26 @@ new class extends Component
                                         </x-dashboard.gate.menu-item>
                                     </flux:menu>
                                 </flux:dropdown>
-                            </flux:table.cell>
+                            </x-table.cell>
                         </flux:table.row>
-                    @endforeach
-                </flux:table.rows>
+                    @empty
+                        <x-table.empty
+                            :columns="$this->tableColumnList"
+                            selectable
+                            actions
+                            label="No posts"
+                            icon="newspaper"
+                            text="No posts match the current filters."
+                        />
+                    @endforelse
+
+                    <x-table.summary
+                        :columns="$this->tableColumnList"
+                        :summary="$this->tableSummary"
+                        selectable
+                        actions
+                    />
+                </x-table.rows>
             </flux:table>
         @endif
     </flux:card>

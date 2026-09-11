@@ -4,15 +4,18 @@ use App\Enums\GateAccessEnum;
 use App\Models\Role;
 use App\Services\GateService;
 use App\Services\RoleService;
+use App\Traits\WithDataTable;
 use App\Traits\WithGateManager;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component
 {
-    use WithGateManager;
+    use WithDataTable, WithGateManager;
 
     public ?Role $role = null;
 
@@ -27,17 +30,61 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('users', 'roles');
-        kPageGate('users.roles');
+        $this->setPageGate('users.roles');
+    }
+
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'name' => ['label' => 'Role', 'locked' => true, 'sortable' => true],
+            'description' => ['label' => 'What it can do'],
+            'gates' => ['label' => 'Access', 'exportable' => false],
+            'users_count' => ['label' => 'Admins', 'exportable' => false],
+            'created_at' => ['label' => 'Added', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        return Role::query()->withCount('users');
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'roles';
+    }
+
+    /**
+     * Every role is on the page at once, so the header checkbox takes all of them.
+     *
+     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     */
+    protected function tableRows(): iterable
+    {
+        return $this->roles;
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'created_at' => $item->createdAtHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
     }
 
     #[Computed]
     public function roles(): Collection
     {
-        return Role::query()
-            ->withCount('users')
-            ->orderByDesc('is_protected')
-            ->orderBy('name')
-            ->get();
+        // The protected role first whatever else is sorted on: it is the one that
+        // keeps the install administrable, and it belongs at the top of the list.
+        return $this->applySort(
+            $this->tableQuery()->orderByDesc('is_protected'),
+            'name',
+            'asc'
+        )->get();
     }
 
     /**
@@ -234,17 +281,17 @@ new class extends Component
         </div>
 
         <flux:table>
-            <flux:table.columns>
-                <flux:table.column>Role</flux:table.column>
-                <flux:table.column>What it can do</flux:table.column>
-                <flux:table.column>Access</flux:table.column>
-                <flux:table.column>Admins</flux:table.column>
-                <flux:table.column>Actions</flux:table.column>
-            </flux:table.columns>
-            <flux:table.rows>
+            <x-table.columns
+                :columns="$this->tableColumnList"
+                :sort="$sortColumn"
+                :direction="$sortDirection"
+                actions
+            />
+
+            <x-table.rows :columns="$this->tableColumnList">
                 @forelse ($this->roles as $item)
                     <flux:table.row wire:key="role-{{ $item->id }}">
-                        <flux:table.cell>
+                        <x-table.cell column="name">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <flux:badge size="sm" :color="$item->is_protected ? 'purple' : 'blue'">
                                     {{ $item->name }}
@@ -260,11 +307,13 @@ new class extends Component
                                     </flux:tooltip>
                                 @endif
                             </div>
-                        </flux:table.cell>
-                        <flux:table.cell class="max-w-md text-slate-500 dark:text-slate-400">
+                        </x-table.cell>
+
+                        <x-table.cell column="description" class="max-w-md text-slate-500 dark:text-slate-400">
                             {{ $item->description ?: '—' }}
-                        </flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="gates">
                             @php($granted = data_get($this->gateCounts, $item->id, 0))
                             @if ($granted)
                                 <flux:badge size="sm" :color="$granted === $this->gateTotal ? 'green' : 'blue'">
@@ -273,9 +322,12 @@ new class extends Component
                             @else
                                 <flux:badge size="sm" color="amber">No screens</flux:badge>
                             @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="font-medium">{{ number_format($item->users_count) }}</flux:table.cell>
-                        <flux:table.cell>
+                        </x-table.cell>
+
+                        <x-table.cell column="users_count" class="font-medium">{{ number_format($item->users_count) }}</x-table.cell>
+                        <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
+
+                        <x-table.cell>
                             <div class="flex flex-wrap gap-1">
                                 {{-- Editing a role's map is handing out access, so it asks for full
                                      access to Users — the same gate the lockout guard protects. --}}
@@ -312,20 +364,18 @@ new class extends Component
                                     />
                                 @endunless
                             </div>
-                        </flux:table.cell>
+                        </x-table.cell>
                     </flux:table.row>
                 @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="5">
-                            <x-dashboard.workspace-no-record
-                                label="Roles"
-                                icon="identification"
-                                text="No roles exist yet. Add one to start assigning administrators."
-                            />
-                        </flux:table.cell>
-                    </flux:table.row>
+                    <x-table.empty
+                        :columns="$this->tableColumnList"
+                        actions
+                        label="Roles"
+                        icon="identification"
+                        text="No roles exist yet. Add one to start assigning administrators."
+                    />
                 @endforelse
-            </flux:table.rows>
+            </x-table.rows>
         </flux:table>
     </flux:card>
 

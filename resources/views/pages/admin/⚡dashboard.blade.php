@@ -2,6 +2,7 @@
 
 use App\Enums\NotificationTopicEnum;
 use App\Enums\StatusUser;
+use App\Enums\UserTypeEnum;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\AdminActionService;
@@ -40,27 +41,31 @@ new class extends Component
     #[Computed]
     public function metrics(): array
     {
-        $usersCount = User::query()->count();
+        $accountsCount = User::query()->count();
         $adminsCount = User::query()->admins()->count();
-        $usersCount = User::query()->users()->count();
+        $membersCount = User::query()->users()->count();
         $suspendedCount = User::query()->where('status', StatusUser::SUSPENDED)->count();
         $unverifiedCount = User::query()->whereNull('email_verified_at')->count();
         $strandedCount = User::query()->withoutLiveRole()->count();
 
+        $trends = $this->signupTrends;
+
         return [
-            'users' => [
-                'label' => 'Total users',
-                'value' => number_format($usersCount),
+            'accounts' => [
+                'label' => 'Total accounts',
+                'value' => number_format($accountsCount),
                 'icon' => 'users',
-                'change' => 'All registered accounts',
+                'change' => 'Every registered account',
                 'tone' => 'sky',
+                'trend' => $trends['all'],
             ],
-            'users' => [
-                'label' => 'users',
-                'value' => number_format($usersCount),
+            'members' => [
+                'label' => 'Members',
+                'value' => number_format($membersCount),
                 'icon' => 'user-group',
                 'change' => 'Accounts in the member workspace',
                 'tone' => 'emerald',
+                'trend' => $trends['member'],
             ],
             'admins' => [
                 'label' => 'Admins',
@@ -68,6 +73,7 @@ new class extends Component
                 'icon' => 'shield-check',
                 'change' => 'Accounts with workspace access',
                 'tone' => 'slate',
+                'trend' => $trends['admin'],
             ],
             'stranded' => [
                 'label' => 'Admins without a role',
@@ -90,6 +96,44 @@ new class extends Component
                 'change' => 'Blocked from signing in',
                 'tone' => 'slate',
             ],
+        ];
+    }
+
+    /**
+     * Sign-ups a month for the last six, split by which workspace the account
+     * belongs to — the series the tiles draw under their figures.
+     *
+     * Every month in the window is present whether anybody signed up in it or not. A
+     * gap is a zero, and a series with holes in it draws a line that climbs through
+     * months that never happened.
+     *
+     * @return array<string, array<int, object>>
+     */
+    #[Computed]
+    public function signupTrends(): array
+    {
+        $rows = User::query()
+            ->selectRaw("{$this->monthExpression} as month, user_type, count(*) as total")
+            ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
+            ->groupBy('month', 'user_type')
+            ->get();
+
+        $months = collect(range(5, 0))->map(fn (int $back) => now()->subMonths($back)->format('Y-m'));
+
+        $series = fn (?UserTypeEnum $type) => $months
+            ->map(fn (string $month) => (object) [
+                'month' => $month,
+                'total' => (int) $rows
+                    ->where('month', $month)
+                    ->when($type, fn ($matched) => $matched->where('user_type', $type->value))
+                    ->sum('total'),
+            ])
+            ->all();
+
+        return [
+            'all' => $series(null),
+            'member' => $series(UserTypeEnum::USER),
+            'admin' => $series(UserTypeEnum::ADMIN),
         ];
     }
 
@@ -173,6 +217,7 @@ new class extends Component
                 :icon="$metric['icon']"
                 :change="$metric['change']"
                 :tone="$metric['tone']"
+                :trend="$metric['trend'] ?? null"
             />
         @endforeach
     </section>
