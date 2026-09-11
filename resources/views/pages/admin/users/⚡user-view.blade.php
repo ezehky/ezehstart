@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusUser;
 use App\Models\User;
 use App\Models\UserProfile;
@@ -36,7 +37,7 @@ new class extends Component
 
     public function mount(): void
     {
-        $this->user->load(['userProfile', 'role']);
+        $this->user->load(['userProfile', 'roles']);
 
         // The access modal always targets the account being viewed.
         $this->openRoleManagerState();
@@ -97,7 +98,7 @@ new class extends Component
 
     protected function afterGateChange(): void
     {
-        $this->user->refresh()->load(['role', 'userProfile']);
+        $this->user->refresh()->load(['roles', 'userProfile']);
 
         unset($this->gateSummary, $this->activityLogs);
     }
@@ -108,6 +109,27 @@ new class extends Component
     public function listKey(): string
     {
         return $this->user->user_type->isAdmin() ? 'admins' : 'members';
+    }
+
+    /**
+     * The gate this account's own screens sit behind.
+     *
+     * The page itself only asks for 'users', because one screen serves both listings.
+     * Every write on it asks for the narrower key, so somebody granted Members alone
+     * cannot edit an administrator through the account view.
+     */
+    public function gateKey(): string
+    {
+        return 'users.'.$this->listKey();
+    }
+
+    /**
+     * How far this account may go on the record being viewed.
+     */
+    #[Computed]
+    public function access(): GateAccessEnum
+    {
+        return kGateAccess($this->gateKey());
     }
 
     #[Computed]
@@ -136,6 +158,11 @@ new class extends Component
 
     public function editAccount(): void
     {
+        $this->respondError(
+            'You do not have access to edit this account.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->resetValidation();
 
         $this->name = $this->user->name;
@@ -160,6 +187,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to edit this account.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $this->user->name = $this->name;
@@ -194,6 +226,11 @@ new class extends Component
 
     public function editSettings(): void
     {
+        $this->respondError(
+            'You do not have access to edit this account.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->resetValidation();
 
         // Backfill any switch that was never written for this account.
@@ -211,6 +248,11 @@ new class extends Component
 
     public function saveSettings(): bool
     {
+        $this->respondError(
+            'You do not have access to edit this account.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->validate(['profileSettings.*' => ['boolean']]);
 
         $profile = UserProfile::query()->firstOrNew(['user_id' => $this->user->id]);
@@ -248,6 +290,11 @@ new class extends Component
     public function toggleStatus(): bool
     {
         $this->respondError(
+            'You do not have access to suspend or reinstate this account.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
+        $this->respondError(
             'You cannot suspend your own account.',
             if: $this->user->id === auth()->id(),
         );
@@ -269,7 +316,8 @@ new class extends Component
 
     protected function afterRoleChange(): void
     {
-        $this->user->refresh()->load(['role', 'userProfile']);
+        $this->user->refresh()->load(['roles', 'userProfile']);
+
 
         // Re-pointed at the refreshed account, so the modal's boxes match what was
         // just written rather than what was there when it opened.
@@ -277,6 +325,7 @@ new class extends Component
 
         unset(
             $this->isAdminAccount,
+            $this->access,
             $this->activityLogs,
             $this->gateSummary,
         );
@@ -291,7 +340,7 @@ new class extends Component
     {
         $this->roleUserId = $this->user->id;
         $this->accountType = $this->user->user_type->value;
-        $this->accountRole = (string) ($this->user->role_id ?? '');
+        $this->accountRoles = $this->user->roles->pluck('id')->map(fn ($id) => (string) $id)->all();
     }
 };
 ?>
@@ -313,8 +362,9 @@ new class extends Component
         <flux:callout icon="exclamation-triangle" variant="warning">
             <flux:callout.heading>This admin cannot reach anything</flux:callout.heading>
             <flux:callout.text>
-                It has no role, or one that has been switched off, so it signs in to an empty
-                workspace. Use <span class="font-medium">Manage access</span> to put it on a live role.
+                It holds no roles, or only ones that have been switched off, so it signs in to an
+                empty workspace. Use <span class="font-medium">Manage access</span> to put it on a
+                live role.
             </flux:callout.text>
         </flux:callout>
     @endif
@@ -335,7 +385,7 @@ new class extends Component
                         <flux:badge size="sm" :color="$user->user_type->isAdmin() ? 'purple' : 'zinc'">
                             {{ $user->user_type->label() }}
                         </flux:badge>
-                        <x-dashboard.user-role :user="$user" />
+                        <x-dashboard.role.badges :user="$user" />
                         @if ($user->hasVerifiedEmail())
                             <flux:badge size="sm" color="green">Email verified</flux:badge>
                         @else
@@ -346,17 +396,37 @@ new class extends Component
             </div>
 
             <div class="flex flex-wrap gap-2">
-                <flux:button icon="pencil-square" variant="primary" wire:click="editAccount">Edit account</flux:button>
-                <flux:button icon="shield-check" variant="filled" wire:click="openRoleManager({{ $user->id }})">
+                <x-dashboard.gate.button
+                    :gate="$this->gateKey()"
+                    level="modify"
+                    icon="pencil-square"
+                    variant="primary"
+                    wire:click="editAccount"
+                >
+                    Edit account
+                </x-dashboard.gate.button>
+
+                {{-- Handing out roles is handing out access, so this one asks for full
+                     access to Users — the same gate the lockout guard protects. --}}
+                <x-dashboard.gate.button
+                    gate="users"
+                    level="full"
+                    icon="shield-check"
+                    variant="filled"
+                    wire:click="openRoleManager({{ $user->id }})"
+                >
                     Manage access
-                </flux:button>
-                <flux:button
+                </x-dashboard.gate.button>
+
+                <x-dashboard.gate.button
+                    :gate="$this->gateKey()"
+                    level="modify"
                     :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
                     :variant="$user->status->isActive() ? 'danger' : 'filled'"
                     x-on:click="$flux.modal('statusModal').show()"
                 >
                     {{ $user->status->isActive() ? 'Suspend' : 'Activate' }}
-                </flux:button>
+                </x-dashboard.gate.button>
             </div>
         </div>
 
@@ -442,7 +512,9 @@ new class extends Component
                                 Which admin screens this account reaches, and how far it may go inside them.
                             </flux:text>
                         </div>
-                        <flux:button
+                        <x-dashboard.gate.button
+                            gate="users"
+                            level="full"
                             variant="ghost"
                             size="sm"
                             icon="pencil-square"
@@ -451,14 +523,15 @@ new class extends Component
                         />
                     </div>
 
-                    @if (! $user->role)
+                    @if ($user->roles->isEmpty())
                         <flux:text class="text-xs">
-                            No role, so nothing is reachable beyond the dashboard and this account's
+                            No roles, so nothing is reachable beyond the dashboard and this account's
                             own profile.
                         </flux:text>
                     @elseif (! $user->gates)
                         <flux:text class="text-xs">
-                            Following the {{ $user->role->name }} role throughout.
+                            Following {{ $user->roles->pluck('name')->join(', ', ' and ') }}
+                            {{ kPluralize('role', $user->roles->count(), prepend: false) }} throughout.
                         </flux:text>
                     @endif
 
@@ -501,7 +574,15 @@ new class extends Component
                         <flux:heading level="2" size="lg">Permissions</flux:heading>
                         <flux:text class="mt-1 text-sm">What this account is allowed to do.</flux:text>
                     </div>
-                    <flux:button variant="ghost" size="sm" icon="pencil-square" wire:click="editSettings" aria-label="Edit permissions" />
+                    <x-dashboard.gate.button
+                        :gate="$this->gateKey()"
+                        level="modify"
+                        variant="ghost"
+                        size="sm"
+                        icon="pencil-square"
+                        wire:click="editSettings"
+                        aria-label="Edit permissions"
+                    />
                 </div>
 
                 <dl class="divide-y divide-slate-100 text-sm dark:divide-slate-800">
@@ -584,14 +665,14 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal
+    <x-dashboard.role.modal
         :user="$this->roleUser"
         :roles="$this->assignableRoles"
         :type="$this->pendingAccountType"
         :blocked="$this->accessBlockedReason"
     />
 
-    <x-dashboard.gates-modal
+    <x-dashboard.gate.modal
         admin
         :rows="$gateRows"
         :inheritance="$this->gateInheritance"

@@ -2,9 +2,11 @@
 
 namespace App\Traits;
 
+use App\Enums\GateAccessEnum;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\GateService;
 use App\Services\RoleService;
 use Flux\Flux;
 use Illuminate\Support\Collection;
@@ -15,10 +17,14 @@ use Livewire\Attributes\Computed;
  * Drives the "account access" modal shared by the admins list, the members list and
  * the user view.
  *
- * Type and role are edited together because they are one decision. A type is which
+ * Type and roles are edited together because they are one decision. A type is which
  * workspace the account signs in to; a role only exists inside the admin one. Editing
- * them on separate screens makes it possible to pick a role for an account that is
+ * them on separate screens makes it possible to pick roles for an account that is
  * about to stop being an admin, and then to save both.
+ *
+ * The role box is a set, not a choice: an admin carries any number and the maps merge
+ * (see GateService). What the form posts is what the account ends up holding, so
+ * unticking a role revokes it.
  *
  * @property-read User|null $roleUser
  * @property-read Collection<int, Role> $assignableRoles
@@ -34,18 +40,26 @@ trait WithUserRoleManager
     public string $accountType = '';
 
     /**
-     * The chosen role id, as a string because it comes off a `<select>`. Empty means
-     * no role — a real choice for an admin, and the only choice for a member.
+     * The ticked role ids, as strings because that is what a checkbox group posts.
+     * Empty means no role at all — a real choice for an admin, and the only choice
+     * for a member.
+     *
+     * @var array<int, string>
      */
-    public string $accountRole = '';
+    public array $accountRoles = [];
 
     public function openRoleManager(User $user): void
     {
+        $this->respondError(
+            'You do not have access to change what accounts reach.',
+            if: ! kGate(GateService::ADMINISTRATION, GateAccessEnum::FULL),
+        );
+
         $this->resetValidation();
 
         $this->roleUserId = $user->id;
         $this->accountType = $user->user_type->value;
-        $this->accountRole = (string) ($user->role_id ?? '');
+        $this->accountRoles = $user->roles->pluck('id')->map(fn ($id) => (string) $id)->all();
 
         unset($this->roleUser, $this->assignableRoles, $this->accessBlockedReason, $this->pendingAccountType);
 
@@ -67,7 +81,7 @@ trait WithUserRoleManager
     #[Computed]
     public function roleUser(): ?User
     {
-        return $this->roleUserId ? User::query()->with('role')->find($this->roleUserId) : null;
+        return $this->roleUserId ? User::query()->with('roles')->find($this->roleUserId) : null;
     }
 
     /**
@@ -85,19 +99,19 @@ trait WithUserRoleManager
     }
 
     /**
-     * Picking a member clears the role box, so the modal never shows a member holding
+     * Picking a member empties the role box, so the modal never shows a member holding
      * one. Nothing is written until save.
      */
     public function updatedAccountType(): void
     {
         if (! $this->pendingType()?->carriesRole()) {
-            $this->accountRole = '';
+            $this->accountRoles = [];
         }
 
         unset($this->accessBlockedReason, $this->pendingAccountType);
     }
 
-    public function updatedAccountRole(): void
+    public function updatedAccountRoles(): void
     {
         unset($this->accessBlockedReason);
     }
@@ -127,12 +141,19 @@ trait WithUserRoleManager
         }
 
         return $type->carriesRole()
-            ? $service->assignBlockedReason($user, $this->pendingRole())
+            ? $service->assignBlockedReason($user, $this->pendingRoles())
             : null;
     }
 
     public function saveRoleAccess(): bool
     {
+        // Putting somebody on a role is handing out access, so it asks for the gate
+        // that hands out gates. The button is hidden as well; this is the boundary.
+        $this->respondError(
+            'You do not have access to change what accounts reach.',
+            if: ! kGate(GateService::ADMINISTRATION, GateAccessEnum::FULL),
+        );
+
         $user = $this->resolveRoleUser();
 
         // Validated inline rather than through rules(). A class method beats a trait
@@ -142,15 +163,15 @@ trait WithUserRoleManager
 
         $service = app(RoleService::class);
         $type = $this->pendingType();
-        $role = $type?->carriesRole() ? $this->pendingRole() : null;
+        $roles = $type?->carriesRole() ? $this->pendingRoles() : collect();
 
         // The guard's own wording, rather than a generic failure.
         $reason = $this->accessBlockedReason;
         $this->respondError($reason ?? '', if: $reason !== null);
 
         $changed = $type === $user->user_type
-            ? $service->assign($user, $role)
-            : $service->changeType($user, $type, $role);
+            ? $service->syncRoles($user, $roles)
+            : $service->changeType($user, $type, $roles);
 
         $this->respondPrimary(if: ! $changed);
 
@@ -162,8 +183,8 @@ trait WithUserRoleManager
     }
 
     /**
-     * The whitelist the modal posts against. A role id is compared as a string
-     * because that is what a `<select>` sends.
+     * The whitelist the modal posts against. Role ids are compared as strings because
+     * that is what a checkbox group sends.
      *
      * @return array<string, array<int, mixed>>
      */
@@ -171,7 +192,8 @@ trait WithUserRoleManager
     {
         return [
             'accountType' => ['required', Rule::in(UserTypeEnum::values())],
-            'accountRole' => ['nullable', Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
+            'accountRoles' => ['array'],
+            'accountRoles.*' => [Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
         ];
     }
 
@@ -185,11 +207,19 @@ trait WithUserRoleManager
         return UserTypeEnum::tryFrom($this->accountType);
     }
 
-    private function pendingRole(): ?Role
+    /**
+     * The roles currently ticked, resolved against the assignable list rather than
+     * fetched: an id that is not on offer is not a role, whatever was posted.
+     *
+     * @return Collection<int, Role>
+     */
+    private function pendingRoles(): Collection
     {
-        return $this->accountRole === ''
-            ? null
-            : $this->assignableRoles->firstWhere('id', (int) $this->accountRole);
+        return collect($this->accountRoles)
+            ->map(fn ($id) => $this->assignableRoles->firstWhere('id', (int) $id))
+            ->filter()
+            ->unique('id')
+            ->values();
     }
 
     private function refreshRoleState(): void

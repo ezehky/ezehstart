@@ -43,14 +43,39 @@ class UserFactory extends Factory
      *
      * The default is deliberate: the protected role carries every gate, so a test
      * that just wants "an admin" gets one who can actually open the screen under
-     * test. Pass a role to narrow it.
+     * test. Pass a role to narrow it, or call withRoles() for more than one.
+     *
+     * The role is attached after creation rather than set as an attribute: roles live
+     * in a pivot now, so there is no column to state. Resolving it inside the callback
+     * also keeps a factory that is never created from seeding a protected role as a
+     * side effect of being defined.
      */
     public function admin(?Role $role = null): static
     {
         return $this->state(fn (array $attributes) => [
             'user_type' => UserTypeEnum::ADMIN,
-            'role_id' => ($role ?? app(RoleService::class)->protectedRole())->id,
-        ]);
+        ])->afterCreating(function (User $user) use ($role) {
+            $user->roles()->syncWithoutDetaching([
+                ($role ?? app(RoleService::class)->protectedRole())->id,
+            ]);
+
+            $user->unsetRelation('roles');
+        });
+    }
+
+    /**
+     * An administrator holding several roles at once — the case where the gate maps
+     * merge rather than one of them simply winning.
+     */
+    public function withRoles(Role ...$roles): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'user_type' => UserTypeEnum::ADMIN,
+        ])->afterCreating(function (User $user) use ($roles) {
+            $user->roles()->syncWithoutDetaching(collect($roles)->pluck('id')->all());
+
+            $user->unsetRelation('roles');
+        });
     }
 
     /**

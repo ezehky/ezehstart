@@ -26,13 +26,16 @@ return new class extends Migration
             // Which workspace this account signs in to. Fixed in code — see
             // UserTypeEnum, and bootstrap/app.php for what a new one costs.
             $table->string('user_type', 20)->default(UserTypeEnum::USER)->index();
-            // The role, and only for an admin. A member has none: the member
-            // workspace is not gated, so there is nothing for a role to say.
-            $table->foreignId('role_id')->nullable()->constrained()->nullOnDelete();
+            // Roles are not here. An admin carries any number of them, so the
+            // assignment lives in the role_user pivot — see that migration. A
+            // member carries none at all: the member workspace is not gated, so
+            // there is nothing for a role to say about one.
+
             // This administrator's personal override, in the same shape as
-            // roles.gates. Null is the normal state and means "inherit the role" —
+            // roles.gates. Null is the normal state and means "inherit the roles" —
             // an empty array does not, it means somebody deliberately took every
-            // gate away. Only keys present here override; the rest come from the role.
+            // gate away. Only keys present here override; the rest come from the
+            // merged role map.
             $table->json('gates')->nullable();
 
             $table->string('timezone')->default(config('app.timezone'));

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\SocialHandleEnum;
 use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Models\Policy;
@@ -79,6 +80,49 @@ class UserService
      * than an error worth showing somebody. The IP and user agent are what make
      * the record evidence rather than a claim.
      */
+    /**
+     * Write an account's public-facing bio and social handles.
+     *
+     * The row is created on demand: a profile is a detail of an account rather than
+     * something every account is made with, so plenty of them do not have one yet.
+     *
+     * Handles are stored exactly as typed and blank ones are dropped rather than
+     * stored empty — an absent key and an empty string would be two spellings of the
+     * same nothing, and socialLinks() would have to know about both.
+     *
+     * @param  array<string, string|null>  $socials  Keyed by SocialHandleEnum value.
+     */
+    public function updateAuthorProfile(User $user, ?string $bio, array $socials): bool
+    {
+        $profile = UserProfile::query()->firstOrNew(['user_id' => $user->id]);
+
+        $profile->bio = filled($bio) ? trim($bio) : null;
+        $profile->socials = collect($socials)
+            ->only(collect(SocialHandleEnum::profiles())->map(fn (SocialHandleEnum $case) => $case->value)->all())
+            ->map(fn ($handle) => trim((string) $handle))
+            ->filter(fn (string $handle) => $handle !== '')
+            ->all();
+
+        if ($profile->exists && $profile->isClean()) {
+            return false;
+        }
+
+        $logService = app(ActivityLogService::class);
+        $affectedColumns = $logService->affectedColumns($profile);
+
+        $profile->save();
+
+        $logService->logActivity(
+            ActivityActionEnum::SETTINGS_UPDATE,
+            "Updated the author profile for {$user->name}.",
+            $affectedColumns,
+            $profile,
+            prefixDescription: false,
+        );
+
+        return true;
+    }
+
     public function recordConsent(Policy $policy, ?User $user = null): UserConsent
     {
         $user ??= $this->user;

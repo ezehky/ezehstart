@@ -15,7 +15,11 @@ class RoleSeeder extends Seeder
      * cannot start without: the protected role, which carries every gate and is what
      * the seeded admin signs in on.
      *
-     * The starter roles beside it are examples — created closed, and expected to be
+     * The author role goes down beside it, because the blog reads that slug to decide
+     * whose byline carries a bio and which posts an account may edit. It is an
+     * ordinary role otherwise — rename it, re-gate it or delete it.
+     *
+     * The starter roles beside them are examples — created closed, and expected to be
      * renamed, re-gated or deleted. They are only ever created, never updated:
      * re-seeding must not hand back access somebody deliberately took away.
      */
@@ -24,6 +28,7 @@ class RoleSeeder extends Seeder
         $service = app(RoleService::class);
 
         $service->protectedRole();
+        $service->authorRole();
 
         foreach (RoleService::STARTER_ROLES as $name => $description) {
             if (Role::query()->where('slug', str($name)->slug())->exists()) {

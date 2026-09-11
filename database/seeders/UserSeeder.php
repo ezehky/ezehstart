@@ -31,15 +31,18 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'ip_address' => '127.0.0.1',
                 'user_type' => UserTypeEnum::ADMIN,
-                'role_id' => $adminRole->id,
             ],
         ];
 
         foreach ($data as $userData) {
-            User::firstOrCreate(
+            $user = User::firstOrCreate(
                 ['email' => $userData['email']],
                 $userData
             );
+
+            // Attached rather than synced: seeding an install that has been running
+            // for a while must not strip roles somebody added to this account.
+            $user->roles()->syncWithoutDetaching([$adminRole->id]);
         }
     }
 }

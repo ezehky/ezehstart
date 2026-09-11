@@ -97,6 +97,7 @@ userOfType(UserTypeEnum::ADMIN);               // active; admins land on the pro
 userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 userOfType(UserTypeEnum::ADMIN, [], $role);    // an admin narrowed to one role
 adminWithoutRole();                            // an admin who reaches nothing
+adminWithRoles($media, $support);              // an admin whose maps have to merge
 roleWithGates('Media', ['content' => 'full']); // a role to put somebody on
 ```
 

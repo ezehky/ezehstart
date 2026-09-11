@@ -68,8 +68,23 @@ new class extends Component
         return \count(app(GateService::class)->keys());
     }
 
+    /**
+     * How far this account may go on this screen, asked once and read by every
+     * button and every write.
+     */
+    #[Computed]
+    public function access(): GateAccessEnum
+    {
+        return kGateAccess('users.roles');
+    }
+
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add roles.',
+            if: ! $this->access->covers(GateAccessEnum::CREATE),
+        );
+
         $this->resetRoleForm();
 
         Flux::modal('roleModal')->show();
@@ -77,6 +92,11 @@ new class extends Component
 
     public function edit(Role $role): void
     {
+        $this->respondError(
+            'You do not have access to edit roles.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->resetValidation();
 
         $this->role = $role;
@@ -98,6 +118,12 @@ new class extends Component
 
     public function save(): bool
     {
+        // The button is hidden either way, which stops nobody who can open a console.
+        $this->respondError(
+            'You do not have access to save roles.',
+            if: ! $this->access->covers($this->role ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE),
+        );
+
         $this->validate();
 
         $service = app(RoleService::class);
@@ -129,6 +155,11 @@ new class extends Component
 
     public function confirmDelete(int $roleId): void
     {
+        $this->respondError(
+            'You do not have access to delete roles.',
+            if: ! $this->access->covers(GateAccessEnum::FULL),
+        );
+
         $this->deleteId = $roleId;
 
         Flux::modal('deleteModal')->show();
@@ -146,6 +177,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have access to delete roles.',
+            if: ! $this->access->covers(GateAccessEnum::FULL),
+        );
+
         $role = Role::query()->whereKey($this->deleteId)->first();
 
         $this->respondError('That role no longer exists.', if: ! $role);
@@ -169,7 +205,7 @@ new class extends Component
 
     protected function afterGateChange(): void
     {
-        unset($this->roles, $this->gateCounts);
+        unset($this->roles, $this->gateCounts, $this->access);
     }
 
     private function resetRoleForm(): void
@@ -188,15 +224,13 @@ new class extends Component
                 <flux:heading level="2" size="lg">Roles</flux:heading>
                 <flux:text class="mt-1">
                     How the administration workspace is divided up. Members carry no role — only
-                    admin accounts do, and each one carries exactly one.
+                    admin accounts do, and one account can hold several. Their access adds up.
                 </flux:text>
             </div>
 
-            @if (kGate('users.roles', GateAccessEnum::CREATE))
-                <flux:button variant="primary" icon="plus" wire:click="create">
-                    Add role
-                </flux:button>
-            @endif
+            <x-dashboard.gate.button gate="users.roles" level="create" variant="primary" icon="plus" wire:click="create">
+                Add role
+            </x-dashboard.gate.button>
         </div>
 
         <flux:table>
@@ -243,34 +277,40 @@ new class extends Component
                         <flux:table.cell class="font-medium">{{ number_format($item->users_count) }}</flux:table.cell>
                         <flux:table.cell>
                             <div class="flex flex-wrap gap-1">
-                                <flux:button
+                                {{-- Editing a role's map is handing out access, so it asks for full
+                                     access to Users — the same gate the lockout guard protects. --}}
+                                <x-dashboard.gate.button
+                                    gate="users"
+                                    level="full"
                                     icon="shield-check"
                                     variant="ghost"
                                     size="sm"
                                     wire:click="openRoleGates({{ $item->id }})"
                                 >
                                     Manage access
-                                </flux:button>
+                                </x-dashboard.gate.button>
 
-                                @if (kGate('users.roles', GateAccessEnum::MODIFY))
-                                    <flux:button
-                                        icon="pencil-square"
-                                        variant="ghost"
-                                        size="sm"
-                                        wire:click="edit({{ $item->id }})"
-                                        title="Edit role"
-                                    />
-                                @endif
+                                <x-dashboard.gate.button
+                                    gate="users.roles"
+                                    level="modify"
+                                    icon="pencil-square"
+                                    variant="ghost"
+                                    size="sm"
+                                    wire:click="edit({{ $item->id }})"
+                                    title="Edit role"
+                                />
 
-                                @if (kGate('users.roles', GateAccessEnum::FULL) && ! $item->is_protected)
-                                    <flux:button
+                                @unless ($item->is_protected)
+                                    <x-dashboard.gate.button
+                                        gate="users.roles"
+                                        level="full"
                                         icon="trash"
                                         variant="ghost"
                                         size="sm"
                                         wire:click="confirmDelete({{ $item->id }})"
                                         title="Delete role"
                                     />
-                                @endif
+                                @endunless
                             </div>
                         </flux:table.cell>
                     </flux:table.row>
@@ -342,7 +382,7 @@ new class extends Component
         @endif
     </x-dashboard.confirm-modal>
 
-    <x-dashboard.gates-modal
+    <x-dashboard.gate.modal
         :rows="$gateRows"
         :subject="$this->gateSubjectLabel()"
     />

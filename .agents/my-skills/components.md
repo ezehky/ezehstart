@@ -11,7 +11,7 @@ with `@props([...])`.
 
 | Group | Purpose | Examples |
 | --- | --- | --- |
-| `dashboard/` | Authenticated workspace chrome and tiles | `avatar`, `stat-card`, `stat-pill`, `mini-stat`, `icon-box`, `progress-ring`, `item`, `sidebar`, `top-navigation`, `tab-nav`, `workspace-no-record`, `user-roles`, `user-roles-modal`, `confirm-modal` |
+| `dashboard/` | Authenticated workspace chrome and tiles | `avatar`, `stat-card`, `stat-pill`, `mini-stat`, `icon-box`, `progress-ring`, `item`, `sidebar`, `top-navigation`, `tab-nav`, `workspace-no-record`, `confirm-modal`, plus the `gate.*` and `role.*` sub-groups below |
 | `chart/` | The SVG chart set — see [dashboard.md](dashboard.md) | `chart`, `chart.svg`, `chart.line`, `chart.area`, `chart.bar`, `chart.point`, `chart.axis`, `chart.axis.grid`, `chart.axis.line`, `chart.axis.tick`, `chart.cursor`, `chart.tooltip`, `chart.tooltip.heading`, `chart.tooltip.value` |
 | `form/` | Field wrappers Flux does not provide | `markdown-field`, `image-field`, `file-field`, `number-field`, `phone-field`, `password` |
 | `site/` | Public marketing sections | `hero`, `features`, `trainings`, `cohorts`, `trainers`, `testimonials`, `faq`, `cta`, `contact`, `footer`, `navbar`, `brand`, `reveal`, `section-heading`, `empty-state`, `legal-page`, `training-card`, `cohort-card` |
@@ -20,6 +20,22 @@ with `@props([...])`.
 | `layouts/` | Page shells | `base`, `email`, `site-master`, `email/theme`, `email/label-value` |
 | `lv/` | Embedded **Livewire** SFCs | `⚡notifications`, `⚡newsletter-form` |
 | *(root)* | `status.blade.php` | `<x-status :status="…" />` |
+
+### Sub-groups
+
+A group nests when a handful of its components are one subject rather than one shape.
+The folder becomes a segment in the name, exactly as `chart/axis/grid.blade.php` is
+`<x-chart.axis.grid>`:
+
+| Folder | Components | About |
+| --- | --- | --- |
+| `dashboard/gate/` | `gate.button`, `gate.menu-item`, `gate.modal` | Controls that appear only at a level — see [gates.md](gates.md) |
+| `dashboard/role/` | `role.badges`, `role.modal` | Which roles an account carries, and editing them |
+
+Each name has to read correctly *with* its prefix. `<x-dashboard.gate.button>` says
+what it is; a folder named for a vague theme — `access/`, `misc/` — leaves
+`<x-dashboard.access.button>` meaning nothing. Nest when the prefix earns its place,
+and leave a one-off flat.
 
 ### `@props`
 
@@ -157,7 +173,7 @@ Callers pass them with `<x-slot:title>`.
 
 <x-status :status="$item->status" />
 <x-dashboard.avatar :user="$item" size="md" />
-<x-dashboard.user-role :user="$item" />
+<x-dashboard.role.badges :user="$item" />
 <x-dashboard.workspace-no-record label="Students" icon="academic-cap" text="No students match the current filters." />
 ```
 

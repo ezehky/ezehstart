@@ -46,9 +46,25 @@ kGate('content.blogs', GateAccessEnum::FULL)      // the delete button
 | Column | Means |
 | --- | --- |
 | `roles.gates` | What everybody holding this role starts from |
-| `users.gates` | One administrator's override, laid over their role key by key |
+| `users.gates` | One administrator's override, laid over their **merged** roles key by key |
 
-`users.gates` being **null** means "inherit the role" and is the normal state. An
+An admin carries **any number of roles** (`role_user`). Their maps are folded into one
+with the **highest access winning each key**, and the override goes on top of the
+result. A role is a grant, so holding a second one can only widen what an account
+reaches — were the merge to take the lowest, adding a narrow role to a broad one would
+quietly revoke access nobody asked to revoke.
+
+`NONE` on one role does not veto a grant on another; it is the floor, not a veto.
+Denying one specific administrator is what the personal override is for, and that still
+wins because it is applied after the merge.
+
+```php
+$user->roles;                                  // every role, live or switched off
+$user->liveRoles();                            // the ones granting something
+app(GateService::class)->inheritedAccessFor($user, 'content');  // the merge, before the override
+```
+
+`users.gates` being **null** means "inherit the roles" and is the normal state. An
 **empty array is not the same thing** — it means somebody deliberately overrode
 everything. Keep the distinction; `updateAdminGates()` takes `null` on purpose.
 
@@ -90,10 +106,22 @@ image and video library screens stay open in the member workspace.
 required, exactly as in [policies.md](policies.md):
 
 ```blade
-@if (kGate('content.blogs', App\Enums\GateAccessEnum::FULL))
-    <flux:button variant="danger" wire:click="confirmDelete({{ $post->id }})">Delete</flux:button>
-@endif
+<x-dashboard.gate.button gate="content.blogs" level="full" variant="danger" wire:click="confirmDelete({{ $post->id }})">
+    Delete
+</x-dashboard.gate.button>
 ```
+
+`<x-dashboard.gate.button>` and its dropdown twin `<x-dashboard.gate.menu-item>` are
+the hiding half, written once rather than as an `@if` around every button on fifteen
+screens. They ask **`kGateAction()`**: `kGate()`, except that an account in an ungated
+workspace passes straight through, so the image and video libraries keep their controls
+in the member workspace, which has no gate keys at all.
+
+That test is on the **account**, not on the route — the one difference from
+`kPageGate()`. `kPageGate()` runs in `mount()`, on the request that opened the page,
+where `admin.*` is a fair test. A control re-renders on every Livewire update too, and
+those arrive on `livewire.update`: a route test would answer "not an admin route" and
+hand every hidden button back the first time somebody typed in a search box.
 
 ```php
 public function delete(): bool
@@ -130,6 +158,12 @@ Go through `RoleService::create()`, never `Role::create()`. A new role starts **
 — gates are granted afterwards from the access editor, which is the one place the
 lockout guard sees the whole picture.
 
+`RoleService::authorRole()` is the other role the kit resolves by slug. It is
+ordinary — rename it, re-gate it, delete it — but `AUTHOR_SLUG` is what the blog reads
+to decide whose byline carries a bio and which posts an account may work on. It ships
+at `CREATE` on `content.blogs`, and `BlogService::authorRestricted()` holds anybody on
+it to their own posts unless something else on their account grants `FULL`.
+
 The exception is `RoleService::protectedRole()`: the one role an install cannot be left
 without. It is created with `fullAccessMap()`, marked `is_protected`, and refused to
 anybody trying to delete or switch it off. Without it there is a reachable state where
@@ -142,22 +176,26 @@ actually open the screen under test.
 
 ## Why
 
-- Storing the map as JSON on the role keeps a permission model in **two columns and no
-  new tables**. A `role_gates` table would be one row per role per screen, joined on
-  every page load, to hold what one small blob holds.
+- Storing the map as JSON on the role keeps a permission model in **two columns and one
+  pivot**. A `role_gates` table would be one row per role per screen, joined on every
+  page load, to hold what one small blob holds. The pivot that did earn its place is
+  `role_user`, because "which roles" is a set an administrator edits, not a map.
 - Keying gates by navigation key rather than by route name means the sidebar and the
   guard read the same value. A page cannot end up visible-but-forbidden or
   reachable-but-hidden, because there is only one fact.
 - A ladder rather than a set of flags means a screen asks one question. Four booleans
   per screen is four times the storage and the first place a "can create but not view"
   contradiction gets in.
-- Per-administrator overrides live on the **user**, beside the role they modify. An
-  override is a change to what a role grants, so an account with no live role resolves
-  to nothing at all — the override included. That is what makes switching a role off
-  actually revoke access rather than leave the overrides standing.
+- Per-administrator overrides live on the **user**, beside the roles they modify. An
+  override is a change to what those roles grant, so an account with no live role
+  resolves to nothing at all — the override included. That is what makes switching a
+  role off actually revoke access rather than leave the overrides standing.
 - Resolution is memoised per request on the singleton because the sidebar asks about a
   dozen gates per render. `flush()` after every write, or the screen that just changed
-  a gate renders against the map it replaced.
+  a gate renders against the map it replaced. When the account that changed is the
+  signed-in one, `syncAuthenticated()` rather than `flush()`: the guard holds its own
+  `User` instance for the whole request, and a stale copy would re-cache the map the
+  write just replaced.
 
 ## Example
 
@@ -239,5 +277,11 @@ on the roles screen.
 - Adding a column to `roles` and forgetting that `User::role()` carries an explicit
   `select()`. A column left out of that list reads back as null everywhere, which looks
   like data rather than like a bug.
-- Assuming an admin has a role. `users.role_id` is nullable and a stranded admin is a
-  state the workspace is built to show — `$user->role?->` , never `$user->role->`.
+- Assuming an admin has a role, or exactly one. The pivot may be empty — a stranded
+  admin is a state the workspace is built to show — and it may hold several, so
+  anything reading "the role" is already wrong. Go through `GateService`.
+- Reading one of an account's roles to decide what it may do. Two roles that both speak
+  about a screen are one answer, and only the merge knows it.
+- Writing a control with a bare `@if (kGate(...))` on a screen shared with the member
+  workspace. `kGate()` answers no for every member; `kGateAction()` is the one that
+  passes non-admin routes through.

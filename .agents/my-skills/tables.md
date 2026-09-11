@@ -114,7 +114,7 @@ Non-negotiables:
 **Roles / chips**:
 
 ```blade
-<flux:table.cell><x-dashboard.user-role :user="$item" /></flux:table.cell>
+<flux:table.cell><x-dashboard.role.badges :user="$item" /></flux:table.cell>
 ```
 
 ### The Actions cell — two forms
@@ -329,7 +329,7 @@ The full body of `⚡students.blade.php`'s table — the reference implementatio
                     </div>
                 </flux:table.cell>
                 <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
-                <flux:table.cell><x-dashboard.user-role :user="$item" /></flux:table.cell>
+                <flux:table.cell><x-dashboard.role.badges :user="$item" /></flux:table.cell>
                 <flux:table.cell>{{ number_format($item->enrolled_count) }}</flux:table.cell>
                 <flux:table.cell>{!! kMoneyFormat(($item->amount_paid_sum ?? 0) / 100) !!}</flux:table.cell>
                 <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>

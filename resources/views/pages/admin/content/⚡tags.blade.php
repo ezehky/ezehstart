@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\Tag;
 use App\Services\ActivityLogService;
@@ -56,6 +57,11 @@ new class extends Component
 
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add tags.',
+            if: ! kGate('content.tags', GateAccessEnum::CREATE),
+        );
+
         $this->resetForm();
 
         Flux::modal('tagModal')->show();
@@ -63,6 +69,11 @@ new class extends Component
 
     public function createMany(): void
     {
+        $this->respondError(
+            'You do not have access to add tags.',
+            if: ! kGate('content.tags', GateAccessEnum::CREATE),
+        );
+
         $this->reset('bulk_names');
         $this->resetValidation();
 
@@ -79,6 +90,11 @@ new class extends Component
      */
     public function saveMany(): bool
     {
+        $this->respondError(
+            'You do not have access to add tags.',
+            if: ! kGate('content.tags', GateAccessEnum::CREATE),
+        );
+
         $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
 
         $tags = app(TagService::class)->resolveTags($this->bulk_names);
@@ -103,6 +119,11 @@ new class extends Component
 
     public function edit(Tag $tag): void
     {
+        $this->respondError(
+            'You do not have access to edit tags.',
+            if: ! kGate('content.tags', GateAccessEnum::MODIFY),
+        );
+
         $this->resetForm();
 
         $this->tag = $tag;
@@ -127,6 +148,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save tags.',
+            if: ! kGate('content.tags', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $action = ActivityActionEnum::TAG_UPDATE;
@@ -166,6 +192,11 @@ new class extends Component
 
     public function confirmDelete(Tag $tag): void
     {
+        $this->respondError(
+            'You do not have delete access to tags.',
+            if: ! kGate('content.tags', GateAccessEnum::FULL),
+        );
+
         $this->tag = $tag;
 
         Flux::modal('deleteTagModal')->show();
@@ -173,6 +204,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have delete access to tags.',
+            if: ! kGate('content.tags', GateAccessEnum::FULL),
+        );
+
         $this->respondError('Select a tag to delete first.', if: ! $this->tag);
 
         $description = " tag: {$this->tag->name}";
@@ -214,8 +250,8 @@ new class extends Component
                     placeholder="Search tags"
                     icon="magnifying-glass"
                 />
-                <flux:button variant="filled" icon="queue-list" wire:click="createMany">Add many</flux:button>
-                <flux:button variant="primary" icon="plus" wire:click="create">New tag</flux:button>
+                <x-dashboard.gate.button gate="content.tags" level="create" variant="filled" icon="queue-list" wire:click="createMany">Add many</x-dashboard.gate.button>
+                <x-dashboard.gate.button gate="content.tags" level="create" variant="primary" icon="plus" wire:click="create">New tag</x-dashboard.gate.button>
             </div>
         </div>
 
@@ -239,8 +275,8 @@ new class extends Component
                             <flux:table.cell>{{ $item->name }}</flux:table.cell>
                             <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
                             <flux:table.cell class="flex justify-end gap-1">
-                                <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                <flux:button size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
+                                <x-dashboard.gate.button gate="content.tags" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                                <x-dashboard.gate.button gate="content.tags" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
                             </flux:table.cell>
                         </flux:table.row>
                     @endforeach

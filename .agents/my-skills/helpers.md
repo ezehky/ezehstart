@@ -94,6 +94,7 @@ plain-text email subject, an aria-label, JSON).
 | `kGate` | `(string $resource, GateAccessEnum\|string $level = VIEW, ?User $user = null): bool` | May this account reach the screen, at least this far? Ask for the **lowest** level you need |
 | `kGateAccess` | `(string $resource, ?User $user = null): GateAccessEnum` | The level itself, for a screen that renders differently at each one |
 | `kPageGate` | `(string $resource, GateAccessEnum\|string $required = VIEW): void` | **Call in every admin `mount()`**, next to `kSetSiteTitle()`. Aborts 404. No-ops off an `admin.*` route |
+| `kGateAction` | `(string $resource, GateAccessEnum\|string $level = VIEW, ?User $user = null): bool` | `kGate()` with `kPageGate()`'s escape hatch — passes non-admin routes through. What the gated button components ask, so one control works in both workspaces |
 
 ### `navigations.php`
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Enums\SocialHandleEnum;
 use App\Services\SiteConfigurationService;
 use App\Traits\WithFormResponseMessage;
@@ -41,6 +42,11 @@ new class extends Component
 
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add social handles.',
+            if: ! kGate('config.social-handles', GateAccessEnum::CREATE),
+        );
+
         $this->resetValidation();
         $this->reset('editingIndex');
         $this->socialHandle = [
@@ -53,6 +59,11 @@ new class extends Component
 
     public function edit(int $index): void
     {
+        $this->respondError(
+            'You do not have access to edit social handles.',
+            if: ! kGate('config.social-handles', GateAccessEnum::MODIFY),
+        );
+
         $this->resetValidation();
         $this->editingIndex = $index;
         $this->socialHandle = $this->socialHandles[$index];
@@ -62,6 +73,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save social handles.',
+            if: ! kGate('config.social-handles', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $this->respondPrimary(
@@ -88,6 +104,11 @@ new class extends Component
 
     public function confirmDelete(int $index): void
     {
+        $this->respondError(
+            'You do not have delete access to social handles.',
+            if: ! kGate('config.social-handles', GateAccessEnum::FULL),
+        );
+
         $this->deletingIndex = $index;
 
         Flux::modal('deleteModal')->show();
@@ -95,6 +116,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have delete access to social handles.',
+            if: ! kGate('config.social-handles', GateAccessEnum::FULL),
+        );
+
         $this->respondError(
             'That social handle is no longer there.',
             if: ! isset($this->socialHandles[$this->deletingIndex]),
@@ -128,9 +154,9 @@ new class extends Component
                 <flux:text class="mt-1">Manage the social links displayed across your site.</flux:text>
             </div>
 
-            <flux:button variant="primary" icon="plus" wire:click="create">
+            <x-dashboard.gate.button gate="config.social-handles" level="create" variant="primary" icon="plus" wire:click="create">
                 Add social handle
-            </flux:button>
+            </x-dashboard.gate.button>
         </div>
 
         <flux:table class="w-full text-left text-sm">
@@ -153,11 +179,11 @@ new class extends Component
                         <flux:table.cell>
                             <div class="flex justify-end gap-1">
                                 <flux:tooltip content="Edit social handle">
-                                    <flux:button variant="ghost" size="sm" icon="pencil-square" wire:click="edit({{ $index }})" />
+                                    <x-dashboard.gate.button gate="config.social-handles" level="modify" variant="ghost" size="sm" icon="pencil-square" wire:click="edit({{ $index }})" />
                                 </flux:tooltip>
 
                                 <flux:tooltip content="Delete social handle">
-                                    <flux:button variant="ghost" size="sm" icon="trash" wire:click="confirmDelete({{ $index }})" />
+                                    <x-dashboard.gate.button gate="config.social-handles" level="full" variant="ghost" size="sm" icon="trash" wire:click="confirmDelete({{ $index }})" />
                                 </flux:tooltip>
                             </div>
                         </flux:table.cell>

@@ -1183,7 +1183,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);
     $role = app(RoleService::class)->protectedRole();
-    UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
+    $admin->roles()->syncWithoutDetaching([$role->id]);
 
     $this->actingAs($admin);
 });

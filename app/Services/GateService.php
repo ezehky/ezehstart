@@ -8,6 +8,7 @@ use App\Enums\StatusDefault;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Support\Collection;
 
 /**
  * Layer 2 of the authorization stack: which admin pages an account may open, and how
@@ -18,8 +19,14 @@ use Illuminate\Container\Attributes\Singleton;
  * administrator may override single keys on top. Nothing here is a Laravel Gate: see
  * policies.md.
  *
- * Only an admin is gated. A member has no role at all, and the member workspace has no
- * gate keys, so asking any of this about one answers NONE and means nothing.
+ * An admin carries *any number* of roles. Their maps merge with the highest access
+ * winning each key, so a role only ever widens what somebody reaches — which is what
+ * makes "Media as well as Support" a thing an administrator can express without
+ * inventing a third role that is the sum of the two. The personal override sits on
+ * top of the merged result and is the only thing that can narrow it.
+ *
+ * Only an admin is gated. A member has no roles at all, and the member workspace has
+ * no gate keys, so asking any of this about one answers NONE and means nothing.
  */
 #[Singleton]
 class GateService
@@ -61,7 +68,7 @@ class GateService
      */
     private function resolvedMapFor(User $user): array
     {
-        return $this->maps[$user->id] ??= $this->mapFor($user, $user->role()->first());
+        return $this->maps[$user->id] ??= $this->mapFor($user, $user->roles()->get());
     }
 
     /**
@@ -98,47 +105,110 @@ class GateService
     }
 
     /**
-     * The map one account resolves to: their role's map with their own overrides laid
-     * over it, key by key.
+     * The map one account resolves to: every live role they carry merged together,
+     * with their own overrides laid over the result, key by key.
      *
      * An account with no live role resolves to nothing at all — the override included.
-     * An override is a change to what a role grants, so with no role underneath it,
+     * An override is a change to what the roles grant, so with nothing underneath it,
      * there is nothing for it to be a change to. That is what makes switching a role
      * off actually revoke access rather than leave the overrides standing.
      *
-     * The role is passed in rather than read off the user so that a *candidate* map
-     * can be tested before it is written.
+     * The roles are passed in rather than read off the account so that a *candidate*
+     * set can be tested before it is written.
+     *
+     * @param  Collection<int, Role>|iterable<Role>  $roles
      */
-    private function mapFor(User $user, ?Role $role): array
+    private function mapFor(User $user, iterable $roles): array
     {
-        if (! $user->user_type->carriesRole() || ! $role?->grantsAccess()) {
+        if (! $user->user_type->carriesRole()) {
+            return [];
+        }
+
+        $live = collect($roles)->filter(fn (Role $role) => $role->grantsAccess());
+
+        if ($live->isEmpty()) {
             return [];
         }
 
         return [
-            ...$role->gatesArray(),
+            ...$this->mergeRoleMaps($live),
             ...$user->gatesArray(),
         ];
+    }
+
+    /**
+     * Fold several role maps into one, the highest access winning each key.
+     *
+     * Additive on purpose: a role is a grant, so holding a second one can only widen
+     * what an account reaches. Were the merge to take the lowest, adding a narrow role
+     * to a broad one would quietly revoke access nobody asked to revoke, and an
+     * administrator handing somebody "Media as well" would be taking access away.
+     *
+     * NONE is the floor rather than a veto here: a key one role denies and another
+     * grants resolves to the grant. Denying one administrator specifically is what the
+     * personal override is for, and it still wins — it is laid over this result.
+     *
+     * @param  Collection<int, Role>  $roles
+     */
+    private function mergeRoleMaps(Collection $roles): array
+    {
+        $merged = [];
+
+        foreach ($roles as $role) {
+            foreach ($role->gatesArray() as $key => $value) {
+                $level = GateAccessEnum::tryFrom((string) $value);
+
+                if (! $level instanceof GateAccessEnum) {
+                    continue;
+                }
+
+                $held = GateAccessEnum::tryFrom((string) ($merged[$key] ?? ''));
+
+                if ($held === null || $level->rank() > $held->rank()) {
+                    $merged[$key] = $level->value;
+                }
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * One account's role set with a single role swapped for a candidate version of
+     * itself — the shape every "would this change lock us out?" guard tests against.
+     *
+     * A role the account does not hold is not added. The question is what *this*
+     * account resolves to after the edit, and editing a role nobody has put them on
+     * does not put them on it.
+     *
+     * @param  Collection<int, Role>|iterable<Role>  $roles
+     * @return Collection<int, Role>
+     */
+    private function withCandidateRole(iterable $roles, Role $candidate): Collection
+    {
+        return collect($roles)
+            ->map(fn (Role $role) => $role->is($candidate) ? $candidate : $role)
+            ->values();
     }
 
     /**
      * Walk every admin in the system and ask whether at least one still holds full
      * access to user management.
      *
-     * `$substitute` is handed each account and the role it is on, and returns the map
-     * to test — which is how a change is checked *before* it is written.
+     * `$substitute` is handed each account and the roles it carries, and returns the
+     * map to test — which is how a change is checked *before* it is written.
      *
-     * @param  callable(User, ?Role): array  $substitute
+     * @param  callable(User, Collection<int, Role>): array  $substitute
      */
     private function administrationSurvives(callable $substitute): bool
     {
         $admins = User::query()
             ->admins()
-            ->with('role')
+            ->with('roles')
             ->get();
 
         foreach ($admins as $admin) {
-            if ($this->lookup($substitute($admin, $admin->role), self::ADMINISTRATION)->isFull()) {
+            if ($this->lookup($substitute($admin, $admin->roles), self::ADMINISTRATION)->isFull()) {
                 return true;
             }
         }
@@ -265,6 +335,27 @@ class GateService
     }
 
     /**
+     * What this account's roles grant over an area *before* their own override is laid
+     * on top.
+     *
+     * What the gate editor shows beside a blank row as "following the roles". It is
+     * the merged map of every live role they carry, read through the same lookup() as
+     * accessFor(), so a hint that disagreed with the resolved access is not possible.
+     */
+    public function inheritedAccessFor(User $user, string $resource): GateAccessEnum
+    {
+        if (\in_array(str($resource)->before('.')->toString(), self::EXEMPT, true)) {
+            return GateAccessEnum::FULL;
+        }
+
+        if (! $user->user_type->carriesRole()) {
+            return GateAccessEnum::NONE;
+        }
+
+        return $this->lookup($this->mergeRoleMaps($user->liveRoles()), $resource);
+    }
+
+    /**
      * Does this account reach the level being asked for? The question every screen
      * asks, and the one kGate() wraps.
      */
@@ -294,9 +385,9 @@ class GateService
         $candidate = (clone $role)->fill(['gates' => $gates]);
 
         $survives = $this->administrationSurvives(
-            fn (User $admin, ?Role $assigned) => $this->mapFor(
+            fn (User $admin, Collection $assigned) => $this->mapFor(
                 $admin,
-                $assigned?->is($role) ? $candidate : $assigned,
+                $this->withCandidateRole($assigned, $candidate),
             )
         );
 
@@ -311,7 +402,7 @@ class GateService
         $candidate = (clone $user)->fill(['gates' => $gates]);
 
         $survives = $this->administrationSurvives(
-            fn (User $admin, ?Role $assigned) => $this->mapFor(
+            fn (User $admin, Collection $assigned) => $this->mapFor(
                 $admin->is($user) ? $candidate : $admin,
                 $assigned,
             )
@@ -321,16 +412,19 @@ class GateService
     }
 
     /**
-     * Why this account cannot be moved onto that role — or off every role, when it is
-     * null — or null when it can.
+     * Why this account cannot be put on exactly that set of roles — the empty set
+     * included, which is how every role is taken away — or null when it can.
+     *
+     * The set is absolute, not a list of additions: what is passed is what the account
+     * would end up holding, so a role dropped from it is a role revoked.
+     *
+     * @param  Collection<int, Role>|iterable<Role>  $roles
      */
-    public function assignmentBlockedReason(User $user, ?Role $role): ?string
+    public function assignmentBlockedReason(User $user, iterable $roles): ?string
     {
-        $candidate = (clone $user)->fill(['role_id' => $role?->id]);
-
         $survives = $this->administrationSurvives(
-            fn (User $admin, ?Role $assigned) => $admin->is($user)
-                ? $this->mapFor($candidate, $role)
+            fn (User $admin, Collection $assigned) => $admin->is($user)
+                ? $this->mapFor($user, $roles)
                 : $this->mapFor($admin, $assigned)
         );
 
@@ -342,15 +436,17 @@ class GateService
      *
      * Deactivating takes the role's whole map away from everybody on it, so it can
      * empty user management just as surely as editing that map key by key would.
+     * Somebody holding a second role that still grants Users is not locked out by it,
+     * which is exactly what the merge has to be asked rather than assumed.
      */
     public function roleDeactivationBlockedReason(Role $role): ?string
     {
         $candidate = (clone $role)->fill(['status' => StatusDefault::INACTIVE]);
 
         $survives = $this->administrationSurvives(
-            fn (User $admin, ?Role $assigned) => $this->mapFor(
+            fn (User $admin, Collection $assigned) => $this->mapFor(
                 $admin,
-                $assigned?->is($role) ? $candidate : $assigned,
+                $this->withCandidateRole($assigned, $candidate),
             )
         );
 
@@ -411,6 +507,7 @@ class GateService
         );
 
         $this->flush();
+        $this->syncAuthenticated($user);
 
         return true;
     }
@@ -422,5 +519,27 @@ class GateService
     public function flush(): void
     {
         $this->maps = [];
+    }
+
+    /**
+     * Reload the signed-in account when it is the one that just changed.
+     *
+     * The guard hands out a single User instance for the whole request, and that copy
+     * still carries the override — or the roles — as they were when the request began.
+     * Flushing the cache alone is not enough: the next kGate() would resolve against
+     * that stale copy and cache the very map the write replaced, so an administrator
+     * editing their own access would see the change only after a reload.
+     *
+     * Every writer calls this straight after its flush().
+     */
+    public function syncAuthenticated(User $user): void
+    {
+        $current = auth()->user();
+
+        if ($current instanceof User && $current->is($user) && $current !== $user) {
+            $current->refresh();
+        }
+
+        $this->flush();
     }
 }

@@ -172,12 +172,15 @@ $data = [[
     'name' => 'Admin User',
     'email' => 'admin@example.test',
     'password' => 'password',
-    'type' => UserTypeEnum::ADMIN,
-    'role_id' => $adminRole->id,
+    'user_type' => UserTypeEnum::ADMIN,
 ]];
 
 foreach ($data as $userData) {
-    User::firstOrCreate(['email' => $userData['email']], $userData);
+    $user = User::firstOrCreate(['email' => $userData['email']], $userData);
+
+    // Attached rather than synced: re-seeding a live install must not strip roles
+    // somebody added to this account.
+    $user->roles()->syncWithoutDetaching([$adminRole->id]);
 }
 ```
 

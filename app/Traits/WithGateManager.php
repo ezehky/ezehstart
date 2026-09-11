@@ -15,8 +15,9 @@ use Livewire\Attributes\Computed;
  *
  * The same grid edits both subjects. A role's map is absolute — a key it does not
  * carry is access nobody on that role has. An administrator's map is an override laid
- * over their role, so it has a third state the role editor does not: a blank row means
- * "whatever the role says", and is not the same answer as No access.
+ * over the roles they carry merged together, so it has a third state the role editor
+ * does not: a blank row means "whatever those roles say", and is not the same answer
+ * as No access.
  *
  * @property-read array<int, array{key: string, label: string, level: GateAccessEnum}> $gateInheritance
  */
@@ -52,6 +53,11 @@ trait WithGateManager
      */
     public function openRoleGates(Role $role): void
     {
+        $this->respondError(
+            'You do not have access to change what accounts reach.',
+            if: ! kGate(GateService::ADMINISTRATION, GateAccessEnum::FULL),
+        );
+
         $this->resetValidation();
 
         $this->gateRoleId = $role->id;
@@ -69,9 +75,16 @@ trait WithGateManager
      */
     public function openAdminGates(User $user): void
     {
+        $this->respondError(
+            'You do not have access to change what accounts reach.',
+            if: ! kGate(GateService::ADMINISTRATION, GateAccessEnum::FULL),
+        );
+
         $this->resetValidation();
 
-        $this->gateRoleId = $user->role_id;
+        // No single role to point at: the inheritance hint comes from every role the
+        // account carries, merged, so it is read off the account itself.
+        $this->gateRoleId = null;
         $this->gateUserId = $user->id;
 
         // Null means the account has never been overridden, which is every row blank
@@ -97,20 +110,22 @@ trait WithGateManager
     }
 
     /**
-     * What the role underneath grants, shown beside each row so an override reads as
-     * a change rather than as a value out of nowhere. Empty for a role edit.
+     * What the roles underneath grant, shown beside each row so an override reads as a
+     * change rather than as a value out of nowhere. Empty for a role edit.
      *
      * @return array<string, GateAccessEnum>
      */
     #[Computed]
     public function gateInheritance(): array
     {
-        if (! $this->editingAdminGates() || ! $role = Role::query()->find($this->gateRoleId)) {
+        if (! $this->editingAdminGates() || ! $user = User::query()->with('roles')->find($this->gateUserId)) {
             return [];
         }
 
+        $service = app(GateService::class);
+
         return collect($this->gateRows)
-            ->mapWithKeys(fn (array $row) => [$row['key'] => $role->gateFor($row['key'])])
+            ->mapWithKeys(fn (array $row) => [$row['key'] => $service->inheritedAccessFor($user, $row['key'])])
             ->all();
     }
 
@@ -127,7 +142,7 @@ trait WithGateManager
 
     /**
      * Empty every row. On a role that closes everything; on an administrator it puts
-     * them back on their role, which is why the button says different things.
+     * them back on their roles, which is why the button says different things.
      */
     public function clearEveryGate(): void
     {
@@ -138,6 +153,14 @@ trait WithGateManager
 
     public function saveGates(): bool
     {
+        // Handing out gates is itself gated, by the one key the lockout guard watches.
+        // Checked here rather than on each host screen: the editor is opened from two
+        // of them and a boundary that lives on the caller is a boundary with a hole.
+        $this->respondError(
+            'You do not have access to change what accounts reach.',
+            if: ! kGate(GateService::ADMINISTRATION, GateAccessEnum::FULL),
+        );
+
         $service = app(GateService::class);
 
         // Validated inline rather than through rules(). A class method beats a trait
@@ -212,12 +235,12 @@ trait WithGateManager
 
     private function saveAdminGates(GateService $service, array $submitted): bool
     {
-        $user = User::query()->with('role')->find($this->gateUserId);
+        $user = User::query()->with('roles')->find($this->gateUserId);
 
         $this->respondError('That account no longer exists.', if: ! $user);
 
         // Nothing overridden at all is not an empty override, it is no override —
-        // and the difference is what puts the account back on its role.
+        // and the difference is what puts the account back on its roles.
         $gates = $submitted === [] ? null : $submitted;
 
         $reason = $service->adminGatesBlockedReason($user, $gates);
@@ -231,7 +254,7 @@ trait WithGateManager
 
         return $this->respondSuccess(
             $gates === null
-                ? 'This account is back on the access its role grants.'
+                ? 'This account is back on the access its roles grant.'
                 : 'Access for this account has been saved.'
         );
     }

@@ -18,7 +18,9 @@ new #[Layout('layouts::site')] class extends Component
         // the editor, which does not come through here.
         abort_unless($post->isLive(), 404);
 
-        $this->post = $post->load(['image', 'user', 'categories', 'tags']);
+        // The author's profile comes along: the byline card at the foot of the post
+        // is rendered from it, and lazy-loading it there would be a query per render.
+        $this->post = $post->load(['image', 'user.userProfile', 'categories', 'tags']);
 
         app(BlogService::class)->recordView($post);
 
@@ -90,6 +92,8 @@ new #[Layout('layouts::site')] class extends Component
             </div>
         @endif
     </article>
+
+    <x-site.author-card :user="$post->user" />
 
     @if ($this->related->isNotEmpty())
         <section class="mt-12 space-y-4">

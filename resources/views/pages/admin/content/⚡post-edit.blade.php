@@ -2,6 +2,7 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\CategoryGroupEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusPost;
 use App\Enums\StatusYes;
 use App\Models\Post;
@@ -80,7 +81,20 @@ new class extends Component
         }
 
         kSetSiteTitle('content', 'blogs', $this->post ? 'edit post' : 'new post');
-        kPageGate('content.blogs');
+
+        // Opening the editor at all is a write, so it asks for the level the save
+        // will need rather than for VIEW: a reader who cannot save has no business
+        // filling this form in and being refused at the end of it.
+        kPageGate('content.blogs', $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
+
+        // An author reaches their own drafts and nothing else. A 404 rather than a
+        // message, for the same reason the page gate returns one — which posts exist
+        // is not something a refused account gets to map.
+        abort_if(
+            $this->post?->exists
+                && app(BlogService::class)->editBlockedReason($this->post, auth()->user()) !== null,
+            404,
+        );
     }
 
     protected function rules(): array
@@ -107,9 +121,22 @@ new class extends Component
 
     public function save()
     {
+        $blog = app(BlogService::class);
+
+        // The page gate already refused anybody who cannot be here, which stops
+        // nobody who can open a console and post at this component directly.
+        $this->respondError(
+            'You do not have access to save posts.',
+            if: ! kGate('content.blogs', $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE),
+        );
+
+        if ($this->post?->exists) {
+            $reason = $blog->editBlockedReason($this->post, auth()->user());
+            $this->respondError($reason ?? '', if: $reason !== null);
+        }
+
         $this->validate();
 
-        $blog = app(BlogService::class);
         $activity = app(ActivityLogService::class);
 
         $isNew = ! $this->post;

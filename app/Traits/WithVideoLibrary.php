@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Enums\GateAccessEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\UserTypeEnum;
 use App\Models\User;
@@ -353,8 +354,34 @@ trait WithVideoLibrary
      * allowed, and checked again inside the service, which is what actually
      * decides — a rule only speaks for requests that came through this form.
      */
+    /**
+     * The gate this library sits behind in the admin workspace.
+     *
+     * There is no member equivalent: the member workspace is not gated, and the same
+     * screen serves both — which is why every check below goes through kGateAction()
+     * rather than kGate(). What a member may see is decided by the service, on the
+     * rows themselves.
+     */
+    private const LIBRARY_GATE = 'content.video-library';
+
+    /**
+     * Refuse a write this account is not gated for.
+     *
+     * Every control is hidden as well, which stops nobody who can open a console and
+     * post at the component directly. This is the boundary — see gates.md.
+     */
+    private function guardLibrary(GateAccessEnum $level, string $action): void
+    {
+        $this->respondError(
+            "You do not have {$action} access to the video library.",
+            if: ! kGateAction(self::LIBRARY_GATE, $level),
+        );
+    }
+
     public function addVideo(): bool
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'create');
+
         $this->validate([
             'video_url' => ['required', 'string', 'max:2048', new VideoUrlRule],
             'new_title' => ['nullable', 'string', 'max:255'],
@@ -405,6 +432,8 @@ trait WithVideoLibrary
      */
     public function saveVideo(): bool
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $video = Video::query()->whereKey($this->edit_id)->first();
 
         abort_unless((bool) $video, 404);
@@ -447,6 +476,8 @@ trait WithVideoLibrary
 
     public function moveSelected(): bool
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $this->validate([
             'move_folder_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
         ]);
@@ -478,6 +509,8 @@ trait WithVideoLibrary
      */
     public function deleteSelected(): bool
     {
+        $this->guardLibrary(GateAccessEnum::FULL, 'delete');
+
         $videos = $this->manageableSelection;
 
         $this->respondError('Choose a video to delete.', $videos->isEmpty());
@@ -513,6 +546,8 @@ trait WithVideoLibrary
 
     public function newFolder(): void
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'create');
+
         $this->resetValidation();
 
         $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_type');
@@ -525,6 +560,8 @@ trait WithVideoLibrary
 
     public function editFolder(int $folderId): void
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $folder = VideoFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
@@ -544,6 +581,8 @@ trait WithVideoLibrary
 
     public function saveFolder(): bool
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'create');
+
         $this->validate([
             'folder_name' => ['required', 'string', 'max:255'],
             'folder_parent_id' => ['nullable', 'integer', Rule::exists('video_folders', 'id')],
@@ -588,6 +627,8 @@ trait WithVideoLibrary
 
     public function deleteFolder(int $folderId): bool
     {
+        $this->guardLibrary(GateAccessEnum::FULL, 'delete');
+
         $folder = VideoFolder::query()->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);

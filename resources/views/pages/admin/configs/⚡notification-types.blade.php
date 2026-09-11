@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\NotificationType;
 use App\Services\ActivityLogService;
@@ -50,6 +51,11 @@ new class extends Component
 
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add notification types.',
+            if: ! kGate('config.notification-types', GateAccessEnum::CREATE),
+        );
+
         $this->resetForm();
 
         $this->flow_order = (int) NotificationType::query()->max('flow_order') + 1;
@@ -59,6 +65,11 @@ new class extends Component
 
     public function edit(NotificationType $notificationType): void
     {
+        $this->respondError(
+            'You do not have access to edit notification types.',
+            if: ! kGate('config.notification-types', GateAccessEnum::MODIFY),
+        );
+
         $this->resetForm();
 
         $this->notificationType = $notificationType;
@@ -96,6 +107,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save notification types.',
+            if: ! kGate('config.notification-types', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $action = ActivityActionEnum::NOTIFICATION_TYPE_UPDATE;
@@ -134,6 +150,11 @@ new class extends Component
 
     public function confirmDelete(int $typeId): void
     {
+        $this->respondError(
+            'You do not have delete access to notification types.',
+            if: ! kGate('config.notification-types', GateAccessEnum::FULL),
+        );
+
         $this->deleteId = $typeId;
 
         Flux::modal('deleteTypeModal')->show();
@@ -141,6 +162,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have delete access to notification types.',
+            if: ! kGate('config.notification-types', GateAccessEnum::FULL),
+        );
+
         $type = NotificationType::query()->whereKey($this->deleteId)->first();
 
         abort_unless((bool) $type, 404);
@@ -181,7 +207,7 @@ new class extends Component
                 </flux:text>
             </div>
 
-            <flux:button variant="primary" icon="plus" wire:click="create">New type</flux:button>
+            <x-dashboard.gate.button gate="config.notification-types" level="create" variant="primary" icon="plus" wire:click="create">New type</x-dashboard.gate.button>
         </div>
 
         @if ($this->types->isEmpty())
@@ -218,8 +244,8 @@ new class extends Component
                             <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
                             <flux:table.cell>
                                 <div class="flex justify-end gap-1">
-                                    <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                    <flux:button size="sm" variant="ghost" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
+                                    <x-dashboard.gate.button gate="config.notification-types" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                                    <x-dashboard.gate.button gate="config.notification-types" level="full" size="sm" variant="ghost" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
                                 </div>
                             </flux:table.cell>
                         </flux:table.row>

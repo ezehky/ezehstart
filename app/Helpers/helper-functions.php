@@ -322,6 +322,46 @@ if (! function_exists('kPageGate')) {
     }
 }
 
+if (! function_exists('kGateAction')) {
+    /**
+     * May this account use one control on the screen it is looking at?
+     *
+     * kGate() with the escape hatch the shared screens need: an account in an ungated
+     * workspace passes straight through. The image and video libraries are one screen
+     * in both workspaces, and the member workspace has no gate keys at all — asking
+     * kGate() there answers no and would take the upload button away from every member.
+     *
+     * The question is asked of the *account*, not of the route, which is the one
+     * difference from kPageGate(). kPageGate() runs in mount(), on the request that
+     * opened the page, so `admin.*` is a fair test there. A control is re-rendered on
+     * every Livewire update as well, and those arrive on the livewire.update route —
+     * a route test would answer "not an admin route" and hand every hidden button
+     * back the first time somebody typed in a search box.
+     *
+     * This is what the gated button and menu-item components call, so a control is
+     * safe to write once and drop into either workspace.
+     *
+     * @param  string  $resource  The navigation key the control sits under.
+     * @param  GateAccessEnum|string  $level  The minimum access it needs.
+     */
+    function kGateAction(string $resource, GateAccessEnum|string $level = GateAccessEnum::VIEW, ?User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        // Nobody signed in reaches a gated control. A guest is not "an ungated
+        // workspace", it is no workspace at all.
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if (! $user->user_type->carriesRole()) {
+            return true;
+        }
+
+        return kGate($resource, $level, $user);
+    }
+}
+
 if (! function_exists('kFluxIcons')) {
     /**
      * Every icon name `<flux:icon>` can render, read from the registered component paths.

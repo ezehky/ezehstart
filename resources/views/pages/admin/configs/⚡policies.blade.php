@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\PolicyTypeEnum;
 use App\Enums\StatusPolicy;
 use App\Enums\StatusYes;
@@ -82,6 +83,11 @@ new class extends Component
 
     public function create(string $type): void
     {
+        $this->respondError(
+            'You do not have access to add policy versions.',
+            if: ! kGate('config.policies', GateAccessEnum::CREATE),
+        );
+
         $policyType = PolicyTypeEnum::from($type);
 
         $serviceInstance = app(PolicyContentService::class);
@@ -104,6 +110,11 @@ new class extends Component
 
     public function edit(Policy $policy): void
     {
+        $this->respondError(
+            'You do not have access to edit policies.',
+            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
+        );
+
         // Published text is what people consented to. It is superseded, never
         // edited — checked here as well as hidden in the markup, because a
         // disabled menu item is not a guard.
@@ -143,6 +154,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save policies.',
+            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $action = ActivityActionEnum::POLICY_UPDATE;
@@ -189,6 +205,11 @@ new class extends Component
      */
     public function confirmPublish(int $policyId): void
     {
+        $this->respondError(
+            'You do not have access to publish policies.',
+            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
+        );
+
         $this->publishId = $policyId;
 
         Flux::modal('publishModal')->show();
@@ -199,6 +220,11 @@ new class extends Component
      */
     public function publish(): bool
     {
+        $this->respondError(
+            'You do not have access to publish policies.',
+            if: ! kGate('config.policies', GateAccessEnum::MODIFY),
+        );
+
         $policy = Policy::query()->whereKey($this->publishId)->first();
 
         abort_unless((bool) $policy, 404);
@@ -259,9 +285,9 @@ new class extends Component
                         </flux:text>
                     </div>
 
-                    <flux:button class="press" size="sm" icon="plus" wire:click="create('{{ $policyType->value }}')">
+                    <x-dashboard.gate.button gate="config.policies" level="create" class="press" size="sm" icon="plus" wire:click="create('{{ $policyType->value }}')">
                         New version
-                    </flux:button>
+                    </x-dashboard.gate.button>
                 </div>
 
                 <flux:table>
@@ -286,14 +312,14 @@ new class extends Component
                                         <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
                                         <flux:menu>
                                             @if ($item->canEdit())
-                                                <flux:menu.item icon="pencil-square" wire:click="edit({{ $item->id }})">
+                                                <x-dashboard.gate.menu-item gate="config.policies" level="modify" icon="pencil-square" wire:click="edit({{ $item->id }})">
                                                     Edit draft
-                                                </flux:menu.item>
+                                                </x-dashboard.gate.menu-item>
                                             @endif
                                             @if ($item->canPublish())
-                                                <flux:menu.item icon="rocket-launch" wire:click="confirmPublish({{ $item->id }})">
+                                                <x-dashboard.gate.menu-item gate="config.policies" level="modify" icon="rocket-launch" wire:click="confirmPublish({{ $item->id }})">
                                                     Publish
-                                                </flux:menu.item>
+                                                </x-dashboard.gate.menu-item>
                                             @endif
                                             <flux:menu.item
                                                 icon="eye"

@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusPost;
 use App\Models\Post;
 use App\Services\ActivityLogService;
+use App\Services\BlogService;
 use App\Services\ImageLibraryService;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
@@ -31,10 +33,31 @@ new class extends Component
         kPageGate('content.blogs');
     }
 
+    /**
+     * How far this account may go on this screen, asked once and read by every
+     * button and every write.
+     */
+    #[Computed]
+    public function access(): GateAccessEnum
+    {
+        return kGateAccess('content.blogs');
+    }
+
+    /**
+     * Is this account held to the posts it wrote? Drives the copy above the table,
+     * so a short list reads as a rule rather than as missing data.
+     */
+    #[Computed]
+    public function ownPostsOnly(): bool
+    {
+        return app(BlogService::class)->authorRestricted(auth()->user());
+    }
+
     #[Computed]
     public function posts()
     {
-        return Post::query()
+        return app(BlogService::class)
+            ->authorScope(Post::query(), auth()->user())
             ->with(['user', 'image', 'categories'])
             ->when($this->search, fn (Builder $query) => $query->searchMacro('title', $this->search))
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
@@ -48,22 +71,27 @@ new class extends Component
     #[Computed]
     public function metrics(): array
     {
+        // Scoped the same way the table is. A "Published: 40" above a list of the
+        // four posts this author wrote is a number about somebody else's work.
+        $service = app(BlogService::class);
+        $scoped = fn () => $service->authorScope(Post::query(), auth()->user());
+
         return [
             [
                 'label' => 'Published',
-                'value' => Post::query()->live()->count(),
+                'value' => $scoped()->live()->count(),
                 'icon' => 'megaphone',
                 'tone' => 'emerald',
             ],
             [
                 'label' => 'Drafts',
-                'value' => Post::query()->where('status', StatusPost::DRAFT)->count(),
+                'value' => $scoped()->where('status', StatusPost::DRAFT)->count(),
                 'icon' => 'pencil-square',
                 'tone' => 'amber',
             ],
             [
                 'label' => 'Total reads',
-                'value' => (int) Post::query()->sum('views'),
+                'value' => (int) $scoped()->sum('views'),
                 'icon' => 'eye',
                 'tone' => 'sky',
             ],
@@ -82,6 +110,14 @@ new class extends Component
 
     public function confirmDelete(Post $post): void
     {
+        $this->respondError(
+            'You do not have delete access to posts.',
+            ! $this->access->covers(GateAccessEnum::FULL),
+        );
+
+        $reason = app(BlogService::class)->editBlockedReason($post, auth()->user());
+        $this->respondError($reason ?? '', $reason !== null);
+
         $this->post = $post;
 
         Flux::modal('deletePostModal')->show();
@@ -89,7 +125,18 @@ new class extends Component
 
     public function delete(): bool
     {
+        // The menu row is hidden, which stops nobody who can open a console.
+        $this->respondError(
+            'You do not have delete access to posts.',
+            ! $this->access->covers(GateAccessEnum::FULL),
+        );
+
         $this->respondError('Select a post to delete first.', ! $this->post);
+
+        // Re-checked rather than trusted: the dialog was opened a while ago, and
+        // ownership is the whole reason this post was reachable at all.
+        $reason = app(BlogService::class)->editBlockedReason($this->post, auth()->user());
+        $this->respondError($reason ?? '', $reason !== null);
 
         // Captured before the row goes, so the log line still says what went.
         $description = " post: {$this->post->title}";
@@ -129,7 +176,11 @@ new class extends Component
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <flux:heading level="2" size="lg">Posts</flux:heading>
-                <flux:text class="mt-1">Everything written for the blog, published or not.</flux:text>
+                <flux:text class="mt-1">
+                    {{ $this->ownPostsOnly
+                        ? 'The posts you have written, published or not.'
+                        : 'Everything written for the blog, published or not.' }}
+                </flux:text>
             </div>
 
             <div class="flex flex-col gap-3 sm:flex-row">
@@ -145,9 +196,15 @@ new class extends Component
                         <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                     @endforeach
                 </flux:select>
-                <flux:button href="{{ route('admin.blog.create') }}" variant="primary" icon="plus">
+                <x-dashboard.gate.button
+                    gate="content.blogs"
+                    level="create"
+                    href="{{ route('admin.blog.create') }}"
+                    variant="primary"
+                    icon="plus"
+                >
                     New post
-                </flux:button>
+                </x-dashboard.gate.button>
             </div>
         </div>
 
@@ -202,25 +259,31 @@ new class extends Component
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                     <flux:menu>
-                                        <flux:menu.item
+                                        <x-dashboard.gate.menu-item
+                                            gate="content.blogs"
+                                            level="modify"
                                             icon="pencil-square"
                                             href="{{ route('admin.blog.edit', $item) }}"
                                         >
                                             Edit
-                                        </flux:menu.item>
+                                        </x-dashboard.gate.menu-item>
                                         @if ($item->isLive())
                                             <flux:menu.item icon="arrow-top-right-on-square" href="{{ route('blog.show', $item) }}">
                                                 View on site
                                             </flux:menu.item>
                                         @endif
-                                        <flux:menu.separator />
-                                        <flux:menu.item
+                                        @if (kGate('content.blogs', App\Enums\GateAccessEnum::FULL))
+                                            <flux:menu.separator />
+                                        @endif
+                                        <x-dashboard.gate.menu-item
+                                            gate="content.blogs"
+                                            level="full"
                                             icon="trash"
                                             variant="danger"
                                             wire:click="confirmDelete({{ $item->id }})"
                                         >
                                             Delete
-                                        </flux:menu.item>
+                                        </x-dashboard.gate.menu-item>
                                     </flux:menu>
                                 </flux:dropdown>
                             </flux:table.cell>

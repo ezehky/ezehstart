@@ -4,6 +4,7 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\GateAccessEnum;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
+use App\Models\Tag;
 use App\Services\GateService;
 use App\Services\RoleService;
 use Livewire\Livewire;
@@ -59,6 +60,56 @@ test('a child with no gate of its own inherits its parent', function () {
 
     expect($this->service->accessFor($this->admin, 'content.tags'))->toBe(GateAccessEnum::MODIFY)
         ->and($this->service->accessFor($this->admin, 'content.blogs'))->toBe(GateAccessEnum::MODIFY);
+});
+
+test('two roles merge with the highest access winning each key', function () {
+    $media = roleWithGates('Media', [
+        'content' => GateAccessEnum::VIEW->value,
+        'transactions' => GateAccessEnum::FULL->value,
+    ]);
+    $editor = roleWithGates('Editor', [
+        'content' => GateAccessEnum::FULL->value,
+    ]);
+
+    $admin = adminWithRoles($media, $editor);
+
+    expect($this->service->accessFor($admin, 'content'))->toBe(GateAccessEnum::FULL)
+        ->and($this->service->accessFor($admin, 'transactions'))->toBe(GateAccessEnum::FULL);
+});
+
+test('a role denying a key does not veto another role granting it', function () {
+    $narrow = roleWithGates('Narrow', ['transactions' => GateAccessEnum::NONE->value]);
+    $wide = roleWithGates('Wide', ['transactions' => GateAccessEnum::MODIFY->value]);
+
+    $admin = adminWithRoles($narrow, $wide);
+
+    expect($this->service->accessFor($admin, 'transactions'))->toBe(GateAccessEnum::MODIFY);
+});
+
+test('an override still narrows what the merged roles grant', function () {
+    $media = roleWithGates('Media', ['content' => GateAccessEnum::FULL->value]);
+    $editor = roleWithGates('Editor', ['content' => GateAccessEnum::CREATE->value]);
+
+    $admin = adminWithRoles($media, $editor);
+    $admin->gates = ['content' => GateAccessEnum::NONE->value];
+    $admin->save();
+
+    $this->service->flush();
+
+    expect($this->service->accessFor($admin->fresh(), 'content'))->toBe(GateAccessEnum::NONE);
+});
+
+test('the inheritance hint is the merge, not one of the roles', function () {
+    $media = roleWithGates('Media', ['content' => GateAccessEnum::VIEW->value]);
+    $editor = roleWithGates('Editor', ['content' => GateAccessEnum::FULL->value]);
+
+    $admin = adminWithRoles($media, $editor);
+    $admin->gates = ['content' => GateAccessEnum::NONE->value];
+    $admin->save();
+
+    // What the account resolves to is NONE, but the editor has to show what it would
+    // fall back to if the override were cleared.
+    expect($this->service->inheritedAccessFor($admin->fresh(), 'content'))->toBe(GateAccessEnum::FULL);
 });
 
 test('a child gate of its own beats the parent in both directions', function () {
@@ -255,6 +306,75 @@ test('clearing an override puts the account back on its role', function () {
 
     expect($this->admin->fresh()->gates)->toBeNull()
         ->and($this->service->accessFor($this->admin->fresh(), 'content'))->toBe(GateAccessEnum::FULL);
+});
+
+// |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+// THE CONTROLS ON A SCREEN
+
+test('a read-only admin can open a screen and is refused every write on it', function () {
+    setAdminRoleGates([
+        'content' => GateAccessEnum::VIEW->value,
+        'users' => GateAccessEnum::FULL->value,
+    ]);
+
+    // The page opens: VIEW is enough to look at it.
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->assertOk();
+
+    foreach (['create', 'createMany'] as $method) {
+        Livewire::actingAs($this->admin)
+            ->test('pages::admin.content.tags')
+            ->call($method)
+            ->assertHasErrors();
+    }
+});
+
+test('an admin who can add but not delete is refused the delete', function () {
+    setAdminRoleGates([
+        'content' => GateAccessEnum::CREATE->value,
+        'users' => GateAccessEnum::FULL->value,
+    ]);
+
+    $tag = Tag::query()->create(['name' => 'Skincare', 'slug' => 'skincare']);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->call('create')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->call('confirmDelete', $tag->id)
+        ->assertHasErrors();
+
+    expect($tag->fresh())->not->toBeNull();
+});
+
+test('the buttons a read-only admin cannot use are not rendered', function () {
+    setAdminRoleGates([
+        'content' => GateAccessEnum::VIEW->value,
+        'users' => GateAccessEnum::FULL->value,
+    ]);
+
+    // Asserted against the wire:click rather than the label: the modals carry the same
+    // words in their headings and are in the DOM whether they are open or not.
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->assertDontSeeHtml('wire:click="create"')
+        ->assertDontSeeHtml('wire:click="createMany"');
+});
+
+test('the same buttons come back once the gate allows them', function () {
+    setAdminRoleGates([
+        'content' => GateAccessEnum::CREATE->value,
+        'users' => GateAccessEnum::FULL->value,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.content.tags')
+        ->assertSeeHtml('wire:click="create"')
+        ->assertSeeHtml('wire:click="createMany"');
 });
 
 test('a gate change is written to the activity log', function () {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusTransaction;
 use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
@@ -122,6 +123,11 @@ new class extends Component
 
     public function confirmSettle(int $transactionId, int $status): void
     {
+        $this->respondError(
+            'You do not have access to settle transactions.',
+            if: ! kGate('transactions', GateAccessEnum::MODIFY),
+        );
+
         $this->settleId = $transactionId;
         $this->settleStatus = $status;
         $this->settleNote = '';
@@ -131,6 +137,12 @@ new class extends Component
 
     public function settle(): bool
     {
+        // The menu row is hidden, which stops nobody who can open a console.
+        $this->respondError(
+            'You do not have access to settle transactions.',
+            if: ! kGate('transactions', GateAccessEnum::MODIFY),
+        );
+
         $transaction = Transaction::query()->whereKey($this->settleId)->first();
 
         abort_unless((bool) $transaction && $this->settleStatus !== null, 404);
@@ -155,6 +167,13 @@ new class extends Component
 
     public function adjust(): bool
     {
+        // An adjustment writes a new row in the ledger, so it asks for CREATE rather
+        // than for the MODIFY that settling an existing one needs.
+        $this->respondError(
+            'You do not have access to post adjustments.',
+            if: ! kGate('transactions', GateAccessEnum::CREATE),
+        );
+
         $this->validate([
             'adjust_user_id' => ['required', 'integer', Rule::exists('users', 'id')],
             'adjust_amount' => ['required', 'numeric', 'min:0.01'],
@@ -212,9 +231,15 @@ new class extends Component
                         <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                     @endforeach
                 </flux:select>
-                <flux:button variant="primary" icon="plus" x-on:click="$flux.modal('adjustModal').show()">
+                <x-dashboard.gate.button
+                    gate="transactions"
+                    level="create"
+                    variant="primary"
+                    icon="plus"
+                    x-on:click="$flux.modal('adjustModal').show()"
+                >
                     Adjustment
-                </flux:button>
+                </x-dashboard.gate.button>
             </div>
         </div>
 
@@ -262,27 +287,34 @@ new class extends Component
                                 <x-status :status="$item->status" />
                             </flux:table.cell>
                             <flux:table.cell>
-                                @if (! $item->isSettled())
+                                @if ($item->isSettled())
+                                    <flux:text size="sm" class="text-slate-400">Settled</flux:text>
+                                @elseif (kGate('transactions', GateAccessEnum::MODIFY))
                                     <flux:dropdown position="bottom" align="end">
                                         <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                         <flux:menu>
-                                            <flux:menu.item
+                                            <x-dashboard.gate.menu-item
+                                                gate="transactions"
+                                                level="modify"
                                                 icon="check"
                                                 wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::CONFIRMED->value }})"
                                             >
                                                 Confirm
-                                            </flux:menu.item>
-                                            <flux:menu.item
+                                            </x-dashboard.gate.menu-item>
+                                            <x-dashboard.gate.menu-item
+                                                gate="transactions"
+                                                level="modify"
                                                 icon="x-mark"
                                                 variant="danger"
                                                 wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::REJECTED->value }})"
                                             >
                                                 Reject
-                                            </flux:menu.item>
+                                            </x-dashboard.gate.menu-item>
                                         </flux:menu>
                                     </flux:dropdown>
                                 @else
-                                    <flux:text size="sm" class="text-slate-400">Settled</flux:text>
+                                    {{-- A read-only account sees the state, not an empty menu. --}}
+                                    <flux:text size="sm" class="text-slate-400">Pending</flux:text>
                                 @endif
                             </flux:table.cell>
                         </flux:table.row>

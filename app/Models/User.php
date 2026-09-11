@@ -6,6 +6,7 @@ use App\Enums\StatusDefault;
 use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
 use App\Services\PolicyContentService;
+use App\Services\RoleService;
 use App\Traits\WithDynamicModelFormatting;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -80,7 +81,7 @@ class User extends Authenticatable
      * This administrator's own gate override as a plain array, for merging and
      * counting.
      *
-     * Null still means "inherit the role" and empty still means "everything was
+     * Null still means "inherit the roles" and empty still means "everything was
      * deliberately taken away" — this flattens both to `[]`, so only call it where
      * that difference has already been decided.
      */
@@ -92,12 +93,41 @@ class User extends Authenticatable
     /**
      * Does this account reach a gated workspace at all?
      *
-     * An admin with no role, or with one that has been deactivated, signs in and
-     * reaches nothing — which is a real state, not a broken one.
+     * An admin with no roles, or with only deactivated ones, signs in and reaches
+     * nothing — which is a real state, not a broken one.
      */
     public function hasLiveRole(): bool
     {
-        return $this->user_type->carriesRole() && (bool) $this->role?->grantsAccess();
+        return $this->user_type->carriesRole() && $this->liveRoles()->isNotEmpty();
+    }
+
+    /**
+     * The roles that are actually granting something right now.
+     *
+     * An admin carries any number, and a switched-off one keeps its assignment
+     * while granting nothing — so everything that reads access reads this rather
+     * than the raw relation.
+     *
+     * @return Collection<int, Role>
+     */
+    public function liveRoles(): Collection
+    {
+        return $this->roles
+            ->filter(fn (Role $role) => $role->grantsAccess())
+            ->values();
+    }
+
+    /**
+     * Does this account write for the blog?
+     *
+     * Asked by slug rather than by gate: plenty of roles reach the blog, but only the
+     * author role says the person *is* an author — which is what decides whose byline
+     * carries a bio and which posts they are held to. The role can be renamed freely;
+     * the slug is what the blog is written against.
+     */
+    public function isAuthor(): bool
+    {
+        return $this->liveRoles()->contains('slug', RoleService::AUTHOR_SLUG);
     }
 
     public function firstName(): string
@@ -156,16 +186,21 @@ class User extends Authenticatable
     }
 
     /**
-     * The admin role, or null. Members never have one.
+     * The admin roles this account carries. Members never have any.
+     *
+     * Many rather than one: an administrator can be Media *and* Support, and the
+     * maps are merged — see GateService::mapFor(). Nothing here decides what that
+     * merge means; ask GateService, never the relation.
      *
      * `gates` is in the select because GateService resolves this account's access
-     * straight off the loaded role. Leave it out and every role map reads as null,
+     * straight off the loaded roles. Leave it out and every role map reads as null,
      * which looks exactly like "granted nothing" rather than like a bug.
      */
-    public function role(): BelongsTo
+    public function roles(): BelongsToMany
     {
-        return $this->belongsTo(Role::class)
-            ->select('id', 'name', 'slug', 'gates', 'status', 'is_protected');
+        return $this->belongsToMany(Role::class)
+            ->select('roles.id', 'roles.name', 'roles.slug', 'roles.gates', 'roles.status', 'roles.is_protected')
+            ->orderBy('roles.name');
     }
 
     public function notificationPreferences(): HasMany
@@ -249,16 +284,27 @@ class User extends Authenticatable
     }
 
     /**
-     * Admins who cannot reach the workspace: no role, or one that is switched off.
-     * A real state — an account promoted before a role was picked, or a whole role
-     * suspended — so the admins listing can call it out rather than show a blank.
+     * Admins who cannot reach the workspace: no roles at all, or only switched-off
+     * ones. A real state — an account promoted before a role was picked, or a whole
+     * role suspended — so the admins listing can call it out rather than show a blank.
+     *
+     * Asked as "has no live role" rather than "has an inactive role": one live role
+     * is enough to reach the workspace, however many dead ones sit beside it.
      */
     #[Scope]
     protected function withoutLiveRole(Builder $builder): void
     {
         $builder->where('user_type', UserTypeEnum::ADMIN)
-            ->where(fn (Builder $query) => $query
-                ->whereNull('role_id')
-                ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));
+            ->whereDoesntHave('roles', fn (Builder $role) => $role->where('status', StatusDefault::ACTIVE));
+    }
+
+    /**
+     * Admins holding one specific role. The admins listing filters on it.
+     */
+    #[Scope]
+    protected function holdingRole(Builder $builder, Role|int $role): void
+    {
+        $builder->whereHas('roles', fn (Builder $query) => $query
+            ->whereKey($role instanceof Role ? $role->id : $role));
     }
 }

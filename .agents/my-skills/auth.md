@@ -28,16 +28,21 @@ group in `bootstrap/app.php`. The starter ships `USER` and `ADMIN`; a project ad
 case when it grows a third workspace.
 
 **Role** — how the *admin* workspace is divided up. A row in `roles`, created from the
-dashboard: "Administrator", "Media", "Support". **Only an admin has one, and exactly
-one** (`users.role_id`). A member has none — the member workspace is not gated, so
-there would be nothing for a role to say.
+dashboard: "Administrator", "Media", "Support". **Only an admin has any, and an admin
+may hold several** — the assignment is the `role_user` pivot, not a column. Their maps
+merge with the highest access winning each key, so "Media as well as Support" is a
+thing an administrator can express without inventing a third role that is the sum of
+the two. A member has none — the member workspace is not gated, so there would be
+nothing for a role to say.
 
 ```php
 $user->isAdmin();          // $user->type->isAdmin()
 $user->isUser();
 $user->isType(UserTypeEnum::ADMIN);
-$user->hasLiveRole();      // admin, on a role, and that role is switched on
-$user->role;               // ?Role — null for every member
+$user->hasLiveRole();      // admin, on at least one role that is switched on
+$user->roles;              // Collection<Role> — always empty for a member
+$user->liveRoles();        // the ones actually granting something right now
+$user->isAuthor();         // holds the author role — see gates.md
 ```
 
 Query scopes:
@@ -46,13 +51,17 @@ Query scopes:
 User::query()->admins();            // type = admin
 User::query()->members();           // type = user
 User::query()->ofType($type);
-User::query()->withoutLiveRole();   // admins with no role, or a switched-off one
+User::query()->withoutLiveRole();   // admins with no live role at all
+User::query()->holdingRole($role);  // admins holding one specific role
 ```
 
 Role and type changes go through `RoleService` + the `WithUserRoleManager` trait —
-`create()`, `update()`, `delete()`, `assign()`, `changeType()`, each with a
-`*BlockedReason(): ?string` guard. Never write `users.role_id` or `users.type`
+`create()`, `update()`, `delete()`, `syncRoles()`, `changeType()`, each with a
+`*BlockedReason(): ?string` guard. Never write the `role_user` pivot or `users.user_type`
 directly.
+
+`syncRoles()` takes the **whole set**, not an addition: what is passed is what the
+account ends up holding, so a role left out of it is a role revoked.
 
 An admin with no live role is a **holding state, not a bug**: they sign in, land on the
 dashboard, and reach nothing else. The admins listing and the dashboard both call it
@@ -337,7 +346,7 @@ new #[Layout('layouts::auth')] class extends Component
 - Installing Breeze / Jetstream / Fortify, or scaffolding auth controllers.
 - `Hash::make()` in a page — the `'password' => 'hashed'` cast handles it.
 - Signing a user in without `session()->regenerate()`.
-- Writing `users.role_id` or `users.type` directly instead of going through
+- Writing the `role_user` pivot or `users.user_type` directly instead of going through
   `RoleService`.
 - Checking a type with a string (`$user->type === 'admin'`) — use `isAdmin()` /
   `isType(UserTypeEnum::ADMIN)`.

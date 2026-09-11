@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusPost;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
+use App\Models\User;
 use App\Traits\WithRichTextSanitizer;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +40,54 @@ class BlogService
         if ($status->isPublished() && $post->published_at === null) {
             $post->published_at = now();
         }
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // AUTHORSHIP
+
+    /**
+     * Is this account held to the posts it wrote?
+     *
+     * An author is. Anybody else reaching the blog is not — a Media role with create
+     * access is a desk that runs the whole blog, and narrowing it to its own drafts
+     * would be a surprise nobody asked for. FULL is the way out: an editor-in-chief
+     * holds the author role *and* full access, and answers no to this.
+     */
+    public function authorRestricted(User $user): bool
+    {
+        return $user->isAuthor() && ! kGate('content.blogs', GateAccessEnum::FULL, $user);
+    }
+
+    /**
+     * Narrow a post query to the rows this account may work on.
+     *
+     * Applied to the listing as well as to the editor, so a restricted author never
+     * sees a row they would be refused on opening. The counts above the table go
+     * through it too — a metric that disagrees with the table below it reads as a bug.
+     */
+    public function authorScope(Builder $query, User $user): Builder
+    {
+        return $query->when(
+            $this->authorRestricted($user),
+            fn (Builder $inner) => $inner->where('user_id', $user->id),
+        );
+    }
+
+    /**
+     * Why this account cannot work on that post, or null when it can.
+     *
+     * A post with no author left — the account was deleted — is nobody's to claim, so
+     * a restricted author is refused it rather than inheriting it.
+     */
+    public function editBlockedReason(Post $post, User $user): ?string
+    {
+        if (! $this->authorRestricted($user)) {
+            return null;
+        }
+
+        return $post->user_id === $user->id
+            ? null
+            : 'You can only work on posts you wrote.';
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

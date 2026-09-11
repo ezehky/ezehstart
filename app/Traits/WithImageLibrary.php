@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Enums\GateAccessEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\UserTypeEnum;
 use App\Models\Image;
@@ -340,8 +341,34 @@ trait WithImageLibrary
      * break every page, post and email already pointing at the old URL, which is
      * exactly why the two are separate columns.
      */
+    /**
+     * The gate this library sits behind in the admin workspace.
+     *
+     * There is no member equivalent: the member workspace is not gated, and the same
+     * screen serves both — which is why every check below goes through kGateAction()
+     * rather than kGate(). What a member may see is decided by the service, on the
+     * rows themselves.
+     */
+    private const LIBRARY_GATE = 'content.image-library';
+
+    /**
+     * Refuse a write this account is not gated for.
+     *
+     * Every control is hidden as well, which stops nobody who can open a console and
+     * post at the component directly. This is the boundary — see gates.md.
+     */
+    private function guardLibrary(GateAccessEnum $level, string $action): void
+    {
+        $this->respondError(
+            "You do not have {$action} access to the image library.",
+            if: ! kGateAction(self::LIBRARY_GATE, $level),
+        );
+    }
+
     public function saveImage(): bool
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $image = Image::query()->whereKey($this->edit_id)->first();
 
         abort_unless((bool) $image, 404);
@@ -380,6 +407,8 @@ trait WithImageLibrary
 
     public function moveSelected(): bool
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $this->validate([
             'move_folder_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
         ]);
@@ -411,6 +440,8 @@ trait WithImageLibrary
      */
     public function deleteSelected(): bool
     {
+        $this->guardLibrary(GateAccessEnum::FULL, 'delete');
+
         $images = $this->manageableSelection;
 
         $this->respondError('Choose an image to delete.', $images->isEmpty());
@@ -446,6 +477,8 @@ trait WithImageLibrary
 
     public function newFolder(): void
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'create');
+
         $this->resetValidation();
 
         $this->reset('folder_id', 'folder_name', 'folder_shared', 'folder_visible_to_type');
@@ -458,6 +491,8 @@ trait WithImageLibrary
 
     public function editFolder(int $folderId): void
     {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
         $folder = ImageFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
@@ -477,6 +512,8 @@ trait WithImageLibrary
 
     public function saveFolder(): bool
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'create');
+
         $this->validate([
             'folder_name' => ['required', 'string', 'max:255'],
             'folder_parent_id' => ['nullable', 'integer', Rule::exists('image_folders', 'id')],
@@ -521,6 +558,8 @@ trait WithImageLibrary
 
     public function deleteFolder(int $folderId): bool
     {
+        $this->guardLibrary(GateAccessEnum::FULL, 'delete');
+
         $folder = ImageFolder::query()->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
@@ -549,6 +588,8 @@ trait WithImageLibrary
      */
     public function afterUpload(array $ids): void
     {
+        $this->guardLibrary(GateAccessEnum::CREATE, 'upload');
+
         if (blank($ids)) {
             return;
         }

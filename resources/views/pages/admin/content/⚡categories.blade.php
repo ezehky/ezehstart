@@ -2,6 +2,7 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\CategoryGroupEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\Category;
 use App\Services\ActivityLogService;
@@ -80,6 +81,11 @@ new class extends Component
 
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add categories.',
+            if: ! kGate('content.categories', GateAccessEnum::CREATE),
+        );
+
         $this->resetForm();
         $this->flow_order = (int) Category::query()
             ->where('category_group', $this->category_group)
@@ -90,6 +96,11 @@ new class extends Component
 
     public function createMany(): void
     {
+        $this->respondError(
+            'You do not have access to add categories.',
+            if: ! kGate('content.categories', GateAccessEnum::CREATE),
+        );
+
         $this->reset('bulk_names');
         $this->resetValidation();
 
@@ -105,6 +116,11 @@ new class extends Component
      */
     public function saveMany(): bool
     {
+        $this->respondError(
+            'You do not have access to add categories.',
+            if: ! kGate('content.categories', GateAccessEnum::CREATE),
+        );
+
         $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
 
         $categories = app(CategoryService::class)->resolveCategories($this->bulk_names, $this->category_group);
@@ -129,6 +145,11 @@ new class extends Component
 
     public function edit(Category $category): void
     {
+        $this->respondError(
+            'You do not have access to edit categories.',
+            if: ! kGate('content.categories', GateAccessEnum::MODIFY),
+        );
+
         $this->resetForm();
 
         $this->category = $category;
@@ -161,6 +182,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save categories.',
+            if: ! kGate('content.categories', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $action = ActivityActionEnum::CATEGORY_UPDATE;
@@ -206,6 +232,11 @@ new class extends Component
 
     public function confirmDelete(Category $category): void
     {
+        $this->respondError(
+            'You do not have delete access to categories.',
+            if: ! kGate('content.categories', GateAccessEnum::FULL),
+        );
+
         // The category is held in a property so the modal can show its name while the
         $this->category = $category;
 
@@ -214,6 +245,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have delete access to categories.',
+            if: ! kGate('content.categories', GateAccessEnum::FULL),
+        );
+
         $this->respondError('Select a category to delete first.', if: ! $this->category);
 
         // Nothing may be left filed under a category that is about to go — nor
@@ -264,8 +300,8 @@ new class extends Component
                 </flux:text>
             </div>
             <div class="flex gap-3">
-                <flux:button size="sm" variant="filled" icon="queue-list" wire:click="createMany">Add many</flux:button>
-                <flux:button size="sm" icon="plus" wire:click="create">Add</flux:button>
+                <x-dashboard.gate.button gate="content.categories" level="create" size="sm" variant="filled" icon="queue-list" wire:click="createMany">Add many</x-dashboard.gate.button>
+                <x-dashboard.gate.button gate="content.categories" level="create" size="sm" icon="plus" wire:click="create">Add</x-dashboard.gate.button>
             </div>
         </div>
 
@@ -286,8 +322,8 @@ new class extends Component
                         <flux:table.cell>{{ $item->attached_count }}</flux:table.cell>
                         <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
                         <flux:table.cell class="flex justify-end gap-1">
-                            <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                            <flux:button size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
+                            <x-dashboard.gate.button gate="content.categories" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                            <x-dashboard.gate.button gate="content.categories" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
                         </flux:table.cell>
                     </flux:table.row>
                 @empty

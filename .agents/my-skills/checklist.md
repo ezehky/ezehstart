@@ -74,7 +74,7 @@ If a line does not apply, it is ✓ by default — but read it first.
       (`$table->string('slug')->unique()`), never as `$table->unique(['slug'])`
 - [ ] ✓ No hand-written index on a `constrained()` foreign key — it is already indexed
 - [ ] ✓ A new column on `roles` was added to the explicit `select()` in
-      `User::userRoles()` / `UserRole::role()`, or it reads back null everywhere
+      `User::roles()`, or it reads back null everywhere
 - [ ] ✓ Slugs are derived in `save()` behind `isDirty('name')`, never bound to an input
 
 ## Livewire pages
@@ -112,8 +112,11 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ The route sits in the correct role-scoped route file
 - [ ] ✓ A new admin screen has a sidebar entry (which is what makes it gateable) and a
       `kPageGate()` call
-- [ ] ✓ A control gated in Blade is gated in the **method** too — `kGate()` in the view
-      hides it, it does not guard it
+- [ ] ✓ A control gated in Blade is gated in the **method** too — hiding it does not
+      guard it. Use `<x-dashboard.gate.button>` / `<x-dashboard.gate.menu-item>` for
+      the hiding half, and `kGate()` inside the method for the boundary
+- [ ] ✓ An account's access was asked of `GateService`, never read off one of its roles
+      — an admin may hold several and only the merge is the answer
 - [ ] ✓ Every `Log::channel()` name exists in `config/logging.php` (`ezeh` for
       application errors; `site-config` for configuration writes)
 - [ ] ✓ Cross-model ownership is re-checked server-side (`abort_unless(...)`)

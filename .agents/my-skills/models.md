@@ -222,15 +222,13 @@ protected function ofType(Builder $builder, UserTypeEnum $type): void
 #[Scope]
 protected function withoutLiveRole(Builder $builder): void
 {
-    $builder->where('type', UserTypeEnum::ADMIN)
-        ->where(fn (Builder $query) => $query
-            ->whereNull('role_id')
-            ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));
+    $builder->where('user_type', UserTypeEnum::ADMIN)
+        ->whereDoesntHave('roles', fn (Builder $role) => $role->where('status', StatusDefault::ACTIVE));
 }
 ```
 
 Common scope names in the project: `active()`, `inFlowOrder()`, `isActive()`,
-`admins()`, `members()`, `ofType()`, `withoutLiveRole()`, `live()`.
+`admins()`, `members()`, `ofType()`, `withoutLiveRole()`, `holdingRole()`, `live()`.
 
 Note `admins()` rather than `isAdmin()` on `User`: a scope and a getter of the same
 name are two methods with one name, and PHP will not load the class at all.

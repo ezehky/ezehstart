@@ -87,7 +87,7 @@ explicitly:
 
 ```php
 $role = app(RoleService::class)->protectedRole();
-UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
+$admin->roles()->syncWithoutDetaching([$role->id]);
 ```
 
 ### The alternative — file-local seed helpers
@@ -144,7 +144,7 @@ status. If you add it, add `HasFactory` to the model and follow the conventions 
 beforeEach(function () {
     $admin = User::factory()->create(['status' => StatusUser::ACTIVE]);   // factory
     $role = app(RoleService::class)->protectedRole();
-    UserRole::query()->create(['user_id' => $admin->id, 'role_id' => $role->id]);
+    $admin->roles()->syncWithoutDetaching([$role->id]);
 
     $this->actingAs($admin);
 });

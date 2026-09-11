@@ -17,14 +17,16 @@
         >
             Library
         </flux:button>
-        <flux:button
+        <x-dashboard.gate.button
+            gate="content.image-library"
+            level="create"
             size="sm"
             icon="arrow-up-tray"
             variant="{{ $tab === 'upload' ? 'primary' : 'ghost' }}"
             wire:click="switchTab('upload')"
         >
             Upload
-        </flux:button>
+        </x-dashboard.gate.button>
     </div>
 
     @if ($tab === 'upload')
@@ -76,18 +78,20 @@
                                 />
 
                                 <flux:menu>
-                                    <flux:menu.item icon="pencil-square" wire:click="editFolder({{ $option['id'] }})">
+                                    <x-dashboard.gate.menu-item gate="content.image-library" level="modify" icon="pencil-square" wire:click="editFolder({{ $option['id'] }})">
                                         Edit folder
-                                    </flux:menu.item>
-                                    <flux:menu.item icon="folder-minus" variant="danger" wire:click="deleteFolder({{ $option['id'] }})">
+                                    </x-dashboard.gate.menu-item>
+                                    <x-dashboard.gate.menu-item gate="content.image-library" level="full" icon="folder-minus" variant="danger" wire:click="deleteFolder({{ $option['id'] }})">
                                         Delete folder
-                                    </flux:menu.item>
+                                    </x-dashboard.gate.menu-item>
                                 </flux:menu>
                             </flux:dropdown>
                         </div>
                     @endforeach
 
-                    <flux:button
+                    <x-dashboard.gate.button
+                        gate="content.image-library"
+                        level="create"
                         size="sm"
                         icon="plus"
                         variant="ghost"
@@ -95,7 +99,7 @@
                         wire:click="newFolder"
                     >
                         New folder
-                    </flux:button>
+                    </x-dashboard.gate.button>
                 </div>
             </div>
 
@@ -315,18 +319,18 @@
                         </flux:text>
 
                         @if ($this->manageableSelection->count() === 1)
-                            <flux:button size="sm" variant="ghost" icon="pencil-square" wire:click="openPanel('edit')">
+                            <x-dashboard.gate.button gate="content.image-library" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="openPanel('edit')">
                                 Edit
-                            </flux:button>
+                            </x-dashboard.gate.button>
                         @endif
 
-                        <flux:button size="sm" variant="ghost" icon="folder-arrow-down" wire:click="openPanel('move')">
+                        <x-dashboard.gate.button gate="content.image-library" level="modify" size="sm" variant="ghost" icon="folder-arrow-down" wire:click="openPanel('move')">
                             Move
-                        </flux:button>
+                        </x-dashboard.gate.button>
 
-                        <flux:button size="sm" variant="ghost" icon="trash" wire:click="openPanel('delete')">
+                        <x-dashboard.gate.button gate="content.image-library" level="full" size="sm" variant="ghost" icon="trash" wire:click="openPanel('delete')">
                             Delete
-                        </flux:button>
+                        </x-dashboard.gate.button>
 
                         <flux:button size="sm" variant="subtle" wire:click="clearSelection">
                             Clear

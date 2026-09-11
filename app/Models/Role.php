@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * An admin role — "Administrator", "Media", "Support".
@@ -19,8 +19,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * starter ships no opinion about which ones a project needs beyond the one protected
  * role that keeps the install administrable.
  *
- * Members never have one. What kind of account this is lives on users.type, and a
- * role only ever hangs off an admin — see UserTypeEnum.
+ * Members never have one. What kind of account this is lives on users.user_type, and
+ * a role only ever hangs off an admin — see UserTypeEnum.
+ *
+ * An admin carries any number of them. Two roles that both speak about a screen are
+ * merged by GateService, highest access winning, so adding a role only ever widens
+ * what somebody reaches.
  */
 #[Unguarded]
 class Role extends Model
@@ -69,8 +73,8 @@ class Role extends Model
      * not a data_get() lookup — see gates.md.
      *
      * This answers for the *role* only. To ask what a given administrator may do,
-     * go through GateService — an admin can carry an override the role knows
-     * nothing about.
+     * go through GateService — an admin can carry other roles, and an override,
+     * that this role knows nothing about.
      */
     public function gateFor(string $resource): GateAccessEnum
     {
@@ -79,9 +83,9 @@ class Role extends Model
 
     // Relationships
 
-    public function users(): HasMany
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(User::class);
+        return $this->belongsToMany(User::class);
     }
 
     // Scopes

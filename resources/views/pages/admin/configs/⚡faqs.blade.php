@@ -2,6 +2,7 @@
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\FaqTypeEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\Faq;
 use App\Services\ActivityLogService;
@@ -75,6 +76,11 @@ new class extends Component
 
     public function create(string $type): void
     {
+        $this->respondError(
+            'You do not have access to add questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::CREATE),
+        );
+
         $faqType = FaqTypeEnum::from($type);
 
         $this->resetForm();
@@ -90,6 +96,11 @@ new class extends Component
 
     public function edit(Faq $faq): void
     {
+        $this->respondError(
+            'You do not have access to edit questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
+        );
+
         $this->resetForm();
 
         $this->faq = $faq;
@@ -118,6 +129,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to save questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $action = ActivityActionEnum::FAQ_UPDATE;
@@ -162,6 +178,11 @@ new class extends Component
      */
     public function toggleStatus(Faq $faq): bool
     {
+        $this->respondError(
+            'You do not have access to show or hide questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::MODIFY),
+        );
+
         $faq->status = $faq->status->isActive() ? StatusDefault::INACTIVE : StatusDefault::ACTIVE;
 
         $serviceInstance = app(ActivityLogService::class);
@@ -185,6 +206,11 @@ new class extends Component
 
     public function confirmDelete(int $faqId): void
     {
+        $this->respondError(
+            'You do not have delete access to questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::FULL),
+        );
+
         $this->deleteId = $faqId;
 
         Flux::modal('deleteModal')->show();
@@ -192,6 +218,11 @@ new class extends Component
 
     public function delete(): bool
     {
+        $this->respondError(
+            'You do not have delete access to questions.',
+            if: ! kGate('config.faqs', GateAccessEnum::FULL),
+        );
+
         $faq = Faq::query()->whereKey($this->deleteId)->first();
 
         abort_unless((bool) $faq, 404);
@@ -237,9 +268,9 @@ new class extends Component
                         <flux:text class="mt-0.5 text-sm">{{ $faqType->description() }}</flux:text>
                     </div>
 
-                    <flux:button class="press" size="sm" icon="plus" wire:click="create('{{ $faqType->value }}')">
+                    <x-dashboard.gate.button gate="config.faqs" level="create" class="press" size="sm" icon="plus" wire:click="create('{{ $faqType->value }}')">
                         Add question
-                    </flux:button>
+                    </x-dashboard.gate.button>
                 </div>
 
                 <flux:table>
@@ -261,22 +292,22 @@ new class extends Component
                                     <flux:dropdown position="right" align="start">
                                         <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
                                         <flux:menu>
-                                            <flux:menu.item icon="pencil-square" wire:click="edit({{ $item->id }})">
+                                            <x-dashboard.gate.menu-item gate="config.faqs" level="modify" icon="pencil-square" wire:click="edit({{ $item->id }})">
                                                 Edit
-                                            </flux:menu.item>
-                                            <flux:menu.item
+                                            </x-dashboard.gate.menu-item>
+                                            <x-dashboard.gate.menu-item gate="config.faqs" level="modify"
                                                 :icon="$item->status->isActive() ? 'eye-slash' : 'eye'"
                                                 wire:click="toggleStatus({{ $item->id }})"
                                             >
                                                 {{ $item->status->isActive() ? 'Hide from site' : 'Show on site' }}
-                                            </flux:menu.item>
-                                            <flux:menu.item
+                                            </x-dashboard.gate.menu-item>
+                                            <x-dashboard.gate.menu-item gate="config.faqs" level="full"
                                                 icon="trash"
                                                 variant="danger"
                                                 wire:click="confirmDelete({{ $item->id }})"
                                             >
                                                 Delete
-                                            </flux:menu.item>
+                                            </x-dashboard.gate.menu-item>
                                         </flux:menu>
                                     </flux:dropdown>
                                 </flux:table.cell>

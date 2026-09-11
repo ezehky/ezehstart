@@ -1,11 +1,14 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\SocialHandleEnum;
 use App\Models\User;
 use App\Services\AccountOtpService;
 use App\Services\ActivityLogService;
+use App\Services\UserService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component
@@ -13,6 +16,19 @@ new class extends Component
     use WithFormResponseMessage, WithPasswordTools;
 
     public User $user;
+
+    /**
+     * The public-facing blurb that runs under this author's byline.
+     */
+    public ?string $bio = null;
+
+    /**
+     * Handles keyed by SocialHandleEnum value, stored exactly as typed — "@someone",
+     * "someone" or a full URL all work, and the address is rebuilt on render.
+     *
+     * @var array<string, string>
+     */
+    public array $socials = [];
 
     public int $passwordStep = 1; // 1 = current password, 2 = otp, 3 = new password
 
@@ -28,7 +44,75 @@ new class extends Component
     {
         $this->user = auth()->user();
 
+        $this->loadAuthorProfile();
+
         kSetSiteTitle('profile');
+    }
+
+    /**
+     * Does this account get the author card?
+     *
+     * Only somebody who actually writes. A bio and a set of handles on an account
+     * whose name never appears under a post is a form nobody will ever see the output
+     * of — see User::isAuthor().
+     */
+    #[Computed]
+    public function isAuthor(): bool
+    {
+        return $this->user->isAuthor();
+    }
+
+    /**
+     * The platforms the author card offers, in one place so the form and the rules
+     * cannot drift apart.
+     *
+     * @return array<int, SocialHandleEnum>
+     */
+    #[Computed]
+    public function socialPlatforms(): array
+    {
+        return SocialHandleEnum::profiles();
+    }
+
+    public function saveAuthorProfile(): bool
+    {
+        // The card is only rendered for an author, which stops nobody who can open a
+        // console and post at this component directly.
+        $this->respondError(
+            'Only accounts on the author role have a public profile to write.',
+            if: ! $this->isAuthor,
+        );
+
+        $this->validate([
+            'bio' => ['nullable', 'string', 'max:1000'],
+            'socials' => ['array'],
+            'socials.*' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $changed = app(UserService::class)->updateAuthorProfile($this->user, $this->bio, $this->socials);
+
+        $this->respondPrimary(if: ! $changed);
+
+        $this->user->load('userProfile');
+        $this->loadAuthorProfile();
+
+        return $this->respondSuccess('Your author profile has been saved.');
+    }
+
+    /**
+     * Fill the form from the stored profile. A platform nobody has filled in comes
+     * back as an empty box rather than a missing one.
+     */
+    private function loadAuthorProfile(): void
+    {
+        $profile = $this->user->userProfile;
+        $stored = $profile?->socialsArray() ?? [];
+
+        $this->bio = $profile?->bio;
+
+        foreach (SocialHandleEnum::profiles() as $platform) {
+            $this->socials[$platform->value] = (string) ($stored[$platform->value] ?? '');
+        }
     }
 
     public function passwordStep1(): void
@@ -110,9 +194,9 @@ new class extends Component
                     <flux:badge size="sm" :color="$user->user_type->isAdmin() ? 'lime' : 'sky'">
                         {{ $user->user_type->label() }}
                     </flux:badge>
-                    @if ($user->role)
-                        <flux:badge size="sm" color="zinc">{{ $user->role->name }}</flux:badge>
-                    @endif
+                    @foreach ($user->roles as $role)
+                        <flux:badge size="sm" color="zinc">{{ $role->name }}</flux:badge>
+                    @endforeach
                 </div>
             </div>
         </div>
@@ -126,6 +210,48 @@ new class extends Component
             <flux:input value="{{ $user->createdAtHuman() }}" label="Created" readonly disabled />
         </div>
     </flux:card>
+
+    {{-- Author profile. Only for accounts that actually write: this is the copy that
+         runs under a byline, so an account whose name never appears under a post has
+         nothing to fill it in for. --}}
+    @if ($this->isAuthor)
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Author profile</flux:heading>
+                <flux:text class="mt-1">
+                    What readers see under your byline. Everything here is public.
+                </flux:text>
+            </div>
+
+            <form wire:submit="saveAuthorProfile" class="space-y-6">
+                <flux:textarea
+                    wire:model="bio"
+                    label="Bio"
+                    rows="3"
+                    placeholder="A couple of sentences about who you are and what you write about."
+                />
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    @foreach ($this->socialPlatforms as $platform)
+                        <flux:input
+                            wire:key="social-{{ $platform->value }}"
+                            wire:model="socials.{{ $platform->value }}"
+                            :label="$platform->label()"
+                            :icon="$platform->icon()"
+                            placeholder="Handle or full link"
+                        />
+                    @endforeach
+                </div>
+
+                <flux:text class="text-xs">
+                    A handle or a full link both work — leave a box empty and that platform is
+                    simply not shown.
+                </flux:text>
+
+                <flux:button type="submit" variant="primary">Save author profile</flux:button>
+            </form>
+        </flux:card>
+    @endif
 
     {{-- Change password --}}
     <flux:card class="space-y-6">

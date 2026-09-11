@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
@@ -14,7 +15,7 @@ test('a member carries no role at all', function () {
     $member = userOfType(UserTypeEnum::USER);
 
     expect($member->user_type->carriesRole())->toBeFalse()
-        ->and($member->role_id)->toBeNull()
+        ->and($member->roles)->toBeEmpty()
         ->and($member->hasLiveRole())->toBeFalse();
 });
 
@@ -22,7 +23,7 @@ test('registering makes a member, never an admin', function () {
     $user = User::factory()->create();
 
     expect($user->user_type)->toBe(UserTypeEnum::USER)
-        ->and($user->role_id)->toBeNull();
+        ->and($user->roles)->toBeEmpty();
 });
 
 test('assigning a role puts the admin on it', function () {
@@ -33,16 +34,52 @@ test('assigning a role puts the admin on it', function () {
     $admin = adminWithoutRole();
     $role = roleWithGates('Media');
 
-    expect(app(RoleService::class)->assign($admin, $role))->toBeTrue()
-        ->and($admin->fresh()->role_id)->toBe($role->id);
+    expect(app(RoleService::class)->syncRoles($admin, [$role]))->toBeTrue()
+        ->and($admin->fresh()->roles->pluck('id')->all())->toBe([$role->id]);
+});
+
+test('an admin can hold several roles at once', function () {
+    userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
+
+    $admin = adminWithoutRole();
+    $media = roleWithGates('Media', ['content' => 'full']);
+    $support = roleWithGates('Support', ['transactions' => 'view']);
+
+    expect(app(RoleService::class)->syncRoles($admin, [$media, $support]))->toBeTrue()
+        ->and($admin->fresh()->roles->pluck('slug')->sort()->values()->all())
+        ->toBe(['media', 'support']);
+});
+
+test('the role set is absolute, so a role left out of it is revoked', function () {
+    userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
+
+    $media = roleWithGates('Media', ['content' => 'full']);
+    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $admin = adminWithRoles($media, $support);
+
+    app(RoleService::class)->syncRoles($admin, [$media]);
+
+    expect($admin->fresh()->roles->pluck('slug')->all())->toBe(['media'])
+        ->and(kGate('transactions', user: $admin->fresh()))->toBeFalse();
+});
+
+test('the same role posted twice is one grant, not two', function () {
+    userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
+
+    $admin = adminWithoutRole();
+    $role = roleWithGates('Media');
+
+    app(RoleService::class)->syncRoles($admin, [$role, $role]);
+
+    expect($admin->fresh()->roles)->toHaveCount(1);
 });
 
 test('a role cannot be given to a member', function () {
     $member = userOfType(UserTypeEnum::USER);
     $role = roleWithGates('Media');
 
-    expect(app(RoleService::class)->assignBlockedReason($member, $role))
-        ->toContain('Only admin accounts carry a role');
+    expect(app(RoleService::class)->assignBlockedReason($member, [$role]))
+        ->toContain('Only admin accounts carry roles');
 });
 
 test('a switched-off role cannot be assigned', function () {
@@ -51,7 +88,7 @@ test('a switched-off role cannot be assigned', function () {
     $role->status = StatusDefault::INACTIVE;
     $role->save();
 
-    expect(app(RoleService::class)->assignBlockedReason($admin, $role))
+    expect(app(RoleService::class)->assignBlockedReason($admin, [$role]))
         ->toContain('switched off');
 });
 
@@ -70,6 +107,22 @@ test('a switched-off role grants nothing to the admins already on it', function 
         ->and(kGate('content', user: $admin->fresh()))->toBeFalse();
 });
 
+test('switching one role off leaves what the others grant standing', function () {
+    userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
+
+    $media = roleWithGates('Media', ['content' => 'full']);
+    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $admin = adminWithRoles($media, $support);
+
+    app(RoleService::class)->update($media, 'Media', null, active: false);
+
+    $admin = $admin->fresh();
+
+    expect($admin->hasLiveRole())->toBeTrue()
+        ->and(kGate('content', user: $admin))->toBeFalse()
+        ->and(kGate('transactions', user: $admin))->toBeTrue();
+});
+
 test('changing type to member clears the role', function () {
     // Another admin has to exist, or the last-admin guard fires first.
     userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
@@ -81,7 +134,7 @@ test('changing type to member clears the role', function () {
     $admin->refresh();
 
     expect($admin->user_type)->toBe(UserTypeEnum::USER)
-        ->and($admin->role_id)->toBeNull();
+        ->and($admin->roles)->toBeEmpty();
 });
 
 test('the last admin cannot be moved out of the admin workspace', function () {
@@ -111,7 +164,7 @@ test('assigning a role is written to the audit trail', function () {
 
     $this->actingAs($admin);
 
-    app(RoleService::class)->assign($account, $role);
+    app(RoleService::class)->syncRoles($account, [$role]);
 
     $this->assertDatabaseHas('activity_logs', [
         'user_id' => $admin->id,
@@ -128,10 +181,29 @@ test('the access modal moves an admin onto a role', function () {
     Livewire::actingAs($admin)
         ->test('pages::admin.users.admins')
         ->call('openRoleManager', $account->id)
-        ->set('accountRole', (string) $role->id)
+        ->set('accountRoles', [(string) $role->id])
         ->call('saveRoleAccess');
 
-    expect($account->fresh()->role_id)->toBe($role->id);
+    expect($account->fresh()->roles->pluck('id')->all())->toBe([$role->id]);
+});
+
+test('the access modal puts an admin on two roles at once', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+    $account = adminWithoutRole();
+    $media = roleWithGates('Media', ['content' => 'full']);
+    $support = roleWithGates('Support', ['transactions' => 'view']);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users.admins')
+        ->call('openRoleManager', $account->id)
+        ->set('accountRoles', [(string) $media->id, (string) $support->id])
+        ->call('saveRoleAccess');
+
+    $account = $account->fresh();
+
+    expect($account->roles)->toHaveCount(2)
+        ->and(kGate('content', user: $account))->toBeTrue()
+        ->and(kGate('transactions', user: $account))->toBeTrue();
 });
 
 test('the access modal moves an account between workspaces', function () {
@@ -143,13 +215,13 @@ test('the access modal moves an account between workspaces', function () {
         ->test('pages::admin.users.members')
         ->call('openRoleManager', $member->id)
         ->set('accountType', UserTypeEnum::ADMIN->value)
-        ->set('accountRole', (string) $role->id)
+        ->set('accountRoles', [(string) $role->id])
         ->call('saveRoleAccess');
 
     $member->refresh();
 
     expect($member->user_type)->toBe(UserTypeEnum::ADMIN)
-        ->and($member->role_id)->toBe($role->id);
+        ->and($member->roles->pluck('id')->all())->toBe([$role->id]);
 });
 
 // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -187,7 +259,7 @@ test('a role with accounts on it cannot be deleted', function () {
     userOfType(UserTypeEnum::ADMIN, [], $role);
 
     expect(app(RoleService::class)->deleteBlockedReason($role))
-        ->toContain('Move it to another role first');
+        ->toContain('Take it off that account first');
 });
 
 test('an empty role is deleted', function () {
@@ -243,12 +315,23 @@ test('the roles screen refuses to delete a role somebody is on', function () {
 test('role rows are seeded once and not reset on a second run', function () {
     (new RoleSeeder)->run();
 
-    $media = Role::query()->where('slug', 'media')->firstOrFail();
-    $media->gates = ['content' => 'view'];
-    $media->save();
+    $author = Role::query()->where('slug', RoleService::AUTHOR_SLUG)->firstOrFail();
+    $author->gates = ['content' => 'view'];
+    $author->save();
 
     (new RoleSeeder)->run();
 
-    expect($media->fresh()->gatesArray())->toBe(['content' => 'view'])
-        ->and(Role::query()->where('slug', 'media')->count())->toBe(1);
+    expect($author->fresh()->gatesArray())->toBe(['content' => 'view'])
+        ->and(Role::query()->where('slug', RoleService::AUTHOR_SLUG)->count())->toBe(1);
+});
+
+test('the author role ships able to write posts and nothing else', function () {
+    $role = app(RoleService::class)->authorRole();
+    $author = userOfType(UserTypeEnum::ADMIN, ['email' => 'author@example.test'], $role);
+
+    expect($role->slug)->toBe(RoleService::AUTHOR_SLUG)
+        ->and($role->is_protected)->toBeFalse()
+        ->and(kGate('content.blogs', GateAccessEnum::CREATE, $author))->toBeTrue()
+        ->and(kGate('content.blogs', GateAccessEnum::FULL, $author))->toBeFalse()
+        ->and(kGate('users', user: $author))->toBeFalse();
 });

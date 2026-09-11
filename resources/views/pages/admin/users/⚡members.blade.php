@@ -148,7 +148,12 @@ new class extends Component
                                     wire:navigate
                                     title="View profile"
                                 />
-                                <flux:button
+                                {{-- Moving an account between workspaces is handing out access, so
+                                     this asks for full access to Users — the gate the lockout
+                                     guard protects. --}}
+                                <x-dashboard.gate.button
+                                    gate="users"
+                                    level="full"
                                     icon="shield-check"
                                     variant="filled"
                                     size="sm"
@@ -173,7 +178,7 @@ new class extends Component
         </flux:table>
     </flux:card>
 
-    <x-dashboard.user-roles-modal
+    <x-dashboard.role.modal
         :user="$this->roleUser"
         :roles="$this->assignableRoles"
         :type="$this->pendingAccountType"

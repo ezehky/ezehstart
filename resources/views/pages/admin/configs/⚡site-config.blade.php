@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Rules\ImageRule;
 use App\Services\SiteConfigurationService;
 use App\Traits\WithFormResponseMessage;
@@ -97,6 +98,11 @@ new class extends Component
 
     public function save(): bool
     {
+        $this->respondError(
+            'You do not have access to change the site configuration.',
+            if: ! kGate('config.site-config', GateAccessEnum::MODIFY),
+        );
+
         $this->validate();
 
         $this->respondPrimary(
@@ -417,8 +423,8 @@ new class extends Component
     </flux:card>
 
     <div class="flex justify-end">
-        <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="save, logoUpload, logoDarkUpload, faviconUpload">
+        <x-dashboard.gate.button gate="config.site-config" level="modify" type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="save, logoUpload, logoDarkUpload, faviconUpload">
             Save changes
-        </flux:button>
+        </x-dashboard.gate.button>
     </div>
 </form>

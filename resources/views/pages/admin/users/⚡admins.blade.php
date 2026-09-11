@@ -1,13 +1,16 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\RoleService;
 use App\Traits\WithUserRoleManager;
 use Flux\Flux;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -31,10 +34,13 @@ new class extends Component
     public ?string $password = null;
 
     /**
-     * The role a newly created admin starts on. Empty is allowed and deliberate —
-     * an account can be stood up before anybody has decided what it should reach.
+     * The roles a newly created admin starts on, as strings because that is what a
+     * checkbox group posts. Empty is allowed and deliberate — an account can be stood
+     * up before anybody has decided what it should reach.
+     *
+     * @var array<int, string>
      */
-    public string $role_id = '';
+    public array $roleIds = [];
 
     #[Url(as: 'q')]
     public string $search = '';
@@ -43,8 +49,9 @@ new class extends Component
     public string $accountStatus = '';
 
     /**
-     * Either a role id, or 'none' for the admins who cannot reach anything. The
-     * pending-work queue on the dashboard links straight into 'none'.
+     * Either a role id — matching any admin who holds it, alongside whatever else
+     * they hold — or 'none' for the admins who cannot reach anything. The pending-work
+     * queue on the dashboard links straight into 'none'.
      */
     #[Url]
     public string $roleState = '';
@@ -75,12 +82,12 @@ new class extends Component
     {
         return User::query()
             ->admins()
-            ->with('role')
+            ->with('roles')
             ->when($this->search !== '', fn ($query) => $query->searchMacro(['name', 'email', 'phone_number'], $this->search))
             ->when($this->accountStatus !== '', fn ($query) => $query->where('status', $this->accountStatus))
             ->when($this->roleState === 'none', fn ($query) => $query->withoutLiveRole())
             ->when($this->roleState !== '' && $this->roleState !== 'none',
-                fn ($query) => $query->where('role_id', (int) $this->roleState))
+                fn ($query) => $query->holdingRole((int) $this->roleState))
             ->latest()
             ->paginate(10);
     }
@@ -102,8 +109,23 @@ new class extends Component
         return StatusUser::forSelect();
     }
 
+    /**
+     * How far this account may go on this screen, asked once and read by every
+     * button and every write.
+     */
+    #[Computed]
+    public function access(): GateAccessEnum
+    {
+        return kGateAccess('users.admins');
+    }
+
     public function create(): void
     {
+        $this->respondError(
+            'You do not have access to add admin accounts.',
+            if: ! $this->access->covers(GateAccessEnum::CREATE),
+        );
+
         $this->resetAdminForm();
 
         Flux::modal('adminModal')->show();
@@ -111,6 +133,11 @@ new class extends Component
 
     public function edit(User $admin): void
     {
+        $this->respondError(
+            'You do not have access to edit admin accounts.',
+            if: ! $this->access->covers(GateAccessEnum::MODIFY),
+        );
+
         $this->resetValidation();
 
         $this->admin = $admin;
@@ -119,7 +146,7 @@ new class extends Component
         $this->phone_number = $admin->phone_number;
         $this->status = $admin->status->boolValue();
         $this->password = null;
-        $this->role_id = (string) ($admin->role_id ?? '');
+        $this->roleIds = $admin->roles->pluck('id')->map(fn ($id) => (string) $id)->all();
 
         Flux::modal('adminModal')->show();
     }
@@ -137,17 +164,24 @@ new class extends Component
             'phone_number' => ['nullable', 'string', 'max:20'],
             'status' => ['boolean'],
             'password' => [$this->admin ? 'nullable' : 'required', 'string', 'min:5'],
-            'role_id' => ['nullable', Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
+            'roleIds' => ['array'],
+            'roleIds.*' => [Rule::in($this->assignableRoles->pluck('id')->map(fn ($id) => (string) $id)->all())],
         ];
     }
 
     public function save(): bool
     {
+        // The button is hidden either way, which stops nobody who can open a console.
+        $this->respondError(
+            'You do not have access to save admin accounts.',
+            if: ! $this->access->covers($this->admin ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE),
+        );
+
         $this->validate();
 
         $logService = app(ActivityLogService::class);
         $roleService = app(RoleService::class);
-        $role = $this->role_id === '' ? null : $this->assignableRoles->firstWhere('id', (int) $this->role_id);
+        $roles = $this->pendingFormRoles();
 
         if (! $this->admin) {
             $this->admin = User::make();
@@ -155,7 +189,6 @@ new class extends Component
             // Every account created here is an admin. The type is set on the object
             // rather than through changeType(): there is no account yet to move.
             $this->admin->user_type = UserTypeEnum::ADMIN;
-            $this->admin->role_id = $role?->id;
             $action = ActivityActionEnum::USER_CREATE;
         } else {
             $action = ActivityActionEnum::USER_UPDATE;
@@ -171,16 +204,19 @@ new class extends Component
         }
 
         $isNew = ! $this->admin->exists;
+        $rolesChanged = $isNew
+            ? $roles->isNotEmpty()
+            : $this->admin->roles->pluck('id')->sort()->values()->all() !== $roles->pluck('id')->sort()->values()->all();
 
-        // On an edit the role moves through the service, so the lockout guard and the
-        // activity log both see it. Setting role_id here would slip past both.
-        if (! $isNew && $this->admin->role_id !== $role?->id) {
-            $reason = $roleService->assignBlockedReason($this->admin, $role);
+        // On an edit the roles move through the service, so the lockout guard and the
+        // activity log both see them. Writing the pivot here would slip past both.
+        if (! $isNew && $rolesChanged) {
+            $reason = $roleService->assignBlockedReason($this->admin, $roles);
             $this->respondError($reason ?? '', if: $reason !== null);
         }
 
         // Nothing changed on an edit: stop here.
-        $this->respondPrimary(if: $this->admin->isClean() && $this->admin->exists && $this->admin->role_id === $role?->id);
+        $this->respondPrimary(if: $this->admin->isClean() && $this->admin->exists && ! $rolesChanged);
 
         $affectedColumns = $logService->affectedColumns($this->admin);
 
@@ -195,8 +231,10 @@ new class extends Component
             );
         }
 
-        if (! $isNew) {
-            $roleService->assign($this->admin, $role);
+        // A brand-new account goes through the service too, for the same reason: the
+        // pivot write, the lockout guard and the log entry are one step, not three.
+        if ($rolesChanged) {
+            $roleService->syncRoles($this->admin, $roles);
         }
 
         Flux::modal('adminModal')->close();
@@ -212,10 +250,25 @@ new class extends Component
         unset($this->admins, $this->strandedCount);
     }
 
+    /**
+     * The roles ticked on the admin form, resolved against the assignable list rather
+     * than fetched: an id that is not on offer is not a role, whatever was posted.
+     *
+     * @return Collection<int, Role>
+     */
+    private function pendingFormRoles(): Collection
+    {
+        return collect($this->roleIds)
+            ->map(fn ($id) => $this->assignableRoles->firstWhere('id', (int) $id))
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
     private function resetAdminForm(): void
     {
         $this->resetValidation();
-        $this->reset('admin', 'name', 'email', 'phone_number', 'status', 'password', 'role_id');
+        $this->reset('admin', 'name', 'email', 'phone_number', 'status', 'password', 'roleIds');
         $this->status = true;
     }
 };
@@ -231,9 +284,9 @@ new class extends Component
                 </flux:text>
             </div>
 
-            <flux:button variant="primary" icon="plus" wire:click="create">
+            <x-dashboard.gate.button gate="users.admins" level="create" variant="primary" icon="plus" wire:click="create">
                 Add admin
-            </flux:button>
+            </x-dashboard.gate.button>
         </div>
 
         @if ($this->strandedCount && $this->roleState !== 'none')
@@ -294,7 +347,7 @@ new class extends Component
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
                         <flux:table.cell>
-                            <x-dashboard.user-role :user="$item" />
+                            <x-dashboard.role.badges :user="$item" />
                         </flux:table.cell>
                         <flux:table.cell>
                             <x-status :status="$item->status" />
@@ -312,14 +365,20 @@ new class extends Component
                                     wire:navigate
                                     title="View profile"
                                 />
-                                <flux:button
+                                <x-dashboard.gate.button
+                                    gate="users.admins"
+                                    level="modify"
                                     icon="pencil-square"
                                     variant="primary"
                                     size="sm"
                                     wire:click="edit({{ $item->id }})"
                                     title="Edit admin"
                                 />
-                                <flux:button
+                                {{-- Handing out roles is handing out access, so this one asks for full
+                                     access to Users — the same gate the lockout guard protects. --}}
+                                <x-dashboard.gate.button
+                                    gate="users"
+                                    level="full"
                                     icon="shield-check"
                                     variant="filled"
                                     size="sm"
@@ -373,16 +432,23 @@ new class extends Component
                 />
             </div>
 
-            <flux:select
-                wire:model="role_id"
-                label="Role"
-                description="What this administrator reaches. Leave it empty to create the account before deciding."
+            <flux:checkbox.group
+                wire:model="roleIds"
+                label="Roles"
+                description="What this administrator reaches. Holding more than one adds the access up; tick none to create the account before deciding."
             >
-                <option value="">No role yet</option>
-                @foreach ($this->assignableRoles as $roleOption)
-                    <option value="{{ $roleOption->id }}">{{ $roleOption->name }}</option>
-                @endforeach
-            </flux:select>
+                @forelse ($this->assignableRoles as $roleOption)
+                    <flux:checkbox
+                        :value="(string) $roleOption->id"
+                        :label="$roleOption->name"
+                        :description="$roleOption->description"
+                    />
+                @empty
+                    <flux:text class="text-sm">
+                        No live roles exist yet. Create one on the Roles screen first.
+                    </flux:text>
+                @endforelse
+            </flux:checkbox.group>
 
             <div class="space-y-4">
                 <flux:switch wire:model="status" label="Active account" description="Allow this admin to sign in." />
@@ -398,7 +464,7 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <x-dashboard.user-roles-modal
+    <x-dashboard.role.modal
         :user="$this->roleUser"
         :roles="$this->assignableRoles"
         :type="$this->pendingAccountType"

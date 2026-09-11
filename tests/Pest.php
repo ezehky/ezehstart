@@ -135,17 +135,29 @@ The second body.',
 }
 
 /**
- * An admin with no role, which can sign in but reaches nothing beyond the dashboard
+ * An admin with no roles, which can sign in but reaches nothing beyond the dashboard
  * and its own profile.
+ *
+ * Built off the bare factory rather than through admin(): that state attaches the
+ * protected role, and there is no column left to null out afterwards.
  */
 function adminWithoutRole(array $attributes = []): User
 {
     return User::factory()->create([
         'status' => StatusUser::ACTIVE,
         'user_type' => UserTypeEnum::ADMIN,
-        'role_id' => null,
         ...$attributes,
     ]);
+}
+
+/**
+ * An admin holding several roles at once, for the tests about how their maps merge.
+ */
+function adminWithRoles(Role ...$roles): User
+{
+    return User::factory()
+        ->withRoles(...$roles)
+        ->create(['status' => StatusUser::ACTIVE]);
 }
 
 /**

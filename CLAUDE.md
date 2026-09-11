@@ -28,7 +28,7 @@ project.
 | Auth | Password, passwordless OTP, social sign-in (Socialite), TOTP two-factor with recovery codes, password history, login throttle |
 | Image library | Folders, multiple upload, per-image visibility, rename-without-changing-the-URL, a delete guard backed by `image_usages` |
 | Video library | The same again for embeds — folders, per-video visibility, a delete guard backed by `video_usages`. A row is a **reference** (provider + id), never a file; the player URL is rebuilt from the pair on every render |
-| Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages |
+| Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages. The seeded **Author** role narrows an account to the posts it wrote and gives it a public byline — bio and social handles on `user_profiles` |
 | Money | `transactions` plus gateways, metas, evidence, balances and charges; balances derived from confirmed rows, never stored |
 | Reference | 250 countries seeded from `database/data/countries.json` — no network call at seed time |
 
@@ -56,10 +56,12 @@ in `bootstrap/app.php`. Add the case to `UserTypeEnum` at the same time — ever
 type decides (its dashboard route, its label, whether it carries a role) lives on the
 case itself, and those `match` arms will fail loudly until you do.
 
-**Type is not role.** `users.type` is the workspace an account signs in to, fixed in
-code. A **role** is a row in `roles` an administrator creates from the dashboard, it
-divides up the admin workspace only, and **only an admin has one — exactly one**.
-Members carry no role at all.
+**Type is not role.** `users.user_type` is the workspace an account signs in to, fixed
+in code. A **role** is a row in `roles` an administrator creates from the dashboard, it
+divides up the admin workspace only, and **only an admin has any**. An admin carries
+**any number of them** — the assignment is the `role_user` pivot, and the gate maps
+merge with the highest access winning each key, so a second role only ever widens what
+somebody reaches. Members carry no role at all.
 
 ## Commands
 
@@ -89,6 +91,9 @@ Change it before the kit becomes a real project.
   `scopeFoo()`.
 - **Every admin write is logged.** Call `ActivityLogService::affectedColumns()` *before*
   `save()`, then `logActivity()` after.
+- **An action button is gated twice.** `<x-dashboard.gate.button>` /
+  `<x-dashboard.gate.menu-item>` hide it, and the method behind it re-checks with
+  `kGate()`. Hiding a control is a courtesy; the method check is the boundary.
 - **Services are `#[Singleton]`** and resolved with `app()`, never `new`.
 - **Ask before adding a dependency.**
 

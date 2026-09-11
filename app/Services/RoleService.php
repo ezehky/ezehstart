@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -16,7 +18,12 @@ use Illuminate\Support\Str;
  * A role is a row an administrator creates — "Media", "Support", "Finance" — not an
  * enum case. What is fixed in code is the *type* of an account (UserTypeEnum), because
  * a type is a workspace and a workspace is three files. A role only ever divides up
- * the admin workspace, so only an admin has one.
+ * the admin workspace, so only an admin has any.
+ *
+ * An admin carries *any number* of them and the maps merge, highest access winning —
+ * see GateService. That is why assignment is a set operation here rather than a
+ * column write: what gets passed is what the account ends up holding, so a role left
+ * out of the set is a role revoked.
  *
  * Every guard in here answers in a sentence rather than a boolean, so the screen can
  * say why instead of failing quietly. Pair each one with its doer: ask the *Reason
@@ -46,6 +53,16 @@ class RoleService
         // 'Support' => 'Answers to member accounts and reads the transaction ledger.',
     ];
 
+    /**
+     * The role that makes somebody an author.
+     *
+     * Held by slug rather than by name so the label can be reworded without breaking
+     * the byline: an author's public bio and social links hang off this, and
+     * BlogService narrows an author to their own posts unless something else on their
+     * account grants full access to the blog.
+     */
+    public const AUTHOR_SLUG = 'author';
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // ROLES
 
@@ -72,6 +89,36 @@ class RoleService
         // — a hand-edited row, a bad import — is one delete away from being locked out.
         $record->is_protected = true;
         $record->save();
+
+        return $record;
+    }
+
+    /**
+     * The author role, created on first use with view access to the blog.
+     *
+     * Unlike the protected role this one is ordinary — it can be renamed, re-gated or
+     * deleted. What is fixed is the slug, because that is what the blog reads to
+     * decide whose byline gets a bio and which posts an account may edit.
+     *
+     * It starts at CREATE on content.blogs rather than closed: a role called Author
+     * that cannot write a post is a puzzle rather than a starting point. Everything
+     * else stays shut.
+     */
+    public function authorRole(): Role
+    {
+        $record = Role::query()->firstOrNew(['slug' => self::AUTHOR_SLUG]);
+
+        if (! $record->exists) {
+            $record->name = 'Author';
+            $record->description = 'Writes and edits their own blog posts.';
+            $record->gates = [
+                'content.blogs' => GateAccessEnum::CREATE->value,
+                'content.image-library' => GateAccessEnum::CREATE->value,
+            ];
+            $record->status = StatusDefault::ACTIVE;
+            $record->is_protected = false;
+            $record->save();
+        }
 
         return $record;
     }
@@ -162,8 +209,8 @@ class RoleService
 
         if ($count = $role->users()->count()) {
             return $count === 1
-                ? 'One account still holds this role. Move it to another role first.'
-                : "{$count} accounts still hold this role. Move them to another role first.";
+                ? 'One account still holds this role. Take it off that account first.'
+                : "{$count} accounts still hold this role. Take it off those accounts first.";
         }
 
         return null;
@@ -216,54 +263,95 @@ class RoleService
     // ASSIGNMENT
 
     /**
-     * Put an admin on a role. Returns false when they are already on it or a guard
-     * blocks it.
+     * Put an admin on exactly this set of roles. Returns false when the set is already
+     * what they hold, or when a guard blocks it.
      *
-     * Clearing the role — passing null — is allowed and leaves an admin who can sign
-     * in but reaches nothing. That is a holding state, not a broken one, and the
-     * admins listing calls it out.
+     * The set is absolute, not a list of additions: a role the account holds and the
+     * set does not is revoked by the same call. Passing an empty set is allowed and
+     * leaves an admin who can sign in but reaches nothing — a holding state, not a
+     * broken one, and the admins listing calls it out.
+     *
+     * @param  iterable<Role>  $roles
      */
-    public function assign(User $user, ?Role $role): bool
+    public function syncRoles(User $user, iterable $roles): bool
     {
-        if ($this->assignBlockedReason($user, $role)) {
+        $roles = $this->uniqueRoles($roles);
+
+        if ($this->assignBlockedReason($user, $roles)) {
             return false;
         }
 
-        if ($user->role_id === $role?->id) {
+        $ids = $roles->pluck('id')->sort()->values();
+
+        if ($user->roles->pluck('id')->sort()->values()->all() === $ids->all()) {
             return false;
         }
 
-        $user->role_id = $role?->id;
-        $user->save();
+        $user->roles()->sync($ids->all());
+        $user->unsetRelation('roles');
 
         app(ActivityLogService::class)->logActivity(
-            $role ? ActivityActionEnum::USER_ROLE_ASSIGN : ActivityActionEnum::USER_ROLE_CLEAR,
-            $role
-                ? "Put {$user->name} on the {$role->name} role."
-                : "Took the role away from {$user->name}.",
+            $roles->isNotEmpty() ? ActivityActionEnum::USER_ROLE_ASSIGN : ActivityActionEnum::USER_ROLE_CLEAR,
+            $roles->isNotEmpty()
+                ? "Put {$user->name} on ".$this->roleSentence($roles).'.'
+                : "Took every role away from {$user->name}.",
             model: $user,
             prefixDescription: false,
         );
 
-        app(GateService::class)->flush();
+        app(GateService::class)->syncAuthenticated($user);
 
         return true;
     }
 
     /**
-     * Why this account cannot be moved to that role, or null when it can.
+     * Why this account cannot be put on that set of roles, or null when it can.
+     *
+     * @param  iterable<Role>  $roles
      */
-    public function assignBlockedReason(User $user, ?Role $role): ?string
+    public function assignBlockedReason(User $user, iterable $roles): ?string
     {
+        $roles = $this->uniqueRoles($roles);
+
         if (! $user->user_type->carriesRole()) {
-            return 'Only admin accounts carry a role. Change the account type first.';
+            return $roles->isEmpty()
+                ? null
+                : 'Only admin accounts carry roles. Change the account type first.';
         }
 
-        if ($role && ! $role->status->isActive()) {
-            return "The {$role->name} role is switched off, so putting an account on it would grant nothing.";
+        if ($offline = $roles->reject(fn (Role $role) => $role->status->isActive())->first()) {
+            return "The {$offline->name} role is switched off, so putting an account on it would grant nothing.";
         }
 
-        return app(GateService::class)->assignmentBlockedReason($user, $role);
+        return app(GateService::class)->assignmentBlockedReason($user, $roles);
+    }
+
+    /**
+     * "the Media role", or "the Media and Support roles" — for a log line that reads
+     * as a sentence rather than as a list of ids.
+     *
+     * @param  Collection<int, Role>  $roles
+     */
+    private function roleSentence(Collection $roles): string
+    {
+        $names = $roles->pluck('name')->all();
+
+        return 'the '.implode(' and ', array_filter([
+            implode(', ', \array_slice($names, 0, -1)),
+            end($names),
+        ])).' '.kPluralize('role', \count($names), prepend: false);
+    }
+
+    /**
+     * One row per role, however the caller assembled the set. A form that posts the
+     * same id twice is a double submission, not two grants.
+     *
+     * @param  iterable<Role>  $roles
+     * @return Collection<int, Role>
+     */
+    private function uniqueRoles(iterable $roles): Collection
+    {
+        return collect($roles)->filter()->unique('id')->values();
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -273,25 +361,35 @@ class RoleService
      * Move an account between workspaces.
      *
      * A type change is not a role change: it decides which dashboard the account
-     * signs in to. Coming *out* of admin clears the role, because a member holding
+     * signs in to. Coming *out* of admin clears every role, because a member holding
      * one would be carrying access to a workspace they can no longer open.
+     *
+     * @param  iterable<Role>  $roles
      */
-    public function changeType(User $user, UserTypeEnum $type, ?Role $role = null): bool
+    public function changeType(User $user, UserTypeEnum $type, iterable $roles = []): bool
     {
         if ($this->typeChangeBlockedReason($user, $type)) {
             return false;
         }
 
         $from = $user->user_type;
+        $roles = $type->carriesRole() ? $this->uniqueRoles($roles) : collect();
 
         $user->user_type = $type;
-        $user->role_id = $type->carriesRole() ? $role?->id : null;
 
-        if ($user->isClean()) {
+        $rolesChanged = $user->roles->pluck('id')->sort()->values()->all()
+            !== $roles->pluck('id')->sort()->values()->all();
+
+        if ($user->isClean() && ! $rolesChanged) {
             return false;
         }
 
         $user->save();
+
+        if ($rolesChanged) {
+            $user->roles()->sync($roles->pluck('id')->all());
+            $user->unsetRelation('roles');
+        }
 
         app(ActivityLogService::class)->logActivity(
             ActivityActionEnum::USER_TYPE_CHANGE,
@@ -300,7 +398,7 @@ class RoleService
             prefixDescription: false,
         );
 
-        app(GateService::class)->flush();
+        app(GateService::class)->syncAuthenticated($user);
 
         return true;
     }
@@ -327,7 +425,7 @@ class RoleService
             return 'This is the last admin account, so it cannot be moved out of the admin workspace.';
         }
 
-        return app(GateService::class)->assignmentBlockedReason($user, null);
+        return app(GateService::class)->assignmentBlockedReason($user, []);
     }
 
     public function adminCount(): int

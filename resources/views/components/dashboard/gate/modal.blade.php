@@ -12,9 +12,9 @@
     rather than nested, because a child left blank inherits its parent's level and the
     grid has to make that readable at a glance.
 
-    On an administrator the blank option means "whatever the role says" and there is a
-    separate No access to deny something the role allows. On a role there is no such
-    distinction — blank is no access.
+    On an administrator the blank option means "whatever their roles say" — every role
+    they carry, merged — and there is a separate No access to deny something those
+    roles allow. On a role there is no such distinction: blank is no access.
 --}}
 <flux:modal name="gatesModal" class="md:w-175">
     <form wire:submit="saveGates" class="space-y-6">
@@ -23,7 +23,7 @@
             <flux:text class="mt-1">
                 @if ($admin)
                     What <span class="font-medium">{{ $subject }}</span> may reach, on top of what their
-                    role already grants. Leave a row on <span class="font-medium">Inherit</span> to follow the role.
+                    roles already grant. Leave a row on <span class="font-medium">Inherit</span> to follow those roles.
                 @else
                     What everybody holding the <span class="font-medium">{{ $subject }}</span> role may
                     reach. A screen left blank does not appear in their sidebar at all.
@@ -62,7 +62,7 @@
                         @if ($admin && $row['level'] === '')
                             @php($inherited = data_get($inheritance, $row['key']))
                             <p class="mt-0.5 text-xs text-slate-400">
-                                Following the role: {{ $inherited?->isNone() ? 'no access' : $inherited?->label(lowercase: true) }}
+                                Following their roles: {{ $inherited?->isNone() ? 'no access' : $inherited?->label(lowercase: true) }}
                             </p>
                         @endif
                     </div>
@@ -73,7 +73,7 @@
                         class="w-44 shrink-0"
                         placeholder="Choose access"
                     >
-                        <flux:select.option value="">{{ $admin ? 'Inherit from role' : 'No access' }}</flux:select.option>
+                        <flux:select.option value="">{{ $admin ? 'Inherit from roles' : 'No access' }}</flux:select.option>
 
                         @if ($admin)
                             <flux:select.option value="{{ App\Enums\GateAccessEnum::NONE->value }}">No access</flux:select.option>

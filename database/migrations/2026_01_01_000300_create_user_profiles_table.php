@@ -27,6 +27,12 @@ return new class extends Migration
             $table->string('postal_code', 10)->nullable();
             $table->text('bio')->nullable();
 
+            // Where this person can be found, as platform => handle or URL, keyed by
+            // SocialHandleEnum. A column rather than a table because it is a handful
+            // of strings read all at once and never queried across accounts — the same
+            // reasoning as the gate maps. The author byline on a post is what reads it.
+            $table->json('socials')->nullable();
+
             $table->json('settings')->nullable(); // UserService::profileDefaultSettings()
 
             $table->timestamp('created_at')->useCurrent();
