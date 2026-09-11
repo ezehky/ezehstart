@@ -515,7 +515,7 @@ new class extends Component
                         <flux:table.cell>{{ $item->title }}</flux:table.cell>
                         <flux:table.cell>{!! $item->amountMoney() !!}</flux:table.cell>
                         <flux:table.cell>{{ $item->channel->label() }}</flux:table.cell>
-                        <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                        <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                         <flux:table.cell>{{ $item->updatedAtHuman() }}</flux:table.cell>
                         <flux:table.cell>
                             <flux:dropdown position="right" align="start">
@@ -733,7 +733,7 @@ new class extends Component
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->reference }}</flux:table.cell>
                         <flux:table.cell>{!! $item->amountMoney() !!}</flux:table.cell>
-                        <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                        <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                         <flux:table.cell>{{ $item->issuedAtHuman() }}</flux:table.cell>
                         <flux:table.cell>
                             <div class="flex gap-2">
@@ -961,7 +961,7 @@ Widths: `md:w-96` confirm · `md:w-150` standard form · `md:w-3xl` form with an
             <flux:table.row wire:key="thing-{{ $item->id }}">
                 <flux:table.cell class="font-medium">{{ $item->name }}</flux:table.cell>
                 <flux:table.cell>{!! $item->amountMoney() !!}</flux:table.cell>
-                <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                 <flux:table.cell>{{ $item->createdAtHuman() }}</flux:table.cell>
                 <flux:table.cell>
                     <flux:dropdown position="right" align="start">

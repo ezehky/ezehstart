@@ -152,7 +152,7 @@ Pass one as `tone="sky"`. Do not invent a seventh.
 
 ### Status colour
 
-Never hand-pick a badge colour. `<x-status :status="$model->status" />` reads
+Never hand-pick a badge colour. `<x-util.status :status="$model->status" />` reads
 `$status->color()`, which maps through `config('_setups.status-color-map')`:
 
 ```
@@ -365,7 +365,7 @@ A page section, complete:
 
 - Hand-rolled `<button>`, `<input>`, `<table>`, `<dialog>` where Flux has a component.
 - Any colour utility without a `dark:` counterpart.
-- Hard-coded status colours — `<x-status>` only.
+- Hard-coded status colours — `<x-util.status>` only.
 - A tone outside the six-tone palette.
 - Inline `style="…"` (the one exception is the dotted radial background in
   `layouts/auth.blade.php`).

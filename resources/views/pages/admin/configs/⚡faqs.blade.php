@@ -286,7 +286,7 @@ new class extends Component
                             <flux:table.row wire:key="faq-{{ $item->id }}">
                                 <flux:table.cell><span class="tabular-nums">{{ $item->flow_order }}</span></flux:table.cell>
                                 <flux:table.cell class="font-medium">{{ $item->question }}</flux:table.cell>
-                                <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                                <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                                 <flux:table.cell>{{ $item->updatedAtHuman() }}</flux:table.cell>
                                 <flux:table.cell>
                                     <flux:dropdown position="right" align="start">

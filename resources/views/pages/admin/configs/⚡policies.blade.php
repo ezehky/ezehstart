@@ -303,8 +303,8 @@ new class extends Component
                         @forelse ($versions as $item)
                             <flux:table.row wire:key="policy-{{ $item->id }}">
                                 <flux:table.cell class="font-medium">v{{ $item->version }}</flux:table.cell>
-                                <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
-                                <flux:table.cell><x-status :status="$item->requires_consent" /></flux:table.cell>
+                                <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
+                                <flux:table.cell><x-util.status :status="$item->requires_consent" /></flux:table.cell>
                                 <flux:table.cell><span class="tabular-nums">{{ number_format($item->consents_count) }}</span></flux:table.cell>
                                 <flux:table.cell>{{ $item->updatedAtHuman() }}</flux:table.cell>
                                 <flux:table.cell>

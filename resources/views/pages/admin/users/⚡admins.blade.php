@@ -350,7 +350,7 @@ new class extends Component
                             <x-dashboard.role.badges :user="$item" />
                         </flux:table.cell>
                         <flux:table.cell>
-                            <x-status :status="$item->status" />
+                            <x-util.status :status="$item->status" />
                         </flux:table.cell>
                         <flux:table.cell>
                             {{ $item->last_seen_at ? $item->lastSeenAtDiffForHumans() : 'Never' }}

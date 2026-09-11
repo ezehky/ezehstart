@@ -172,7 +172,7 @@ new class extends Component
                                 {!! $item->balance ? kMoneyFormat($item->balance->balance_after) : '—' !!}
                             </flux:table.cell>
                             <flux:table.cell>
-                                <x-status :status="$item->status" />
+                                <x-util.status :status="$item->status" />
                             </flux:table.cell>
                         </flux:table.row>
                     @endforeach

@@ -241,7 +241,7 @@ new class extends Component
                                 @endunless
                             </flux:table.cell>
                             <flux:table.cell>{{ number_format($item->notification_preferences_count) }}</flux:table.cell>
-                            <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                            <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                             <flux:table.cell>
                                 <div class="flex justify-end gap-1">
                                     <x-dashboard.gate.button gate="config.notification-types" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />

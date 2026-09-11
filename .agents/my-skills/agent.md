@@ -87,7 +87,7 @@ behaviour inline. A capability shared by two or more pages becomes the eighth.
 
 ### 6. Prefer existing components over creating new ones
 Check `resources/views/components/` first: `dashboard/`, `form/`, `layouts/`, `lv/`,
-plus the top-level `x-status`. Then check Flux (`flux:card`, `flux:table`,
+plus the top-level `x-util.status`. Then check Flux (`flux:card`, `flux:table`,
 `flux:modal`, `flux:input`, …). Only create a Blade component when a pattern is used in
 **three or more** places.
 

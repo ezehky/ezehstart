@@ -135,7 +135,7 @@ new class extends Component
                             <flux:badge size="sm" color="zinc">{{ $item->user_type->label() }}</flux:badge>
                         </flux:table.cell>
                         <flux:table.cell>
-                            <x-status :status="$item->status" />
+                            <x-util.status :status="$item->status" />
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->createdAtHuman() }}</flux:table.cell>
                         <flux:table.cell>

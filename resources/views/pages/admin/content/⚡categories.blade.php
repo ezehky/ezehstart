@@ -320,7 +320,7 @@ new class extends Component
                         <flux:table.cell>{{ $item->name }}</flux:table.cell>
                         <flux:table.cell>{{ $item->parentName() }}</flux:table.cell>
                         <flux:table.cell>{{ $item->attached_count }}</flux:table.cell>
-                        <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                        <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                         <flux:table.cell class="flex justify-end gap-1">
                             <x-dashboard.gate.button gate="content.categories" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
                             <x-dashboard.gate.button gate="content.categories" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />

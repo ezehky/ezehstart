@@ -284,7 +284,7 @@ new class extends Component
                                 <flux:badge size="sm" inset="top bottom">{{ $item->via->label() }}</flux:badge>
                             </flux:table.cell>
                             <flux:table.cell>
-                                <x-status :status="$item->status" />
+                                <x-util.status :status="$item->status" />
                             </flux:table.cell>
                             <flux:table.cell>
                                 @if ($item->isSettled())

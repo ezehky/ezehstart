@@ -19,7 +19,7 @@ with `@props([...])`.
 | `finance/` | Money widgets | `withdraw-button-card`, `withdraw-modal` |
 | `layouts/` | Page shells | `base`, `email`, `site-master`, `email/theme`, `email/label-value` |
 | `lv/` | Embedded **Livewire** SFCs | `⚡notifications`, `⚡newsletter-form` |
-| *(root)* | `status.blade.php` | `<x-status :status="…" />` |
+| *(root)* | `status.blade.php` | `<x-util.status :status="…" />` |
 
 ### Sub-groups
 
@@ -171,7 +171,7 @@ Callers pass them with `<x-slot:title>`.
     :tone="$metric['tone']"
 />
 
-<x-status :status="$item->status" />
+<x-util.status :status="$item->status" />
 <x-dashboard.avatar :user="$item" size="md" />
 <x-dashboard.role.badges :user="$item" />
 <x-dashboard.workspace-no-record label="Students" icon="academic-cap" text="No students match the current filters." />

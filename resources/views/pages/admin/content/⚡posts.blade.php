@@ -253,7 +253,7 @@ new class extends Component
                             </flux:table.cell>
                             <flux:table.cell>{{ number_format($item->views) }}</flux:table.cell>
                             <flux:table.cell>
-                                <x-status :status="$item->status" />
+                                <x-util.status :status="$item->status" />
                             </flux:table.cell>
                             <flux:table.cell>
                                 <flux:dropdown position="bottom" align="end">

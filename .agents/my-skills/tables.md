@@ -94,7 +94,7 @@ Non-negotiables:
 **Status**:
 
 ```blade
-<flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+<flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
 ```
 
 **Enum label**:
@@ -332,7 +332,7 @@ The full body of `⚡students.blade.php`'s table — the reference implementatio
                 <flux:table.cell><x-dashboard.role.badges :user="$item" /></flux:table.cell>
                 <flux:table.cell>{{ number_format($item->enrolled_count) }}</flux:table.cell>
                 <flux:table.cell>{!! kMoneyFormat(($item->amount_paid_sum ?? 0) / 100) !!}</flux:table.cell>
-                <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                 <flux:table.cell>{{ $item->createdAtHuman() }}</flux:table.cell>
                 <flux:table.cell>
                     <div class="flex gap-2">
@@ -367,7 +367,7 @@ See the block at the top of this file, and the full page template in
 - A destructive action without a confirm modal, or one still using `wire:confirm`.
 - `{{ $item->amountMoney() }}` — money needs `{!! !!}` (it returns `&#8358;`).
 - `{{ $item->created_at->format('d/m/Y') }}` — use `createdAtHuman()`.
-- `{{ $item->status->value }}` or a hard-coded badge colour — use `<x-status>`.
+- `{{ $item->status->value }}` or a hard-coded badge colour — use `<x-util.status>`.
 - Blank cells for missing values — use `?: '—'`.
 - `:paginated` (not a real Flux prop; two legacy files use it inertly).
 - Querying inside the loop (`$item->admissions()->count()`) — use `withCount()`.

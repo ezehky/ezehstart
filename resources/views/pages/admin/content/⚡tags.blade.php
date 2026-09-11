@@ -273,7 +273,7 @@ new class extends Component
                     @foreach ($this->tags as $item)
                         <flux:table.row wire:key="tag-{{ $item->id }}">
                             <flux:table.cell>{{ $item->name }}</flux:table.cell>
-                            <flux:table.cell><x-status :status="$item->status" /></flux:table.cell>
+                            <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
                             <flux:table.cell class="flex justify-end gap-1">
                                 <x-dashboard.gate.button gate="content.tags" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
                                 <x-dashboard.gate.button gate="content.tags" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
