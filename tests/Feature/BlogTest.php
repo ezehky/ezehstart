@@ -108,6 +108,51 @@ test('an image with no width is left alone', function () {
         ->and($clean)->not->toContain('width');
 });
 
+test('subscript and superscript survive', function () {
+    $clean = app(BlogService::class)->sanitize('<p>H<sub>2</sub>O and E=mc<sup>2</sup></p>');
+
+    expect($clean)->toContain('<sub>2</sub>')
+        ->and($clean)->toContain('<sup>2</sup>');
+});
+
+test('a table keeps the column widths the editor wrote', function () {
+    // tiptap emits the colgroup, not the author — a table stripped of it loses
+    // every column width the writer dragged.
+    $html = '<table style="min-width: 75px"><colgroup><col style="width: 120px"></colgroup>'
+        .'<tbody><tr><th><p>Name</p></th></tr><tr><td><p>Ada</p></td></tr></tbody></table>';
+
+    $clean = app(BlogService::class)->sanitize($html);
+
+    expect($clean)->toContain('<colgroup>')
+        ->and($clean)->toContain('<col style="width: 120px">')
+        ->and($clean)->toContain('<th>')
+        ->and($clean)->toContain('<td>');
+});
+
+test('a link that opens a new tab is given noopener', function () {
+    $clean = app(BlogService::class)->sanitize('<a href="https://example.com" target="_blank">Go</a>');
+
+    expect($clean)->toContain('rel="noopener"');
+});
+
+test('noopener is added to a rel the author already set', function () {
+    $clean = app(BlogService::class)->sanitize('<a href="https://example.com" target="_blank" rel="nofollow">Go</a>');
+
+    expect($clean)->toContain('rel="nofollow noopener"');
+});
+
+test('a link that already carries noopener is left alone', function () {
+    $html = '<a href="https://example.com" target="_blank" rel="noopener nofollow">Go</a>';
+
+    expect(app(BlogService::class)->sanitize($html))->toBe($html);
+});
+
+test('a link that stays in the same tab is not given noopener', function () {
+    $html = '<a href="https://example.com" rel="nofollow">Go</a>';
+
+    expect(app(BlogService::class)->sanitize($html))->toBe($html);
+});
+
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // TAXONOMY
 

@@ -287,6 +287,18 @@
     .rich-prose u {
         @apply underline underline-offset-2;
     }
+    /* The browser's own sub/sup shift the line box and open a gap between lines.
+       A zero line-height with a relative nudge keeps the baseline where it was. */
+    .rich-prose sub,
+    .rich-prose sup {
+        @apply relative align-baseline text-[0.75em] leading-none;
+    }
+    .rich-prose sub {
+        bottom: -0.25em;
+    }
+    .rich-prose sup {
+        top: -0.5em;
+    }
     .rich-prose a {
         @apply font-medium text-lime-700 underline underline-offset-2 transition-colors hover:text-lime-800 dark:text-lime-300 dark:hover:text-lime-200;
     }
@@ -325,6 +337,63 @@
     }
     .rich-prose hr {
         @apply my-8 border-slate-200 dark:border-white/10;
+    }
+
+    /* A table. Ruled cells and a tinted header are the whole design: a table set
+       in prose reads as a grid or it does not read as a table at all. */
+    .rich-prose table {
+        @apply my-6 border-collapse text-[15px];
+    }
+    .rich-prose th,
+    .rich-prose td {
+        /* relative, because a resize handle is positioned against the cell. */
+        @apply relative border border-slate-200 px-3 py-2 align-top dark:border-slate-700;
+    }
+    .rich-prose th {
+        @apply bg-slate-100 text-start font-semibold text-slate-900 dark:bg-slate-800 dark:text-white;
+    }
+    /* Cell content is paragraphs, and the `> * + *` rule above never reaches
+       them — it only spaces the top level. */
+    .rich-prose th p + p,
+    .rich-prose td p + p {
+        @apply mt-2;
+    }
+
+    /* On the public page the table is its own horizontal scroller.
+       tiptap writes the table's width into a style attribute, so on a phone the
+       element would otherwise push the viewport sideways — and an inline width
+       can only be beaten with !important. The stored HTML is a bare <table> with
+       nothing to wrap it in, which is why the element scrolls itself rather than
+       sitting in an overflow container. Scoped away from the editor, where the
+       node view already supplies a .tableWrapper to scroll. */
+    .rich-prose:not(.ProseMirror) table {
+        @apply block max-w-full overflow-x-auto;
+        width: max-content !important;
+        min-width: 0 !important;
+    }
+
+    /* In the editor the table fills the column and holds the widths the colgroup
+       gives it, which is what makes a column drag resize rather than reflow. */
+    .ProseMirror .tableWrapper {
+        @apply overflow-x-auto;
+    }
+    .ProseMirror table {
+        @apply w-full table-fixed;
+    }
+
+    /* The bar that follows the pointer while a column border is being dragged. */
+    .ProseMirror .column-resize-handle {
+        @apply pointer-events-none absolute -end-0.5 bottom-0 top-0 z-20 w-1 bg-lime-500;
+    }
+    .ProseMirror.resize-cursor {
+        cursor: col-resize;
+    }
+
+    /* Cells inside a multi-cell selection. A tint over the cell rather than a
+       background on it, so the cell's own header fill still shows through. */
+    .ProseMirror .selectedCell::after {
+        @apply pointer-events-none absolute inset-0 z-[2] bg-lime-500/20;
+        content: "";
     }
 
     /* A video embed. aspect-ratio rather than the old padding-top wrapper, so the

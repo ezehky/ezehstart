@@ -3,6 +3,9 @@ import StarterKit from "@tiptap/starter-kit";
 import ResizableImage from "./resizable-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
+import { TableKit } from "@tiptap/extension-table";
 import VideoEmbed from "./video-embed";
 
 /**
@@ -55,12 +58,24 @@ export default (placeholder = "") => {
         linkOpen: false,
         linkUrl: "",
 
+        /**
+         * Whether the link being written should open in a new tab. Held here
+         * rather than derived from the selection because the checkbox has to stay
+         * answerable while the bar is open and the selection has not changed yet.
+         */
+        linkBlank: true,
+
         init() {
             editor = new Editor({
                 element: this.$refs.editor,
                 extensions: [
                     StarterKit.configure({
                         heading: { levels: [2, 3, 4] },
+                        // Link's own defaults would stamp target="_blank" onto
+                        // every anchor, which would make the new-tab checkbox a
+                        // control that can only ever be turned on. Nulling them
+                        // here leaves both attributes to applyLink().
+                        link: { HTMLAttributes: { target: null, rel: null } },
                     }),
                     ResizableImage.configure({
                         inline: false,
@@ -68,6 +83,12 @@ export default (placeholder = "") => {
                     }),
                     VideoEmbed,
                     TextAlign.configure({ types: ["heading", "paragraph"] }),
+                    Subscript,
+                    Superscript,
+                    // Resizable columns: a table of prose is unreadable at the
+                    // equal widths it is created with, and the drag is the only
+                    // width control the toolbar does not have to carry.
+                    TableKit.configure({ table: { resizable: true } }),
                     Placeholder.configure({ placeholder }),
                 ],
                 // `content` is the entangled Livewire property, so it already holds
@@ -118,9 +139,24 @@ export default (placeholder = "") => {
                 orderedList: editor.isActive("orderedList"),
                 blockquote: editor.isActive("blockquote"),
                 codeBlock: editor.isActive("codeBlock"),
+                subscript: editor.isActive("subscript"),
+                superscript: editor.isActive("superscript"),
                 h2: editor.isActive("heading", { level: 2 }),
                 h3: editor.isActive("heading", { level: 3 }),
                 link: editor.isActive("link"),
+
+                // Alignment reads off the attribute rather than a node name, so
+                // a left-aligned heading and a left-aligned paragraph both light
+                // the same button.
+                alignLeft: editor.isActive({ textAlign: "left" }),
+                alignCenter: editor.isActive({ textAlign: "center" }),
+                alignRight: editor.isActive({ textAlign: "right" }),
+                alignJustify: editor.isActive({ textAlign: "justify" }),
+
+                // Drives the table bar, which is shown only while the caret is
+                // inside a table — nine row and column controls have no meaning
+                // anywhere else and would only crowd the toolbar.
+                table: editor.isActive("table"),
             };
         },
 
@@ -141,7 +177,17 @@ export default (placeholder = "") => {
          * dismissed with Escape.
          */
         openLink() {
-            this.linkUrl = editor.getAttributes("link").href || "";
+            const attributes = editor.getAttributes("link");
+
+            this.linkUrl = attributes.href || "";
+
+            // An existing link reports what it was actually saved with; a new one
+            // starts checked, which is how every link this editor wrote before the
+            // checkbox existed behaved.
+            this.linkBlank = attributes.href
+                ? attributes.target === "_blank"
+                : true;
+
             this.linkOpen = true;
 
             this.$nextTick(() => this.$refs.linkInput?.focus());
@@ -176,11 +222,18 @@ export default (placeholder = "") => {
                 ? url
                 : `https://${url}`;
 
+            // noopener only matters on a link that hands over a window, so it is
+            // set with the target rather than always: a same-tab link carrying it
+            // is noise in the stored HTML.
             editor
                 .chain()
                 .focus()
                 .extendMarkRange("link")
-                .setLink({ href, target: "_blank", rel: "noopener nofollow" })
+                .setLink({
+                    href,
+                    target: this.linkBlank ? "_blank" : null,
+                    rel: this.linkBlank ? "noopener nofollow" : "nofollow",
+                })
                 .run();
 
             this.linkOpen = false;
