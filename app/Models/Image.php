@@ -79,7 +79,7 @@ class Image extends Model
 
         return match (true) {
             $this->visibility->isPublic() => true,
-            $this->visibility->isType() => $this->visible_to_type === $user->type,
+            $this->visibility->isType() => $this->visible_to_type === $user->user_type,
             default => false,
         };
     }
@@ -128,7 +128,7 @@ class Image extends Model
             ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
             ->orWhere(fn (Builder $typeQuery) => $typeQuery
                 ->where('visibility', MediaVisibilityEnum::TYPE)
-                ->where('visible_to_type', $user->type)));
+                ->where('visible_to_type', $user->user_type)));
     }
 
     /**

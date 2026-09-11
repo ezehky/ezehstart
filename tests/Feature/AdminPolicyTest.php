@@ -154,7 +154,7 @@ test('publishing is recorded in the activity log as its own action', function ()
         ->call('confirmPublish', $draft->id)
         ->call('publish');
 
-    expect(ActivityLog::query()->where('action', ActivityActionEnum::POLICY_PUBLISH)->exists())->toBeTrue();
+    expect(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::POLICY_PUBLISH)->exists())->toBeTrue();
 });
 
 test('saving a draft is recorded against the policy', function () {
@@ -165,7 +165,7 @@ test('saving a draft is recorded against the policy', function () {
         ->set('content', '## 1. Overview')
         ->call('save');
 
-    expect(ActivityLog::query()->where('action', ActivityActionEnum::POLICY_CREATE)->exists())->toBeTrue();
+    expect(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::POLICY_CREATE)->exists())->toBeTrue();
 });
 
 // ==================== Version numbering

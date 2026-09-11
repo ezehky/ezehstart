@@ -8,7 +8,7 @@
      that matters, so that one is called out. --}}
 
 <div {{ $attributes->class(['flex flex-wrap items-center gap-1']) }}>
-    @if (! $user->type->carriesRole())
+    @if (! $user->user_type->carriesRole())
         <span class="text-sm text-slate-400">—</span>
     @elseif (! $user->role)
         <flux:badge size="sm" color="amber">No role</flux:badge>

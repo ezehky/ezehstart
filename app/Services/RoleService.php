@@ -255,7 +255,7 @@ class RoleService
      */
     public function assignBlockedReason(User $user, ?Role $role): ?string
     {
-        if (! $user->type->carriesRole()) {
+        if (! $user->user_type->carriesRole()) {
             return 'Only admin accounts carry a role. Change the account type first.';
         }
 
@@ -282,9 +282,9 @@ class RoleService
             return false;
         }
 
-        $from = $user->type;
+        $from = $user->user_type;
 
-        $user->type = $type;
+        $user->user_type = $type;
         $user->role_id = $type->carriesRole() ? $role?->id : null;
 
         if ($user->isClean()) {
@@ -310,12 +310,12 @@ class RoleService
      */
     public function typeChangeBlockedReason(User $user, UserTypeEnum $type): ?string
     {
-        if ($user->type === $type) {
+        if ($user->user_type === $type) {
             return "This account is already {$type->label(lowercase: true)}.";
         }
 
         // Leaving the admin workspace is the only direction that can lock anybody out.
-        if (! $user->type->isAdmin()) {
+        if (! $user->user_type->isAdmin()) {
             return null;
         }
 

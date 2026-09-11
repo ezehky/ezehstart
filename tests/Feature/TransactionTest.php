@@ -237,7 +237,7 @@ test('a manual adjustment is recorded and logged', function () {
     expect($transaction->transaction_group)->toBe(TransactionGroupEnum::ADJUSTMENT)
         ->and(app(TransactionService::class)->balanceFor($this->member->fresh()))->toBe(50.0);
 
-    $this->assertDatabaseHas('activity_logs', ['action' => 'transaction.create']);
+    $this->assertDatabaseHas('activity_logs', ['activity_log_action' => 'transaction.create']);
 });
 
 test('a debit adjustment takes money away', function () {

@@ -13,7 +13,7 @@ use Livewire\Livewire;
 test('a member carries no role at all', function () {
     $member = userOfType(UserTypeEnum::USER);
 
-    expect($member->type->carriesRole())->toBeFalse()
+    expect($member->user_type->carriesRole())->toBeFalse()
         ->and($member->role_id)->toBeNull()
         ->and($member->hasLiveRole())->toBeFalse();
 });
@@ -21,7 +21,7 @@ test('a member carries no role at all', function () {
 test('registering makes a member, never an admin', function () {
     $user = User::factory()->create();
 
-    expect($user->type)->toBe(UserTypeEnum::USER)
+    expect($user->user_type)->toBe(UserTypeEnum::USER)
         ->and($user->role_id)->toBeNull();
 });
 
@@ -80,7 +80,7 @@ test('changing type to member clears the role', function () {
 
     $admin->refresh();
 
-    expect($admin->type)->toBe(UserTypeEnum::USER)
+    expect($admin->user_type)->toBe(UserTypeEnum::USER)
         ->and($admin->role_id)->toBeNull();
 });
 
@@ -115,7 +115,7 @@ test('assigning a role is written to the audit trail', function () {
 
     $this->assertDatabaseHas('activity_logs', [
         'user_id' => $admin->id,
-        'action' => ActivityActionEnum::USER_ROLE_ASSIGN->value,
+        'activity_log_action' => ActivityActionEnum::USER_ROLE_ASSIGN->value,
         'loggable_id' => $account->id,
     ]);
 });
@@ -148,7 +148,7 @@ test('the access modal moves an account between workspaces', function () {
 
     $member->refresh();
 
-    expect($member->type)->toBe(UserTypeEnum::ADMIN)
+    expect($member->user_type)->toBe(UserTypeEnum::ADMIN)
         ->and($member->role_id)->toBe($role->id);
 });
 

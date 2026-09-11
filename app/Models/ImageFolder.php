@@ -53,7 +53,7 @@ class ImageFolder extends Model
 
         return match ($this->visibility) {
             MediaVisibilityEnum::PUBLIC => true,
-            MediaVisibilityEnum::TYPE => $this->visible_to_type === $user->type,
+            MediaVisibilityEnum::TYPE => $this->visible_to_type === $user->user_type,
             default => false,
         };
     }
@@ -136,6 +136,6 @@ class ImageFolder extends Model
             ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
             ->orWhere(fn (Builder $typeQuery) => $typeQuery
                 ->where('visibility', MediaVisibilityEnum::TYPE)
-                ->where('visible_to_type', $user->type)));
+                ->where('visible_to_type', $user->user_type)));
     }
 }

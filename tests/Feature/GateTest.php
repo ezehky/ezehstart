@@ -266,7 +266,7 @@ test('a gate change is written to the activity log', function () {
         ->call('grantEveryGate')
         ->call('saveGates');
 
-    expect($this->admin->activityLogs()->where('action', ActivityActionEnum::ROLE_GATES_UPDATE)->exists())
+    expect($this->admin->activityLogs()->where('activity_log_action', ActivityActionEnum::ROLE_GATES_UPDATE)->exists())
         ->toBeTrue();
 });
 

@@ -62,7 +62,7 @@ new class extends Component
                     ->where('description', 'like', "%{$this->search}%")
                     ->orWhere('ip_address', 'like', "%{$this->search}%")
                     ->orWhereHas('user', fn ($user) => $user->searchMacro(['name', 'email'], $this->search))))
-            ->when($this->action !== '', fn ($query) => $query->where('action', $this->action))
+            ->when($this->action !== '', fn ($query) => $query->where('activity_log_action', $this->action))
             ->when($this->from !== '', fn ($query) => $query->whereDate('created_at', '>=', $this->from))
             ->when($this->to !== '', fn ($query) => $query->whereDate('created_at', '<=', $this->to))
             ->latest()
@@ -180,7 +180,7 @@ new class extends Component
                             @endif
                         </flux:table.cell>
                         <flux:table.cell>
-                            <flux:badge size="sm">{{ $item->action->label() }}</flux:badge>
+                            <flux:badge size="sm">{{ $item->activity_log_action->label() }}</flux:badge>
                         </flux:table.cell>
                         <flux:table.cell class="max-w-sm truncate">{{ $item->description }}</flux:table.cell>
                         <flux:table.cell class="text-xs text-slate-500">
@@ -217,7 +217,7 @@ new class extends Component
         @if ($log = $this->selectedLog)
             <div class="space-y-6">
                 <div>
-                    <flux:heading size="lg">{{ $log->action->label() }}</flux:heading>
+                    <flux:heading size="lg">{{ $log->activity_log_action->label() }}</flux:heading>
                     <flux:text class="mt-1">{{ $log->description }}</flux:text>
                 </div>
 

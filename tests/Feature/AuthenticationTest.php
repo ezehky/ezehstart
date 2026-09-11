@@ -63,7 +63,7 @@ test('a user can sign in with their password', function () {
     Mail::assertQueued(LoginEmail::class);
     $this->assertDatabaseHas('activity_logs', [
         'user_id' => $user->id,
-        'action' => ActivityActionEnum::LOGIN->value,
+        'activity_log_action' => ActivityActionEnum::LOGIN->value,
     ]);
 });
 

@@ -66,7 +66,7 @@ class ActivityLogService
         $columns ??= [
             'id',
             'user_id',
-            'action',
+            'activity_log_action',
             'description',
             'created_at',
         ];
@@ -154,7 +154,7 @@ class ActivityLogService
             'os' => $os,
             'user_agent' => $userAgent,
             'ip_address' => request()->ip(),
-            'action' => $action,
+            'activity_log_action' => $action,
             'description' => $description,
             ...$data,
         ]);

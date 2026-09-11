@@ -40,6 +40,24 @@ return new class extends Migration
 The two docblocks (`Run the migrations.` / `Reverse the migrations.`) are present in
 every migration — keep them.
 
+### Column names
+
+**Never name a column after an SQL keyword.** `type`, `group`, `order`, `key`,
+`value`, `index`, `action` and the rest are reserved somewhere, and a reserved column
+needs quoting for the rest of its life. Prefix it with the table's singular name:
+
+```php
+$table->string('user_type', 20)->default(UserTypeEnum::USER)->index();   // yes
+$table->string('type', 20)->default(UserTypeEnum::USER)->index();        // no
+
+$table->string('post_group', 100)->index();                              // yes
+$table->string('group', 100)->index();                                   // no
+```
+
+`status`, `name`, `slug`, `title`, `description`, `reference`, `amount`, `flow_order`
+and every `is_*` / `*_at` / `*_id` are not reserved and stay bare. The full rule, the
+keyword list and the framework-table exemption are in [naming.md](naming.md).
+
 ### Column order
 
 1. `$table->id();`
@@ -107,6 +125,10 @@ $table->string('transaction_wallet', 50)->default(TransactionWalletEnum::BALANCE
 $table->string('via', 50)->default(TransactionViaEnum::PLATFORM)->index();
 $table->string('faq_type')->default(FaqTypeEnum::GENERAL)->index();
 ```
+
+Every one of those is prefixed with the table's singular name — `transaction_type`,
+not `type`; `faq_type`, not `type`. That is the reserved-word rule above, and the enum
+name gives you the column name for free: `TransactionWalletEnum` → `transaction_wallet`.
 
 When the column stores an enum but has no default, note the enum in a trailing comment:
 `// TransactionGroupEnum`.
@@ -305,6 +327,8 @@ rewrite the body to match.
   Public identifiers are human `reference` strings from `kReferenceId()` and `slug`s
   from `kSlug()`.
 - Unindexed status/type columns that the admin filters on.
+- A column named `type`, `group`, `order`, `key`, `value`, `index`, `action`, or any
+  other SQL keyword — prefix it with the table's singular name (`user_type`).
 - Editing an existing migration that has shipped — write a new one.
 - An empty or `//` `down()` method.
 - `Schema::table()` inside a `create` migration file.

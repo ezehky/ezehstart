@@ -24,7 +24,7 @@ trait WithAuthWorker
     protected function userDashboardRedirect(array $with = [])
     {
         return redirect()
-            ->intended(auth()->user()->type->dashboardRoute())
+            ->intended(auth()->user()->user_type->dashboardRoute())
             ->with($with);
     }
 

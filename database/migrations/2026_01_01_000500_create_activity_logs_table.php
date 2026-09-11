@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('action', 100)->index(); // ActivityActionEnum values
+            $table->string('activity_log_action', 100)->index(); // ActivityActionEnum values
             $table->string('description', 1000);
             $table->json('original')->nullable();
             $table->json('changes')->nullable();

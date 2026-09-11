@@ -34,7 +34,7 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'ip_address' => fake()->ipv4(),
-            'type' => UserTypeEnum::USER,
+            'user_type' => UserTypeEnum::USER,
         ];
     }
 
@@ -48,7 +48,7 @@ class UserFactory extends Factory
     public function admin(?Role $role = null): static
     {
         return $this->state(fn (array $attributes) => [
-            'type' => UserTypeEnum::ADMIN,
+            'user_type' => UserTypeEnum::ADMIN,
             'role_id' => ($role ?? app(RoleService::class)->protectedRole())->id,
         ]);
     }

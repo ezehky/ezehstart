@@ -147,7 +147,7 @@ test('every write is recorded in the activity log', function () {
         ->call('confirmDelete', $faq->id)
         ->call('delete');
 
-    expect(ActivityLog::query()->where('action', ActivityActionEnum::FAQ_UPDATE)->exists())->toBeTrue()
+    expect(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::FAQ_UPDATE)->exists())->toBeTrue()
         // Captured before the row went, so the line still says what was deleted.
-        ->and(ActivityLog::query()->where('action', ActivityActionEnum::FAQ_DELETE)->exists())->toBeTrue();
+        ->and(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::FAQ_DELETE)->exists())->toBeTrue();
 });

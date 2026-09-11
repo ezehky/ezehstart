@@ -25,7 +25,7 @@ return new class extends Migration
 
             // Which workspace this account signs in to. Fixed in code — see
             // UserTypeEnum, and bootstrap/app.php for what a new one costs.
-            $table->string('type', 20)->default(UserTypeEnum::USER)->index();
+            $table->string('user_type', 20)->default(UserTypeEnum::USER)->index();
             // The role, and only for an admin. A member has none: the member
             // workspace is not gated, so there is nothing for a role to say.
             $table->foreignId('role_id')->nullable()->constrained()->nullOnDelete();

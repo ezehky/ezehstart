@@ -154,7 +154,7 @@ new class extends Component
             $this->admin->email_verified_at = now();
             // Every account created here is an admin. The type is set on the object
             // rather than through changeType(): there is no account yet to move.
-            $this->admin->type = UserTypeEnum::ADMIN;
+            $this->admin->user_type = UserTypeEnum::ADMIN;
             $this->admin->role_id = $role?->id;
             $action = ActivityActionEnum::USER_CREATE;
         } else {

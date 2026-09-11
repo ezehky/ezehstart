@@ -107,8 +107,8 @@ new class extends Component
             <div>
                 <flux:heading size="lg">{{ $user->name }}</flux:heading>
                 <div class="mt-1 flex flex-wrap gap-1.5">
-                    <flux:badge size="sm" :color="$user->type->isAdmin() ? 'lime' : 'sky'">
-                        {{ $user->type->label() }}
+                    <flux:badge size="sm" :color="$user->user_type->isAdmin() ? 'lime' : 'sky'">
+                        {{ $user->user_type->label() }}
                     </flux:badge>
                     @if ($user->role)
                         <flux:badge size="sm" color="zinc">{{ $user->role->name }}</flux:badge>

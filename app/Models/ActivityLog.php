@@ -21,7 +21,7 @@ class ActivityLog extends Model
     protected function casts(): array
     {
         return [
-            'action' => ActivityActionEnum::class,
+            'activity_log_action' => ActivityActionEnum::class,
             'original' => AsArrayObject::class,
             'changes' => AsArrayObject::class,
             'platform' => ActivityPlatformEnum::class,

@@ -132,7 +132,7 @@ new class extends Component
                         </flux:table.cell>
                         <flux:table.cell>{{ $item->phone_number ?: '—' }}</flux:table.cell>
                         <flux:table.cell>
-                            <flux:badge size="sm" color="zinc">{{ $item->type->label() }}</flux:badge>
+                            <flux:badge size="sm" color="zinc">{{ $item->user_type->label() }}</flux:badge>
                         </flux:table.cell>
                         <flux:table.cell>
                             <x-status :status="$item->status" />

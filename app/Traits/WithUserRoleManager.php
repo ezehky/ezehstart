@@ -44,7 +44,7 @@ trait WithUserRoleManager
         $this->resetValidation();
 
         $this->roleUserId = $user->id;
-        $this->accountType = $user->type->value;
+        $this->accountType = $user->user_type->value;
         $this->accountRole = (string) ($user->role_id ?? '');
 
         unset($this->roleUser, $this->assignableRoles, $this->accessBlockedReason, $this->pendingAccountType);
@@ -122,7 +122,7 @@ trait WithUserRoleManager
 
         $service = app(RoleService::class);
 
-        if ($type !== $user->type) {
+        if ($type !== $user->user_type) {
             return $service->typeChangeBlockedReason($user, $type);
         }
 
@@ -148,7 +148,7 @@ trait WithUserRoleManager
         $reason = $this->accessBlockedReason;
         $this->respondError($reason ?? '', if: $reason !== null);
 
-        $changed = $type === $user->type
+        $changed = $type === $user->user_type
             ? $service->assign($user, $role)
             : $service->changeType($user, $type, $role);
 

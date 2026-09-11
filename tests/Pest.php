@@ -142,7 +142,7 @@ function adminWithoutRole(array $attributes = []): User
 {
     return User::factory()->create([
         'status' => StatusUser::ACTIVE,
-        'type' => UserTypeEnum::ADMIN,
+        'user_type' => UserTypeEnum::ADMIN,
         'role_id' => null,
         ...$attributes,
     ]);

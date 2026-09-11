@@ -106,8 +106,60 @@ Groups in use: `dashboard`, `form`, `site`, `training`, `finance`, `layouts`, `l
 - Ordering column: `flow_order`.
 - Money columns are plain nouns storing minor units: `fee`, `amount`, `amount_paid`,
   `balance`, `compare_fee`.
-- Type/category columns take the enum's subject: `faq_type`, `policy_type`,
-  `transaction_type`, `transaction_group`, `transaction_wallet`, `day_of_week`.
+- Type/category columns take the enum's subject, which is also the table's singular
+  name: `faq_type`, `policy_type`, `transaction_type`, `transaction_group`,
+  `transaction_wallet`, `day_of_week`.
+- **No column is ever a bare SQL keyword.** Prefix it with the table's singular name —
+  `user_type`, never `type`; `post_group`, never `group`. See below.
+
+#### Reserved words are never column names
+
+A column named after an SQL keyword has to be quoted for the rest of its life — in a
+raw expression, in `whereRaw`, in `selectRaw`, in a join written by hand, in whatever
+reporting tool reads the database in two years. One of those backticks always gets
+forgotten, and what comes back is a syntax error pointing at the wrong token.
+
+**The fix is a prefix, and the prefix is the table's singular name.**
+
+| Table | No | Yes |
+| --- | --- | --- |
+| `users` | `type` | `user_type` |
+| `posts` | `group` | `post_group` |
+| `invoices` | `order` | `invoice_order` |
+| `site_settings` | `key`, `value` | `setting_key`, `setting_value` |
+| `videos` | `index` | `video_index` |
+
+`type` is the one written by reflex, and it is the one to watch. It is reserved in
+ANSI SQL, it is a keyword in several engines, and it collides with Eloquent's own
+`$model->type` besides. Write `{singular}_type` — the enum name already says the same
+thing: `UserTypeEnum` → `user_type`, `FaqTypeEnum` → `faq_type`,
+`TransactionTypeEnum` → `transaction_type`.
+
+Keywords that turn up as tempting column names. The list is illustrative, not
+exhaustive — that is the point of the rule:
+
+```
+type    group   order   key     value   index   option  match   check   default
+range   rank    action  level   mode    state   role    user    system  usage
+start   end     first   last    next    left    right   read    write   desc
+limit   offset  set     show    when    where   with    count   sum     position
+```
+
+When in doubt, prefix. A prefixed column is never wrong; a bare one might be.
+
+**Not reserved, and deliberately bare.** `status`, `name`, `slug`, `title`,
+`description`, `content`, `excerpt`, `reference`, `amount`, `balance`, `visibility`,
+`flow_order`, and every `is_*`, `*_at`, `*_id`. These are the house names and they are
+safe — do not "fix" them into `post_status` or `user_name`.
+
+**Framework tables are exempt.** `cache.key`, `cache.value`, `cache_locks.owner`,
+`notifications.type`, `jobs.queue`, `sessions.payload` are Laravel's own schema and
+Laravel's own queries quote them correctly. Never rename a column in a table this
+project did not design.
+
+Every first-party column in this kit already obeys the rule — `users.user_type`,
+`activity_logs.activity_log_action`, `faqs.faq_type`, `transactions.transaction_type`.
+There is no grandfathered exception to copy.
 
 ## Why
 
@@ -171,3 +223,5 @@ routes/admin.php:
   `app/Helpers/` is `k*`.
 - Repeating the route group prefix inside the route file
   (`->name('admin.faqs')` inside `routes/admin.php` yields `admin.admin.faqs`).
+- A column named `type`, `group`, `order`, `key`, `value`, `index`, `action` or any
+  other SQL keyword — prefix it with the table's singular name.

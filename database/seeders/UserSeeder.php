@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
                 'password' => 'password',
                 'email_verified_at' => now(),
                 'ip_address' => '127.0.0.1',
-                'type' => UserTypeEnum::ADMIN,
+                'user_type' => UserTypeEnum::ADMIN,
                 'role_id' => $adminRole->id,
             ],
         ];

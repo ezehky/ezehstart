@@ -39,7 +39,7 @@ class User extends Authenticatable
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'type' => UserTypeEnum::USER->value,
+        'user_type' => UserTypeEnum::USER->value,
     ];
 
     /**
@@ -54,7 +54,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'last_seen_at' => 'datetime',
             'status' => StatusUser::class,
-            'type' => UserTypeEnum::class,
+            'user_type' => UserTypeEnum::class,
             'gates' => AsArrayObject::class,
         ];
     }
@@ -63,17 +63,17 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->type->isAdmin();
+        return $this->user_type->isAdmin();
     }
 
     public function isUser(): bool
     {
-        return $this->type->isUser();
+        return $this->user_type->isUser();
     }
 
     public function isType(UserTypeEnum $type): bool
     {
-        return $this->type === $type;
+        return $this->user_type === $type;
     }
 
     /**
@@ -97,7 +97,7 @@ class User extends Authenticatable
      */
     public function hasLiveRole(): bool
     {
-        return $this->type->carriesRole() && (bool) $this->role?->grantsAccess();
+        return $this->user_type->carriesRole() && (bool) $this->role?->grantsAccess();
     }
 
     public function firstName(): string
@@ -228,7 +228,7 @@ class User extends Authenticatable
     #[Scope]
     protected function ofType(Builder $builder, UserTypeEnum $type): void
     {
-        $builder->where('type', $type);
+        $builder->where('user_type', $type);
     }
 
     /**
@@ -239,13 +239,13 @@ class User extends Authenticatable
     #[Scope]
     protected function admins(Builder $builder): void
     {
-        $builder->where('type', UserTypeEnum::ADMIN);
+        $builder->where('user_type', UserTypeEnum::ADMIN);
     }
 
     #[Scope]
     protected function members(Builder $builder): void
     {
-        $builder->where('type', UserTypeEnum::USER);
+        $builder->where('user_type', UserTypeEnum::USER);
     }
 
     /**
@@ -256,7 +256,7 @@ class User extends Authenticatable
     #[Scope]
     protected function withoutLiveRole(Builder $builder): void
     {
-        $builder->where('type', UserTypeEnum::ADMIN)
+        $builder->where('user_type', UserTypeEnum::ADMIN)
             ->where(fn (Builder $query) => $query
                 ->whereNull('role_id')
                 ->orWhereHas('role', fn (Builder $role) => $role->where('status', StatusDefault::INACTIVE)));

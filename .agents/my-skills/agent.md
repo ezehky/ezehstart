@@ -127,6 +127,7 @@ Never generate any of the following in this project:
 | `protected $casts = [...]` | `protected function casts(): array` |
 | `public function scopeActive($q)` | `#[Scope] protected function active(Builder $query): void` |
 | `$table->timestamps()` | `useCurrent()` / `useCurrentOnUpdate()` pair |
+| A column named `type`, `group`, `order`, `key`, `value`, `index`, `action` — any SQL keyword | `{singular}_type`, `{singular}_group` — prefix with the table's singular name |
 | `Gate::`, `$this->authorize()`, `app/Policies` | Middleware + service guard + `abort_unless` |
 | `session()->flash('success')` for form feedback | `$this->respondSuccess('…')` (Flux toast) |
 | `dd()`, `dump()`, `ray()`, `var_dump()` | Remove before finishing |

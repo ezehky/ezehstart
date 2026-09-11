@@ -55,6 +55,9 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Model has `#[Unguarded]`, `casts()` method, and `// Getters` /
       `// Relationships` / `// Scopes` section comments
 - [ ] ✓ Scopes use `#[Scope] protected function name(Builder $query): void`
+- [ ] ✓ No column is named after an SQL keyword (`type`, `group`, `order`, `key`,
+      `value`, `index`, `action`) — it carries the table's singular name as a prefix
+      (`user_type`, `post_group`)
 - [ ] ✓ Every status/type column is cast to an enum
 - [ ] ✓ Every `json` column casts to `AsArrayObject::class` (or `AsCollection::class`
       for a list) — **never** `'array'` or `'json'`, which discard writes silently

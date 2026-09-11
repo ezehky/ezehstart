@@ -54,7 +54,7 @@ new class extends Component
     #[Computed]
     public function isAdminAccount(): bool
     {
-        return $this->user->type->carriesRole();
+        return $this->user->user_type->carriesRole();
     }
 
     /**
@@ -107,7 +107,7 @@ new class extends Component
      */
     public function listKey(): string
     {
-        return $this->user->type->isAdmin() ? 'admins' : 'members';
+        return $this->user->user_type->isAdmin() ? 'admins' : 'members';
     }
 
     #[Computed]
@@ -290,7 +290,7 @@ new class extends Component
     private function openRoleManagerState(): void
     {
         $this->roleUserId = $this->user->id;
-        $this->accountType = $this->user->type->value;
+        $this->accountType = $this->user->user_type->value;
         $this->accountRole = (string) ($this->user->role_id ?? '');
     }
 };
@@ -332,8 +332,8 @@ new class extends Component
                     </div>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <x-status :status="$user->status" />
-                        <flux:badge size="sm" :color="$user->type->isAdmin() ? 'purple' : 'zinc'">
-                            {{ $user->type->label() }}
+                        <flux:badge size="sm" :color="$user->user_type->isAdmin() ? 'purple' : 'zinc'">
+                            {{ $user->user_type->label() }}
                         </flux:badge>
                         <x-dashboard.user-role :user="$user" />
                         @if ($user->hasVerifiedEmail())

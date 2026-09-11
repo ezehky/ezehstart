@@ -111,7 +111,7 @@ class GateService
      */
     private function mapFor(User $user, ?Role $role): array
     {
-        if (! $user->type->carriesRole() || ! $role?->grantsAccess()) {
+        if (! $user->user_type->carriesRole() || ! $role?->grantsAccess()) {
             return [];
         }
 
