@@ -58,7 +58,7 @@ beforeEach(function () {
 
 test('a dependent field is only asked for while its switch is on', function () {
     $component = Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.security.password-history', false)
         // A depth that would fail min:1 if the rule were still being applied.
         ->set('config.security.password-history-depth', 0)
@@ -69,7 +69,7 @@ test('a dependent field is only asked for while its switch is on', function () {
 
 test('a dependent field is validated again once its switch comes back on', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.security.password-history', true)
         ->set('config.security.password-history-depth', 0)
         ->call('save')
@@ -78,14 +78,14 @@ test('a dependent field is validated again once its switch comes back on', funct
 
 test('the account deletion window follows its own switch', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.user.account-deletion', false)
         ->set('config.user.account-deletion-days', 0)
         ->call('save')
         ->assertHasNoErrors();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.user.account-deletion', true)
         ->set('config.user.account-deletion-days', 0)
         ->call('save')
@@ -94,7 +94,7 @@ test('the account deletion window follows its own switch', function () {
 
 test('strict verification is only asked for while verification is on', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.email-settings.verification', false)
         ->set('config.email-settings.verification-strict', null)
         ->call('save')
@@ -103,7 +103,7 @@ test('strict verification is only asked for while verification is on', function 
 
 test('a switch turned off stays off after a save', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.site-config')
+        ->test('pages::admin.configs.security')
         ->set('config.security.passwordless-login', false)
         ->call('save')
         ->assertHasNoErrors();

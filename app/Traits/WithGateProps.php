@@ -16,12 +16,26 @@ trait WithGateProps
 
     public string $gateFull;
 
-    protected function setPageGate(string $pageGate): void
+    /**
+     * Name the gate this screen sits behind, and close the screen to an account that
+     * does not hold it.
+     *
+     * The enforcement is the point: a hidden sidebar entry is a courtesy, and a page
+     * whose key is only remembered for its buttons is still reachable by anyone who
+     * types the URL. kPageGate() lets non-admin routes through, so a shared screen
+     * opened from the member workspace is unaffected.
+     *
+     * @param  string  $pageGate  The navigation key this screen sits under.
+     * @param  GateAccessEnum  $required  The minimum access needed to open it.
+     */
+    protected function setPageGate(string $pageGate, GateAccessEnum $required = GateAccessEnum::VIEW): void
     {
         $this->pageGate = $pageGate;
         $this->gateModify = GateAccessEnum::MODIFY->value;
         $this->gateCreate = GateAccessEnum::CREATE->value;
         $this->gateFull = GateAccessEnum::FULL->value;
+
+        kPageGate($pageGate, $required);
     }
 
     protected function checkGate(GateAccessEnum $access = GateAccessEnum::MODIFY, ?string $msg = null): void

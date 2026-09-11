@@ -6,9 +6,10 @@ use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
-use App\Traits\WithGateProps;
+use App\Traits\WithDataTable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -17,7 +18,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithGateProps, WithPagination;
+    use WithDataTable, WithPagination;
 
     #[Url]
     public string $search = '';
@@ -50,10 +51,33 @@ new class extends Component
         $this->setPageGate('transactions');
     }
 
-    #[Computed]
-    public function transactions()
+    /**
+     * The ledger as a table: which columns it has, what each one is good for, and
+     * which of them a total belongs under.
+     */
+    protected function tableColumns(): array
     {
-        return Transaction::query()
+        return [
+            // The reference is what identifies the row, so it stays whatever else is
+            // put away.
+            'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
+            'user' => ['label' => 'Account'],
+            'amount' => ['label' => 'Amount', 'sortable' => true, 'summary' => 'sum', 'money' => true],
+            'transaction_group' => ['label' => 'Group', 'sortable' => true],
+            'via' => ['label' => 'Via', 'sortable' => true],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'created_at' => ['label' => 'Date', 'sortable' => true],
+        ];
+    }
+
+    /**
+     * The question the screen is asking, without its ordering. The bulk bar, the
+     * totals and the export all ask it again, so the filters have to live here rather
+     * than in the computed that paginates it.
+     */
+    protected function tableQuery(): Builder
+    {
+        $query = Transaction::query()
             ->with(['user', 'balance', 'gateway'])
             ->when($this->search, fn (Builder $query) => $query
                 ->where(fn (Builder $inner) => $inner
@@ -62,9 +86,45 @@ new class extends Component
                         ->where('name', 'like', '%'.$this->search.'%')
                         ->orWhere('email', 'like', '%'.$this->search.'%'))))
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
-            ->when($this->group !== '', fn (Builder $query) => $query->where('transaction_group', $this->group))
-            ->newestFirst()
-            ->paginate(20);
+            ->when($this->group !== '', fn (Builder $query) => $query->where('transaction_group', $this->group));
+
+        return $this->applyDateRange($query);
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'transactions';
+    }
+
+    /**
+     * One cell on the way into a file. The columns that are a relationship or a
+     * formatted amount cannot be read straight off the model, and an export of
+     * "App\Models\User" helps nobody.
+     */
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'user' => $item->user?->name,
+            'amount' => $item->signedAmount(),
+            'created_at' => $item->createdDatetimeHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
+    protected function afterBulkAction(): void
+    {
+        unset($this->transactions, $this->metrics);
+    }
+
+    #[Computed]
+    public function transactions()
+    {
+        // The chosen sort first, falling back to the ledger's own order — newest at
+        // the top, and the id to break a tie between two rows written in the same
+        // second.
+        return $this->applySort($this->tableQuery(), 'created_at')
+            ->orderByDesc('id')
+            ->paginate($this->tablePerPage());
     }
 
     /**
@@ -105,16 +165,19 @@ new class extends Component
 
     public function updatedSearch(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function updatedStatus(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function updatedGroup(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
@@ -149,7 +212,7 @@ new class extends Component
 
         Flux::modal('settleModal')->close();
         $this->reset('settleId', 'settleStatus', 'settleNote');
-        unset($this->transactions, $this->metrics);
+        unset($this->transactions, $this->metrics, $this->tableSummary);
 
         $this->respondError($error, $error !== null);
 
@@ -183,7 +246,7 @@ new class extends Component
 
         Flux::modal('adjustModal')->close();
         $this->reset('adjust_user_id', 'adjust_amount', 'adjust_reason', 'adjust_credit');
-        unset($this->transactions, $this->metrics);
+        unset($this->transactions, $this->metrics, $this->tableSummary);
 
         return $this->respondSuccess('The adjustment has been recorded.');
     }
@@ -234,85 +297,129 @@ new class extends Component
             </div>
         </div>
 
-        @if ($this->transactions->isEmpty())
-            <x-dashboard.workspace-no-record
-                icon="receipt-percent"
-                label="No transactions"
-                text="Nothing has moved through the ledger yet."
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            {{-- A ledger is read by period more often than by anything else, so the
+                 range sits beside the filters rather than behind a menu. --}}
+            <x-form.date-field
+                mode="range"
+                wire:model.live="dateFrom"
+                end-model="dateTo"
+                label="Dated between"
+                class="sm:max-w-md"
             />
-        @else
-            <flux:table :paginate="$this->transactions">
-                <flux:table.columns>
-                    <flux:table.column>Reference</flux:table.column>
-                    <flux:table.column>Account</flux:table.column>
-                    <flux:table.column>Amount</flux:table.column>
-                    <flux:table.column>Via</flux:table.column>
-                    <flux:table.column>Status</flux:table.column>
-                    <flux:table.column />
-                </flux:table.columns>
 
-                <flux:table.rows>
-                    @foreach ($this->transactions as $item)
-                        <flux:table.row wire:key="txn-{{ $item->id }}">
-                            <flux:table.cell>
-                                <p class="font-mono text-xs">{{ $item->reference }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->createdDatetimeHuman() }}</p>
-                            </flux:table.cell>
-                            <flux:table.cell>
-                                <p class="font-medium text-slate-950 dark:text-white">{{ $item->user?->name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->description }}</p>
-                            </flux:table.cell>
-                            <flux:table.cell>
-                                <span @class([
-                                    'font-medium',
-                                    'text-red-600 dark:text-red-400' => $item->transaction_type->isDebit(),
-                                    'text-emerald-600 dark:text-emerald-400' => ! $item->transaction_type->isDebit(),
-                                ])>
-                                    {{ $item->signedAmount() }}
-                                </span>
-                            </flux:table.cell>
-                            <flux:table.cell>
-                                <flux:badge size="sm" inset="top bottom">{{ $item->via->label() }}</flux:badge>
-                            </flux:table.cell>
-                            <flux:table.cell>
-                                <x-util.status :status="$item->status" />
-                            </flux:table.cell>
-                            <flux:table.cell>
-                                @if ($item->isSettled())
-                                    <flux:text size="sm" class="text-slate-400">Settled</flux:text>
-                                @elseif (kGate('transactions', GateAccessEnum::MODIFY))
-                                    <flux:dropdown position="bottom" align="end">
-                                        <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
-                                        <flux:menu>
-                                            <x-dashboard.gate.menu-item
-                                                :gate="$pageGate"
-                                                :level="$gateModify"
-                                                icon="check"
-                                                wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::CONFIRMED->value }})"
-                                            >
-                                                Confirm
-                                            </x-dashboard.gate.menu-item>
-                                            <x-dashboard.gate.menu-item
-                                                :gate="$pageGate"
-                                                :level="$gateModify"
-                                                icon="x-mark"
-                                                variant="danger"
-                                                wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::REJECTED->value }})"
-                                            >
-                                                Reject
-                                            </x-dashboard.gate.menu-item>
-                                        </flux:menu>
-                                    </flux:dropdown>
-                                @else
-                                    {{-- A read-only account sees the state, not an empty menu. --}}
-                                    <flux:text size="sm" class="text-slate-400">Pending</flux:text>
-                                @endif
-                            </flux:table.cell>
-                        </flux:table.row>
-                    @endforeach
-                </flux:table.rows>
-            </flux:table>
-        @endif
+            <x-table.column-manager :columns="$this->tableColumnList" />
+        </div>
+
+        <x-table.bulk-bar
+            :count="$this->selectedCount"
+            :matching="$selectMatching"
+            subject="transactions"
+        />
+
+        <flux:table :paginate="$this->transactions">
+            <x-table.columns
+                :columns="$this->tableColumnList"
+                :sort="$sortColumn"
+                :direction="$sortDirection"
+                selectable
+                actions
+                actions-label=""
+            />
+
+            <x-table.rows :columns="$this->tableColumnList">
+                @forelse ($this->transactions as $item)
+                    <flux:table.row wire:key="txn-{{ $item->id }}">
+                        <x-table.select :id="$item->id" />
+
+                        <x-table.cell column="reference">
+                            <p class="font-mono text-xs">{{ $item->reference }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->description }}</p>
+                        </x-table.cell>
+
+                        {{-- The account is the one thing on this row worth opening,
+                             so the cell itself is the link rather than an eye button
+                             in the actions column. --}}
+                        <x-table.cell column="user" :href="$item->user ? route('admin.user', $item->user) : null">
+                            <p class="font-medium text-slate-950 dark:text-white">{{ $item->user?->name }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item->user?->email }}</p>
+                        </x-table.cell>
+
+                        <x-table.cell column="amount">
+                            <span @class([
+                                'font-medium',
+                                'text-red-600 dark:text-red-400' => $item->transaction_type->isDebit(),
+                                'text-emerald-600 dark:text-emerald-400' => ! $item->transaction_type->isDebit(),
+                            ])>
+                                {{ $item->signedAmount() }}
+                            </span>
+                        </x-table.cell>
+
+                        <x-table.cell column="transaction_group">
+                            <flux:badge size="sm" color="zinc" inset="top bottom">{{ $item->transaction_group->label() }}</flux:badge>
+                        </x-table.cell>
+
+                        <x-table.cell column="via">
+                            <flux:badge size="sm" inset="top bottom">{{ $item->via->label() }}</flux:badge>
+                        </x-table.cell>
+
+                        <x-table.cell column="status">
+                            <x-util.status :status="$item->status" />
+                        </x-table.cell>
+
+                        <x-table.cell column="created_at">{{ $item->createdDatetimeHuman() }}</x-table.cell>
+
+                        <x-table.cell>
+                            @if ($item->isSettled())
+                                <flux:text size="sm" class="text-slate-400">Settled</flux:text>
+                            @elseif (kGate('transactions', GateAccessEnum::MODIFY))
+                                <flux:dropdown position="bottom" align="end">
+                                    <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
+                                    <flux:menu>
+                                        <x-dashboard.gate.menu-item
+                                            :gate="$pageGate"
+                                            :level="$gateModify"
+                                            icon="check"
+                                            wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::CONFIRMED->value }})"
+                                        >
+                                            Confirm
+                                        </x-dashboard.gate.menu-item>
+                                        <x-dashboard.gate.menu-item
+                                            :gate="$pageGate"
+                                            :level="$gateModify"
+                                            icon="x-mark"
+                                            variant="danger"
+                                            wire:click="confirmSettle({{ $item->id }}, {{ StatusTransaction::REJECTED->value }})"
+                                        >
+                                            Reject
+                                        </x-dashboard.gate.menu-item>
+                                    </flux:menu>
+                                </flux:dropdown>
+                            @else
+                                {{-- A read-only account sees the state, not an empty menu. --}}
+                                <flux:text size="sm" class="text-slate-400">Pending</flux:text>
+                            @endif
+                        </x-table.cell>
+                    </flux:table.row>
+                @empty
+                    <x-table.empty
+                        :columns="$this->tableColumnList"
+                        selectable
+                        actions
+                        label="No transactions"
+                        icon="receipt-percent"
+                        text="Nothing in the ledger matches the current filters."
+                    />
+                @endforelse
+
+                <x-table.summary
+                    :columns="$this->tableColumnList"
+                    :summary="$this->tableSummary"
+                    selectable
+                    actions
+                />
+            </x-table.rows>
+        </flux:table>
     </flux:card>
 
     {{-- Settle --}}

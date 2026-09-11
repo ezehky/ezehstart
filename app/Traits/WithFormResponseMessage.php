@@ -99,7 +99,12 @@ trait WithFormResponseMessage
 
     protected function validationAttributes(): array
     {
-        $rules = collect($this->getRules())->keys()->toArray();
+        // WithAuthWorker carries this trait into a plain controller as well, and a
+        // controller has no rule set to name its fields from. Nothing calls this
+        // there — Livewire does — so an empty list is the honest answer.
+        $rules = method_exists($this, 'getRules')
+            ? collect($this->getRules())->keys()->toArray()
+            : [];
 
         $attributes = [];
         foreach ($rules as $value) {

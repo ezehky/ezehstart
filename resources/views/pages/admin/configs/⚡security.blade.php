@@ -78,7 +78,7 @@ new class extends Component
 
         $this->saveConfig();
 
-        $this->redirectRoute('admin.site-config', navigate: true);
+        $this->redirectRoute('admin.config.security', navigate: true);
 
         return $this->respondSuccess();
     }

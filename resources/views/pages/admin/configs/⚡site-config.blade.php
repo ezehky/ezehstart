@@ -92,7 +92,7 @@ new class extends Component
 
         $this->reset('logoUpload', 'logoDarkUpload', 'faviconUpload');
 
-        $this->redirectRoute('admin.site-config', navigate: true);
+        $this->redirectRoute('admin.config.site', navigate: true);
 
         return $this->respondSuccess();
     }

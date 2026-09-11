@@ -200,6 +200,11 @@ enum ActivityActionEnum: string
             self::SOCIAL_ACCOUNT_LINK => 'Connected ',
             self::SOCIAL_ACCOUNT_UNLINK => 'Disconnected ',
 
+            // Files. A spreadsheet in or out is a whole-screen action rather than
+            // one about a single row, so the subject is the count and the filename.
+            self::IMPORT => 'Imported ',
+            self::EXPORT => 'Exported ',
+
             // Money
             self::TRANSACTION_CONFIRM => 'Confirmed ',
             self::TRANSACTION_REJECT => 'Rejected ',

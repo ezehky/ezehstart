@@ -1,0 +1,320 @@
+/**
+ * The calendar behind <x-form.date-field>.
+ *
+ * Flux's free tier has no date picker, so this is the project's own. It writes
+ * plain YYYY-MM-DD strings into a hidden input and lets Livewire pick them up the
+ * way it would any other field, which is what keeps a date filter working with the
+ * same ->when($this->from !== '', ...) clause every other filter uses.
+ *
+ * Every date here is built and read in local parts, never through Date.parse or
+ * toISOString. "2026-03-01" parsed as a date is UTC midnight, which in any negative
+ * offset is the 28th of February, and a calendar that quietly shifts a day is worse
+ * than no calendar at all.
+ */
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+/** A local Date from YYYY-MM-DD, or null for anything that is not one. */
+export function parseISO(value) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+    }
+
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+
+    // Rejects the 31st of February rather than rolling it into March.
+    return date.getMonth() === month - 1 ? date : null;
+}
+
+/** YYYY-MM-DD from a Date's local parts. */
+export function toISO(date) {
+    if (!date) {
+        return "";
+    }
+
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+}
+
+/**
+ * The cells of one month, padded to whole weeks.
+ *
+ * Leading and trailing blanks are nulls rather than the neighbouring month's days:
+ * a grid that renders them invites clicking one, and a date picker that jumps you
+ * to a different month on a mis-click is a bug people report as "it picked the
+ * wrong date".
+ */
+export function monthGrid(year, month, weekStart = 0) {
+    const first = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const lead = (first.getDay() - weekStart + 7) % 7;
+
+    const cells = Array(lead).fill(null);
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        cells.push(new Date(year, month, day));
+    }
+
+    while (cells.length % 7 !== 0) {
+        cells.push(null);
+    }
+
+    return cells;
+}
+
+export default function datePicker({
+    mode = "single",
+    start = "",
+    end = "",
+    min = "",
+    max = "",
+    weekStart = 0,
+    months = 1,
+    format = "medium",
+}) {
+    return {
+        open: false,
+
+        /** The committed values, as YYYY-MM-DD. The hidden inputs mirror these. */
+        start,
+
+        end,
+
+        /** The day under the cursor, so a half-picked range previews as you move. */
+        hovering: null,
+
+        /** The left-hand month on show. */
+        viewYear: new Date().getFullYear(),
+
+        viewMonth: new Date().getMonth(),
+
+        weekdays: [],
+
+        init() {
+            this.weekdays = [
+                ...WEEKDAYS.slice(weekStart),
+                ...WEEKDAYS.slice(0, weekStart),
+            ];
+
+            // Livewire renders the bound value onto the hidden input, so adopt
+            // whatever is already there rather than opening on today's month when
+            // a date has been chosen. A filtered URL is loaded exactly this way.
+            this.start = this.start || this.$refs.startInput?.value || "";
+            this.end = this.end || this.$refs.endInput?.value || "";
+
+            this.syncViewToSelection();
+
+            // Livewire can change the bound property from the server -- a reset
+            // button on a filter bar does exactly that -- and the calendar has to
+            // follow it rather than keep showing what was picked here.
+            this.$watch("start", () => this.syncViewToSelection());
+        },
+
+        // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        // WHAT IS ON SHOW
+
+        get panels() {
+            return Array.from({ length: months }, (_, offset) => {
+                const date = new Date(this.viewYear, this.viewMonth + offset, 1);
+
+                return {
+                    year: date.getFullYear(),
+                    month: date.getMonth(),
+                    label: MONTHS[date.getMonth()] + " " + date.getFullYear(),
+                    cells: monthGrid(date.getFullYear(), date.getMonth(), weekStart),
+                };
+            });
+        },
+
+        get label() {
+            if (mode === "range") {
+                if (!this.start && !this.end) {
+                    return "";
+                }
+
+                return [this.start, this.end]
+                    .map((value) => (value ? this.formatted(value) : "..."))
+                    .join(" - ");
+            }
+
+            return this.start ? this.formatted(this.start) : "";
+        },
+
+        get hasValue() {
+            return Boolean(this.start || this.end);
+        },
+
+        formatted(value) {
+            const date = parseISO(value);
+
+            if (!date) {
+                return "";
+            }
+
+            if (format === "iso") {
+                return value;
+            }
+
+            return date.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: format === "long" ? "long" : "short",
+                day: "numeric",
+            });
+        },
+
+        // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        // MOVING AROUND
+
+        syncViewToSelection() {
+            const anchor = parseISO(this.start) ?? parseISO(this.end) ?? new Date();
+
+            this.viewYear = anchor.getFullYear();
+            this.viewMonth = anchor.getMonth();
+        },
+
+        shiftMonth(by) {
+            const shifted = new Date(this.viewYear, this.viewMonth + by, 1);
+
+            this.viewYear = shifted.getFullYear();
+            this.viewMonth = shifted.getMonth();
+        },
+
+        // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        // THE STATE OF ONE DAY
+
+        disabled(date) {
+            if (!date) {
+                return true;
+            }
+
+            const iso = toISO(date);
+
+            return Boolean((min && iso < min) || (max && iso > max));
+        },
+
+        isSelected(date) {
+            if (!date) {
+                return false;
+            }
+
+            const iso = toISO(date);
+
+            return iso === this.start || iso === this.end;
+        },
+
+        isToday(date) {
+            return date ? toISO(date) === toISO(new Date()) : false;
+        },
+
+        /**
+         * Between the two ends of the range -- including, while only one end is
+         * picked, the stretch out to whatever the cursor is over, so the shape of
+         * the selection is visible before it is committed.
+         */
+        inRange(date) {
+            if (mode !== "range" || !date || !this.start) {
+                return false;
+            }
+
+            const iso = toISO(date);
+            const far = this.end || this.hovering;
+
+            if (!far) {
+                return false;
+            }
+
+            const [from, to] =
+                this.start <= far ? [this.start, far] : [far, this.start];
+
+            return iso > from && iso < to;
+        },
+
+        // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        // PICKING
+
+        select(date) {
+            if (this.disabled(date)) {
+                return;
+            }
+
+            const iso = toISO(date);
+
+            if (mode !== "range") {
+                this.start = iso;
+                this.commit();
+                this.open = false;
+
+                return;
+            }
+
+            // A range picks its two ends in order. A click while both are already
+            // set starts a new range rather than stretching the old one, which is
+            // what people expect from every other calendar they have used.
+            if (!this.start || this.end) {
+                this.start = iso;
+                this.end = "";
+            } else if (iso < this.start) {
+                this.end = this.start;
+                this.start = iso;
+            } else {
+                this.end = iso;
+            }
+
+            this.commit();
+
+            if (this.start && this.end) {
+                this.open = false;
+            }
+        },
+
+        clear() {
+            this.start = "";
+            this.end = "";
+            this.hovering = null;
+
+            this.commit();
+            this.open = false;
+        },
+
+        /**
+         * Hand the values to Livewire.
+         *
+         * Written onto the hidden inputs and announced with a real input event,
+         * because that is the one thing wire:model listens for -- setting .value
+         * from script alone fires nothing and the server never hears about it.
+         */
+        commit() {
+            [
+                [this.$refs.startInput, this.start],
+                [this.$refs.endInput, this.end],
+            ].forEach(([input, value]) => {
+                if (!input || input.value === value) {
+                    return;
+                }
+
+                input.value = value;
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+                input.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+        },
+    };
+}

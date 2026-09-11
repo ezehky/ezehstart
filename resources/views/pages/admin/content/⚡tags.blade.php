@@ -6,9 +6,12 @@ use App\Enums\StatusDefault;
 use App\Models\Tag;
 use App\Services\ActivityLogService;
 use App\Services\TagService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithDataTable;
+use App\Traits\WithFileImport;
+use App\Traits\WithStatusToggle;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -17,7 +20,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithPagination;
+    use WithDataTable, WithFileImport, WithPagination, WithStatusToggle;
 
     public ?Tag $tag = null;
 
@@ -38,20 +41,70 @@ new class extends Component
     public function mount(): void
     {
         kSetSiteTitle('content', 'tags');
-        kPageGate('content.tags');
+        $this->setPageGate('content.tags');
+    }
+
+    /**
+     * The listing as a table, for WithDataTable.
+     */
+    protected function tableColumns(): array
+    {
+        return [
+            'name' => ['label' => 'Name', 'locked' => true, 'sortable' => true],
+            'status' => ['label' => 'Status', 'sortable' => true],
+            'created_at' => ['label' => 'Added', 'sortable' => true],
+        ];
+    }
+
+    protected function tableQuery(): Builder
+    {
+        $query = Tag::query()
+            ->when($this->search, fn (Builder $query) => $query->searchMacro('name', $this->search));
+
+        return $this->applyDateRange($query);
+    }
+
+    protected function tableSubject(): string
+    {
+        return 'tags';
+    }
+
+    /**
+     * Tags are the one listing where clearing a handful at once is the normal job —
+     * they arrive by being typed, and tidying up is most of what this screen is for.
+     */
+    protected function tableDeletable(): bool
+    {
+        return true;
+    }
+
+    protected function tableDeleteAction(): ActivityActionEnum
+    {
+        return ActivityActionEnum::TAG_DELETE;
+    }
+
+    protected function tableExportValue(Model $item, string $column): mixed
+    {
+        return match ($column) {
+            'created_at' => $item->createdAtHuman(),
+            default => $this->defaultExportValue($item, $column),
+        };
+    }
+
+    protected function afterBulkAction(): void
+    {
+        unset($this->tags);
     }
 
     #[Computed]
     public function tags()
     {
-        return Tag::query()
-            ->when($this->search, fn (Builder $query) => $query->searchMacro('name', $this->search))
-            ->alphabetical()
-            ->paginate(20);
+        return $this->applySort($this->tableQuery(), 'name', 'asc')->paginate($this->tablePerPage());
     }
 
     public function updatedSearch(): void
     {
+        $this->clearSelection();
         $this->resetPage();
     }
 
@@ -224,6 +277,78 @@ new class extends Component
         return $this->respondSuccess('The tag has been deleted.');
     }
 
+    /**
+     * Open the import box. The state is cleared on the way in so a second run does
+     * not open onto the last one's skipped lines.
+     */
+    public function startImport(): void
+    {
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to import tags.');
+
+        $this->reset('importFile', 'importSkipped', 'importedCount');
+        $this->resetValidation();
+
+        Flux::modal('tagImportModal')->show();
+    }
+
+    /**
+     * The column an imported file has to carry, for WithFileImport.
+     */
+    protected function importColumns(): array
+    {
+        return ['name'];
+    }
+
+    protected function importSubject(): string
+    {
+        return 'tags';
+    }
+
+    /**
+     * One row of an imported file. A name already on the list is not a failure — an
+     * import is worth having because it can be run twice — so it counts as a row that
+     * did nothing rather than one that broke.
+     */
+    protected function importRow(array $row, int $line): bool
+    {
+        $name = trim((string) $row['name']);
+
+        if ($name === '') {
+            throw new \RuntimeException('The name is blank.');
+        }
+
+        return (bool) app(TagService::class)->resolveTags([$name])->first()?->wasRecentlyCreated;
+    }
+
+    protected function afterImport(): void
+    {
+        unset($this->tags);
+
+        // Left open where rows were refused: the skipped list is the only place those
+        // lines are named, and closing the box would take it away unread.
+        if ($this->importSkipped === []) {
+            Flux::modal('tagImportModal')->close();
+        }
+    }
+
+    /**
+     * The record behind a row switch, for WithStatusToggle.
+     */
+    protected function statusRecord(int|string $key): ?Model
+    {
+        return Tag::find($key);
+    }
+
+    protected function statusAction(): ActivityActionEnum
+    {
+        return ActivityActionEnum::TAG_UPDATE;
+    }
+
+    protected function afterStatusToggle(): void
+    {
+        unset($this->tags);
+    }
+
     private function resetForm(): void
     {
         $this->reset('tag', 'name', 'status');
@@ -250,39 +375,72 @@ new class extends Component
                     placeholder="Search tags"
                     icon="magnifying-glass"
                 />
+                <x-dashboard.gate.button gate="content.tags" level="create" variant="filled" icon="arrow-up-tray" wire:click="startImport">Import</x-dashboard.gate.button>
                 <x-dashboard.gate.button gate="content.tags" level="create" variant="filled" icon="queue-list" wire:click="createMany">Add many</x-dashboard.gate.button>
                 <x-dashboard.gate.button gate="content.tags" level="create" variant="primary" icon="plus" wire:click="create">New tag</x-dashboard.gate.button>
             </div>
         </div>
 
-        @if ($this->tags->isEmpty())
-            <x-dashboard.workspace-no-record
-                icon="hashtag"
-                label="No tags yet"
-                text="They appear here as soon as an author uses one."
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <x-form.date-field
+                mode="range"
+                wire:model.live="dateFrom"
+                end-model="dateTo"
+                label="Added between"
+                class="sm:max-w-md"
             />
-        @else
-            <flux:table :paginate="$this->tags">
-                <flux:table.columns>
-                    <flux:table.column>Name</flux:table.column>
-                    <flux:table.column>Status</flux:table.column>
-                    <flux:table.column />
-                </flux:table.columns>
 
-                <flux:table.rows>
-                    @foreach ($this->tags as $item)
-                        <flux:table.row wire:key="tag-{{ $item->id }}">
-                            <flux:table.cell>{{ $item->name }}</flux:table.cell>
-                            <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
-                            <flux:table.cell class="flex justify-end gap-1">
-                                <x-dashboard.gate.button gate="content.tags" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
-                                <x-dashboard.gate.button gate="content.tags" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
-                            </flux:table.cell>
-                        </flux:table.row>
-                    @endforeach
-                </flux:table.rows>
-            </flux:table>
-        @endif
+            <x-table.column-manager :columns="$this->tableColumnList" />
+        </div>
+
+        <x-table.bulk-bar
+            :count="$this->selectedCount"
+            :matching="$selectMatching"
+            subject="tags"
+            gate="content.tags"
+            deletable
+        />
+
+        <flux:table :paginate="$this->tags">
+            <x-table.columns
+                :columns="$this->tableColumnList"
+                :sort="$sortColumn"
+                :direction="$sortDirection"
+                selectable
+                actions
+                actions-label=""
+            />
+
+            <x-table.rows :columns="$this->tableColumnList">
+                @forelse ($this->tags as $item)
+                    <flux:table.row wire:key="tag-{{ $item->id }}">
+                        <x-table.select :id="$item->id" />
+
+                        <x-table.cell column="name" class="font-medium">{{ $item->name }}</x-table.cell>
+
+                        <x-table.cell column="status">
+                            <x-util.status-toggle :status="$item->status" :id="$item->id" gate="content.tags" />
+                        </x-table.cell>
+
+                        <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
+
+                        <x-table.cell class="flex justify-end gap-1">
+                            <x-dashboard.gate.button gate="content.tags" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="edit({{ $item->id }})" />
+                            <x-dashboard.gate.button gate="content.tags" level="full" size="sm" variant="danger" icon="trash" wire:click="confirmDelete({{ $item->id }})" />
+                        </x-table.cell>
+                    </flux:table.row>
+                @empty
+                    <x-table.empty
+                        :columns="$this->tableColumnList"
+                        selectable
+                        actions
+                        label="No tags yet"
+                        icon="hashtag"
+                        text="They appear here as soon as an author uses one, or as soon as a file is imported."
+                    />
+                @endforelse
+            </x-table.rows>
+        </flux:table>
     </flux:card>
 
     <flux:modal name="tagModal" class="modal-sm">
@@ -318,6 +476,52 @@ new class extends Component
                     <flux:button variant="ghost" type="button">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Add them</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal name="tagImportModal" class="modal-sm">
+        <form wire:submit="import" class="space-y-4">
+            <flux:heading size="lg">Import tags</flux:heading>
+
+            <flux:text>
+                One column headed <strong>name</strong>. A tag already on the list is left
+                where it is, so the same file can be sent up twice without making duplicates.
+            </flux:text>
+
+            <x-form.file-field
+                wire:model="importFile"
+                label="Spreadsheet"
+                formats="CSV or XLSX"
+                maxSize="2 MB"
+                accept=".csv,.txt,.xlsx"
+            />
+
+            {{-- Named lines rather than a count: an import that quietly dropped four
+                 rows is worse than one that says which four. --}}
+            @if ($importSkipped)
+                <flux:callout icon="exclamation-triangle" variant="warning">
+                    <flux:callout.text>
+                        <span class="font-medium">{{ count($importSkipped) }} row{{ count($importSkipped) === 1 ? '' : 's' }} could not be used.</span>
+
+                        <ul class="mt-2 list-inside list-disc space-y-1">
+                            @foreach (array_slice($importSkipped, 0, 10) as $line)
+                                <li>{{ $line }}</li>
+                            @endforeach
+                        </ul>
+
+                        @if (count($importSkipped) > 10)
+                            <p class="mt-2">…and {{ count($importSkipped) - 10 }} more.</p>
+                        @endif
+                    </flux:callout.text>
+                </flux:callout>
+            @endif
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary" wire:loading.attr="disabled" wire:target="import, importFile">Import</flux:button>
             </div>
         </form>
     </flux:modal>
