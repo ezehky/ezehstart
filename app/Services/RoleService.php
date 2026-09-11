@@ -41,9 +41,9 @@ class RoleService
      * @var array<string, string>
      */
     public const STARTER_ROLES = [
-        'Executive' => 'Sees the whole workspace but is not expected to configure it.',
-        'Media' => 'Runs the blog, the image library and the video library.',
-        'Support' => 'Answers to member accounts and reads the transaction ledger.',
+        // 'Executive' => 'Sees the whole workspace but is not expected to configure it.',
+        // 'Media' => 'Runs the blog, the image library and the video library.',
+        // 'Support' => 'Answers to member accounts and reads the transaction ledger.',
     ];
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
