@@ -275,7 +275,7 @@ protected function afterRoleChange(): void
 ### Embedded Livewire components
 
 Non-page SFCs live in `resources/views/components/lv/⚡name.blade.php` and are used as
-`<livewire:lv.notifications />`. Only two exist (`⚡notifications`, `⚡newsletter-form`)
+`<livewire:livewire.notifications />`. Only two exist (`⚡notifications`, `⚡newsletter-form`)
 — reserve this for genuinely reusable stateful widgets.
 
 ## Why

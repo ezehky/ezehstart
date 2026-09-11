@@ -24,7 +24,7 @@ use Livewire\Component;
  * It never decides what the video is *for* — that is the caller's business.
  *
  * Browsing, folders, adding, editing, moving and deleting all come from
- * WithVideoLibrary and the lv._video-library partial, so this dialog and the
+ * WithVideoLibrary and the library._video-library partial, so this dialog and the
  * full-page library are the same screen in two frames.
  */
 new class extends Component
@@ -150,7 +150,7 @@ new class extends Component
                 </flux:text>
             </div>
 
-            @include('components.lv._video-library')
+            @include('components.library._video-library')
 
             @if ($multiple && $tab === 'library')
                 <div class="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">

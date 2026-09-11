@@ -247,9 +247,9 @@ new class extends Component
         </div>
     </form>
 
-    <livewire:lv.image-picker />
+    <livewire:livewire.library.image-picker />
 
     {{-- The editor's video button opens this. It names no slot, so it answers with
          a browser event carrying a player URL rather than with ids. --}}
-    <livewire:lv.video-picker />
+    <livewire:livewire.library.video-picker />
 </div>

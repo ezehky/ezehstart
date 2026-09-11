@@ -120,7 +120,7 @@ menu links to.
 ### The bell
 
 `resources/views/components/lv/⚡notifications.blade.php`, embedded as
-`<livewire:lv.notifications />` in `x-dashboard.top-navigation`. Its badge is
+`<livewire:livewire.notifications />` in `x-dashboard.top-navigation`. Its badge is
 `unreadCount + pendingCount`.
 
 ## 4. Pending actions — the important distinction

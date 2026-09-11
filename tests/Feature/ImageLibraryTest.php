@@ -397,7 +397,7 @@ test('the picker picks one image and hands it straight back', function () {
     $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open')
         ->call('toggle', $image->id)
         // The single-pick contract the blog editor already depends on.
@@ -412,7 +412,7 @@ test('the picker holds several images until the choice is confirmed', function (
     $two = $service->store($this->member, uploadedImage('two.jpg'));
 
     $picker = Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open', true)
         ->call('toggle', $one->id)
         ->call('toggle', $two->id)
@@ -433,7 +433,7 @@ test('a multiple selection stops at the ceiling the caller set', function () {
     $two = $service->store($this->member, uploadedImage('two.jpg'));
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open', true, 1)
         ->call('toggle', $one->id)
         ->call('toggle', $two->id)
@@ -455,7 +455,7 @@ test('the picker refuses to delete an image that is still in use', function () {
     $service->attach($image, $post, 'cover');
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open')
         ->set('selected', [$image->id])
         ->call('deleteSelected');
@@ -468,7 +468,7 @@ test('the picker will not let a member delete somebody else image', function () 
     $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage(), visibility: MediaVisibilityEnum::PUBLIC);
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open')
         // Visible to them, but not theirs to manage, so it never reaches the batch.
         ->set('selected', [$image->id])
@@ -483,7 +483,7 @@ test('the picker will not let a member delete somebody else image', function () 
 
 test('the uploader stages files before it stores any of them', function () {
     $uploader = Livewire::actingAs($this->member)
-        ->test('lv.image-uploader')
+        ->test('livewire.library.image-uploader')
         ->set('imagesUpload', [uploadedImage('one.jpg'), uploadedImage('two.jpg')]);
 
     // Staged, not stored: somebody who dragged in a wrong file can still drop it.
@@ -504,7 +504,7 @@ test('an upload takes the visibility of the folder it lands in', function () {
     );
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-uploader', ['folder' => $folder->id])
+        ->test('livewire.library.image-uploader', ['folder' => $folder->id])
         ->set('imagesUpload', [uploadedImage()])
         ->call('uploadImages')
         ->assertHasNoErrors();
@@ -552,7 +552,7 @@ test('what the uploader stores comes back selected in the picker', function () {
     $image = app(ImageLibraryService::class)->store($this->member, uploadedImage('fresh.jpg'));
 
     $picker = Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open', true)
         // The uploader announces what it stored; the picker is listening.
         ->dispatch('imagesUploaded', ids: [$image->id]);
@@ -601,7 +601,7 @@ test('a member cannot edit somebody else image on either screen', function () {
     );
 
     // Visible to them, but not theirs to change, so the panel refuses to open.
-    foreach (['pages::shared.image-library', 'lv.image-picker'] as $screen) {
+    foreach (['pages::shared.image-library', 'livewire.library.image-picker'] as $screen) {
         Livewire::actingAs($this->member)
             ->test($screen)
             ->set('selected', [$image->id])
@@ -623,7 +623,7 @@ test('the page and the picker offer the same library actions', function () {
     $state = ['search', 'folder', 'sort', 'selected', 'multiple', 'max', 'tab', 'panel'];
 
     $page = Livewire::actingAs($this->member)->test('pages::shared.image-library')->instance();
-    $picker = Livewire::actingAs($this->member)->test('lv.image-picker')->instance();
+    $picker = Livewire::actingAs($this->member)->test('livewire.library.image-picker')->instance();
 
     foreach ($actions as $action) {
         expect(method_exists($page, $action))->toBeTrue("the page is missing {$action}()")
@@ -833,7 +833,7 @@ test('the picker carries the slot that asked and leaves the editor alone', funct
     $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         ->call('open', false, null, 'cover')
         ->call('toggle', $image->id)
         ->assertDispatched('imagesSelected', ids: [$image->id], slot: 'cover')
@@ -848,7 +848,7 @@ test('reopening a multiple slot shows what it already holds', function () {
     $two = $service->store($this->member, uploadedImage('two.jpg'));
 
     Livewire::actingAs($this->member)
-        ->test('lv.image-picker')
+        ->test('livewire.library.image-picker')
         // Without this, confirming would replace the pair rather than add to it.
         ->call('open', true, 3, 'gallery', [$one->id, $two->id])
         ->assertSet('selected', [$one->id, $two->id]);

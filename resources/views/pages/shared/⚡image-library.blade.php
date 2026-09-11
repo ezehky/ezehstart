@@ -8,7 +8,7 @@ use Livewire\Component;
 /**
  * The image library as a full page.
  *
- * Everything it does lives in WithImageLibrary and the lv._library partial, which
+ * Everything it does lives in WithImageLibrary and the library._library partial, which
  * the picker uses too — the two screens were allowed to drift apart once and are
  * deliberately not able to again. All this file adds is the page heading.
  */
@@ -40,6 +40,6 @@ new class extends Component
     </div>
 
     <flux:card>
-        @include('components.lv._library')
+        @include('components.library._library')
     </flux:card>
 </div>

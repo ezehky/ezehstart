@@ -143,7 +143,7 @@ visibility rules, same usage-backed delete guard — a screen that already knows
   all three.
 - **`x-form.rich-text`** — a tiptap editor bound to a Livewire property, writing back
   on blur rather than on every keystroke, because a response landing mid-word moves
-  the cursor. It inserts images through `<livewire:lv.image-picker>` and never talks
+  the cursor. It inserts images through `<livewire:livewire.library.image-picker>` and never talks
   to an upload endpoint itself.
 - **`BlogService::sanitize()`** runs over editor HTML on the way in. HTML from a form
   is untrusted however trusted the author is — an author account is exactly what an

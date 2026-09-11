@@ -45,7 +45,7 @@ use Livewire\Attributes\On;
  * and in the markup:
  *
  *     <x-form.video-slot name="trailer" label="Trailer" :videos="$this->slotVideos('trailer')" />
- *     <livewire:lv.video-picker />
+ *     <livewire:livewire.library.video-picker />
  *
  * Requires WithFormResponseMessage on the using component.
  */

@@ -41,7 +41,7 @@ use Livewire\Attributes\On;
  * and in the markup:
  *
  *     <x-form.image-slot name="cover" label="Cover image" :images="$this->slotImages('cover')" />
- *     <livewire:lv.image-picker />
+ *     <livewire:livewire.library.image-picker />
  *
  * Requires WithFormResponseMessage on the using component.
  */

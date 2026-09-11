@@ -21,7 +21,7 @@ use Livewire\WithPagination;
  * Two screens want all of it — the full-page library and the picker that opens
  * over whatever somebody is writing — and they must not drift apart again. The
  * behaviour lives here; each screen supplies only its own chrome, and the shared
- * markup lives in the `lv._library` partial they both include.
+ * markup lives in the `library._library` partial they both include.
  *
  * Requires WithFormResponseMessage on the using component.
  */

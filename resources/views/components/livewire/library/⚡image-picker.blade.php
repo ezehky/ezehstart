@@ -25,7 +25,7 @@ use Livewire\Component;
  * It never decides what the image is *for* — that is the caller's business.
  *
  * Browsing, folders, editing, moving and deleting all come from WithImageLibrary
- * and the lv._library partial, so this dialog and the full-page library are the
+ * and the library._library partial, so this dialog and the full-page library are the
  * same screen in two frames. What is added here is the frame and the answer.
  */
 new class extends Component
@@ -156,7 +156,7 @@ new class extends Component
                 </flux:text>
             </div>
 
-            @include('components.lv._library')
+            @include('components.library._library')
 
             @if ($multiple && $tab === 'library')
                 <div class="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">

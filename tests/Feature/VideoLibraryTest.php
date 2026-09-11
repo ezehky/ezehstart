@@ -403,7 +403,7 @@ test('the picker hands the editor a player url and no slot', function () {
     $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
 
     Livewire::actingAs($this->member)
-        ->test('lv.video-picker')
+        ->test('livewire.library.video-picker')
         ->call('open', false, null, null, null)
         ->call('toggle', $video->id)
         ->assertDispatched('video-picked', url: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
@@ -413,7 +413,7 @@ test('a pick made for a named slot does not also reach the editor', function () 
     $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
 
     Livewire::actingAs($this->member)
-        ->test('lv.video-picker')
+        ->test('livewire.library.video-picker')
         ->call('open', false, null, 'trailer', null)
         ->call('toggle', $video->id)
         // A trailer chosen for a form must not also drop itself into the body

@@ -6,7 +6,7 @@
      drives both screens and they cannot drift apart. Behaviour lives in
      App\Traits\WithVideoLibrary.
 
-     The image sibling is lv._library, and the two are deliberately alike. The one
+     The image sibling is library._library, and the two are deliberately alike. The one
      real difference is the second tab: a video is added by pasting a link, so this
      is a small form rather than a file queue. --}}
 

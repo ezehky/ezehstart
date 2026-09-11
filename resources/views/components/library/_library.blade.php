@@ -28,7 +28,7 @@
     </div>
 
     @if ($tab === 'upload')
-        <livewire:lv.image-uploader
+        <livewire:livewire.library.image-uploader
             :folder="$folder"
             heading="Upload images"
             :subheading="$this->currentFolder

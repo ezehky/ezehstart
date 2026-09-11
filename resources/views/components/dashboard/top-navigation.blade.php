@@ -24,7 +24,7 @@
             <input type="search" class="w-36 border-0 bg-transparent p-0 text-sm text-slate-950 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white" placeholder="Search" aria-label="Search" />
             <kbd class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800">/</kbd>
         </label> --}}
-        <livewire:lv.notifications />
+        <livewire:livewire.notifications />
         <flux:dropdown x-data align="end">
             <flux:button variant="subtle" square class="group" aria-label="Preferred color scheme">
                 <flux:icon.sun x-show="$flux.appearance === 'light'" variant="mini" class="text-zinc-500 dark:text-white" />

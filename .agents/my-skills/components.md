@@ -172,7 +172,7 @@ Shorthand `:$variable` when the prop name equals the variable name:
 `resources/views/components/lv/⚡notifications.blade.php` is a full Livewire SFC used as:
 
 ```blade
-<livewire:lv.notifications />
+<livewire:livewire.notifications />
 ```
 
 Reserve this for stateful widgets appearing on many pages (the notification bell, the
