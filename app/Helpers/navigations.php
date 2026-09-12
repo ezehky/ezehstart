@@ -39,6 +39,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Social handles',
                         'link' => route('admin.config.social-handles'),
                     ],
+                    'json' => [
+                        'label' => 'JSON Editor',
+                        'link' => route('admin.config.json'),
+                    ],
                     'policies' => [
                         'label' => 'Policies',
                         'link' => route('admin.config.policies'),
