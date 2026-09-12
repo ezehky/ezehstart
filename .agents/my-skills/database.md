@@ -214,15 +214,26 @@ return ClassSessionReminder::insertOrIgnore([
 
 ### Cross-driver SQL
 
-SQLite in tests, MySQL/PostgreSQL in production. Branch explicitly:
+SQLite in tests, MySQL/PostgreSQL in production. Branch explicitly, and branch it
+**once** — on the enum case or the service that owns the expression, never in the
+screen that needs it:
 
 ```php
-$this->monthExpression = match (DB::connection()->getDriverName()) {
-    'sqlite' => "strftime('%Y-%m', created_at)",
-    'pgsql' => "to_char(created_at, 'YYYY-MM')",
-    default => "date_format(created_at, '%Y-%m')",
-};
+// app/Enums/TrendPeriodEnum.php — how the project already does it
+public function expression(string $column = 'created_at', ?string $driver = null): string
+{
+    $driver ??= DB::connection()->getDriverName();
+
+    return match ($driver) {
+        'sqlite' => "strftime('{$this->sqliteFormat()}', {$column})",
+        'pgsql' => "to_char({$column}, '{$this->postgresFormat()}')",
+        default => "date_format({$column}, '{$this->sqliteFormat()}')",
+    };
+}
 ```
+
+Grouping a date column is already done: call `TrendService` rather than writing the
+`match` again. See [dashboard.md](dashboard.md).
 
 Bind parameters in `orderByRaw`:
 

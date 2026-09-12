@@ -164,12 +164,7 @@ Callers pass them with `<x-slot:title>`.
 ### Passing props
 
 ```blade
-<x-dashboard.stat-card
-    :label="$metric['label']"
-    :value="$metric['value']"
-    :icon="$metric['icon']"
-    :tone="$metric['tone']"
-/>
+<x-dashboard.stat-card :metric="$metric" />
 
 <x-util.e-badge :enum="$item->status" />
 <x-dashboard.avatar :user="$item" size="md" />

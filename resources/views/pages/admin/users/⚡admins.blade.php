@@ -71,13 +71,13 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'name' => ['label' => 'Admin', 'locked' => true, 'sortable' => true],
-            'email' => ['label' => 'Email'],
-            'phone_number' => ['label' => 'Phone'],
-            'roles' => ['label' => 'Role'],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'last_seen_at' => ['label' => 'Last seen', 'sortable' => true],
-            'created_at' => ['label' => 'Added', 'sortable' => true],
+            'name' => $this->columnMaker('Admin', locked: true, sortable: true),
+            'email' => $this->columnMaker('Email'),
+            'phone_number' => $this->columnMaker('Phone'),
+            'roles' => $this->columnMaker('Role'),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'last_seen_at' => $this->columnMaker('Last seen', sortable: true),
+            'created_at' => $this->columnMaker('Added', sortable: true),
         ];
     }
 
@@ -108,12 +108,12 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'search' => ['label' => 'Search'],
-            'roleState' => [
-                'label' => 'Role',
-                'options' => ['none' => 'No live role'] + $this->assignableRoles->pluck('name', 'id')->all(),
-            ],
-            'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+            'search' => $this->filterMaker('Search'),
+            'roleState' => $this->filterMaker(
+                'Role',
+                ['none' => 'No live role'] + $this->assignableRoles->pluck('name', 'id')->all(),
+            ),
+            'accountStatus' => $this->filterMaker('Status', StatusUser::forSelect()),
         ];
     }
 

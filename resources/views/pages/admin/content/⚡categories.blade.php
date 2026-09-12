@@ -75,13 +75,13 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'image' => ['label' => 'Image', 'exportable' => false],
-            'name' => ['label' => 'Name', 'locked' => true, 'sortable' => true],
-            'parent' => ['label' => 'Parent'],
-            'attached_count' => ['label' => 'Attached', 'exportable' => false],
-            'flow_order' => ['label' => 'Order', 'sortable' => true],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'created_at' => ['label' => 'Added', 'sortable' => true],
+            'image' => $this->columnMaker('Image', exportable: false),
+            'name' => $this->columnMaker('Name', locked: true, sortable: true),
+            'parent' => $this->columnMaker('Parent'),
+            'attached_count' => $this->columnMaker('Attached', exportable: false),
+            'flow_order' => $this->columnMaker('Order', sortable: true),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'created_at' => $this->columnMaker('Added', sortable: true),
         ];
     }
 
@@ -107,7 +107,7 @@ new class extends Component
      */
     protected function tableFilters(): array
     {
-        return ['search' => ['label' => 'Search']];
+        return ['search' => $this->filterMaker('Search')];
     }
 
     protected function tableDateLabel(): string
@@ -270,10 +270,7 @@ new class extends Component
 
     public function create(): void
     {
-        $this->respondError(
-            'You do not have access to add categories.',
-            if: ! kGate('content.categories', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add categories.');
 
         $this->resetForm();
         $this->flow_order = (int) Category::query()
@@ -285,10 +282,7 @@ new class extends Component
 
     public function createMany(): void
     {
-        $this->respondError(
-            'You do not have access to add categories.',
-            if: ! kGate('content.categories', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add categories.');
 
         $this->reset('bulk_names');
         $this->resetValidation();
@@ -305,10 +299,7 @@ new class extends Component
      */
     public function saveMany(): bool
     {
-        $this->respondError(
-            'You do not have access to add categories.',
-            if: ! kGate('content.categories', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add categories.');
 
         $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
 
@@ -334,10 +325,7 @@ new class extends Component
 
     public function edit(Category $category): void
     {
-        $this->respondError(
-            'You do not have access to edit categories.',
-            if: ! kGate('content.categories', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY, 'You do not have access to edit categories.');
 
         $this->resetForm();
 
@@ -374,10 +362,7 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save categories.',
-            if: ! kGate('content.categories', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY, 'You do not have access to save categories.');
 
         $this->validate();
 
@@ -429,10 +414,7 @@ new class extends Component
 
     public function confirmDelete(Category $category): void
     {
-        $this->respondError(
-            'You do not have delete access to categories.',
-            if: ! kGate('content.categories', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to categories.');
 
         // The category is held in a property so the modal can show its name while the
         $this->category = $category;
@@ -442,10 +424,7 @@ new class extends Component
 
     public function delete(): bool
     {
-        $this->respondError(
-            'You do not have delete access to categories.',
-            if: ! kGate('content.categories', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to categories.');
 
         $this->respondError('Select a category to delete first.', if: ! $this->category);
 

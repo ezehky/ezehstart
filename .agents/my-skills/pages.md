@@ -365,9 +365,9 @@ public function students()
 public function metrics(): array
 {
     return [
-        ['label' => 'Total students', 'value' => number_format($total), 'icon' => 'academic-cap', 'tone' => 'sky'],
-        ['label' => 'Active accounts', 'value' => number_format($active), 'icon' => 'check-badge', 'tone' => 'emerald'],
-        ['label' => 'Enrolled admissions', 'value' => number_format($enrolled), 'icon' => 'ticket', 'tone' => 'slate'],
+        $this->metricMaker('Total students', $total, 'academic-cap', tone: 'sky'),
+        $this->metricMaker('Active accounts', $active, 'check-badge', tone: 'emerald'),
+        $this->metricMaker('Enrolled admissions', $enrolled, 'ticket'),
     ];
 }
 ```
@@ -378,12 +378,7 @@ public function metrics(): array
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Thing metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 
@@ -599,31 +594,23 @@ feeds pulled from services.
 ```php
 public User $user;
 
-public string $monthExpression;
-
 public function mount(): void
 {
     $this->user = auth()->user();
     kSetSiteTitle('dashboard');
-
-    $this->monthExpression = match (DB::connection()->getDriverName()) {
-        'sqlite' => "strftime('%Y-%m', created_at)",
-        'pgsql' => "to_char(created_at, 'YYYY-MM')",
-        default => "date_format(created_at, '%Y-%m')",
-    };
 }
 
 #[Computed]
 public function metrics(): array
 {
     return [
-        'users' => [
-            'label' => 'Total users',
-            'value' => number_format($usersCount),
-            'icon' => 'users',
-            'change' => 'All registered accounts',
-            'tone' => 'sky',
-        ],
+        'users' => $this->metricMaker(
+            'Total users',
+            $usersCount,
+            'users',
+            tone: 'sky',
+            change: 'All registered accounts',
+        ),
         …
     ];
 }

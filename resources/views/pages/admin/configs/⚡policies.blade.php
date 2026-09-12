@@ -66,13 +66,13 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'version' => ['label' => 'Version', 'locked' => true, 'sortable' => true],
-            'title' => ['label' => 'Title'],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'requires_consent' => ['label' => 'Consent'],
-            'consents_count' => ['label' => 'Accepted by', 'exportable' => false],
-            'effective_at' => ['label' => 'In force from', 'sortable' => true],
-            'updated_at' => ['label' => 'Updated', 'sortable' => true],
+            'version' => $this->columnMaker('Version', locked: true, sortable: true),
+            'title' => $this->columnMaker('Title'),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'requires_consent' => $this->columnMaker('Consent'),
+            'consents_count' => $this->columnMaker('Accepted by', exportable: false),
+            'effective_at' => $this->columnMaker('In force from', sortable: true),
+            'updated_at' => $this->columnMaker('Updated', sortable: true),
         ];
     }
 

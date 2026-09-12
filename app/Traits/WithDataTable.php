@@ -32,9 +32,9 @@ use Symfony\Component\HttpFoundation\Response;
  *     protected function tableColumns(): array
  *     {
  *         return [
- *             'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
- *             'amount' => ['label' => 'Amount', 'sortable' => true, 'summary' => 'sum', 'money' => true],
- *             'created_at' => ['label' => 'Date', 'sortable' => true],
+ *             'reference' => $this->columnMaker('Reference', locked: true, sortable: true),
+ *             'amount' => $this->columnMaker('Amount', sortable: true, summary: 'sum', money: true),
+ *             'created_at' => $this->columnMaker('Date', sortable: true),
  *         ];
  *     }
  *
@@ -58,7 +58,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 trait WithDataTable
 {
-    use WithGateProps;
+    use WithGateProps, WithMetrics;
 
     /**
      * The chip that stands for both ends of the date range at once. Spelt with a
@@ -174,6 +174,71 @@ trait WithDataTable
                     : ! \in_array($key, $this->hiddenColumns, true),
             ])
             ->all();
+    }
+
+    /**
+     * One column's settings, named rather than spelled.
+     *
+     *     'amount' => $this->columnMaker('Amount', sortable: true, summary: 'sum', money: true),
+     *
+     * The array form still works and is what this returns — but a key typed wrong in
+     * an array is silently ignored, and a column that quietly stopped summing is not
+     * a thing anybody notices. Named arguments make the same mistake a fatal error,
+     * and the editor lists what is on offer.
+     *
+     * @param  string|null  $label  What the header says. Defaults to the key, headlined
+     * @param  bool  $sortable  Whether the header sorts
+     * @param  bool  $locked  The column that says which row this is — never hidden
+     * @param  'sum'|'avg'|'count'|null  $summary  The total under the table
+     * @param  bool  $money  The value is minor units, so format it as money
+     * @param  bool  $exportable  Whether it goes into an export
+     * @return array<string, mixed>
+     */
+    protected function columnMaker(
+        ?string $label = null,
+        bool $sortable = false,
+        bool $locked = false,
+        ?string $summary = null,
+        bool $money = false,
+        bool $exportable = true,
+    ): array {
+        // Caught here rather than when the footer renders: a declaration is where the
+        // typo is, and a page that boots and then breaks on one row of the footer is
+        // the harder thing to place.
+        if ($summary !== null && ! \in_array($summary, ['sum', 'avg', 'count'], true)) {
+            throw new \InvalidArgumentException("Unknown column summary: {$summary}");
+        }
+
+        return [
+            'label' => $label,
+            'sortable' => $sortable,
+            'locked' => $locked,
+            'summary' => $summary,
+            'money' => $money,
+            'exportable' => $exportable,
+        ];
+    }
+
+    /**
+     * One filter's settings, named rather than spelled.
+     *
+     *     'status' => $this->filterMaker('Status', StatusTransaction::forSelect()),
+     *     'search' => $this->filterMaker('Search'),
+     *
+     * The key is the **property** the filter is bound to, and the chip reads that
+     * property to say what is currently on.
+     *
+     * @param  string|null  $label  What the chip calls it. Defaults to the key, headlined
+     * @param  array<array-key, string>  $options  The same list the select is built from, so the
+     *                                             chip says "Status: Confirmed" rather than "Status: 2"
+     * @return array<string, mixed>
+     */
+    protected function filterMaker(?string $label = null, array $options = []): array
+    {
+        return [
+            'label' => $label,
+            'options' => $options,
+        ];
     }
 
     public function isColumnVisible(string $column): bool
@@ -766,8 +831,8 @@ trait WithDataTable
     // WHAT THE PAGE SUPPLIES
 
     /**
-     * The columns, in the order they are shown. Each carries its label and, where it
-     * is not a plain column, any of: sortable, locked, summary, money, exportable.
+     * The columns, in the order they are shown. Build each with `columnMaker()`,
+     * which names the settings rather than leaving them to be spelled.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -842,14 +907,15 @@ trait WithDataTable
      *     protected function tableFilters(): array
      *     {
      *         return [
-     *             'search' => ['label' => 'Search'],
-     *             'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+     *             'search' => $this->filterMaker('Search'),
+     *             'accountStatus' => $this->filterMaker('Status', StatusUser::forSelect()),
      *         ];
      *     }
      *
-     * `options` is the same list the select is built from — the chip needs it to say
-     * the label back rather than the value that was filed. Nothing is declared here
-     * on a screen with no filters, and the chip bar renders nothing.
+     * Build each with `filterMaker()`. Its `options` is the same list the select is
+     * built from — the chip needs it to say the label back rather than the value that
+     * was filed. Nothing is declared here on a screen with no filters, and the chip
+     * bar renders nothing.
      *
      * @return array<string, array<string, mixed>>
      */

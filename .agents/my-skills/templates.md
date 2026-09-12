@@ -661,9 +661,9 @@ new class extends Component
         $collected = (int) Invoice::query()->where('status', StatusInvoice::PAID)->sum('amount') / 100;
 
         return [
-            ['label' => 'Issued', 'value' => number_format($issued), 'icon' => 'document-text', 'tone' => 'sky'],
-            ['label' => 'Overdue', 'value' => number_format($overdue), 'icon' => 'clock', 'tone' => 'amber'],
-            ['label' => 'Collected', 'value' => kMoneyFormat($collected), 'icon' => 'banknotes', 'tone' => 'emerald'],
+            $this->metricMaker('Issued', $issued, 'document-text', tone: 'sky'),
+            $this->metricMaker('Overdue', $overdue, 'clock', tone: 'amber'),
+            $this->metricMaker('Collected', kMoneyFormat($collected, decodeHtml: true), 'banknotes', tone: 'emerald'),
         ];
     }
 };
@@ -672,12 +672,7 @@ new class extends Component
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Invoice metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 

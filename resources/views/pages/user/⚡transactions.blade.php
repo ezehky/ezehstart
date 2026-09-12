@@ -42,12 +42,12 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
-            'description' => ['label' => 'Description'],
-            'amount' => ['label' => 'Amount', 'sortable' => true, 'summary' => 'sum', 'money' => true],
-            'balance' => ['label' => 'Balance after', 'exportable' => false],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'created_at' => ['label' => 'Date', 'sortable' => true],
+            'reference' => $this->columnMaker('Reference', locked: true, sortable: true),
+            'description' => $this->columnMaker('Description'),
+            'amount' => $this->columnMaker('Amount', sortable: true, summary: 'sum', money: true),
+            'balance' => $this->columnMaker('Balance after', exportable: false),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'created_at' => $this->columnMaker('Date', sortable: true),
         ];
     }
 
@@ -80,8 +80,8 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'group' => ['label' => 'Type', 'options' => TransactionGroupEnum::forSelect()],
-            'status' => ['label' => 'Status', 'options' => StatusTransaction::forSelect()],
+            'group' => $this->filterMaker('Type', TransactionGroupEnum::forSelect()),
+            'status' => $this->filterMaker('Status', StatusTransaction::forSelect()),
         ];
     }
 
@@ -150,24 +150,9 @@ new class extends Component
             ->count();
 
         return [
-            [
-                'label' => 'Balance',
-                'value' => kMoneyFormat($this->balance, decodeHtml: true),
-                'icon' => 'banknotes',
-                'tone' => 'emerald',
-            ],
-            [
-                'label' => 'Transactions',
-                'value' => number_format($this->user->transactions()->count()),
-                'icon' => 'receipt-percent',
-                'tone' => 'sky',
-            ],
-            [
-                'label' => 'Awaiting review',
-                'value' => number_format($pending),
-                'icon' => 'clock',
-                'tone' => $pending > 0 ? 'amber' : 'slate',
-            ],
+            $this->metricMaker('Balance', kMoneyFormat($this->balance, decodeHtml: true), 'banknotes', tone: 'emerald'),
+            $this->metricMaker('Transactions', $this->user->transactions()->count(), 'receipt-percent', tone: 'sky'),
+            $this->metricMaker('Awaiting review', $pending, 'clock', tone: $pending > 0 ? 'amber' : 'slate'),
         ];
     }
 };
@@ -176,12 +161,7 @@ new class extends Component
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Balance summary">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 

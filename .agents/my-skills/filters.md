@@ -101,6 +101,26 @@ public function cohorts(): Collection
 }
 ```
 
+### Declaring them — `filterMaker()`
+
+A listing on `WithDataTable` declares its filters once, and the trait renders the chip
+bar off that one declaration. Build each with **`filterMaker()`**:
+
+```php
+protected function tableFilters(): array
+{
+    return [
+        'search' => $this->filterMaker('Search'),
+        'status' => $this->filterMaker('Status', StatusTransaction::forSelect()),
+        'group' => $this->filterMaker('Type', TransactionGroupEnum::forSelect()),
+    ];
+}
+```
+
+The key is the **property** the filter is bound to. The second argument is the same
+list the select is built from — without it the chip reads "Status: 2" instead of
+"Status: Confirmed". A search box has no options, so it takes only a label.
+
 ### The filter bar
 
 Sits in the card header, to the right of the heading:
@@ -273,6 +293,8 @@ new class extends Component
 ```
 
 ## Avoid
+
+- Writing a filter as an array literal instead of `$this->filterMaker(...)`.
 
 - A filter property without `#[Url]`.
 - Forgetting `resetPage()` — the user lands on an empty page.

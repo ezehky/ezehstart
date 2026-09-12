@@ -39,11 +39,11 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'name' => ['label' => 'Role', 'locked' => true, 'sortable' => true],
-            'description' => ['label' => 'What it can do'],
-            'gates' => ['label' => 'Access', 'exportable' => false],
-            'users_count' => ['label' => 'Admins', 'exportable' => false],
-            'created_at' => ['label' => 'Added', 'sortable' => true],
+            'name' => $this->columnMaker('Role', locked: true, sortable: true),
+            'description' => $this->columnMaker('What it can do'),
+            'gates' => $this->columnMaker('Access', exportable: false),
+            'users_count' => $this->columnMaker('Admins', exportable: false),
+            'created_at' => $this->columnMaker('Added', sortable: true),
         ];
     }
 

@@ -47,11 +47,11 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'title' => ['label' => 'Type', 'locked' => true, 'sortable' => true],
-            'notification_type' => ['label' => 'Key', 'sortable' => true],
-            'notification_preferences_count' => ['label' => 'Subscribed', 'exportable' => false],
-            'flow_order' => ['label' => 'Order', 'sortable' => true],
-            'status' => ['label' => 'Status', 'sortable' => true],
+            'title' => $this->columnMaker('Type', locked: true, sortable: true),
+            'notification_type' => $this->columnMaker('Key', sortable: true),
+            'notification_preferences_count' => $this->columnMaker('Subscribed', exportable: false),
+            'flow_order' => $this->columnMaker('Order', sortable: true),
+            'status' => $this->columnMaker('Status', sortable: true),
         ];
     }
 

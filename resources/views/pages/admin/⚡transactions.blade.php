@@ -6,11 +6,11 @@ use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
+use App\Services\TrendService;
 use App\Traits\WithDataTable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -61,13 +61,13 @@ new class extends Component
         return [
             // The reference is what identifies the row, so it stays whatever else is
             // put away.
-            'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
-            'user' => ['label' => 'Account'],
-            'amount' => ['label' => 'Amount', 'locked' => true, 'sortable' => true, 'summary' => 'sum', 'money' => true],
-            'transaction_group' => ['label' => 'Group', 'sortable' => true],
-            'via' => ['label' => 'Via', 'sortable' => true],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'created_at' => ['label' => 'Date', 'sortable' => true],
+            'reference' => $this->columnMaker('Reference', locked: true, sortable: true),
+            'user' => $this->columnMaker('Account'),
+            'amount' => $this->columnMaker('Amount', locked: true, sortable: true, summary: 'sum', money: true),
+            'transaction_group' => $this->columnMaker('Group', sortable: true),
+            'via' => $this->columnMaker('Via', sortable: true),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'created_at' => $this->columnMaker('Date', sortable: true),
         ];
     }
 
@@ -80,12 +80,10 @@ new class extends Component
     {
         $query = Transaction::query()
             ->with(['user', 'balance', 'gateway'])
-            ->when($this->search, fn (Builder $query) => $query
-                ->where(fn (Builder $inner) => $inner
-                    ->where('reference', 'like', '%'.$this->search.'%')
-                    ->orWhereHas('user', fn (Builder $userQuery) => $userQuery
-                        ->where('name', 'like', '%'.$this->search.'%')
-                        ->orWhere('email', 'like', '%'.$this->search.'%'))))
+            ->when($this->search !== '', fn (Builder $query) => $query
+                ->where(fn (Builder $group) => $group
+                    ->searchMacro(['reference', 'description'], $this->search)
+                    ->orWhereHas('user', fn (Builder $user) => $user->searchMacro(['name', 'email'], $this->search))))
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', (int) $this->status))
             ->when($this->group !== '', fn (Builder $query) => $query->where('transaction_group', $this->group));
 
@@ -105,9 +103,9 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'search' => ['label' => 'Search'],
-            'status' => ['label' => 'Status', 'options' => StatusTransaction::forSelect()],
-            'group' => ['label' => 'Type', 'options' => TransactionGroupEnum::forSelect()],
+            'search' => $this->filterMaker('Search'),
+            'status' => $this->filterMaker('Status', StatusTransaction::forSelect()),
+            'group' => $this->filterMaker('Type', TransactionGroupEnum::forSelect()),
         ];
     }
 
@@ -170,26 +168,26 @@ new class extends Component
             ->sum('amount') / 100;
 
         return [
-            [
-                'label' => 'Awaiting review',
-                'value' => number_format($pending),
-                'icon' => 'clock',
-                'tone' => $pending > 0 ? 'amber' : 'slate',
-            ],
-            [
-                'label' => 'Deposits confirmed',
-                'value' => kMoneyFormat($confirmedIn, decodeHtml: true),
-                'icon' => 'banknotes',
-                'tone' => 'emerald',
-                'trend' => $this->ledgerTrends['deposits'],
-            ],
-            [
-                'label' => 'All transactions',
-                'value' => number_format(Transaction::query()->count()),
-                'icon' => 'receipt-percent',
-                'tone' => 'sky',
-                'trend' => $this->ledgerTrends['all'],
-            ],
+            $this->metricMaker(
+                'Awaiting review',
+                $pending,
+                'clock',
+                tone: $pending > 0 ? 'amber' : 'slate',
+            ),
+            $this->metricMaker(
+                'Deposits confirmed',
+                kMoneyFormat($confirmedIn, decodeHtml: true),
+                'banknotes',
+                tone: 'emerald',
+                trend: $this->ledgerTrends['deposits'],
+            ),
+            $this->metricMaker(
+                'All transactions',
+                Transaction::query()->count(),
+                'receipt-percent',
+                tone: 'sky',
+                trend: $this->ledgerTrends['all'],
+            ),
         ];
     }
 
@@ -198,49 +196,32 @@ new class extends Component
      * the figures. A total says where the ledger stands; the line says whether it got
      * there steadily or in one week.
      *
-     * Every month in the window is present whether anything moved in it or not — a
-     * gap would draw a line climbing through months that never happened.
+     * Both series come off one grouped read, and every month in the window is present
+     * whether anything moved in it or not — see TrendService.
      *
      * @return array<string, array<int, object>>
      */
     #[Computed]
     public function ledgerTrends(): array
     {
-        $expression = match (DB::connection()->getDriverName()) {
-            'sqlite' => "strftime('%Y-%m', created_at)",
-            'pgsql' => "to_char(created_at, 'YYYY-MM')",
-            default => "date_format(created_at, '%Y-%m')",
-        };
+        return app(TrendService::class)->trends(
+            Transaction::query(),
+            splitBy: ['transaction_group', 'status'],
+            series: [
+                'all' => [],
 
-        $rows = Transaction::query()
-            ->selectRaw("{$expression} as month, transaction_group, status, count(*) as total, sum(amount) as amount")
-            ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
-            ->groupBy('month', 'transaction_group', 'status')
-            ->get();
-
-        $months = collect(range(5, 0))->map(fn (int $back) => now()->subMonths($back)->format('Y-m'));
-
-        return [
-            'all' => $months
-                ->map(fn (string $month) => (object) [
-                    'month' => $month,
-                    'total' => (int) $rows->where('month', $month)->sum('total'),
-                ])
-                ->all(),
-
-            // Money confirmed in, in major units — the raw sum is minor, and it is
-            // divided exactly once, here.
-            'deposits' => $months
-                ->map(fn (string $month) => (object) [
-                    'month' => $month,
-                    'total' => (float) $rows
-                        ->where('month', $month)
-                        ->where('transaction_group', TransactionGroupEnum::DEPOSIT->value)
-                        ->where('status', StatusTransaction::CONFIRMED->value)
-                        ->sum('amount') / 100,
-                ])
-                ->all(),
-        ];
+                // Money confirmed in. The stored amount is minor units, so the
+                // series is divided exactly once, here.
+                'deposits' => [
+                    'match' => [
+                        'transaction_group' => TransactionGroupEnum::DEPOSIT,
+                        'status' => StatusTransaction::CONFIRMED,
+                    ],
+                    'sum' => 'amount',
+                    'divideBy' => 100,
+                ],
+            ],
+        );
     }
 
     public function updatedSearch(): void
@@ -336,13 +317,7 @@ new class extends Component
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Transaction metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-                :trend="$metric['trend'] ?? null"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 
@@ -357,7 +332,7 @@ new class extends Component
                 <flux:input
                     class="sm:min-w-60"
                     wire:model.live.debounce.350ms="search"
-                    placeholder="Reference, name or email"
+                    placeholder="Reference, description, name or email"
                     icon="magnifying-glass"
                 />
                 <flux:select wire:model.live="status" class="sm:min-w-40">
@@ -452,7 +427,7 @@ new class extends Component
                         <x-table.cell>
                             @if ($item->isSettled())
                                 <flux:text size="sm" class="text-slate-400">Settled</flux:text>
-                            @elseif (kGate('transactions', GateAccessEnum::MODIFY))
+                            @elseif (kGateAction($pageGate, $gateModify))
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                     <flux:menu>

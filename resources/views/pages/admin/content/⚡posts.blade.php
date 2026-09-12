@@ -35,16 +35,6 @@ new class extends Component
     }
 
     /**
-     * How far this account may go on this screen, asked once and read by every
-     * button and every write.
-     */
-    #[Computed]
-    public function access(): GateAccessEnum
-    {
-        return kGateAccess('content.blogs');
-    }
-
-    /**
      * Is this account held to the posts it wrote? Drives the copy above the table,
      * so a short list reads as a rule rather than as missing data.
      */
@@ -60,12 +50,12 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'title' => ['label' => 'Post', 'locked' => true, 'sortable' => true],
-            'categories' => ['label' => 'Categories'],
-            'user' => ['label' => 'Author'],
-            'views' => ['label' => 'Reads', 'sortable' => true, 'summary' => 'sum'],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'published_at' => ['label' => 'Published', 'sortable' => true],
+            'title' => $this->columnMaker('Post', locked: true, sortable: true),
+            'categories' => $this->columnMaker('Categories'),
+            'user' => $this->columnMaker('Author'),
+            'views' => $this->columnMaker('Reads', sortable: true, summary: 'sum'),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'published_at' => $this->columnMaker('Published', sortable: true),
         ];
     }
 
@@ -96,8 +86,8 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'search' => ['label' => 'Search'],
-            'status' => ['label' => 'Status', 'options' => StatusPost::forSelect()],
+            'search' => $this->filterMaker('Search'),
+            'status' => $this->filterMaker('Status', StatusPost::forSelect()),
         ];
     }
 
@@ -169,33 +159,15 @@ new class extends Component
         $scoped = fn () => $service->authorScope(Post::query(), auth()->user());
 
         return [
-            [
-                'label' => 'Published',
-                'value' => $scoped()->live()->count(),
-                'icon' => 'megaphone',
-                'tone' => 'emerald',
-            ],
-            [
-                'label' => 'Drafts',
-                'value' => $scoped()->where('status', StatusPost::DRAFT)->count(),
-                'icon' => 'pencil-square',
-                'tone' => 'amber',
-            ],
-            [
-                'label' => 'Total reads',
-                'value' => (int) $scoped()->sum('views'),
-                'icon' => 'eye',
-                'tone' => 'sky',
-            ],
+            $this->metricMaker('Published', $scoped()->live()->count(), 'megaphone', tone: 'emerald'),
+            $this->metricMaker('Drafts', $scoped()->where('status', StatusPost::DRAFT)->count(), 'pencil-square', tone: 'amber'),
+            $this->metricMaker('Total reads', (int) $scoped()->sum('views'), 'eye', tone: 'sky'),
         ];
     }
 
     public function confirmDelete(Post $post): void
     {
-        $this->respondError(
-            'You do not have delete access to posts.',
-            ! $this->access->covers(GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to posts.');
 
         $reason = app(BlogService::class)->editBlockedReason($post, auth()->user());
         $this->respondError($reason ?? '', $reason !== null);
@@ -208,10 +180,7 @@ new class extends Component
     public function delete(): bool
     {
         // The menu row is hidden, which stops nobody who can open a console.
-        $this->respondError(
-            'You do not have delete access to posts.',
-            ! $this->access->covers(GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to posts.');
 
         $this->respondError('Select a post to delete first.', ! $this->post);
 
@@ -245,12 +214,7 @@ new class extends Component
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Blog metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 
@@ -383,7 +347,7 @@ new class extends Component
                                                 View on site
                                             </flux:menu.item>
                                         @endif
-                                        @if (kGate('content.blogs', App\Enums\GateAccessEnum::FULL))
+                                        @if (kGateAction($pageGate, $gateFull))
                                             <flux:menu.separator />
                                         @endif
                                         <x-dashboard.gate.menu-item

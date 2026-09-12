@@ -8,18 +8,10 @@ A dashboard is: **greeting header → metric cards → chart → feeds**. Everyt
 ```php
 public User $user;
 
-public string $monthExpression;
-
 public function mount(): void
 {
     $this->user = auth()->user();
     kSetSiteTitle('dashboard');
-
-    $this->monthExpression = match (DB::connection()->getDriverName()) {
-        'sqlite' => "strftime('%Y-%m', created_at)",
-        'pgsql' => "to_char(created_at, 'YYYY-MM')",
-        default => "date_format(created_at, '%Y-%m')",
-    };
 }
 ```
 
@@ -45,74 +37,70 @@ exclamation mark so the template can end with a full stop.
 
 ### Metrics — `#[Computed] metrics(): array`
 
+Every tile is built with **`metricMaker()`**, from `WithMetrics`. `WithDataTable`
+already pulls that trait in, so a listing has it; a dashboard adds `use WithMetrics`
+itself.
+
 **Admin dashboard** returns a **keyed** array (each tile is addressable):
 
 ```php
 #[Computed]
 public function metrics(): array
 {
-    $usersCount = User::query()->count();
-    $revenue = (int) Transaction::query()
-        ->where('status', StatusTransaction::CONFIRMED)
-        ->whereIn('transaction_type', [TransactionTypeEnum::CREDIT, TransactionTypeEnum::DIRECT])
-        ->sum('amount') / 100;
-
     return [
-        'users' => [
-            'label' => 'Total users',
-            'value' => number_format($usersCount),
-            'icon' => 'users',
-            'change' => 'All registered accounts',
-            'tone' => 'sky',
-        ],
-        'revenue' => [
-            'label' => 'Total revenue',
-            'value' => kMoneyFormat($revenue),
-            'icon' => 'banknotes',
-            'change' => 'Confirmed credits and direct payments',
-            'tone' => 'emerald',
-        ],
-        …
+        'accounts' => $this->metricMaker(
+            'Total accounts',
+            User::query()->count(),
+            'users',
+            tone: 'sky',
+            change: 'Every registered account',
+            trend: $this->signupTrends['all'],
+        ),
+        'suspended' => $this->metricMaker(
+            'Suspended',
+            User::query()->where('status', StatusUser::SUSPENDED)->count(),
+            'lock-closed',
+            change: 'Blocked from signing in',
+        ),
     ];
 }
 ```
 
-**Index pages** return a **list** array (rendered in order):
+A **listing** returns a plain list — nothing addresses the tiles:
 
 ```php
 return [
-    ['label' => 'Total students', 'value' => number_format($total), 'icon' => 'academic-cap', 'tone' => 'sky'],
-    ['label' => 'Active accounts', 'value' => number_format($active), 'icon' => 'check-badge', 'tone' => 'emerald'],
-    ['label' => 'Enrolled admissions', 'value' => number_format($enrolled), 'icon' => 'ticket', 'tone' => 'slate'],
+    $this->metricMaker('Total users', $total, 'users', tone: 'sky'),
+    $this->metricMaker('Active accounts', $active, 'check-badge', tone: 'emerald'),
+    $this->metricMaker('Awaiting review', $pending, 'clock', tone: $pending > 0 ? 'amber' : 'slate'),
 ];
 ```
 
-Every tile has exactly these keys: `label`, `value`, `icon`, `tone`, and optionally
-`change` (the small caption underneath).
+| Argument | Means |
+| --- | --- |
+| `$label` *(first)* | What the figure is |
+| `$value` *(second)* | A number is `number_format()`ed for you; a string — money, a percentage — is trusted as it stands |
+| `$icon` *(third)* | The Heroicon in the corner |
+| `tone:` | `slate`, `emerald`, `amber`, `sky`, `rose`, `lime`. Anything else throws |
+| `change:` | The line under the figure, saying what it counts |
+| `trend:` | A `TrendService` series, drawn as a sparkline |
+| `trendField:` | Which field of that series is the value. Defaults to `total` |
 
-Formatting rules:
+**Never `number_format()` the value yourself** — passing an `int` is the point, and a
+string is taken to be already written.
 
-- counts → `number_format()`
-- money → `kMoneyFormat()` (raw `sum()` is minor units, so divide by 100)
-- `tone` is one of the six: `lime`, `emerald`, `sky`, `amber`, `rose`, `slate`
-
-Rendering:
+The tile is rendered whole, so no page can leave a prop off:
 
 ```blade
-<section class="grid gap-4 sm:grid-cols-3" aria-label="Student metrics">
+<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Platform metrics">
     @foreach ($this->metrics as $metric)
-        <x-dashboard.stat-card
-            :label="$metric['label']"
-            :value="$metric['value']"
-            :icon="$metric['icon']"
-            :tone="$metric['tone']"
-        />
+        <x-dashboard.stat-card :metric="$metric" />
     @endforeach
 </section>
 ```
 
-Grids: `sm:grid-cols-3` for three tiles, `sm:grid-cols-2 lg:grid-cols-3` for six.
-The `<section>` carries an `aria-label`.
+Metrics count the **whole** set, never the current page, and any write that changes
+the underlying data must `unset($this->metrics)`.
 
 ### Charts — `<x-chart>`, still no library
 
@@ -127,23 +115,15 @@ the engine's job now:
 
 ```php
 #[Computed]
-public function revenueByMonth(): Collection
+public function revenueByMonth(): array
 {
-    $result = Transaction::query()
-        ->selectRaw("{$this->monthExpression} as month, sum(amount) as total")
-        ->where('status', StatusTransaction::CONFIRMED)
-        ->whereIn('transaction_type', [TransactionTypeEnum::CREDIT, TransactionTypeEnum::DIRECT])
-        ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
-        ->groupBy('month')
-        ->orderBy('month')
-        ->get();
-
-    return $result->map(fn ($item) => (object) [
-        'month' => $item->month,
-        'label' => Carbon::createFromFormat('Y-m', $item->month)->format('F Y'),
-        'monthShort' => Carbon::createFromFormat('Y-m', $item->month)->format('M'),
-        'total' => $item->total / 100,
-    ]);
+    return app(TrendService::class)->trend(
+        Transaction::query()
+            ->where('status', StatusTransaction::CONFIRMED)
+            ->whereIn('transaction_type', [TransactionTypeEnum::CREDIT, TransactionTypeEnum::DIRECT]),
+        sum: 'amount',
+        divideBy: 100,
+    );
 }
 ```
 
@@ -155,7 +135,7 @@ public function revenueByMonth(): Collection
             <x-chart.axis.tick />
         </x-chart.axis>
 
-        <x-chart.axis axis="x" field="monthShort">
+        <x-chart.axis axis="x" field="short">
             <x-chart.axis.line />
             <x-chart.axis.tick />
         </x-chart.axis>
@@ -201,9 +181,82 @@ Points:
   takes their option arrays.
 - Rows are still cast to `(object)` so Blade reads `$row->label`, matching model
   access; they serialise to JSON either way.
-- The driver-specific month expression is still resolved once in `mount()`.
+- The series fields are fixed: `period`, `label`, `short`, `total`. Axes read
+  `short`, tooltips read `label`, marks read `total`.
 - Guard the empty set with `@if ($this->rows->isEmpty())` and an empty state — an
   axis over nothing is not worth drawing.
+
+### Trends — `TrendService`
+
+**Never write the month grouping by hand.** Bucketing a date column is the one place
+raw SQL is unavoidable and every driver spells it differently, so it lives once, in
+`TrendPeriodEnum`, and `TrendService` is what a screen calls.
+
+One series — a sparkline, or a chart:
+
+```php
+#[Computed]
+public function signupsByMonth(): array
+{
+    return app(TrendService::class)->trend(User::query());
+}
+```
+
+```php
+->trend(Order::query(), sum: 'total', divideBy: 100)             money, in major units
+->trend(Visit::query(), periods: 30, period: TrendPeriodEnum::DAY)
+->trend(Signup::query(), column: 'confirmed_at')
+```
+
+Several series off **one** read — three tiles cost one query, not three. `splitBy`
+names the columns the query groups on; a series' `match` then carves those rows:
+
+```php
+#[Computed]
+public function ledgerTrends(): array
+{
+    return app(TrendService::class)->trends(
+        Transaction::query(),
+        splitBy: ['transaction_group', 'status'],
+        series: [
+            'all' => [],
+            'deposits' => [
+                'match' => [
+                    'transaction_group' => TransactionGroupEnum::DEPOSIT,
+                    'status' => StatusTransaction::CONFIRMED,
+                ],
+                'sum' => 'amount',
+                'divideBy' => 100,
+            ],
+        ],
+    );
+}
+```
+
+| Series key | Means |
+| --- | --- |
+| `match` | column => value the grouped rows must equal. Enums are fine |
+| `sum` | a column to total. Omitted, the series counts rows |
+| `divideBy` | divide each point — minor units stored as integers |
+
+Then hand a series to a tile, or to a chart:
+
+```blade
+<x-dashboard.stat-card … :trend="$this->ledgerTrends['deposits']" />
+```
+
+Every point is an object carrying `period`, `label`, `short` and `total`, so the same
+series draws as a sparkline, a bar chart or a line without touching the PHP.
+
+Two things the service does that hand-written queries kept getting wrong:
+
+- **The window is padded.** Every bucket is present whether anything landed in it or
+  not — a gap draws a line climbing through months that never happened. It follows
+  that a series is never empty, only flat, so guard an empty state on
+  `collect($series)->sum('total') === 0`, not on `isEmpty()`.
+- **The rows are not hydrated.** They are aggregates, read through `toBase()` — a model
+  built out of three grouped columns is a record that does not exist. A `match` value
+  may be written either as the enum case or as the stored value; both land.
 
 ### Feeds — delegate to services
 
@@ -263,8 +316,8 @@ Metrics count the **whole** set, never the current page.
   bars, a line or an area without touching the PHP.
 - Composing the parts rather than configuring them means the markup says what is on
   screen: no gridlines in the Blade, no gridlines in the chart.
-- Branching the month expression by driver lets the same dashboard run against SQLite
-  in tests and MySQL in production.
+- Keeping the driver branch inside `TrendPeriodEnum` lets the same dashboard run
+  against SQLite in tests and MySQL in production, from one place.
 - Fixing the tile shape (`label`, `value`, `icon`, `tone`, `change`) lets one component
   render every metric in the app.
 
@@ -278,13 +331,7 @@ The admin dashboard's structure, in order:
 
     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Key metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :change="$metric['change']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 
@@ -308,9 +355,9 @@ public function metrics(): array
     $collected = (int) Invoice::query()->where('status', StatusInvoice::PAID)->sum('amount') / 100;
 
     return [
-        ['label' => 'Issued invoices', 'value' => number_format($issued), 'icon' => 'document-text', 'tone' => 'sky'],
-        ['label' => 'Overdue', 'value' => number_format($overdue), 'icon' => 'clock', 'tone' => 'amber'],
-        ['label' => 'Collected', 'value' => kMoneyFormat($collected), 'icon' => 'banknotes', 'tone' => 'emerald'],
+        $this->metricMaker('Issued invoices', $issued, 'document-text', tone: 'sky'),
+        $this->metricMaker('Overdue', $overdue, 'clock', tone: 'amber'),
+        $this->metricMaker('Collected', kMoneyFormat($collected, decodeHtml: true), 'banknotes', tone: 'emerald'),
     ];
 }
 ```
@@ -318,12 +365,7 @@ public function metrics(): array
 ```blade
 <section class="grid gap-4 sm:grid-cols-3" aria-label="Invoice metrics">
     @foreach ($this->metrics as $metric)
-        <x-dashboard.stat-card
-            :label="$metric['label']"
-            :value="$metric['value']"
-            :icon="$metric['icon']"
-            :tone="$metric['tone']"
-        />
+        <x-dashboard.stat-card :metric="$metric" />
     @endforeach
 </section>
 ```

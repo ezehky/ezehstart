@@ -33,12 +33,12 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'name' => ['label' => 'Member', 'locked' => true, 'sortable' => true],
-            'email' => ['label' => 'Email'],
-            'phone_number' => ['label' => 'Phone'],
-            'user_type' => ['label' => 'Type'],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'created_at' => ['label' => 'Joined', 'sortable' => true],
+            'name' => $this->columnMaker('Member', locked: true, sortable: true),
+            'email' => $this->columnMaker('Email'),
+            'phone_number' => $this->columnMaker('Phone'),
+            'user_type' => $this->columnMaker('Type'),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'created_at' => $this->columnMaker('Joined', sortable: true),
         ];
     }
 
@@ -63,8 +63,8 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'search' => ['label' => 'Search'],
-            'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+            'search' => $this->filterMaker('Search'),
+            'accountStatus' => $this->filterMaker('Status', StatusUser::forSelect()),
         ];
     }
 
@@ -133,9 +133,9 @@ new class extends Component
         $unverified = $base()->whereNull('email_verified_at')->count();
 
         return [
-            ['label' => 'Total users', 'value' => number_format($total), 'icon' => 'users', 'tone' => 'sky'],
-            ['label' => 'Active accounts', 'value' => number_format($active), 'icon' => 'check-badge', 'tone' => 'emerald'],
-            ['label' => 'Unverified email', 'value' => number_format($unverified), 'icon' => 'envelope', 'tone' => 'slate'],
+            $this->metricMaker('Total users', $total, 'users', tone: 'sky'),
+            $this->metricMaker('Active accounts', $active, 'check-badge', tone: 'emerald'),
+            $this->metricMaker('Unverified email', $unverified, 'envelope'),
         ];
     }
 
@@ -149,12 +149,7 @@ new class extends Component
 <div class="space-y-6">
     <section class="grid gap-4 sm:grid-cols-3" aria-label="Member metrics">
         @foreach ($this->metrics as $metric)
-            <x-dashboard.stat-card
-                :label="$metric['label']"
-                :value="$metric['value']"
-                :icon="$metric['icon']"
-                :tone="$metric['tone']"
-            />
+            <x-dashboard.stat-card :metric="$metric" />
         @endforeach
     </section>
 

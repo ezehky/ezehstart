@@ -9,7 +9,7 @@ use App\Models\Post;
 use App\Services\ActivityLogService;
 use App\Services\BlogService;
 use App\Services\VideoLibraryService;
-use App\Traits\WithFormResponseMessage;
+use App\Traits\WithGateProps;
 use App\Traits\WithImagePicker;
 use App\Traits\WithTaxonomy;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithImagePicker, WithTaxonomy;
+    use WithGateProps, WithImagePicker, WithTaxonomy;
 
     public ?Post $post = null;
 
@@ -85,7 +85,7 @@ new class extends Component
         // Opening the editor at all is a write, so it asks for the level the save
         // will need rather than for VIEW: a reader who cannot save has no business
         // filling this form in and being refused at the end of it.
-        kPageGate('content.blogs', $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
+        $this->setPageGate('content.blogs', $this->requiredAccess());
 
         // An author reaches their own drafts and nothing else. A 404 rather than a
         // message, for the same reason the page gate returns one — which posts exist
@@ -95,6 +95,15 @@ new class extends Component
                 && app(BlogService::class)->editBlockedReason($this->post, auth()->user()) !== null,
             404,
         );
+    }
+
+    /**
+     * Editing an existing post is MODIFY; starting one is CREATE. The page gate and
+     * the save ask the same question, so it is answered in one place.
+     */
+    protected function requiredAccess(): GateAccessEnum
+    {
+        return $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE;
     }
 
     protected function rules(): array
@@ -125,10 +134,7 @@ new class extends Component
 
         // The page gate already refused anybody who cannot be here, which stops
         // nobody who can open a console and post at this component directly.
-        $this->respondError(
-            'You do not have access to save posts.',
-            if: ! kGate('content.blogs', $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE),
-        );
+        $this->checkGate($this->requiredAccess(), 'You do not have access to save posts.');
 
         if ($this->post?->exists) {
             $reason = $blog->editBlockedReason($this->post, auth()->user());

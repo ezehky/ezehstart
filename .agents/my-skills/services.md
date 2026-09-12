@@ -3,7 +3,7 @@
 ## Rule
 
 All business logic that is shared, transactional, or spans more than one aggregate
-lives in `app/Services/`. Eighteen ship with the starter:
+lives in `app/Services/`. Nineteen ship with the starter:
 
 | Service | Owns |
 | --- | --- |
@@ -25,6 +25,7 @@ lives in `app/Services/`. Eighteen ship with the starter:
 | `ImageLibraryService` | Uploads, folders, visibility, the delete guard, usage tracking |
 | `BlogService` | Post HTML sanitising, tag resolution, publishing, the public feed |
 | `TransactionService` | The ledger: balances, settling, charges, manual adjustments |
+| `TrendService` | Series over time — every sparkline and chart. See [dashboard.md](dashboard.md) |
 
 ```php
 <?php

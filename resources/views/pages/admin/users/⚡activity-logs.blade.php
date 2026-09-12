@@ -36,11 +36,11 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'user' => ['label' => 'User', 'locked' => true],
-            'activity_log_action' => ['label' => 'Action', 'sortable' => true],
-            'description' => ['label' => 'Description'],
-            'origin' => ['label' => 'Origin'],
-            'created_at' => ['label' => 'When', 'sortable' => true],
+            'user' => $this->columnMaker('User', locked: true),
+            'activity_log_action' => $this->columnMaker('Action', sortable: true),
+            'description' => $this->columnMaker('Description'),
+            'origin' => $this->columnMaker('Origin'),
+            'created_at' => $this->columnMaker('When', sortable: true),
         ];
     }
 
@@ -69,8 +69,8 @@ new class extends Component
     protected function tableFilters(): array
     {
         return [
-            'search' => ['label' => 'Search'],
-            'action' => ['label' => 'Action', 'options' => ActivityActionEnum::forSelect()],
+            'search' => $this->filterMaker('Search'),
+            'action' => $this->filterMaker('Action', ActivityActionEnum::forSelect()),
         ];
     }
 

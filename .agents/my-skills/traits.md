@@ -14,11 +14,16 @@ Shared behaviour is composed with traits in `app/Traits/`, all named `With{Capab
 | `WithPasswordTools` | any page taking a password | `passwordStrengthRule()`, `$passwordNote` |
 | `WithUserRoleManager` | admin user listings | the whole "manage roles" modal — `roleUser`, `roleMatrix`, `grantRole()`, `revokeRole()`, `switchRole()`, `afterRoleChange()` hook |
 | `WithEmailResolver` | **every Mailable** | injects `$emailConfig` into the mail view |
+| `WithMetrics` | any screen with stat tiles | `metricMaker()` — see [dashboard.md](dashboard.md) |
+| `WithDataTable` | admin listings | the whole listing — `columnMaker()`, sorting, the column manager, bulk selection, filters, date range, export. See [tables.md](tables.md) |
 
 Livewire's own traits used alongside them: `WithPagination`, `WithFileUploads`.
 
-Those seven are the whole of `app/Traits/`. The eighth is the one you write the moment
-two pages need the same state and the same handful of methods — a shared modal, a
+Those are the ones you reach for by name; `app/Traits/` holds a handful more, each
+owning one screen's worth of shared state — `WithImageLibrary`, `WithVideoLibrary`,
+`WithTaxonomy`, `WithFileImport`, `WithGateManager`, and the rest. **Read the directory
+before writing shared logic.** The next one is the one you write the moment two pages
+need the same state and the same handful of methods — a shared modal, a
 shared editor, a shared set of guards. Name it `With{Capability}` and follow the rules
 below.
 
@@ -35,7 +40,8 @@ use WithAuthWorker, WithPasswordTools;
 ### Traits that require other traits
 
 A trait may `use` another. `WithUserRoleManager` and `WithAuthWorker` both pull in
-`WithFormResponseMessage`, so a page using either does **not** need to list it again:
+`WithFormResponseMessage`, and `WithDataTable` pulls in `WithGateProps` and
+`WithMetrics`, so a page using either does **not** need to list it again:
 
 ```php
 trait WithCohortAdmin

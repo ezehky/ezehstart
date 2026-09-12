@@ -1,6 +1,8 @@
 {{--
     The metric tile every dashboard opens with.
 
+        <x-dashboard.stat-card :metric="$metric" />      — a tile metricMaker() built, whole
+
         <x-dashboard.stat-card label="Orders" value="1,013" icon="shopping-bag" tone="sky" />
 
         <x-dashboard.stat-card
@@ -22,9 +24,10 @@
 --}}
 
 @props([
-    'label',
-    'value',
-    'icon',
+    'metric' => null,
+    'label' => '',
+    'value' => '',
+    'icon' => 'chart-bar',
     'change' => null,
     'tone' => 'slate',
     'trend' => null,
@@ -32,6 +35,16 @@
 ])
 
 @php
+    // A tile built by metricMaker() arrives whole, so a page renders it as
+    // <x-dashboard.stat-card :metric="$metric" /> and cannot leave a prop off.
+    if (is_array($metric)) {
+        ['label' => $label, 'value' => $value, 'icon' => $icon] = $metric;
+        $change = $metric['change'] ?? $change;
+        $tone = $metric['tone'] ?? $tone;
+        $trend = $metric['trend'] ?? $trend;
+        $trendField = $metric['trendField'] ?? $trendField;
+    }
+
     $toneClasses = match ($tone) {
         'emerald' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
         'amber' => 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',

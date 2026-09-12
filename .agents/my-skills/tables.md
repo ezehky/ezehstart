@@ -50,6 +50,42 @@ Non-negotiables:
 <flux:table.column>Actions</flux:table.column>
 ```
 
+### Columns — `columnMaker()`
+
+A listing that uses `WithDataTable` declares its columns once, and the trait draws the
+header, the column manager, the export and the footer totals off that one declaration.
+Build each with **`columnMaker()`** rather than an array literal:
+
+```php
+protected function tableColumns(): array
+{
+    return [
+        'reference' => $this->columnMaker('Reference', locked: true, sortable: true),
+        'user' => $this->columnMaker('Account'),
+        'amount' => $this->columnMaker('Amount', sortable: true, summary: 'sum', money: true),
+        'status' => $this->columnMaker('Status', sortable: true),
+        'created_at' => $this->columnMaker('Date', sortable: true),
+    ];
+}
+```
+
+| Argument | Means |
+| --- | --- |
+| `$label` *(first, positional)* | What the header says. Omitted, the key is headlined |
+| `sortable:` | The header sorts on this column |
+| `locked:` | The column that says which row this is — the manager cannot hide it |
+| `summary:` | `'sum'`, `'avg'` or `'count'` — the total under the table |
+| `money:` | The value is minor units, so the summary is formatted as money |
+| `exportable:` | Whether it goes into an export. Defaults to `true` |
+
+The array form still works — `columnMaker()` returns one — but a key spelled wrong in
+an array is silently ignored, and a column that quietly stopped summing is not a thing
+anybody notices. A named argument spelled wrong is a fatal error, and an unknown
+`summary:` throws where it is declared rather than when the footer renders.
+
+The key is the **column on the query**: `summary` aggregates it and `sortable` orders
+by it, so a computed or relation column takes neither.
+
 ### Cell content patterns
 
 **Identity with avatar** — the standard user cell:
@@ -358,6 +394,8 @@ See the block at the top of this file, and the full page template in
 [pages.md](pages.md) shape A / B.
 
 ## Avoid
+
+- Writing a column as an array literal instead of `$this->columnMaker(...)`.
 
 - Raw `<table>` / `<thead>` / `<tbody>` / `<tr>` / `<td>`.
 - Missing `wire:key`.

@@ -50,9 +50,9 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'name' => ['label' => 'Name', 'locked' => true, 'sortable' => true],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'created_at' => ['label' => 'Added', 'sortable' => true],
+            'name' => $this->columnMaker('Name', locked: true, sortable: true),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'created_at' => $this->columnMaker('Added', sortable: true),
         ];
     }
 
@@ -74,7 +74,7 @@ new class extends Component
      */
     protected function tableFilters(): array
     {
-        return ['search' => ['label' => 'Search']];
+        return ['search' => $this->filterMaker('Search')];
     }
 
     protected function tableDateLabel(): string
@@ -131,10 +131,7 @@ new class extends Component
 
     public function create(): void
     {
-        $this->respondError(
-            'You do not have access to add tags.',
-            if: ! kGate('content.tags', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add tags.');
 
         $this->resetForm();
 
@@ -143,10 +140,7 @@ new class extends Component
 
     public function createMany(): void
     {
-        $this->respondError(
-            'You do not have access to add tags.',
-            if: ! kGate('content.tags', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add tags.');
 
         $this->reset('bulk_names');
         $this->resetValidation();
@@ -164,10 +158,7 @@ new class extends Component
      */
     public function saveMany(): bool
     {
-        $this->respondError(
-            'You do not have access to add tags.',
-            if: ! kGate('content.tags', GateAccessEnum::CREATE),
-        );
+        $this->checkGate(GateAccessEnum::CREATE, 'You do not have access to add tags.');
 
         $this->validate(['bulk_names' => ['required', 'string', 'max:2000']]);
 
@@ -193,10 +184,7 @@ new class extends Component
 
     public function edit(Tag $tag): void
     {
-        $this->respondError(
-            'You do not have access to edit tags.',
-            if: ! kGate('content.tags', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY, 'You do not have access to edit tags.');
 
         $this->resetForm();
 
@@ -222,10 +210,7 @@ new class extends Component
 
     public function save(): bool
     {
-        $this->respondError(
-            'You do not have access to save tags.',
-            if: ! kGate('content.tags', GateAccessEnum::MODIFY),
-        );
+        $this->checkGate(GateAccessEnum::MODIFY, 'You do not have access to save tags.');
 
         $this->validate();
 
@@ -266,10 +251,7 @@ new class extends Component
 
     public function confirmDelete(Tag $tag): void
     {
-        $this->respondError(
-            'You do not have delete access to tags.',
-            if: ! kGate('content.tags', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to tags.');
 
         $this->tag = $tag;
 
@@ -278,10 +260,7 @@ new class extends Component
 
     public function delete(): bool
     {
-        $this->respondError(
-            'You do not have delete access to tags.',
-            if: ! kGate('content.tags', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to tags.');
 
         $this->respondError('Select a tag to delete first.', if: ! $this->tag);
 

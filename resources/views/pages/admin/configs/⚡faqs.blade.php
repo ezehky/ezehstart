@@ -77,12 +77,12 @@ new class extends Component
     protected function tableColumns(): array
     {
         return [
-            'flow_order' => ['label' => 'Order', 'sortable' => true],
-            'question' => ['label' => 'Question', 'locked' => true, 'sortable' => true],
-            'answer' => ['label' => 'Answer', 'exportable' => true],
-            'faq_type' => ['label' => 'Section'],
-            'status' => ['label' => 'Status', 'sortable' => true],
-            'updated_at' => ['label' => 'Updated', 'sortable' => true],
+            'flow_order' => $this->columnMaker('Order', sortable: true),
+            'question' => $this->columnMaker('Question', locked: true, sortable: true),
+            'answer' => $this->columnMaker('Answer', exportable: true),
+            'faq_type' => $this->columnMaker('Section'),
+            'status' => $this->columnMaker('Status', sortable: true),
+            'updated_at' => $this->columnMaker('Updated', sortable: true),
         ];
     }
 

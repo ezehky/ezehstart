@@ -87,14 +87,26 @@ own key, and drops a branch only when no child survived.
 
 ### Guarding a screen
 
-One line in `mount()`, next to `kSetSiteTitle()`:
+One line in `mount()`, next to `kSetSiteTitle()`. Use **`setPageGate()`**, from
+`WithGateProps` — `WithDataTable` and `WithStatusToggle` already pull that trait in,
+so most screens have it and the rest add `use WithGateProps`:
 
 ```php
 public function mount(): void
 {
     kSetSiteTitle('users', 'roles');
-    kPageGate('users.roles');
+    $this->setPageGate('users.roles');
 }
+```
+
+It calls `kPageGate()` for you **and** remembers the key, which is what lets every
+later check on the screen ask without naming it again. Call `kPageGate()` directly only
+on a screen that has no write to guard at all.
+
+A screen whose level depends on what it is doing passes it:
+
+```php
+$this->setPageGate('content.blogs', $this->post?->exists ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
 ```
 
 `kPageGate()` aborts with a **404**, not a 403 — the shape of the admin surface is not
@@ -123,16 +135,35 @@ where `admin.*` is a fair test. A control re-renders on every Livewire update to
 those arrive on `livewire.update`: a route test would answer "not an admin route" and
 hand every hidden button back the first time somebody typed in a search box.
 
+The method check is **`checkGate()`**, also from `WithGateProps`. It asks about the key
+`setPageGate()` already recorded, so the gate key is written once per screen rather than
+once per method — and a screen whose key changes cannot be left half-renamed:
+
 ```php
 public function delete(): bool
 {
     // The button is hidden, which stops nobody who can open a console.
-    $this->respondError(
-        'You do not have delete access to posts.',
-        if: ! kGate('content.blogs', GateAccessEnum::FULL),
-    );
+    $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to posts.');
     …
 }
+```
+
+The message is optional; leave it off and the level supplies a sensible one:
+
+```php
+$this->checkGate(GateAccessEnum::CREATE);   // "You do not have access to create new items in this area."
+```
+
+**Never write `respondError(if: ! kGate('some.key', …))` in a page method.** It is the
+same check with the key spelled again, and the spelling is what goes wrong.
+
+The trait also puts the three levels on the component as plain strings — `$gateCreate`,
+`$gateModify`, `$gateFull` — for the Blade half:
+
+```blade
+<x-dashboard.gate.button gate="content.blogs" :level="$gateCreate" icon="plus" variant="primary" wire:click="create">
+    New post
+</x-dashboard.gate.button>
 ```
 
 ### Never gated
@@ -226,18 +257,19 @@ A screen that renders differently at each level:
 #[Computed]
 public function access(): GateAccessEnum
 {
-    return kGateAccess('content.blogs');
+    return kGateAccess($this->pageGate);
 }
 
 public function delete(): bool
 {
-    $this->respondError(
-        'You do not have delete access to posts.',
-        if: ! $this->access->covers(GateAccessEnum::FULL),
-    );
+    $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to posts.');
     …
 }
 ```
+
+`kGateAccess()` is for a screen that **renders differently** at each level — a heading,
+a column, a whole panel. A write is guarded with `checkGate()`, never with
+`$this->access->covers(...)`: that is the same question asked the long way round.
 
 ```blade
 @if ($this->access->covers(App\Enums\GateAccessEnum::CREATE))
@@ -254,13 +286,18 @@ Adding a gateable screen is two lines and no migration:
 
 ```php
 // 2. the page's mount()
-kPageGate('invoices');
+$this->setPageGate('invoices');
 ```
 
 Existing roles do not carry the new key, so it starts closed for everybody — grant it
 on the roles screen.
 
 ## Avoid
+
+- `kPageGate()` in a page's `mount()` where `$this->setPageGate()` is available.
+- `respondError(if: ! kGate('literal.key', …))` inside a page method — that is
+  `$this->checkGate(…)`, with the key already known.
+- Naming the gate key more than once on a screen.
 
 - `Gate::define()`, `@can`, `$this->authorize()`, `can:` middleware, `app/Policies/`.
 - A second list of gateable screens. The navigation tree is the list.

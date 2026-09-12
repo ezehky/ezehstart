@@ -99,10 +99,7 @@ new class extends Component
 
     public function confirmDelete(int $index): void
     {
-        $this->respondError(
-            'You do not have delete access to social handles.',
-            if: ! kGate('config.social-handles', GateAccessEnum::FULL),
-        );
+        $this->checkGate(GateAccessEnum::FULL, 'You do not have delete access to social handles.');
 
         $this->deletingIndex = $index;
 

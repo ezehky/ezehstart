@@ -128,8 +128,8 @@ public function metrics(): array
     $active = User::query()->users()->where('status', StatusUser::ACTIVE)->count();
 
     return [
-        ['label' => 'Total students', 'value' => number_format($total), 'icon' => 'academic-cap', 'tone' => 'sky'],
-        ['label' => 'Active accounts', 'value' => number_format($active), 'icon' => 'check-badge', 'tone' => 'emerald'],
+        $this->metricMaker('Total students', $total, 'academic-cap', tone: 'sky'),
+        $this->metricMaker('Active accounts', $active, 'check-badge', tone: 'emerald'),
     ];
 }
 ```
