@@ -87,7 +87,7 @@ Route::post('/payment/{vendor}', Webhook\PaymentWebhookController::class);
 
 ```blade
 {{ $item->training_type->label() }}
-<x-util.status :status="$item->status" />
+<x-util.e-badge :enum="$item->status" />
 {{ $item->status->isActive() ? 'Hide from site' : 'Show on site' }}
 :icon="$item->status->isActive() ? 'eye-slash' : 'eye'"
 ```
@@ -101,7 +101,7 @@ Never `{{ $item->status->value }}` in user-facing text.
 - `label()` derived from the case **name** (not a hand-written map) means adding a case
   costs one line.
 - Centralising colour in `config/_setups.php` lets 9 different status enums share one
-  visual language, so `<x-util.status>` works for all of them with no per-enum code.
+  visual language, so `<x-util.e-badge>` works for all of them with no per-enum code.
 - `forSelect()` means every `<select>` in the app is built the same way and can never
   drift from the enum.
 - Backing statuses with `int` keeps status columns as `tinyInteger` — small, indexable,
@@ -352,7 +352,7 @@ public InvoiceChannelEnum $channel = InvoiceChannelEnum::EMAIL;
     @endforeach
 </flux:select>
 
-<x-util.status :status="$item->status" />
+<x-util.e-badge :enum="$item->status" />
 ```
 
 ## Avoid
@@ -365,7 +365,7 @@ public InvoiceChannelEnum $channel = InvoiceChannelEnum::EMAIL;
 - Comparing with `==` or the backing value: write `$status->isActive()`, not
   `$status === StatusDefault::ACTIVE` in application code and never
   `$status->value === 1`.
-- `$model->status->value` in Blade — use `label()` or `<x-util.status>`.
+- `$model->status->value` in Blade — use `label()` or `<x-util.e-badge>`.
 - New status enums where `StatusDefault` or `StatusYes` already fits.
 - Adding a status case without adding its colour to `config/_setups.php`.
 - `->cases()` loops in Blade — build the option list in `mount()` or a `#[Computed]`

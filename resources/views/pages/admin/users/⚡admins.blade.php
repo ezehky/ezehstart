@@ -444,7 +444,7 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="status">
-                            <x-util.status :status="$item->status" />
+                            <x-util.e-badge :enum="$item->status" />
                         </x-table.cell>
 
                         <x-table.cell column="last_seen_at">

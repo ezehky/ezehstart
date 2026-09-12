@@ -381,7 +381,7 @@ new class extends Component
                         <div>{{ $user->phone_number ?: 'No phone number' }}</div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
-                        <x-util.status :status="$user->status" />
+                        <x-util.e-badge :enum="$user->status" />
                         <flux:badge size="sm" :color="$user->user_type->isAdmin() ? 'purple' : 'zinc'">
                             {{ $user->user_type->label() }}
                         </flux:badge>

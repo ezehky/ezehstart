@@ -445,7 +445,7 @@ new class extends Component
                         <x-table.cell column="name" class="font-medium">{{ $item->name }}</x-table.cell>
 
                         <x-table.cell column="status">
-                            <x-util.status-toggle :status="$item->status" :id="$item->id" gate="content.tags" />
+                            <x-util.e-badge :enum="$item->status" :id="$item->id" gate="content.tags" />
                         </x-table.cell>
 
                         <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>

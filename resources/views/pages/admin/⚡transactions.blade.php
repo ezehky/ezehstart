@@ -436,7 +436,7 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="transaction_group">
-                            <x-util.status :status="$item->transaction_group" />
+                            <x-util.e-badge :enum="$item->transaction_group" />
                         </x-table.cell>
 
                         <x-table.cell column="via">
@@ -444,7 +444,7 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="status">
-                            <x-util.status :status="$item->status" />
+                            <x-util.e-badge :enum="$item->status" />
                         </x-table.cell>
 
                         <x-table.cell column="created_at">{{ $item->createdDatetimeHuman() }}</x-table.cell>

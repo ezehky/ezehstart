@@ -359,7 +359,7 @@ new class extends Component
                             <x-table.cell column="views">{{ number_format($item->views) }}</x-table.cell>
 
                             <x-table.cell column="status">
-                                <x-util.status :status="$item->status" />
+                                <x-util.e-badge :enum="$item->status" />
                             </x-table.cell>
 
                             <x-table.cell column="published_at">

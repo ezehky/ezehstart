@@ -346,8 +346,8 @@ new class extends Component
                             <flux:table.row wire:key="policy-{{ $item->id }}">
                                 <x-table.cell column="version" class="font-medium">v{{ $item->version }}</x-table.cell>
                                 <x-table.cell column="title">{{ $item->title }}</x-table.cell>
-                                <x-table.cell column="status"><x-util.status :status="$item->status" /></x-table.cell>
-                                <x-table.cell column="requires_consent"><x-util.status :status="$item->requires_consent" /></x-table.cell>
+                                <x-table.cell column="status"><x-util.e-badge :enum="$item->status" /></x-table.cell>
+                                <x-table.cell column="requires_consent"><x-util.e-badge :enum="$item->requires_consent" /></x-table.cell>
                                 <x-table.cell column="consents_count"><span class="tabular-nums">{{ number_format($item->consents_count) }}</span></x-table.cell>
                                 <x-table.cell column="effective_at">{{ $item->effective_at ? $item->effectiveAtHuman() : '—' }}</x-table.cell>
                                 <x-table.cell column="updated_at">{{ $item->updatedAtHuman() }}</x-table.cell>

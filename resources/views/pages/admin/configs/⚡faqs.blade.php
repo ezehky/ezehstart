@@ -452,7 +452,7 @@ new class extends Component
                                     <flux:badge size="sm" color="zinc">{{ $item->faq_type->label() }}</flux:badge>
                                 </x-table.cell>
 
-                                <x-table.cell column="status"><x-util.status :status="$item->status" /></x-table.cell>
+                                <x-table.cell column="status"><x-util.e-badge :enum="$item->status" /></x-table.cell>
                                 <x-table.cell column="updated_at">{{ $item->updatedAtHuman() }}</x-table.cell>
 
                                 <x-table.cell>

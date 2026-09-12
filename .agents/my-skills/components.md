@@ -19,7 +19,7 @@ with `@props([...])`.
 | `finance/` | Money widgets | `withdraw-button-card`, `withdraw-modal` |
 | `layouts/` | Page shells | `base`, `email`, `site-master`, `email/theme`, `email/label-value` |
 | `lv/` | Embedded **Livewire** SFCs | `⚡notifications`, `⚡newsletter-form` |
-| *(root)* | `status.blade.php` | `<x-util.status :status="…" />` |
+| `util/` | Small standalone widgets | `e-badge` (`<x-util.e-badge :enum="…" />`), `countdown`, `floating-actions` |
 
 ### Sub-groups
 
@@ -171,7 +171,7 @@ Callers pass them with `<x-slot:title>`.
     :tone="$metric['tone']"
 />
 
-<x-util.status :status="$item->status" />
+<x-util.e-badge :enum="$item->status" />
 <x-dashboard.avatar :user="$item" size="md" />
 <x-dashboard.role.badges :user="$item" />
 <x-dashboard.workspace-no-record label="Students" icon="academic-cap" text="No students match the current filters." />
@@ -215,12 +215,15 @@ needs a `match` over a variant. Otherwise inline it.
 
 ## Example
 
-`resources/views/components/status.blade.php` — the smallest and most-used component:
+`resources/views/components/util/e-badge.blade.php` — the most-used component. Its
+badge branch is the whole idea: colour and label come off the enum case, never off
+the call site. (The same file renders a switch instead when the page passes `id` and
+`gate` — see [ui.md](ui.md).)
 
 ```blade
-@props(['status'])
-<flux:badge :color="$status->color()" {{ $attributes->merge(['size' => 'sm', 'inset' => 'top bottom']) }}>
-    {{ kBreakText($status->label()) }}
+@props(['enum'])
+<flux:badge :color="$enum->color()" {{ $attributes->merge(['size' => 'sm', 'inset' => 'top bottom']) }}>
+    {{ $enum->label() }}
 </flux:badge>
 ```
 

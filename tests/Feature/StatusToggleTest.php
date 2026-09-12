@@ -9,7 +9,7 @@ use App\Models\Tag;
 use Livewire\Livewire;
 
 /**
- * The row switch — WithStatusToggle plus <x-util.status-toggle> — exercised through
+ * The row switch — WithStatusToggle plus <x-util.e-badge> — exercised through
  * the tags listing, which is the first screen to carry it.
  */
 beforeEach(function () {

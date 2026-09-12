@@ -9,7 +9,7 @@ use App\Services\ActivityLogService;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * The row switch behind <x-util.status-toggle>: one click flips a record between
+ * The row switch behind <x-util.e-badge>: one click flips a record between
  * active and inactive without opening its edit form.
  *
  * A status is the one field on a listing that gets changed on its own — a tag is

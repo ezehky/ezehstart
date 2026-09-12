@@ -20,7 +20,7 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Uses existing enums; no bare string/int status columns were introduced
 - [ ] ✓ Uses existing traits (`WithFormResponseMessage`, `WithEnumHelpers`,
       `WithDynamicModelFormatting`, …)
-- [ ] ✓ Uses existing UI components (`x-dashboard.*`, `x-form.*`, `x-util.status`, Flux)
+- [ ] ✓ Uses existing UI components (`x-dashboard.*`, `x-form.*`, `x-util.e-badge`, Flux)
       before creating a new one
 - [ ] ✓ Uses existing `k*()` helpers for slugs, money, dates, files, pluralisation
 - [ ] ✓ Uses existing layouts (`layouts::app` by default, `layouts::auth` for guests)
@@ -99,7 +99,7 @@ If a line does not apply, it is ✓ by default — but read it first.
 
 - [ ] ✓ Flux components used before hand-rolled markup
 - [ ] ✓ Every colour has a `dark:` counterpart
-- [ ] ✓ Status badges use `<x-util.status :status="$item->status" />`
+- [ ] ✓ Status badges use `<x-util.e-badge :enum="$item->status" />`
 - [ ] ✓ Empty states use `<x-dashboard.workspace-no-record>` or the inline
       `colspan` row pattern
 - [ ] ✓ Tables use `flux:table` / `flux:table.columns` / `flux:table.rows`

@@ -263,7 +263,7 @@ new class extends Component
 
                             <x-table.cell column="notification_preferences_count">{{ number_format($item->notification_preferences_count) }}</x-table.cell>
                             <x-table.cell column="flow_order"><span class="tabular-nums">{{ $item->flow_order }}</span></x-table.cell>
-                            <x-table.cell column="status"><x-util.status :status="$item->status" /></x-table.cell>
+                            <x-table.cell column="status"><x-util.e-badge :enum="$item->status" /></x-table.cell>
 
                             <x-table.cell class="flex justify-end gap-1">
                                 <x-dashboard.gate.button

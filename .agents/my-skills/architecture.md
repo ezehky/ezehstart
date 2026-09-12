@@ -53,7 +53,7 @@ resources/views/
 │   │                 password, phone-field
 │   ├── layouts/      base, email, email/*
 │   ├── lv/           ⚡notifications  (a Livewire SFC used as a component, not a page)
-│   └── status.blade.php
+│   └── util/         e-badge, countdown, floating-actions
 ├── emails/auth/      mail views
 ├── flux/icon/        custom Flux icons (brand logos)
 ├── layouts/          app.blade.php, auth.blade.php  → the "layouts::" namespace

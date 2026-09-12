@@ -236,7 +236,7 @@ new class extends Component
                 @forelse ($this->things as $item)
                     <flux:table.row wire:key="thing-{{ $item->id }}">
                         <flux:table.cell class="font-medium">{{ $item->name }}</flux:table.cell>
-                        <flux:table.cell><x-util.status :status="$item->status" /></flux:table.cell>
+                        <flux:table.cell><x-util.e-badge :enum="$item->status" /></flux:table.cell>
                         <flux:table.cell>
                             <flux:dropdown position="right" align="start">
                                 <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />

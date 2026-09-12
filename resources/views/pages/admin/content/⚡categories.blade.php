@@ -576,7 +576,7 @@ new class extends Component
                         <x-table.cell column="flow_order">{{ $item->flow_order }}</x-table.cell>
 
                         <x-table.cell column="status">
-                            <x-util.status-toggle :status="$item->status" :id="$item->id" gate="content.categories" />
+                            <x-util.e-badge :enum="$item->status" :id="$item->id" gate="content.categories" />
                         </x-table.cell>
 
                         <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
