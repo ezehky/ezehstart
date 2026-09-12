@@ -90,6 +90,22 @@ new class extends Component
         return 'posts';
     }
 
+    /**
+     * The filters, for the chips that take them off again.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'search' => ['label' => 'Search'],
+            'status' => ['label' => 'Status', 'options' => StatusPost::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Published';
+    }
+
     protected function tableDateColumn(): string
     {
         return 'published_at';
@@ -294,7 +310,9 @@ new class extends Component
                 <x-table.column-manager :columns="$this->tableColumnList" />
             </div>
 
-            <x-table.bulk-bar class="mb-5" :count="$this->selectedCount" :matching="$selectMatching" subject="posts" />
+            <x-table.active-filters :filters="$this->tableActiveFilters" />
+
+            <x-table.bulk-bar class="mb-5" :count="$this->selectedCount" :total="$this->tableTotalCount" :matching="$selectMatching" :columns="$this->tableExportOptions" subject="posts" />
 
             <flux:table :paginate="$this->posts">
                 <x-table.columns

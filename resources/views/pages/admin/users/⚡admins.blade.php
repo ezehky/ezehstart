@@ -100,6 +100,28 @@ new class extends Component
         return 'admins';
     }
 
+    /**
+     * The filters, for the chips that take them off again. A role is named by its
+     * own row rather than by an enum, so the chip reads the same list the select is
+     * built from.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'search' => ['label' => 'Search'],
+            'roleState' => [
+                'label' => 'Role',
+                'options' => ['none' => 'No live role'] + $this->assignableRoles->pluck('name', 'id')->all(),
+            ],
+            'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Added';
+    }
+
     protected function tableExportValue(Model $item, string $column): mixed
     {
         return match ($column) {
@@ -386,7 +408,9 @@ new class extends Component
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
-        <x-table.bulk-bar class="mb-5" :count="$this->selectedCount" :matching="$selectMatching" subject="admins" />
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
+        <x-table.bulk-bar class="mb-5" :count="$this->selectedCount" :total="$this->tableTotalCount" :matching="$selectMatching" :columns="$this->tableExportOptions" subject="admins" />
 
         <flux:table :paginate="$this->admins">
             <x-table.columns

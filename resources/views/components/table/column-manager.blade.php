@@ -22,12 +22,12 @@
 @endphp
 
 <flux:dropdown position="bottom" align="end" {{ $attributes->merge() }}>
-    <flux:button icon="view-columns" icon:trailing="chevron-down" variant="filled">
-        {{ $label }}
+    <flux:button icon="view-columns" variant="filled">
+        {{-- <span class="sr-only">{{ $label }}</span>
 
         @if ($hidden > 0)
-            <flux:badge size="sm" color="zinc" class="ms-1">{{ $hidden }} off</flux:badge>
-        @endif
+            <flux:badge size="sm" color="zinc" class="ms-1 sr-only">{{ $hidden }} off</flux:badge>
+        @endif --}}
     </flux:button>
 
     <flux:menu class="min-w-56">
@@ -51,8 +51,6 @@
         </flux:menu.group>
 
         @if ($hidden > 0)
-            <flux:menu.separator />
-
             <flux:menu.item icon="arrow-path" wire:click="resetColumns">Show them all</flux:menu.item>
         @endif
     </flux:menu>

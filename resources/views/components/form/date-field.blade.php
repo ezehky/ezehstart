@@ -13,6 +13,10 @@
     In range mode the same wire:model modifiers are applied to both ends, so
     `wire:model.live` on the start makes the end live too. `end-model` names the
     second property; without it a range has nowhere to put its far end.
+
+    The binding runs both ways. A property cleared on the server — a filter chip, a
+    Clear button, a fresh URL — empties the box as well, rather than leaving a range
+    printed in a field the listing below has already stopped honouring.
 --}}
 
 @props([
@@ -100,6 +104,10 @@
         'months' => $months,
         'format' => $format,
         'presets' => array_values($presetList),
+        // Named so the calendar can follow them rather than only write to them. A
+        // filter that is cleared on the server has to clear the box as well.
+        'startProperty' => $modelDirective ? (string) $attributes->get($modelDirective) : '',
+        'endProperty' => (string) ($endModel ?? ''),
     ]);
 @endphp
 
@@ -134,21 +142,31 @@
             x-bind:value="label"
             x-on:click="open = ! open"
             x-on:keydown.enter.prevent="open = ! open"
-        />
-
-        @if ($clearable)
-            <flux:button
-                icon="x-mark"
-                variant="subtle"
-                size="sm"
-                type="button"
-                class="absolute end-1 top-1/2 -translate-y-1/2"
-                x-cloak
-                x-show="hasValue"
-                x-on:click.stop="clear()"
-                title="Clear date"
-            />
-        @endif
+        >
+            {{-- Handed to Flux as the field's trailing slot rather than positioned
+                 over the field by hand. A flux:button carries `relative` in its own
+                 class list, Tailwind writes `.relative` after `.absolute`, and an
+                 `absolute` added from out here loses that tie — which is how the
+                 clear button ended up sitting under the field instead of inside it.
+                 The slot is already placed, and Flux widens the input's padding to
+                 match so the date never runs under the icon. --}}
+            @if ($clearable)
+                <x-slot name="iconTrailing">
+                    <flux:button
+                        icon="x-mark"
+                        variant="subtle"
+                        size="xs"
+                        square
+                        type="button"
+                        class="-me-1"
+                        x-cloak
+                        x-show="hasValue"
+                        x-on:click.stop="clear()"
+                        title="Clear date"
+                    />
+                </x-slot>
+            @endif
+        </flux:input>
 
         <div
             x-cloak

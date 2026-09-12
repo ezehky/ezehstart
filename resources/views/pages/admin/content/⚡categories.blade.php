@@ -101,6 +101,20 @@ new class extends Component
         return 'categories';
     }
 
+    /**
+     * The filters, for the chips that take them off again. The group is not one of
+     * them — it is which screen this is rather than a narrowing of it.
+     */
+    protected function tableFilters(): array
+    {
+        return ['search' => ['label' => 'Search']];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Added';
+    }
+
     protected function tableDeletable(): bool
     {
         return true;
@@ -518,10 +532,14 @@ new class extends Component
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
         <x-table.bulk-bar
             class="mt-5"
             :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
             :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
             subject="categories"
             gate="content.categories"
             deletable

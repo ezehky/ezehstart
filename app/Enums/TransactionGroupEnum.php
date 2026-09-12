@@ -47,4 +47,18 @@ enum TransactionGroupEnum: string
     {
         return $this === self::ADJUSTMENT;
     }
+
+    /**
+     * Colors
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::DEPOSIT => 'green',
+            self::WITHDRAWAL => 'red',
+            self::PURCHASE => 'blue',
+            self::REFUND => 'yellow',
+            self::ADJUSTMENT => 'gray',
+        };
+    }
 }

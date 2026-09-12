@@ -70,6 +70,19 @@ new class extends Component
     }
 
     /**
+     * The filters, for the chips that take them off again.
+     */
+    protected function tableFilters(): array
+    {
+        return ['search' => ['label' => 'Search']];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Added';
+    }
+
+    /**
      * Tags are the one listing where clearing a handful at once is the normal job —
      * they arrive by being typed, and tidying up is most of what this screen is for.
      */
@@ -402,9 +415,13 @@ new class extends Component
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
         <x-table.bulk-bar
             :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
             :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
             subject="tags"
             gate="content.tags"
             deletable

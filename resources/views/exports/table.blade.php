@@ -37,7 +37,7 @@
         @if ($subheading)
             {{ $subheading }} &middot;
         @endif
-        {{ kSiteConfig('name') }} &middot; {{ now()->format('jS M, Y') }}
+        {{ kSiteConfig('name', default: config('app.name')) }} &middot; {{ now()->format('jS M, Y') }}
     </p>
 
     <table>

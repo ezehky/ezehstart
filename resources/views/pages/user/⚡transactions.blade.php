@@ -74,6 +74,22 @@ new class extends Component
         return 'transactions';
     }
 
+    /**
+     * The filters, for the chips that take them off again.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'group' => ['label' => 'Type', 'options' => TransactionGroupEnum::forSelect()],
+            'status' => ['label' => 'Status', 'options' => StatusTransaction::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Dated';
+    }
+
     protected function tableExportValue(Model $item, string $column): mixed
     {
         return match ($column) {
@@ -214,10 +230,14 @@ new class extends Component
 
             {{-- Export only: a member takes a copy of their own statement, and there
                  is nothing on this screen for them to delete. --}}
+            <x-table.active-filters :filters="$this->tableActiveFilters" />
+
             <x-table.bulk-bar
                 class="mb-5"
                 :count="$this->selectedCount"
+                :total="$this->tableTotalCount"
                 :matching="$selectMatching"
+                :columns="$this->tableExportOptions"
                 subject="transactions"
             />
 

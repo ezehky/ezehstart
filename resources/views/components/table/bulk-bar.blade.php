@@ -2,9 +2,15 @@
     The bar that appears once rows are ticked: what is selected, how to widen or drop
     the selection, and what can be done with it.
 
-        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="transactions" />
+        <x-table.bulk-bar
+            :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
+            :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
+            subject="transactions"
+        />
 
-        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="tags" gate="content.tags" deletable>
+        <x-table.bulk-bar … subject="tags" gate="content.tags" deletable>
             <x-slot:actions>
                 <flux:button size="sm" variant="filled" icon="check" wire:click="bulkApprove">Approve</flux:button>
             </x-slot:actions>
@@ -14,15 +20,19 @@
     privilege — while delete appears only where the screen allows it at all and the
     account holds full access. Both re-check on the way in; this is the courtesy half.
 
-    "Select all N matching" is the important one: a page checkbox ticks twenty rows,
-    and an administrator clearing out a filtered result means the whole result, not
-    the first page of it.
+    "Select all N" is the important one: a page checkbox ticks twenty rows, and an
+    administrator clearing out a filtered result means the whole result, not the
+    first page of it. The count is on the link because "all" means a different
+    number on every screen, and it is the one somebody needs to see before pressing
+    it rather than afterwards.
 --}}
 
 @props([
     'count' => 0,
+    'total' => 0,
     'matching' => false,
     'subject' => 'records',
+    'columns' => [],
     'gate' => null,
     'level' => 'full',
     'deletable' => false,
@@ -37,42 +47,28 @@
                 {{ number_format($count) }} {{ $subject }} selected
             </span>
 
-            @if ($matching)
-                <span class="text-lime-800/80 dark:text-lime-200/70">Everything the current filters match.</span>
-            @else
+            @if (!$matching && $total > $count)
                 <flux:link href="#" wire:click.prevent="selectAllMatching" class="text-sm">
-                    Select everything that matches
+                    Select all {{ number_format($total) }}
                 </flux:link>
             @endif
 
             <flux:link href="#" wire:click.prevent="clearSelection" variant="subtle" class="text-sm">
-                Clear
+                Deselect all
             </flux:link>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
             {!! $actions !!}
 
+            {{-- One button rather than a format menu: the format is the smallest of
+                 the decisions an export involves, and it belongs beside the other
+                 two — which columns go in the file, and what they are called once
+                 they are in it. --}}
             @if ($exportable)
-                <flux:dropdown position="bottom" align="end">
-                    <flux:button size="sm" variant="filled" icon="arrow-down-tray" icon:trailing="chevron-down">
-                        Export
-                    </flux:button>
-
-                    <flux:menu>
-                        <flux:menu.item icon="table-cells" wire:click="export('csv')">CSV (.csv)</flux:menu.item>
-                        <flux:menu.item icon="document-chart-bar" wire:click="export('xlsx')">Excel (.xlsx)</flux:menu.item>
-                        <flux:menu.item icon="document-text" wire:click="export('pdf')">PDF (.pdf)</flux:menu.item>
-
-                        <flux:menu.separator />
-
-                        {{-- An export follows the table by default. This is for the
-                             time somebody wants the columns they hid as well. --}}
-                        <flux:menu.item>
-                            <flux:switch wire:model.live="exportAllColumns" label="Every column" align="left" />
-                        </flux:menu.item>
-                    </flux:menu>
-                </flux:dropdown>
+                <flux:button size="sm" variant="filled" icon="arrow-down-tray" wire:click="openExportModal">
+                    Export
+                </flux:button>
             @endif
 
             @if ($deletable)
@@ -96,9 +92,13 @@
         </div>
     </div>
 
-    {{-- The dialog travels with the bar rather than being left for each page to
+    {{-- The dialogs travel with the bar rather than being left for each page to
          remember. A bulk delete is the one action on a listing with no undo, and
          "the page that forgot its confirm modal" is not a failure worth allowing. --}}
+    @if ($exportable)
+        <x-table.export-modal :columns="$columns" :subject="$subject" :count="$count" />
+    @endif
+
     @if ($deletable)
         <x-dashboard.confirm-modal
             name="bulkDeleteModal"

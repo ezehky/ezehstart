@@ -87,20 +87,30 @@ class ExportService
      */
     private function pdf(string $filename, array $headers, iterable $rows, array $meta): Response
     {
-        // A driver is the developer's choice — dompdf needs nothing installed beyond
-        // its own package, browsershot needs Node and Chrome — and none of them ships
-        // with the kit. Whichever is configured, a missing one must read as a setting
-        // that has not been made rather than as a crash on a download button.
+        // dompdf ships with the kit and renders in pure PHP, so this works on an
+        // install where nothing but composer has been run. A project that switches
+        // to browsershot or gotenberg takes on their binaries as well — and where
+        // those are not there, it has to read as a setting nobody has made rather
+        // than as a crash on a download button.
+        //
+        // Written to a file and sent from there rather than handed back as the
+        // package's own response. That one is a plain Illuminate response, and
+        // Livewire only recognises a streamed or binary-file response as a download
+        // — so a PDF returned straight from a Livewire action leaves the button
+        // looking like it did nothing at all.
+        $path = tempnam(sys_get_temp_dir(), 'export').'.pdf';
+
         try {
-            return Pdf::view('exports.table', [
+            Pdf::view('exports.table', [
                 'headers' => $headers,
                 'rows' => $rows instanceof Collection ? $rows : collect($rows),
                 'heading' => $meta['heading'] ?? 'Export',
                 'subheading' => $meta['subheading'] ?? null,
             ])
                 ->landscape()
-                ->download($filename)
-                ->toResponse(request());
+                ->save($path);
+
+            return response()->download($path, $filename)->deleteFileAfterSend();
         } catch (\Throwable $exception) {
             throw new \RuntimeException(
                 'PDF export is not set up on this install: '.$exception->getMessage(),

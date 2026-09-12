@@ -170,6 +170,8 @@ export default function datePicker({
     months = 1,
     format = "medium",
     presets = [],
+    startProperty = "",
+    endProperty = "",
 }) {
     return {
         open: false,
@@ -203,10 +205,32 @@ export default function datePicker({
 
             this.syncViewToSelection();
 
-            // Livewire can change the bound property from the server -- a reset
-            // button on a filter bar does exactly that -- and the calendar has to
-            // follow it rather than keep showing what was picked here.
+            // However the near end came to change, the months on show follow it.
             this.$watch("start", () => this.syncViewToSelection());
+
+            // Livewire owns these values as much as the calendar does: a filter
+            // chip, a Clear button or a fresh URL changes them on the server, and
+            // what is printed in the box has to be what the listing is actually
+            // filtered by. Nothing here reads back on its own -- wire:model writes
+            // the new value onto the hidden input and this component never hears of
+            // it -- which is how clearing the date filter left the old range sitting
+            // in a field the table below had already stopped honouring.
+            this.followProperty(startProperty, (value) => (this.start = value));
+            this.followProperty(endProperty, (value) => (this.end = value));
+        },
+
+        /**
+         * Follow a Livewire property for as long as this field is on the page.
+         *
+         * A date field rendered outside a Livewire component has no $wire and
+         * nothing to follow, which is why this asks rather than assumes.
+         */
+        followProperty(property, apply) {
+            if (!property || typeof this.$wire?.$watch !== "function") {
+                return;
+            }
+
+            this.$wire.$watch(property, (value) => apply(value ?? ""));
         },
 
         // ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

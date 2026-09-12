@@ -63,6 +63,22 @@ new class extends Component
         return 'activity logs';
     }
 
+    /**
+     * The filters, for the chips that take them off again.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'search' => ['label' => 'Search'],
+            'action' => ['label' => 'Action', 'options' => ActivityActionEnum::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Logged';
+    }
+
     protected function tableExportValue(Model $item, string $column): mixed
     {
         return match ($column) {
@@ -124,13 +140,6 @@ new class extends Component
         Flux::modal('activityLogModal')->show();
     }
 
-    public function clearFilters(): void
-    {
-        $this->reset('search', 'action', 'dateFrom', 'dateTo');
-        $this->clearSelection();
-        $this->resetPage();
-    }
-
     /**
      * The before/after pairs for a log, keyed by column.
      *
@@ -176,22 +185,21 @@ new class extends Component
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <x-form.date-field
-                    mode="range"
-                    wire:model.live="dateFrom"
-                    end-model="dateTo"
-                    with-presets
-                    label="Between"
-                    class="sm:max-w-md"
-                />
-                <flux:button variant="ghost" icon="x-mark" wire:click="clearFilters">Clear filters</flux:button>
-            </div>
+            <x-form.date-field
+                mode="range"
+                wire:model.live="dateFrom"
+                end-model="dateTo"
+                with-presets
+                label="Between"
+                class="sm:max-w-md"
+            />
 
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
-        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="activity logs" />
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
+        <x-table.bulk-bar :count="$this->selectedCount" :total="$this->tableTotalCount" :matching="$selectMatching" :columns="$this->tableExportOptions" subject="activity logs" />
 
         <flux:table :paginate="$this->logs">
             <x-table.columns

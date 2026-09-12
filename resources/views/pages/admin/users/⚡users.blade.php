@@ -57,6 +57,22 @@ new class extends Component
         return 'members';
     }
 
+    /**
+     * The filters, for the chips that take them off again.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'search' => ['label' => 'Search'],
+            'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Joined';
+    }
+
     protected function tableExportValue(Model $item, string $column): mixed
     {
         return match ($column) {
@@ -178,7 +194,15 @@ new class extends Component
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
-        <x-table.bulk-bar :count="$this->selectedCount" :matching="$selectMatching" subject="members" />
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
+        <x-table.bulk-bar
+            :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
+            :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
+            subject="members"
+        />
 
         <flux:table :paginate="$this->users">
             <x-table.columns

@@ -384,7 +384,9 @@ new class extends Component
 
         <x-table.bulk-bar
             :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
             :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
             subject="questions"
             :gate="$pageGate"
             deletable

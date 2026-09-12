@@ -31,7 +31,7 @@
             <a
                 href="{{ $href }}"
                 @if ($navigate) wire:navigate @endif
-                class="block hover:underline decoration-slate-300 underline-offset-4 dark:decoration-slate-600"
+                class="block underline-offset-4 dark:decoration-slate-600"
             >
                 {{ $slot }}
             </a>

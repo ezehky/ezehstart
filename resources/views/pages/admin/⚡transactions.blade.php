@@ -63,7 +63,7 @@ new class extends Component
             // put away.
             'reference' => ['label' => 'Reference', 'locked' => true, 'sortable' => true],
             'user' => ['label' => 'Account'],
-            'amount' => ['label' => 'Amount', 'sortable' => true, 'summary' => 'sum', 'money' => true],
+            'amount' => ['label' => 'Amount', 'locked' => true, 'sortable' => true, 'summary' => 'sum', 'money' => true],
             'transaction_group' => ['label' => 'Group', 'sortable' => true],
             'via' => ['label' => 'Via', 'sortable' => true],
             'status' => ['label' => 'Status', 'sortable' => true],
@@ -98,6 +98,25 @@ new class extends Component
     }
 
     /**
+     * The filters, for the chips that take them off again. The group has no select
+     * of its own — it arrives from a link on the dashboard — and the chip is what
+     * says so on the screen it lands on.
+     */
+    protected function tableFilters(): array
+    {
+        return [
+            'search' => ['label' => 'Search'],
+            'status' => ['label' => 'Status', 'options' => StatusTransaction::forSelect()],
+            'group' => ['label' => 'Type', 'options' => TransactionGroupEnum::forSelect()],
+        ];
+    }
+
+    protected function tableDateLabel(): string
+    {
+        return 'Dated';
+    }
+
+    /**
      * One cell on the way into a file. The columns that are a relationship or a
      * formatted amount cannot be read straight off the model, and an export of
      * "App\Models\User" helps nobody.
@@ -129,7 +148,7 @@ new class extends Component
     }
 
     /**
-     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     * @return iterable<int, Model>
      */
     protected function tableRows(): iterable
     {
@@ -374,9 +393,13 @@ new class extends Component
             <x-table.column-manager :columns="$this->tableColumnList" />
         </div>
 
+        <x-table.active-filters :filters="$this->tableActiveFilters" />
+
         <x-table.bulk-bar
             :count="$this->selectedCount"
+            :total="$this->tableTotalCount"
             :matching="$selectMatching"
+            :columns="$this->tableExportOptions"
             subject="transactions"
         />
 
@@ -409,17 +432,11 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="amount">
-                            <span @class([
-                                'font-medium',
-                                'text-red-600 dark:text-red-400' => $item->transaction_type->isDebit(),
-                                'text-emerald-600 dark:text-emerald-400' => ! $item->transaction_type->isDebit(),
-                            ])>
-                                {{ $item->signedAmount() }}
-                            </span>
+                            <x-transaction.amount :transaction="$item" />
                         </x-table.cell>
 
                         <x-table.cell column="transaction_group">
-                            <flux:badge size="sm" color="zinc" inset="top bottom">{{ $item->transaction_group->label() }}</flux:badge>
+                            <x-util.status :status="$item->transaction_group" />
                         </x-table.cell>
 
                         <x-table.cell column="via">

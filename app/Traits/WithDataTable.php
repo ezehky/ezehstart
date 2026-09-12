@@ -49,13 +49,22 @@ use Symfony\Component\HttpFoundation\Response;
  *     }
  *
  * @property-read array<string, array<string, mixed>> $tableColumnList
+ * @property-read array<string, array<string, mixed>> $tableExportOptions
+ * @property-read array<string, array<string, string>> $tableActiveFilters
  * @property-read array<string, string> $tableExportHeaders
  * @property-read array<string, string> $tableSummary
+ * @property-read int $tableTotalCount
  * @property-read int $selectedCount
  */
 trait WithDataTable
 {
     use WithGateProps;
+
+    /**
+     * The chip that stands for both ends of the date range at once. Spelt with a
+     * dash so it can never collide with a page's own filter property.
+     */
+    public const DATE_FILTER = 'date-range';
 
     /**
      * The chosen rows, by key. Strings because a checkbox value arrives as one, and
@@ -73,6 +82,18 @@ trait WithDataTable
      * can say so and the actions can work off the query rather than off the page.
      */
     public bool $selectMatching = false;
+
+    /**
+     * Rows unticked by hand while "everything the filters match" is on, by key.
+     *
+     * Kept as the exceptions rather than turning the selection back into a list:
+     * somebody who chose eleven hundred rows and then dropped one meant eleven
+     * hundred less one, and re-reading the whole result into `selected` to take a
+     * row out of it is a list nobody wanted the app to hold.
+     *
+     * @var array<int, string>
+     */
+    public array $excluded = [];
 
     /**
      * Columns the account has put away, by key.
@@ -101,15 +122,30 @@ trait WithDataTable
     public string $exportFormat = 'csv';
 
     /**
-     * Whether an export takes the columns on screen or all of them. Off by default:
-     * the spreadsheet somebody wants is usually the table they are looking at.
+     * The columns this export carries, by key. Seeded from the table on screen and
+     * then whatever the account ticked in the export dialog.
+     *
+     * @var array<int, string>
      */
-    public bool $exportAllColumns = false;
+    public array $exportColumns = [];
+
+    /**
+     * The heading each exported column lands under, by key. A column is called one
+     * thing on a dashboard and another in the spreadsheet somebody has to hand to
+     * an accountant, and renaming it here beats renaming it in Excel afterwards.
+     *
+     * @var array<string, string>
+     */
+    public array $exportLabels = [];
 
     public function mountWithDataTable(): void
     {
         $this->hiddenColumns = (array) app(DashboardManagerService::class)
             ->get('column-manager', $this->tableKey(), []);
+
+        // Seeded on the way in rather than only when the dialog opens, so export()
+        // called straight off a button still has columns to carry.
+        $this->resetExportColumns();
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -135,7 +171,7 @@ trait WithDataTable
                 'exportable' => $column['exportable'] ?? true,
                 'visible' => ($column['locked'] ?? false)
                     ? true
-                    : ! in_array($key, $this->hiddenColumns, true),
+                    : ! \in_array($key, $this->hiddenColumns, true),
             ])
             ->all();
     }
@@ -162,7 +198,11 @@ trait WithDataTable
 
         app(DashboardManagerService::class)->put('column-manager', $this->tableKey(), $this->hiddenColumns);
 
-        unset($this->tableColumnList, $this->tableExportHeaders);
+        unset($this->tableColumnList, $this->tableExportOptions, $this->tableExportHeaders);
+
+        // An export follows the table by default, so a column put away goes out of
+        // the file with it until somebody says otherwise in the export dialog.
+        $this->resetExportColumns();
     }
 
     /**
@@ -176,7 +216,9 @@ trait WithDataTable
 
         app(DashboardManagerService::class)->forget('column-manager', $this->tableKey());
 
-        unset($this->tableColumnList, $this->tableExportHeaders);
+        unset($this->tableColumnList, $this->tableExportOptions, $this->tableExportHeaders);
+
+        $this->resetExportColumns();
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -237,28 +279,154 @@ trait WithDataTable
 
     public function updatedDateFrom(): void
     {
-        $this->clearSelection();
-        $this->resetPage();
+        $this->afterFilterChange();
     }
 
     public function updatedDateTo(): void
     {
+        $this->afterFilterChange();
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // THE FILTERS, AS CHIPS
+
+    /**
+     * The filters currently narrowing the listing, ready to be shown and taken off
+     * one at a time.
+     *
+     * Both ends of the date range are one chip: they were chosen together in one
+     * field, and "From the 3rd" with no far end is half a sentence rather than a
+     * filter of its own.
+     *
+     * @return array<string, array<string, string>>
+     */
+    #[Computed]
+    public function tableActiveFilters(): array
+    {
+        $active = collect($this->tableFilters())
+            ->filter(fn (array $filter, string $key) => (string) $this->{$key} !== '')
+            ->map(fn (array $filter, string $key) => [
+                'label' => $filter['label'] ?? (string) str($key)->headline(),
+                // A select shows a label and files a value; the chip has to say the
+                // label back, or a status filter reads as "Status: 2". Read as a
+                // plain key rather than through data_get(), which would take a
+                // search term with a full stop in it for a nested path.
+                'value' => (string) ($filter['options'][$this->{$key}] ?? $this->{$key}),
+            ])
+            ->all();
+
+        if ($range = $this->tableDateRangeLabel()) {
+            $active[self::DATE_FILTER] = ['label' => $this->tableDateLabel(), 'value' => $range];
+        }
+
+        return $active;
+    }
+
+    /**
+     * Take one filter off.
+     */
+    public function clearFilter(string $key): void
+    {
+        if ($key === self::DATE_FILTER) {
+            $this->reset('dateFrom', 'dateTo');
+        } else {
+            // The key arrives over the wire, and reset() aimed at an arbitrary
+            // property would put any of them back — the sort, the gate, the page.
+            // Only what the screen declared as a filter can be cleared from here.
+            $this->respondError(
+                'That filter is not on this screen.',
+                if: ! array_key_exists($key, $this->tableFilters()),
+            );
+
+            $this->reset($key);
+        }
+
+        $this->afterFilterChange();
+    }
+
+    /**
+     * Every filter off at once.
+     *
+     * The sort and the column arrangement are left where they are: those are how
+     * the account reads this screen rather than what it is being shown, and losing
+     * them to a Clear button is not what anybody pressing it meant.
+     */
+    public function clearFilters(): void
+    {
+        if ($filters = array_keys($this->tableFilters())) {
+            $this->reset($filters);
+        }
+
+        $this->reset('dateFrom', 'dateTo');
+
+        $this->afterFilterChange();
+    }
+
+    /**
+     * What every filter change does: let go of rows that are about to leave the
+     * screen, and go back to the first page of what is left.
+     */
+    protected function afterFilterChange(): void
+    {
         $this->clearSelection();
         $this->resetPage();
+
+        unset($this->tableActiveFilters, $this->tableTotalCount);
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // SELECTION
 
     /**
-     * The header checkbox. Ticking it takes the rows on screen — not the whole result,
-     * which is what the bulk bar offers separately once this is on.
+     * Tick the rows of whichever page is now on screen, while "everything that
+     * matches" is on.
+     *
+     * `selected` only ever holds the keys of the page being looked at — a selection
+     * of eleven hundred rows is a count, not a list — so page two arrives with its
+     * boxes empty and the header still ticked unless its own keys are put in before
+     * it renders. That is the state the screen was showing: a bar saying twenty-four
+     * rows are chosen above a page where none of them appear to be.
+     */
+    public function renderingWithDataTable(): void
+    {
+        if (! $this->selectMatching) {
+            return;
+        }
+
+        $keys = $this->tablePageKeys();
+
+        $this->selected = array_values(array_diff($keys, $this->excluded));
+        $this->selectPage = $keys !== [] && $this->selected === $keys;
+    }
+
+    /**
+     * The header checkbox. It governs the rows on screen and nothing else — the
+     * whole result is what the bulk bar offers separately.
      */
     public function updatedSelectPage(bool $value): void
     {
-        $this->selectMatching = false;
+        $keys = $this->tablePageKeys();
 
-        $this->selected = $value ? $this->tablePageKeys() : [];
+        if ($this->selectMatching) {
+            // While the whole result is chosen, the header sets this page aside or
+            // brings it back, and every other page stays chosen.
+            $this->excluded = $value
+                ? array_values(array_diff($this->excluded, $keys))
+                : array_values(array_unique([...$this->excluded, ...$keys]));
+
+            $this->selected = $value ? $keys : [];
+
+            unset($this->selectedCount);
+
+            return;
+        }
+
+        // Added to what is already chosen rather than replacing it: somebody paging
+        // through and ticking each header means all of those pages, and a header
+        // that started over would quietly drop the ones behind them.
+        $this->selected = $value
+            ? array_values(array_unique([...$this->selected, ...$keys]))
+            : array_values(array_diff($this->selected, $keys));
 
         unset($this->selectedCount);
     }
@@ -274,11 +442,18 @@ trait WithDataTable
      */
     public function updatedSelected(): void
     {
-        // Hand-picking rows is the opposite of "everything the filters match", so the
-        // wider selection is dropped the moment one row is touched.
-        $this->selectMatching = false;
-
         $keys = $this->tablePageKeys();
+
+        if ($this->selectMatching) {
+            // A row put back while the whole result is chosen is an exception to it
+            // rather than the end of it. Falling back to the page on screen — which
+            // is what this used to do — turned eleven hundred rows into twelve
+            // without saying so, and the bar went on reading as a selection.
+            $this->excluded = array_values(array_unique([
+                ...array_diff($this->excluded, $keys),
+                ...array_diff($keys, $this->selected),
+            ]));
+        }
 
         $this->selectPage = $keys !== [] && array_diff($keys, $this->selected) === [];
 
@@ -294,14 +469,27 @@ trait WithDataTable
     {
         $this->selectMatching = true;
         $this->selectPage = true;
+        $this->excluded = [];
         $this->selected = $this->tablePageKeys();
+
+        unset($this->selectedCount);
     }
 
     public function clearSelection(): void
     {
-        $this->reset('selected', 'selectPage', 'selectMatching');
+        $this->reset('selected', 'selectPage', 'selectMatching', 'excluded');
 
         unset($this->selectedCount);
+    }
+
+    /**
+     * How many rows the current filters match. Also what "Select all N" offers, so
+     * the number on the link is the number the bar will read once it is used.
+     */
+    #[Computed]
+    public function tableTotalCount(): int
+    {
+        return $this->tableQuery()->toBase()->getCountForPagination();
     }
 
     /**
@@ -311,19 +499,23 @@ trait WithDataTable
     public function selectedCount(): int
     {
         return $this->selectMatching
-            ? $this->tableQuery()->toBase()->getCountForPagination()
+            ? max($this->tableTotalCount - count($this->excluded), 0)
             : count($this->selected);
     }
 
     /**
-     * The rows an action works on: the whole filtered result once "select all
-     * matching" has been used, and the ticked keys otherwise.
+     * The rows an action works on: the whole filtered result less anything put back
+     * by hand once "select all matching" has been used, and the ticked keys
+     * otherwise.
      */
     protected function selectionQuery(): Builder
     {
-        return $this->selectMatching
-            ? $this->tableQuery()
-            : $this->tableQuery()->whereKey($this->selected);
+        if (! $this->selectMatching) {
+            return $this->tableQuery()->whereKey($this->selected);
+        }
+
+        return $this->tableQuery()
+            ->when($this->excluded !== [], fn (Builder $query) => $query->whereKeyNot($this->excluded));
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -397,19 +589,82 @@ trait WithDataTable
     // EXPORT
 
     /**
-     * The columns an export carries: what is on screen, or everything the page
-     * declared where the account asked for all of it.
+     * Every column that can go into a file, whether or not it is on screen.
+     *
+     * The dialog offers the hidden ones as well: a column put away because it makes
+     * the table too wide is still a column somebody wants in the spreadsheet.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    #[Computed]
+    public function tableExportOptions(): array
+    {
+        return collect($this->tableColumnList)
+            ->filter(fn (array $column) => $column['exportable'])
+            ->all();
+    }
+
+    /**
+     * Open the dialog that says which columns go into the file and what each one is
+     * called in it.
+     *
+     * The choice is re-seeded from the table every time it opens, so the dialog
+     * always starts as the screen behind it. A rename belongs to the export being
+     * taken rather than to the screen — the account that wants "Member" to read
+     * "Full name" this once should not find it renamed on the table next week.
+     */
+    public function openExportModal(): void
+    {
+        $this->checkGate(GateAccessEnum::VIEW, 'You do not have access to export from this area.');
+
+        $this->resetExportColumns();
+
+        Flux::modal('exportModal')->show();
+    }
+
+    /**
+     * Back to the table as it stands: the columns on screen, under the headings
+     * they carry there.
+     */
+    public function resetExportColumns(): void
+    {
+        $this->exportColumns = collect($this->tableExportOptions)
+            ->filter(fn (array $column) => $column['visible'])
+            ->keys()
+            ->all();
+
+        $this->exportLabels = collect($this->tableExportOptions)
+            ->map(fn (array $column) => $column['label'])
+            ->all();
+
+        unset($this->tableExportHeaders);
+    }
+
+    /**
+     * The columns an export carries, each under the heading it was given.
      *
      * @return array<string, string>
      */
     #[Computed]
     public function tableExportHeaders(): array
     {
-        return collect($this->tableColumnList)
-            ->filter(fn (array $column) => $column['exportable'])
-            ->filter(fn (array $column) => $this->exportAllColumns || $column['visible'])
-            ->map(fn (array $column) => $column['label'])
+        return collect($this->tableExportOptions)
+            // Filtered out of the declared list rather than read off exportColumns,
+            // so the file keeps the screen's column order however the boxes were
+            // ticked. A spreadsheet whose columns moved about is not the table
+            // anybody asked for.
+            ->filter(fn (array $column, string $key) => in_array($key, $this->exportColumns, true))
+            ->map(fn (array $column, string $key) => $this->exportHeading($key) ?: $column['label'])
             ->all();
+    }
+
+    /**
+     * One heading as the account typed it: trimmed, and cut to a length a
+     * spreadsheet column can still show.
+     */
+    private function exportHeading(string $column): string
+    {
+        return mb_substr(trim((string) ($this->exportLabels[$column] ?? '')), 0, 60);
     }
 
     /**
@@ -422,13 +677,22 @@ trait WithDataTable
 
         $format = $format ?: $this->exportFormat;
 
+        // The format is a bound property as well as an argument, so it arrives from
+        // the wire. An unsupported one is somebody's dialog, not a broken screen.
+        $this->respondError(
+            'That export format is not available.',
+            if: ! in_array($format, ExportService::FORMATS, true),
+        );
+
         $headers = $this->tableExportHeaders;
 
         $this->respondError('Choose at least one column to export.', if: $headers === []);
 
-        $query = ($this->selected === [] || $this->selectMatching)
+        // Nothing ticked at all means the whole filtered result, which is what
+        // somebody pressing Export on an untouched table means.
+        $query = ($this->selected === [] && ! $this->selectMatching)
             ? $this->tableQuery()
-            : $this->tableQuery()->whereKey($this->selected);
+            : $this->selectionQuery();
 
         $rows = $query
             ->get()
@@ -457,6 +721,8 @@ trait WithDataTable
 
             return null;
         }
+
+        Flux::modal('exportModal')->close();
 
         $this->respondSuccess(number_format($rows->count()).' '.$this->tableSubject().' exported.');
 
@@ -561,6 +827,38 @@ trait WithDataTable
     }
 
     /**
+     * What the date range is called on this screen. The chip says it back, so
+     * "Joined between" reads as "Joined: 1st to 5th" rather than as "Date".
+     */
+    protected function tableDateLabel(): string
+    {
+        return 'Date';
+    }
+
+    /**
+     * The filters this screen offers, by property name, so they can be shown as
+     * chips and taken off one at a time:
+     *
+     *     protected function tableFilters(): array
+     *     {
+     *         return [
+     *             'search' => ['label' => 'Search'],
+     *             'accountStatus' => ['label' => 'Status', 'options' => StatusUser::forSelect()],
+     *         ];
+     *     }
+     *
+     * `options` is the same list the select is built from — the chip needs it to say
+     * the label back rather than the value that was filed. Nothing is declared here
+     * on a screen with no filters, and the chip bar renders nothing.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    protected function tableFilters(): array
+    {
+        return [];
+    }
+
+    /**
      * Whether this screen offers bulk delete at all. Off unless a page says otherwise:
      * a ledger has no delete, and a button that appears by default is one somebody
      * ships without meaning to.
@@ -617,10 +915,10 @@ trait WithDataTable
     }
 
     /**
-     * The line under the heading on an exported PDF. Says what the file is a view of,
-     * because a filtered export looks like a complete one once it has left the screen.
+     * The date range in words, or null where neither end has been set. Read both by
+     * the chip that takes it off and by the line under an exported PDF's heading.
      */
-    protected function tableExportSubheading(): ?string
+    protected function tableDateRangeLabel(): ?string
     {
         return match (true) {
             $this->dateFrom !== '' && $this->dateTo !== '' => "{$this->dateFrom} to {$this->dateTo}",
@@ -628,6 +926,15 @@ trait WithDataTable
             $this->dateTo !== '' => "Up to {$this->dateTo}",
             default => null,
         };
+    }
+
+    /**
+     * The line under the heading on an exported PDF. Says what the file is a view of,
+     * because a filtered export looks like a complete one once it has left the screen.
+     */
+    protected function tableExportSubheading(): ?string
+    {
+        return $this->tableDateRangeLabel();
     }
 
     /**
