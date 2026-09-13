@@ -7,6 +7,7 @@ use App\Services\SiteConfigurationService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 // |||||||||||||||||||||||||||||||||||||||||||||||||||||
 // IMAGES & FILES
@@ -420,5 +421,28 @@ if (! function_exists('kStoreComparePrice')) {
         $compare_price ??= 0;
 
         return ($compare_price > $price) ? $compare_price : $price;
+    }
+}
+
+// ACCOUNT RESTORE
+if (! function_exists('kAccountRestoreUrl')) {
+    /**
+     * The one-click link that takes an account back out of its deletion grace
+     * period.
+     *
+     * Signed rather than guarded by a login: the person who needs it may not be
+     * able to get to their dashboard, and the whole point is that it works from
+     * the email. It expires on the deletion date, because a link that restores
+     * an account already removed is a link that can only disappoint.
+     */
+    function kAccountRestoreUrl(User $user): string
+    {
+        $expires = $user->deletion_scheduled_at ?? now()->addDays(30);
+
+        return URL::temporarySignedRoute(
+            'account.restore',
+            $expires,
+            ['user' => $user->id],
+        );
     }
 }

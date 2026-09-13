@@ -20,8 +20,11 @@ if ($isUser) {
 
     $userSettings = auth()->user()->userProfile->settings ?? [];
 
+    // Asked through the service rather than kSiteConfig(): the helper's default
+    // fires on any falsy value, so a switch deliberately turned off would read
+    // back as on and leave the tab on the screen.
     if (
-        ! kSiteConfig('user.account-deletion', default: false) ||
+        ! app(\App\Services\AccountDeletionService::class)->isEnabled() ||
         ! data_get($userSettings, 'can-delete-account', false)
     ) {
         unset($tabs['delete-account']);

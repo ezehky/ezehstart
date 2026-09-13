@@ -76,10 +76,15 @@ class SocialAuthController extends Controller
                 ->with('error', 'We could not create your account. Please try again.');
         }
 
-        // A suspended account must not be able to walk back in through a provider.
-        if ($user->status->isSuspended()) {
+        // A suspended or deleted account must not be able to walk back in through
+        // a provider. An account inside its deletion grace period still may — it
+        // is still theirs until the date passes, and signing in is how somebody
+        // gets to the screen that cancels it.
+        if ($user->status->isSuspended() || $user->status->isDeleted()) {
             return redirect()->route('login')
-                ->with('error', 'Your account has been suspended. Please contact support.');
+                ->with('error', $user->status->isSuspended()
+                    ? 'Your account has been suspended. Please contact support.'
+                    : 'This account has been deleted.');
         }
 
         Auth::login($user, true);

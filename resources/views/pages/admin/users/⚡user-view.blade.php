@@ -198,7 +198,13 @@ new class extends Component
         $this->user->name = $this->name;
         $this->user->email = strtolower($this->email);
         $this->user->phone_number = $this->phone_number;
-        $this->user->status = StatusUser::tryFrom((int) $this->status);
+        // A deletion in flight is not something this switch can express, so it
+        // does not get to overwrite it. Without this, an administrator fixing a
+        // typo in a name would silently cancel a scheduled deletion — and leave
+        // deletion_scheduled_at behind for the sweep to act on anyway.
+        if (! $this->user->status->inDeletionFlow()) {
+            $this->user->status = StatusUser::tryFrom((int) $this->status);
+        }
 
         if ($this->password) {
             $this->user->password = $this->password;
@@ -298,6 +304,15 @@ new class extends Component
         $this->respondError(
             'You cannot suspend your own account.',
             if: $this->user->id === auth()->id(),
+        );
+
+        // Suspending an account that is already on its way out would read as a
+        // status change and act as a cancellation. The account holder owns this
+        // decision; an administrator who needs to intervene does it from the
+        // deletion tools rather than from a lock button.
+        $this->respondError(
+            'This account is scheduled for deletion. Cancel the deletion before changing its status.',
+            if: $this->user->status->inDeletionFlow(),
         );
 
         $this->user->status = $this->user->status->isActive() ? StatusUser::SUSPENDED : StatusUser::ACTIVE;
@@ -418,15 +433,17 @@ new class extends Component
                     Manage access
                 </x-dashboard.gate.button>
 
-                <x-dashboard.gate.button
-                    :gate="$this->gateKey()"
-                    :level="$gateModify"
-                    :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
-                    :variant="$user->status->isActive() ? 'danger' : 'filled'"
-                    x-on:click="$flux.modal('statusModal').show()"
-                >
-                    {{ $user->status->isActive() ? 'Suspend' : 'Activate' }}
-                </x-dashboard.gate.button>
+                @unless ($user->status->inDeletionFlow())
+                    <x-dashboard.gate.button
+                        :gate="$this->gateKey()"
+                        :level="$gateModify"
+                        :icon="$user->status->isActive() ? 'lock-closed' : 'lock-open'"
+                        :variant="$user->status->isActive() ? 'danger' : 'filled'"
+                        x-on:click="$flux.modal('statusModal').show()"
+                    >
+                        {{ $user->status->isActive() ? 'Suspend' : 'Activate' }}
+                    </x-dashboard.gate.button>
+                @endunless
             </div>
         </div>
 
@@ -623,7 +640,19 @@ new class extends Component
                 />
             </div>
 
-            <flux:switch wire:model="status" label="Active account" description="Allow this account to sign in." />
+            @if ($user->status->inDeletionFlow())
+                <flux:callout color="amber" icon="clock" class="text-sm">
+                    <flux:callout.text>
+                        This account is {{ $user->status->label(lowercase: true) }}
+                        @if ($user->deletion_scheduled_at)
+                            and is removed on {{ $user->deletion_scheduled_at->format('M d, Y') }}
+                        @endif
+                        , so its sign-in status is not editable here.
+                    </flux:callout.text>
+                </flux:callout>
+            @else
+                <flux:switch wire:model="status" label="Active account" description="Allow this account to sign in." />
+            @endif
 
             <div class="flex justify-end gap-3">
                 <flux:modal.close>

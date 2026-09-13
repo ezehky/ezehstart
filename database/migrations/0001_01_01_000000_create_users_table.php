@@ -44,6 +44,13 @@ return new class extends Migration
             $table->tinyInteger('status')->default(StatusUser::ACTIVE);
             $table->timestamp('last_seen_at')->nullable();
 
+            // The account-deletion grace period. Requested is when the account
+            // holder asked, scheduled is the moment the command may act. Both are
+            // cleared on restore, so an account that changed its mind carries no
+            // trace of the request — and the index is what the nightly sweep reads.
+            $table->timestamp('deletion_requested_at')->nullable();
+            $table->timestamp('deletion_scheduled_at')->nullable()->index();
+
             $table->rememberToken();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

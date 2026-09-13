@@ -54,6 +54,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_seen_at' => 'datetime',
+            'deletion_requested_at' => 'datetime',
+            'deletion_scheduled_at' => 'datetime',
             'status' => StatusUser::class,
             'user_type' => UserTypeEnum::class,
             'gates' => AsArrayObject::class,
@@ -238,6 +240,11 @@ class User extends Authenticatable
         return $this->hasMany(PasswordHistory::class);
     }
 
+    public function deletionReminders(): HasMany
+    {
+        return $this->hasMany(UserDeletionReminder::class);
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(Image::class);
@@ -306,5 +313,31 @@ class User extends Authenticatable
     {
         $builder->whereHas('roles', fn (Builder $query) => $query
             ->whereKey($role instanceof Role ? $role->id : $role));
+    }
+
+    /**
+     * Accounts inside the deletion grace period. The status is asked for as well
+     * as the date because an administrator can put an account back to active,
+     * and that has to count as a cancellation rather than leave a stale date the
+     * sweep would still act on.
+     */
+    #[Scope]
+    protected function pendingDeletion(Builder $builder): void
+    {
+        $builder->where('status', StatusUser::PENDING_DELETION)
+            ->whereNotNull('deletion_scheduled_at');
+    }
+
+    /**
+     * Pending accounts whose date has passed. Deliberately unbounded at the far
+     * end, unlike the reminders: a grace period that expired during an outage
+     * has still expired, and the account holder asked for this. Catching up is
+     * the right behaviour here even though it is the wrong behaviour for a
+     * warning about a date that is already behind us.
+     */
+    #[Scope]
+    protected function dueForDeletion(Builder $builder): void
+    {
+        $builder->pendingDeletion()->where('deletion_scheduled_at', '<=', now());
     }
 }

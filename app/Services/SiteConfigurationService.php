@@ -42,6 +42,12 @@ class SiteConfigurationService
             'user' => [
                 'account-deletion' => true,
                 'account-deletion-days' => 30,
+
+                // What the end of the grace period does to an account that has
+                // history behind it. On keeps the row with its personal details
+                // stripped; off removes the account and everything it owns. An
+                // account with no history is removed outright either way.
+                'anonymous-after-deletion' => true,
             ],
 
             // Every switch here turns a whole sign-in feature on or off, so the

@@ -3,6 +3,8 @@
 use App\Enums\PolicyTypeEnum;
 use App\Http\Controllers\PolicyPageController;
 use App\Http\Controllers\SocialAuthController;
+use App\Models\User;
+use App\Services\AccountDeletionService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -63,6 +65,26 @@ Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'
 
 // Email Verification
 Route::livewire('/email-verification/{user:email}', 'pages::auth.email-verification')->name('email.verification');
+
+// Undo a scheduled account deletion. Signed and time-limited rather than sat
+// behind the login: the link has to work straight from the email, including for
+// somebody who has already forgotten they asked. It is deliberately outside the
+// guest group so that clicking it while signed in works too.
+Route::get('/account/restore/{user}', function (User $user) {
+    $service = app(AccountDeletionService::class);
+
+    // Nothing to undo. A link used twice, or one clicked after an administrator
+    // already put the account back, is a 404 rather than a silent no-op.
+    abort_unless($service->isPending($user), 404);
+
+    $service->cancel($user, notify: false);
+
+    $message = 'Welcome back. Your account is no longer scheduled for deletion.';
+
+    return auth()->id() === $user->id
+        ? redirect()->route($user->user_type->dashboardRoute())->with('message', $message)
+        : redirect()->route('login')->with('message', $message);
+})->middleware('signed')->name('account.restore');
 
 // General Auth Routes
 Route::middleware('auth')->group(function (): void {

@@ -35,6 +35,20 @@
                     <flux:callout variant="danger" icon="x-circle" class="mt-6 text-sm">{!! session('error') !!}</flux:callout>
                 @endsession
 
+                {{-- A pending deletion is not a toast. It stays on every screen of the
+                     workspace until the account holder cancels it or the date arrives,
+                     because there is nothing to undo afterwards. Members only: the
+                     route lives in the member workspace, and so does the feature. --}}
+                @if (auth()->user()?->isUser() && auth()->user()->status->isPendingDeletion() && auth()->user()->deletion_scheduled_at)
+                    <flux:callout color="amber" icon="clock" class="mt-6 text-sm">
+                        <flux:callout.heading>Your account is scheduled for deletion</flux:callout.heading>
+                        <flux:callout.text>
+                            Everything goes on {{ auth()->user()->deletion_scheduled_at->format('M d, Y') }}.
+                            <flux:link :href="route('user.delete-account')" wire:navigate>Keep my account</flux:link>
+                        </flux:callout.text>
+                    </flux:callout>
+                @endif
+
                 {{ $slot }}
             </main>
         </div>

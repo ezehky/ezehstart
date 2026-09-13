@@ -89,6 +89,10 @@ new class extends Component
         // users may delete their account in the first place.
         if ((bool) data_get($this->config, 'user.account-deletion')) {
             $rules['config.user.account-deletion-days'] = ['required', 'integer', 'min:1', 'max:365'];
+
+            // What happens when the grace period runs out. Only meaningful while
+            // members can ask to be deleted in the first place.
+            $rules['config.user.anonymous-after-deletion'] = ['required', 'boolean'];
         }
 
         // How many previous hashes to keep. Meaningless — and a liability — when the
@@ -154,6 +158,12 @@ new class extends Component
                         placeholder="e.g. 30"
                         min="1"
                         max="365"
+                    />
+
+                    <flux:switch
+                        wire:model="config.user.anonymous-after-deletion"
+                        label="Anonymize instead of deleting"
+                        description="Keep the account row with its personal details stripped, so history that points at it stays readable. Off removes the account and everything it owns, including its library files."
                     />
                 @endif
             </flux:card>

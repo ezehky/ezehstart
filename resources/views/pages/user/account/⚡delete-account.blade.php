@@ -5,7 +5,6 @@ use App\Services\AccountDeletionService;
 use App\Services\AccountOtpService;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
@@ -30,11 +29,30 @@ new class extends Component
 
         // An account that has never opened its dashboard has no profile row yet, so
         // the switch is read null-safely rather than assumed to exist.
-        $deletion = kSiteConfig('user.account-deletion', default: false) &&
+        $deletion = app(AccountDeletionService::class)->isEnabled() &&
             (bool) data_get($this->user->userProfile?->settings, 'can-delete-account', false);
         abort_unless($deletion, 404);
 
         kSetSiteTitle('profile', 'delete account');
+    }
+
+    /**
+     * The account is inside its grace period, so the screen shows the countdown
+     * and the way out rather than the confirmation form.
+     */
+    public function isPending(): bool
+    {
+        return app(AccountDeletionService::class)->isPending($this->user);
+    }
+
+    public function daysRemaining(): int
+    {
+        return app(AccountDeletionService::class)->daysRemaining($this->user);
+    }
+
+    public function graceDays(): int
+    {
+        return app(AccountDeletionService::class)->graceDays();
     }
 
     public function openConfirm(): void
@@ -59,7 +77,7 @@ new class extends Component
                 'password' => ['required', 'string', 'current_password'],
             ], attributes: ['confirmation_text' => 'confirmation']);
 
-            $this->performDeletion();
+            $this->scheduleDeletion();
 
             return;
         }
@@ -91,27 +109,40 @@ new class extends Component
             'otp'
         );
 
-        $this->performDeletion();
+        $this->scheduleDeletion();
     }
 
-    protected function performDeletion()
+    /**
+     * Start the grace period. Nothing is destroyed here and the account stays
+     * signed in — the whole point of the delay is that somebody who changes
+     * their mind can walk back in and say so.
+     */
+    protected function scheduleDeletion(): bool
     {
-        $service = app(AccountDeletionService::class);
+        $scheduledAt = app(AccountDeletionService::class)->schedule($this->user);
 
-        if ($service->hasSignificantActivity($this->user)) {
-            $service->anonymize($this->user);
-        } else {
-            $service->hardDelete($this->user);
-        }
+        $this->user->refresh();
 
-        // Log out directly rather than via UserService::logoutUser() — the user row
-        // may have just been hard-deleted, and that helper also writes an activity
-        // log entry that would violate the users FK if the row no longer exists.
-        Auth::logout();
-        session()->invalidate();
-        session()->regenerateToken();
+        Flux::modal('confirm-delete-account')->close();
+        $this->reset('step', 'password', 'confirmation_text', 'otp');
 
-        return to_route('home')->with('status', 'Your account has been deleted. We\'re sorry to see you go.');
+        return $this->respondSuccess(
+            'Your account is scheduled for deletion on '.$scheduledAt->format('M d, Y').'. You can cancel any time before then.',
+        );
+    }
+
+    /**
+     * Change of mind, from the screen rather than from the emailed link.
+     */
+    public function cancelDeletion(): bool
+    {
+        $this->respondError('This account is not scheduled for deletion.', ! $this->isPending());
+
+        app(AccountDeletionService::class)->cancel($this->user);
+
+        $this->user->refresh();
+
+        return $this->respondSuccess('Your account is no longer scheduled for deletion.');
     }
 };
 ?>
@@ -124,30 +155,68 @@ new class extends Component
         subtitle="Permanently delete your account and personal data."
     />
 
-    <flux:card class="space-y-6">
-        <div>
-            <flux:heading level="2" size="lg">Delete account</flux:heading>
-            <flux:text class="mt-1">This action cannot be undone. Please review what happens carefully.</flux:text>
-        </div>
+    @if ($this->isPending())
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Scheduled for deletion</flux:heading>
+                <flux:text class="mt-1">
+                    Your account is due to be deleted on
+                    <strong>{{ $user->deletion_scheduled_at->format('M d, Y') }}</strong>.
+                </flux:text>
+            </div>
 
-        <flux:callout color="rose" icon="exclamation-triangle">
-            <flux:callout.heading>This action is permanent</flux:callout.heading>
-            <flux:callout.text>
-                Once your account is deleted, all of its resources and data will be permanently removed. This action
-                cannot be undone. Please make sure you have downloaded any information you want to keep before continuing.
-            </flux:callout.text>
-        </flux:callout>
+            <flux:callout color="amber" icon="clock">
+                <flux:callout.heading>
+                    @if ($this->daysRemaining() === 0)
+                        This is your last day
+                    @else
+                        {{ $this->daysRemaining() }} {{ str()->plural('day', $this->daysRemaining()) }} left
+                    @endif
+                </flux:callout.heading>
+                <flux:callout.text>
+                    Nothing has been removed yet, and the account works exactly as it did before. We will email you
+                    5 days and 1 day before the date arrives. Once it passes, your account and its data cannot be
+                    recovered.
+                </flux:callout.text>
+            </flux:callout>
 
-        <div class="flex justify-end">
-            <flux:button variant="danger" icon="trash" wire:click="openConfirm">Delete my account</flux:button>
-        </div>
-    </flux:card>
+            <div class="flex justify-end">
+                <flux:button variant="primary" icon="arrow-uturn-left" wire:click="cancelDeletion">
+                    Keep my account
+                </flux:button>
+            </div>
+        </flux:card>
+    @else
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Delete account</flux:heading>
+                <flux:text class="mt-1">This action cannot be undone. Please review what happens carefully.</flux:text>
+            </div>
+
+            <flux:callout color="rose" icon="exclamation-triangle">
+                <flux:callout.heading>This action is permanent</flux:callout.heading>
+                <flux:callout.text>
+                    Deleting your account starts a {{ $this->graceDays() }}-day countdown. Nothing is removed during
+                    that time and you can cancel from this page or from the email we send you. Once the countdown ends,
+                    all of your resources and data are permanently removed and this cannot be undone. Please make sure
+                    you have downloaded any information you want to keep before continuing.
+                </flux:callout.text>
+            </flux:callout>
+
+            <div class="flex justify-end">
+                <flux:button variant="danger" icon="trash" wire:click="openConfirm">Delete my account</flux:button>
+            </div>
+        </flux:card>
+    @endif
 
     <flux:modal name="confirm-delete-account" class="md:w-105">
         <div class="space-y-5">
             <div>
                 <flux:heading size="lg">Confirm account deletion</flux:heading>
-                <flux:text class="mt-1">This step can't be reversed.</flux:text>
+                <flux:text class="mt-1">
+                    Your account will be deleted on
+                    {{ now()->addDays($this->graceDays())->format('M d, Y') }}.
+                </flux:text>
             </div>
 
             @session('status')

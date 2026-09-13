@@ -123,24 +123,6 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 'link' => route('user.dashboard'),
                 'icon' => 'rectangle-group',
             ],
-            'account' => [
-                'label' => 'Account',
-                'children' => [
-                    'account-settings' => [
-                        'label' => 'Preferences',
-                        'link' => route('user.account-settings'),
-                    ],
-                    'security-settings' => [
-                        'label' => 'Security',
-                        'link' => route('user.security-settings'),
-                    ],
-                    'delete-account' => [
-                        'label' => 'Delete account',
-                        'link' => route('user.delete-account'),
-                    ],
-                ],
-                'icon' => 'cog-6-tooth',
-            ],
             'transactions' => [
                 'label' => 'Transactions',
                 'link' => route('user.transactions'),
@@ -160,6 +142,24 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 'label' => 'Profile',
                 'link' => route('user.profile'),
                 'icon' => 'user-circle',
+            ],
+            'account' => [
+                'label' => 'Account',
+                'children' => [
+                    'account-settings' => [
+                        'label' => 'Preferences',
+                        'link' => route('user.account-settings'),
+                    ],
+                    'security-settings' => [
+                        'label' => 'Security',
+                        'link' => route('user.security-settings'),
+                    ],
+                    'delete-account' => [
+                        'label' => 'Delete account',
+                        'link' => route('user.delete-account'),
+                    ],
+                ],
+                'icon' => 'cog-6-tooth',
             ],
         ],
         'site' => [

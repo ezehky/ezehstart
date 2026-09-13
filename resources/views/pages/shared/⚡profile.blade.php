@@ -173,10 +173,22 @@ new class extends Component
 ?>
 
 <div class="mx-auto max-w-3xl space-y-6">
-    <div>
-        <flux:heading level="1" size="xl">My profile</flux:heading>
-        <flux:text class="mt-1">Your account details. Contact an administrator to update any of this information.</flux:text>
-    </div>
+    {{-- The account tabs, but only in the member workspace: every route the nav
+         points at is a user.* one, and the admin workspace has a profile page
+         and nothing else to tab between. --}}
+    @if ($user->isUser())
+        <x-dashboard.tab-nav
+            active="profile"
+            isUser
+            title="My profile"
+            subtitle="Your account details. Contact an administrator to update any of this information."
+        />
+    @else
+        <div>
+            <flux:heading level="1" size="xl">My profile</flux:heading>
+            <flux:text class="mt-1">Your account details. Contact an administrator to update any of this information.</flux:text>
+        </div>
+    @endif
 
     @session('status')
         <flux:callout color="lime" class="text-sm">{{ session('status') }}</flux:callout>

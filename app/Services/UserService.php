@@ -217,13 +217,20 @@ class UserService
         // Get the authenticated user
         $user = auth()->user();
 
-        // Check if the user is suspended
-        if ($user->status->isSuspended()) {
+        // A status that carries a message is a status that cannot reach a
+        // workspace — suspended today, deleted once a grace period has run out.
+        // PENDING_DELETION deliberately carries none: the account still works
+        // while it waits, and locking it out early would take away the very
+        // chance to cancel that the delay exists to give.
+        if ($blocked = $user->status->message()) {
             // Log out the user
             $this->logoutUser();
 
-            // Redirect to login page with an error message
-            return 'Your account has been suspended. Please contact support.';
+            // The suspended wording is fuller here than on the enum, which is
+            // written for an admin table rather than for the person turned away.
+            return $user->status->isSuspended()
+                ? 'Your account has been suspended. Please contact support.'
+                : $blocked;
         }
 
         // Check that this account belongs in this workspace at all

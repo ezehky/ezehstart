@@ -54,6 +54,8 @@ enum ActivityActionEnum: string
     case EMAIL_CHANGE = 'email-change';
     case SESSION_LOGOUT_OTHERS = 'session.logout-others';
     case SETTINGS_UPDATE = 'settings.update';
+    case ACCOUNT_DELETE_SCHEDULE = 'account.delete-schedule';
+    case ACCOUNT_DELETE_CANCEL = 'account.delete-cancel';
     case ACCOUNT_ANONYMIZE = 'account.anonymize';
     case ACCOUNT_DELETE = 'account.delete';
 
@@ -231,6 +233,8 @@ enum ActivityActionEnum: string
             self::REGISTER => 'Registered a new account.',
             self::SESSION_LOGOUT_OTHERS => 'Logged out of other active sessions.',
             self::SETTINGS_UPDATE => 'Updated their account preferences.',
+            self::ACCOUNT_DELETE_SCHEDULE => 'Scheduled their account for deletion.',
+            self::ACCOUNT_DELETE_CANCEL => 'Cancelled the deletion of their account.',
             self::ACCOUNT_ANONYMIZE => 'Deleted their account (data anonymized).',
             self::ACCOUNT_DELETE => 'Permanently deleted their account.',
 

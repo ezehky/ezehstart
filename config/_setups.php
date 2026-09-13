@@ -72,6 +72,7 @@ return [
         'incomplete' => 'warning',
         'late' => 'warning',
         'draft' => 'warning',
+        'pending-deletion' => 'warning',
         // PRIMARY
         'created' => 'primary',
         'archived' => 'primary',
