@@ -37,8 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Redirect guests to the login page
         $middleware->redirectGuestsTo(fn () => route('login'));
 
-        // Send a signed-in account to the workspace its type belongs to
-        $middleware->redirectUsersTo(fn (Request $request) => $request->user()->type->dashboardRoute());
+        // Send a signed-in account to the workspace its type belongs to. The column
+        // is user_type, not type — type is an SQL keyword this project does not use
+        // as a column name, and ->type read back null here, so every guest route a
+        // signed-in account touched was a 500 rather than a redirect.
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()->user_type->dashboardRoute());
 
         // Prevent CSRF for webhooks
         $middleware->preventRequestForgery(except: [

@@ -62,3 +62,27 @@ test('signing in updates the last seen timestamp', function () {
 
     expect($user->fresh()->last_seen_at)->not->toBeNull();
 });
+
+/*
+ * redirectUsersTo() reads the account's type to decide where to send it. It was
+ * reading ->type, which is not a column on this project's users table — the
+ * column is user_type, because type is an SQL keyword the house style bans. It
+ * came back null and every guest route a signed-in account touched was a 500.
+ */
+test('a signed-in account is redirected off a guest screen rather than erroring', function (string $route) {
+    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+
+    $this->actingAs($member)->get(route($route))->assertRedirect(route('user.dashboard'));
+})->with([
+    'login',
+    'register',
+    'password.request',
+    'passwordless',
+    'two-factor.challenge',
+]);
+
+test('an administrator lands in the admin workspace instead', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    $this->actingAs($admin)->get(route('login'))->assertRedirect(route('admin.dashboard'));
+});
