@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithImageLibrary;
 use Livewire\Attributes\On;
@@ -16,10 +17,27 @@ new class extends Component
 {
     use WithFormResponseMessage, WithImageLibrary;
 
-    public function mount(): void
+    /**
+     * @param  ?User  $user  Whose library to show. Only an administrator may
+     *                       name one, and only through the per-member route.
+     *                       Every other entry point leaves it null and gets
+     *                       the ordinary visibility rules.
+     */
+    public function mount(?User $user = null): void
     {
         kSetSiteTitle('content', 'image-library');
         kPageGate('content.image-library');
+
+        if ($user) {
+            // Re-checked here rather than trusted to the route: this is the
+            // boundary, and middleware only says which workspace they are in.
+            abort_unless(auth()->user()->isAdmin(), 404);
+            abort_unless($user->isUser(), 404);
+
+            $this->ownerId = $user->id;
+
+            kSetSiteTitle('content', 'image-library', $user->name);
+        }
     }
 
     /**

@@ -128,7 +128,7 @@ class ImageLibraryService
             'size' => Storage::disk('public')->size($path),
             'width' => $dimensions['width'],
             'height' => $dimensions['height'],
-            ...$this->visibilityAttributes($visibility, $visibleToType),
+            ...$this->visibilityAttributes($visibility, $visibleToType, $user),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -181,7 +181,7 @@ class ImageLibraryService
             'title' => trim($title) ?: $image->title,
             'image_folder_id' => $folder?->id,
             'alt_text' => $altText,
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType, $image->user) : []),
         ]);
 
         $affected = $activity->affectedColumns($image);
@@ -189,6 +189,8 @@ class ImageLibraryService
         $image->save();
 
         $activity->logActivity(ActivityActionEnum::IMAGE_UPDATE, $image->title, $affected, $image);
+
+        $this->tellOwner($image, "Your image \"{$image->title}\" was updated.");
 
         return $image;
     }
@@ -210,12 +212,21 @@ class ImageLibraryService
 
         $path = $image->file_path;
         $title = $image->title;
+        $owner = $image->user;
 
         $image->delete();
 
         kDeleteFile($path);
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::IMAGE_DELETE, $title);
+
+        // Resolved before the row went, so there is still an owner to tell. The
+        // isUser() guard matches tellOwner(): an admin's own media is the site's,
+        // not something they need telling about.
+        if ($owner?->isUser()) {
+            app(NotificationSubscriberService::class)
+                ->notifyOwnerOfChange($owner, "Your image \"{$title}\" was deleted.");
+        }
 
         return null;
     }
@@ -245,7 +256,7 @@ class ImageLibraryService
             'parent_id' => $parent?->id,
             'name' => trim($name),
             'slug' => kSlug($name),
-            ...$this->visibilityAttributes($visibility, $visibleToType),
+            ...$this->visibilityAttributes($visibility, $visibleToType, $ownerId ? $user : null),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -272,7 +283,7 @@ class ImageLibraryService
         $folder->fill([
             'name' => trim($name) ?: $folder->name,
             'slug' => kSlug(trim($name) ?: $folder->name),
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType, $folder->user) : []),
         ]);
 
         $affected = $activity->affectedColumns($folder);
@@ -326,7 +337,47 @@ class ImageLibraryService
             }
         });
 
+        // One message per owner rather than one per file: somebody whose ten
+        // images were refiled in a single action was subject to one change, and
+        // ten emails saying so is a worse way to be told.
+        $destination = $folder?->name ?? 'the library root';
+
+        $images->groupBy('user_id')->each(function (Collection $owned) use ($destination) {
+            $owner = $owned->first()?->user;
+
+            if (! $owner?->isUser()) {
+                return;
+            }
+
+            $count = $owned->count();
+
+            app(NotificationSubscriberService::class)->notifyOwnerOfChange(
+                $owner,
+                $count === 1
+                    ? "Your image \"{$owned->first()->title}\" was moved to {$destination}."
+                    : "{$count} of your images were moved to {$destination}.",
+            );
+        });
+
         return $images->count();
+    }
+
+    /**
+     * Tell an image's owner that somebody else changed it.
+     *
+     * Silent when the owner is an administrator or is the one doing it — the
+     * point is that a member's library is private, so a change they did not make
+     * is worth hearing about.
+     */
+    private function tellOwner(Image $image, string $summary): void
+    {
+        $owner = $image->user;
+
+        if (! $owner?->isUser()) {
+            return;
+        }
+
+        app(NotificationSubscriberService::class)->notifyOwnerOfChange($owner, $summary);
     }
 
     /**
@@ -335,9 +386,9 @@ class ImageLibraryService
      *
      * @return Collection<int, array{id: int, label: string}>
      */
-    public function folderOptions(User $user): Collection
+    public function folderOptions(User $user, ?User $owner = null): Collection
     {
-        $folders = ImageFolder::query()->active()->browsableBy($user)->orderBy('name')->get();
+        $folders = ImageFolder::query()->active()->browsableBy($user, $owner)->orderBy('name')->get();
 
         $byParent = $folders->groupBy('parent_id');
 
@@ -451,11 +502,11 @@ class ImageLibraryService
     /**
      * The picker's query: what this account may choose from.
      */
-    public function libraryQuery(User $user, ?ImageFolder $folder = null, ?string $search = null, string $sort = 'newest'): Builder
+    public function libraryQuery(User $user, ?ImageFolder $folder = null, ?string $search = null, string $sort = 'newest', ?User $owner = null): Builder
     {
         return Image::query()
             ->active()
-            ->visibleTo($user)
+            ->visibleTo($user, $owner)
             ->when($folder, fn (Builder $query) => $query->where('image_folder_id', $folder->id))
             ->when($search, fn (Builder $query) => $query->where('title', 'like', '%'.$search.'%'))
             ->tap(fn (Builder $query) => $this->applySort($query, $sort));
@@ -485,8 +536,21 @@ class ImageLibraryService
      *
      * @return array<string, mixed>
      */
-    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role): array
+    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role, ?User $owner = null): array
     {
+        // A member's library is theirs alone, whatever the form asked for. There
+        // is no audience in this product for one member's uploads to reach
+        // another, so PUBLIC or TYPE on a member-owned row would only ever be a
+        // leak — enforced here rather than in the screens, because a screen is
+        // not a boundary. A row owned by nobody is a shared platform folder and
+        // is left alone.
+        if ($owner?->isUser()) {
+            return [
+                'visibility' => MediaVisibilityEnum::PRIVATE,
+                'visible_to_type' => null,
+            ];
+        }
+
         return [
             'visibility' => $visibility,
             'visible_to_type' => $visibility->needsType() ? $role : null,

@@ -2,15 +2,19 @@
 
 use App\Enums\MediaVisibilityEnum;
 use App\Enums\UserTypeEnum;
+use App\Mail\UploadModifiedEmail;
 use App\Models\Image;
 use App\Models\ImageFolder;
 use App\Models\Post;
 use App\Models\User;
+use App\Notifications\GeneralNotification;
 use App\Services\ImageLibraryService;
 use App\Services\SiteConfigurationService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithImagePicker;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -110,20 +114,38 @@ test('renaming changes the title and never the stored path', function () {
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // VISIBILITY
 
-test('a private image is invisible to everybody but its owner and an admin', function () {
+test('a member image is invisible to everybody but its owner', function () {
     $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
 
     $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     expect($image->isVisibleTo($this->member))->toBeTrue()
-        ->and($image->isVisibleTo($this->admin))->toBeTrue()
         ->and($image->isVisibleTo($stranger))->toBeFalse()
-        ->and($image->isVisibleTo(null))->toBeFalse();
+        ->and($image->isVisibleTo(null))->toBeFalse()
+        // An administrator included. The row has to be guarded and not merely
+        // hidden, because this is what a picker asks before accepting an id.
+        ->and($image->isVisibleTo($this->admin))->toBeFalse()
+        // Except on the screen that exists to look at this member's library,
+        // which says so rather than being assumed.
+        ->and($image->isVisibleTo($this->admin, ownerScoped: true))->toBeTrue();
+});
+
+test('the picker refuses a member image an administrator asked for by id', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    // The grid never shows it, but nothing stops an id being sent up the wire.
+    Livewire::actingAs($this->admin)
+        ->test('livewire.library.image-picker')
+        ->set('selected', [$image->id])
+        ->call('confirmSelection')
+        ->assertHasErrors();
 });
 
 test('a public image is visible to anybody', function () {
+    // Owned by an administrator, because only site media can be public now — a
+    // member's uploads are forced private however they are stored.
     $image = app(ImageLibraryService::class)->store(
-        $this->member,
+        $this->admin,
         uploadedImage(),
         visibility: MediaVisibilityEnum::PUBLIC
     );
@@ -170,8 +192,9 @@ test('the library query hides other people images from a member', function () {
     $service->store($this->admin, uploadedImage('theirs.jpg'));
 
     expect($service->libraryQuery($this->member)->count())->toBe(1)
-        // The admin's library is the site's media manager, so it shows everything.
-        ->and($service->libraryQuery($this->admin)->count())->toBe(2);
+        // And the admin's library is the site's own media, not everybody's. A
+        // member's uploads are reached through the per-member screen instead.
+        ->and($service->libraryQuery($this->admin)->count())->toBe(1);
 });
 
 test('search matches on the title', function () {
@@ -334,7 +357,9 @@ test('a private folder stays out of another member folder rail', function () {
     $other = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     $service->createFolder($other, 'Theirs');
-    $service->createFolder($other, 'Open to all', visibility: MediaVisibilityEnum::PUBLIC);
+
+    // Shared folders are the site's, so an administrator makes this one.
+    $service->createFolder($this->admin, 'Open to all', visibility: MediaVisibilityEnum::PUBLIC);
 
     $labels = $service->folderOptions($this->member)->pluck('label');
 
@@ -360,8 +385,8 @@ test('a role folder reaches only the role it names', function () {
 test('tightening a folder does not move the images inside it', function () {
     $service = app(ImageLibraryService::class);
 
-    $folder = $service->createFolder($this->member, 'Mixed', visibility: MediaVisibilityEnum::PUBLIC);
-    $image = $service->store($this->member, uploadedImage(), folder: $folder, visibility: MediaVisibilityEnum::PUBLIC);
+    $folder = $service->createFolder($this->admin, 'Mixed', visibility: MediaVisibilityEnum::PUBLIC);
+    $image = $service->store($this->admin, uploadedImage(), folder: $folder, visibility: MediaVisibilityEnum::PUBLIC);
 
     $service->updateFolder($folder, 'Mixed', MediaVisibilityEnum::PRIVATE);
 
@@ -498,20 +523,21 @@ test('the uploader stages files before it stores any of them', function () {
 
 test('an upload takes the visibility of the folder it lands in', function () {
     $folder = app(ImageLibraryService::class)->createFolder(
-        $this->member,
+        $this->admin,
         'Public shelf',
         visibility: MediaVisibilityEnum::PUBLIC,
     );
 
-    Livewire::actingAs($this->member)
+    Livewire::actingAs($this->admin)
         ->test('livewire.library.image-uploader', ['folder' => $folder->id])
         ->set('imagesUpload', [uploadedImage()])
         ->call('uploadImages')
         ->assertHasNoErrors();
 
     // The folder is where a new image starts. It keeps that setting afterwards
-    // wherever it is refiled.
-    expect($this->member->images()->first()->visibility)->toBe(MediaVisibilityEnum::PUBLIC);
+    // wherever it is refiled. Asserted on an admin upload, because a member's is
+    // private regardless of where it lands.
+    expect($this->admin->images()->first()->visibility)->toBe(MediaVisibilityEnum::PUBLIC);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -875,4 +901,292 @@ test('the blog editor holds its cover through the slot', function () {
     expect($post->image_id)->toBe($image->id)
         // The usage row is what stops the file being deleted out from under it.
         ->and(app(ImageLibraryService::class)->usedImageIds($post, 'cover'))->toBe([$image->id]);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SELECTING IN BULK
+
+test('select all ticks every image on the page', function () {
+    $service = app(ImageLibraryService::class);
+
+    collect(range(1, 3))->each(fn (int $i) => $service->store($this->member, uploadedImage("photo-{$i}.jpg")));
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->call('toggleSelectAll');
+
+    expect($component->get('selected'))->toHaveCount(3);
+});
+
+test('select all a second time clears the page again', function () {
+    $service = app(ImageLibraryService::class);
+
+    collect(range(1, 3))->each(fn (int $i) => $service->store($this->member, uploadedImage("photo-{$i}.jpg")));
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->call('toggleSelectAll')
+        ->call('toggleSelectAll');
+
+    expect($component->get('selected'))->toBe([]);
+});
+
+test('a selection is dropped once the images have been moved', function () {
+    $service = app(ImageLibraryService::class);
+    $image = $service->store($this->member, uploadedImage());
+    $folder = $service->createFolder($this->member, 'Invoices');
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->set('selected', [$image->id])
+        ->set('move_folder_id', $folder->id)
+        ->call('moveSelected')
+        ->assertHasNoErrors();
+
+    expect($component->get('selected'))->toBe([])
+        ->and($image->fresh()->image_folder_id)->toBe($folder->id);
+});
+
+test('a selection is dropped once the image has been edited', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->set('selected', [$image->id])
+        ->call('openPanel', 'edit')
+        ->set('title', 'A better name')
+        ->call('saveImage')
+        ->assertHasNoErrors();
+
+    expect($component->get('selected'))->toBe([])
+        ->and($image->fresh()->title)->toBe('A better name');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// A MEMBER'S LIBRARY IS THEIRS
+
+test('a member upload is private however it was asked for', function () {
+    $image = app(ImageLibraryService::class)->store(
+        $this->member,
+        uploadedImage(),
+        visibility: MediaVisibilityEnum::PUBLIC,
+    );
+
+    // The screen is not the boundary. Whatever the form said, a member's upload
+    // has no audience beyond the member.
+    expect($image->visibility)->toBe(MediaVisibilityEnum::PRIVATE)
+        ->and($image->visible_to_type)->toBeNull();
+});
+
+test('a member folder is private however it was asked for', function () {
+    $folder = app(ImageLibraryService::class)->createFolder(
+        $this->member,
+        'Mine',
+        shared: true,
+        visibility: MediaVisibilityEnum::PUBLIC,
+    );
+
+    expect($folder->visibility)->toBe(MediaVisibilityEnum::PRIVATE)
+        // shared: true is refused as well — a platform folder belongs to nobody,
+        // and this one still belongs to the member who asked.
+        ->and($folder->user_id)->toBe($this->member->id);
+});
+
+test('editing a member image cannot open it up', function () {
+    $service = app(ImageLibraryService::class);
+    $image = $service->store($this->member, uploadedImage());
+
+    $service->update($image, $image->title, visibility: MediaVisibilityEnum::PUBLIC);
+
+    expect($image->fresh()->visibility)->toBe(MediaVisibilityEnum::PRIVATE);
+});
+
+test('member uploads stay out of the admin library and picker', function () {
+    $service = app(ImageLibraryService::class);
+
+    $service->store($this->member, uploadedImage('theirs.jpg'));
+    $service->store($this->admin, uploadedImage('ours.jpg'));
+
+    expect($service->libraryQuery($this->admin)->pluck('title')->all())->toBe(['ours']);
+});
+
+test('member folders stay out of the admin folder rail', function () {
+    $service = app(ImageLibraryService::class);
+
+    $service->createFolder($this->member, 'Their folder');
+    $service->createFolder($this->admin, 'Our folder');
+
+    $labels = $service->folderOptions($this->admin)->pluck('label');
+
+    expect($labels)->toContain('Our folder')
+        ->and($labels)->not->toContain('Their folder');
+});
+
+test('a shared platform folder stays on the admin rail', function () {
+    $service = app(ImageLibraryService::class);
+
+    $service->createFolder($this->admin, 'Everyones', shared: true);
+
+    expect($service->folderOptions($this->admin)->pluck('label'))->toContain('Everyones');
+});
+
+test('an administrator reaches one member library by naming them', function () {
+    $service = app(ImageLibraryService::class);
+    $image = $service->store($this->member, uploadedImage('theirs.jpg'));
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.user-image-library', $this->member))
+        ->assertSuccessful()
+        ->assertSee('theirs');
+
+    expect($service->libraryQuery($this->admin, owner: $this->member)->pluck('id')->all())
+        ->toBe([$image->id]);
+});
+
+test('a member cannot open somebody else library', function () {
+    $other = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
+
+    // The member workspace has no such route at all, and the admin one refuses
+    // anybody who does not belong in it.
+    $this->actingAs($this->member)
+        ->get(route('admin.user-image-library', $other))
+        ->assertNotFound();
+});
+
+test('the per-member screen refuses an administrator as its subject', function () {
+    $other = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.user-image-library', $other))
+        ->assertNotFound();
+});
+
+test('the user list offers both libraries for a member', function () {
+    $this->actingAs($this->admin)
+        ->get(route('admin.users'))
+        ->assertSuccessful()
+        ->assertSee(route('admin.user-image-library', $this->member))
+        ->assertSee(route('admin.user-video-library', $this->member));
+});
+
+test('the account page offers both libraries for a member', function () {
+    $this->actingAs($this->admin)
+        ->get(route('admin.user', $this->member))
+        ->assertSuccessful()
+        ->assertSee(route('admin.user-image-library', $this->member))
+        ->assertSee(route('admin.user-video-library', $this->member));
+});
+
+test('the account page offers no library links for another administrator', function () {
+    $other = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.user', $other))
+        ->assertSuccessful()
+        ->assertDontSee(route('admin.user-image-library', $other));
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// TELLING THE OWNER
+
+test('a member is told when an administrator edits their image', function () {
+    Mail::fake();
+    Notification::fake();
+
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $this->actingAs($this->admin);
+
+    app(ImageLibraryService::class)->update($image, 'Renamed by an admin');
+
+    Mail::assertQueued(UploadModifiedEmail::class);
+    Notification::assertSentTo($this->member, GeneralNotification::class);
+});
+
+test('a member is told when an administrator deletes their image', function () {
+    Mail::fake();
+
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $this->actingAs($this->admin);
+
+    app(ImageLibraryService::class)->delete($image);
+
+    Mail::assertQueued(UploadModifiedEmail::class);
+});
+
+test('a member is told once when several of their images are moved', function () {
+    Mail::fake();
+
+    $service = app(ImageLibraryService::class);
+    $folder = $service->createFolder($this->admin, 'Reviewed', shared: true);
+    $images = collect([
+        $service->store($this->member, uploadedImage('one.jpg')),
+        $service->store($this->member, uploadedImage('two.jpg')),
+    ]);
+
+    $this->actingAs($this->admin);
+
+    $service->moveImages($images, $folder);
+
+    // One change, one message — not one per file.
+    Mail::assertQueued(UploadModifiedEmail::class, 1);
+});
+
+test('a member changing their own image is told nothing', function () {
+    Mail::fake();
+    Notification::fake();
+
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $this->actingAs($this->member);
+
+    app(ImageLibraryService::class)->update($image, 'Renamed by me');
+
+    Mail::assertNothingQueued();
+    Notification::assertNothingSent();
+});
+
+test('an administrator changing their own image tells nobody', function () {
+    Mail::fake();
+
+    $image = app(ImageLibraryService::class)->store($this->admin, uploadedImage());
+
+    $this->actingAs($this->admin);
+
+    app(ImageLibraryService::class)->update($image, 'Site media');
+
+    Mail::assertNothingQueued();
+});
+
+test('the email switch turns off the email and leaves the bell', function () {
+    Mail::fake();
+    Notification::fake();
+
+    app(SiteConfigurationService::class)->update(['uploads' => ['modification' => ['email' => false, 'in-app' => true]]]);
+
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $this->actingAs($this->admin);
+
+    app(ImageLibraryService::class)->update($image, 'Renamed');
+
+    Mail::assertNothingQueued();
+    Notification::assertSentTo($this->member, GeneralNotification::class);
+});
+
+test('both switches off sends nothing at all', function () {
+    Mail::fake();
+    Notification::fake();
+
+    app(SiteConfigurationService::class)->update(['uploads' => ['modification' => ['email' => false, 'in-app' => false]]]);
+
+    $image = app(ImageLibraryService::class)->store($this->member, uploadedImage());
+
+    $this->actingAs($this->admin);
+
+    app(ImageLibraryService::class)->update($image, 'Renamed');
+
+    Mail::assertNothingQueued();
+    Notification::assertNothingSent();
 });

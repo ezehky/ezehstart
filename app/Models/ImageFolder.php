@@ -120,14 +120,30 @@ class ImageFolder extends Model
 
     /**
      * The folders this user may browse: their own, plus anything whose visibility
-     * lets them in. An administrator browses the lot — the library is also the
-     * site's media manager, and hiding folders from the person maintaining the
-     * site hides the site from them.
+     * lets them in.
+     *
+     * An administrator browses the site's own folders — the shared ones that
+     * belong to nobody, and those an admin account made. A folder a member
+     * created is theirs, and is reached only through the per-member screen that
+     * passes $owner.
      */
     #[Scope]
-    protected function browsableBy(Builder $query, User $user): void
+    protected function browsableBy(Builder $query, User $user, ?User $owner = null): void
     {
+        // One account's folders, asked for by name.
+        if ($owner) {
+            $query->where('user_id', $owner->id);
+
+            return;
+        }
+
         if ($user->isAdmin()) {
+            // Null is a shared folder, which belongs to the platform rather than
+            // to a person, so it stays on the admin's screen.
+            $query->where(fn (Builder $inner) => $inner
+                ->whereNull('user_id')
+                ->orWhereHas('user', fn (Builder $account) => $account->where('user_type', UserTypeEnum::ADMIN)));
+
             return;
         }
 

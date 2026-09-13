@@ -5,12 +5,14 @@ use App\Enums\StatusPost;
 use App\Enums\StatusYes;
 use App\Enums\UserTypeEnum;
 use App\Enums\VideoProviderEnum;
+use App\Mail\UploadModifiedEmail;
 use App\Models\Post;
 use App\Models\Video;
 use App\Models\VideoFolder;
 use App\Services\BlogService;
 use App\Services\SiteConfigurationService;
 use App\Services\VideoLibraryService;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -108,15 +110,18 @@ test('a url no provider serves is not stored', function () {
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // VISIBILITY
 
-test('a private video is invisible to everybody but its owner and an admin', function () {
+test('a member video is invisible to everybody but its owner', function () {
     $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
 
     $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
     expect($video->isVisibleTo($this->member))->toBeTrue()
-        ->and($video->isVisibleTo($this->admin))->toBeTrue()
         ->and($video->isVisibleTo($stranger))->toBeFalse()
-        ->and($video->isVisibleTo(null))->toBeFalse();
+        ->and($video->isVisibleTo(null))->toBeFalse()
+        // An administrator included, and for the same reason as the image
+        // library: a hidden row is not a guarded row.
+        ->and($video->isVisibleTo($this->admin))->toBeFalse()
+        ->and($video->isVisibleTo($this->admin, ownerScoped: true))->toBeTrue();
 });
 
 test('a type video reaches everybody of that type', function () {
@@ -157,9 +162,10 @@ test('the library query offers only what the account may see', function () {
     // The public one only: the member's is theirs, and the admin's private one is
     // nobody else's business.
     expect($service->libraryQuery($stranger)->pluck('video_id')->all())->toBe(['123456789'])
-        // An administrator browses the lot — the library is also the site's media
-        // manager, and one that hides rows from them is not a manager.
-        ->and($service->libraryQuery($this->admin)->count())->toBe(3);
+        // The administrator sees the site's own two and not the member's. A
+        // member's references are reached through the per-member screen.
+        ->and($service->libraryQuery($this->admin)->count())->toBe(2)
+        ->and($service->libraryQuery($this->admin, owner: $this->member)->count())->toBe(1);
 });
 
 test('a folder somebody may not browse still does not hide a video they may see', function () {
@@ -420,4 +426,65 @@ test('a pick made for a named slot does not also reach the editor', function () 
         // being written.
         ->assertNotDispatched('video-picked')
         ->assertDispatched('videosSelected');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SELECTING IN BULK
+
+test('select all ticks every video on the page', function () {
+    $service = app(VideoLibraryService::class);
+
+    $service->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
+    $service->store($this->member, 'https://vimeo.com/123456789');
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.video-library')
+        ->call('toggleSelectAll');
+
+    expect($component->get('selected'))->toHaveCount(2);
+
+    expect($component->call('toggleSelectAll')->get('selected'))->toBe([]);
+});
+
+test('a video selection is dropped once the videos have been moved', function () {
+    $service = app(VideoLibraryService::class);
+    $video = $service->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
+    $folder = $service->createFolder($this->member, 'Talks');
+
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.video-library')
+        ->set('selected', [$video->id])
+        ->set('move_folder_id', $folder->id)
+        ->call('moveSelected')
+        ->assertHasNoErrors();
+
+    expect($component->get('selected'))->toBe([])
+        ->and($video->fresh()->video_folder_id)->toBe($folder->id);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// TELLING THE OWNER
+
+test('a member is told when an administrator edits their video', function () {
+    Mail::fake();
+
+    $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
+
+    $this->actingAs($this->admin);
+
+    app(VideoLibraryService::class)->update($video, 'Renamed by an admin');
+
+    Mail::assertQueued(UploadModifiedEmail::class);
+});
+
+test('a member changing their own video is told nothing', function () {
+    Mail::fake();
+
+    $video = app(VideoLibraryService::class)->store($this->member, 'https://youtu.be/dQw4w9WgXcQ');
+
+    $this->actingAs($this->member);
+
+    app(VideoLibraryService::class)->update($video, 'Renamed by me');
+
+    Mail::assertNothingQueued();
 });

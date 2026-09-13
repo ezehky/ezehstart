@@ -112,7 +112,7 @@ class VideoLibraryService
             'video_id' => $resolved['id'],
             'description' => $description,
             'duration' => $duration,
-            ...$this->visibilityAttributes($visibility, $visibleToType),
+            ...$this->visibilityAttributes($visibility, $visibleToType, $user),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -160,7 +160,7 @@ class VideoLibraryService
             'video_folder_id' => $folder?->id,
             'description' => $description,
             'duration' => $duration,
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType, $video->user) : []),
         ]);
 
         $affected = $activity->affectedColumns($video);
@@ -168,6 +168,8 @@ class VideoLibraryService
         $video->save();
 
         $activity->logActivity(ActivityActionEnum::VIDEO_UPDATE, $video->title, $affected, $video);
+
+        $this->tellOwner($video, "Your video \"{$video->title}\" was updated.");
 
         return $video;
     }
@@ -190,9 +192,17 @@ class VideoLibraryService
 
         $title = $video->title;
 
+        // Resolved before the row goes, so there is still an owner to tell.
+        $owner = $video->user;
+
         $video->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::VIDEO_DELETE, $title);
+
+        if ($owner?->isUser()) {
+            app(NotificationSubscriberService::class)
+                ->notifyOwnerOfChange($owner, "Your video \"{$title}\" was deleted.");
+        }
 
         return null;
     }
@@ -222,7 +232,7 @@ class VideoLibraryService
             'parent_id' => $parent?->id,
             'name' => trim($name),
             'slug' => kSlug($name),
-            ...$this->visibilityAttributes($visibility, $visibleToType),
+            ...$this->visibilityAttributes($visibility, $visibleToType, $ownerId ? $user : null),
             'status' => StatusDefault::ACTIVE,
         ]);
 
@@ -249,7 +259,7 @@ class VideoLibraryService
         $folder->fill([
             'name' => trim($name) ?: $folder->name,
             'slug' => kSlug(trim($name) ?: $folder->name),
-            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType) : []),
+            ...($visibility ? $this->visibilityAttributes($visibility, $visibleToType, $folder->user) : []),
         ]);
 
         $affected = $activity->affectedColumns($folder);
@@ -303,7 +313,46 @@ class VideoLibraryService
             }
         });
 
+        // One message per owner rather than one per row: somebody whose ten
+        // videos were refiled in a single action was subject to one change.
+        $destination = $folder?->name ?? 'the library root';
+
+        $videos->groupBy('user_id')->each(function (Collection $owned) use ($destination) {
+            $owner = $owned->first()?->user;
+
+            if (! $owner?->isUser()) {
+                return;
+            }
+
+            $count = $owned->count();
+
+            app(NotificationSubscriberService::class)->notifyOwnerOfChange(
+                $owner,
+                $count === 1
+                    ? "Your video \"{$owned->first()->title}\" was moved to {$destination}."
+                    : "{$count} of your videos were moved to {$destination}.",
+            );
+        });
+
         return $videos->count();
+    }
+
+    /**
+     * Tell a video's owner that somebody else changed it.
+     *
+     * Silent when the owner is an administrator or is the one doing it — the
+     * point is that a member's library is private, so a change they did not make
+     * is worth hearing about.
+     */
+    private function tellOwner(Video $video, string $summary): void
+    {
+        $owner = $video->user;
+
+        if (! $owner?->isUser()) {
+            return;
+        }
+
+        app(NotificationSubscriberService::class)->notifyOwnerOfChange($owner, $summary);
     }
 
     /**
@@ -312,9 +361,9 @@ class VideoLibraryService
      *
      * @return Collection<int, array{id: int, label: string}>
      */
-    public function folderOptions(User $user): Collection
+    public function folderOptions(User $user, ?User $owner = null): Collection
     {
-        $folders = VideoFolder::query()->active()->browsableBy($user)->orderBy('name')->get();
+        $folders = VideoFolder::query()->active()->browsableBy($user, $owner)->orderBy('name')->get();
 
         $byParent = $folders->groupBy('parent_id');
 
@@ -480,11 +529,11 @@ class VideoLibraryService
     /**
      * The picker's query: what this account may choose from.
      */
-    public function libraryQuery(User $user, ?VideoFolder $folder = null, ?string $search = null, string $sort = 'newest'): Builder
+    public function libraryQuery(User $user, ?VideoFolder $folder = null, ?string $search = null, string $sort = 'newest', ?User $owner = null): Builder
     {
         return Video::query()
             ->active()
-            ->visibleTo($user)
+            ->visibleTo($user, $owner)
             ->when($folder, fn (Builder $query) => $query->where('video_folder_id', $folder->id))
             ->when($search, fn (Builder $query) => $query->where('title', 'like', '%'.$search.'%'))
             ->tap(fn (Builder $query) => $this->applySort($query, $sort));
@@ -514,8 +563,18 @@ class VideoLibraryService
      *
      * @return array<string, mixed>
      */
-    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role): array
+    private function visibilityAttributes(MediaVisibilityEnum $visibility, ?UserTypeEnum $role, ?User $owner = null): array
     {
+        // A member's library is theirs alone, whatever the form asked for — the
+        // same rule as the image library, for the same reason. A row owned by
+        // nobody is a shared platform folder and is left alone.
+        if ($owner?->isUser()) {
+            return [
+                'visibility' => MediaVisibilityEnum::PRIVATE,
+                'visible_to_type' => null,
+            ];
+        }
+
         return [
             'visibility' => $visibility,
             'visible_to_type' => $visibility->needsType() ? $role : null,

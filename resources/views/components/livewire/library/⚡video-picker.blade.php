@@ -93,7 +93,7 @@ new class extends Component
         $videos = Video::query()
             ->whereKey($this->selected)
             ->get()
-            ->filter(fn (Video $video) => $video->isVisibleTo($this->user))
+            ->filter(fn (Video $video) => $video->isVisibleTo($this->user, $this->owner !== null))
             ->values();
 
         $this->respondError('Choose a video first.', $videos->isEmpty());

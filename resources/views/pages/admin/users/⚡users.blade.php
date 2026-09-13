@@ -238,27 +238,55 @@ new class extends Component
 
                         <x-table.cell column="created_at">{{ $item->createdAtHuman() }}</x-table.cell>
 
-                        <x-table.cell class="flex gap-2">
-                            <flux:button
-                                icon="eye"
-                                variant="primary"
-                                size="sm"
-                                :href="route('admin.user', $item)"
-                                wire:navigate
-                                title="View profile"
-                            />
-                            {{-- Moving an account between workspaces is handing out access, so
-                                    this asks for full access to Users — the gate the lockout
-                                    guard protects. --}}
-                            <x-dashboard.gate.button
-                                gate="users"
-                                :level="$gateFull"
-                                icon="shield-check"
-                                variant="filled"
-                                size="sm"
-                                wire:click="openRoleManager({{ $item->id }})"
-                                title="Manage access"
-                            />
+                        <x-table.cell>
+                            <flux:dropdown position="right" align="start">
+                                <flux:button icon="ellipsis-vertical" variant="ghost" size="sm" />
+                                <flux:menu>
+                                    <flux:menu.item
+                                        icon="eye"
+                                        :href="route('admin.user', $item)"
+                                        wire:navigate
+                                    >
+                                        View profile
+                                    </flux:menu.item>
+
+                                    {{-- A member's uploads are private and absent from the
+                                         admin library, so these two are the only way in. --}}
+                                    <x-dashboard.gate.menu-item
+                                        gate="content.image-library"
+                                        level="view"
+                                        icon="photo"
+                                        :href="route('admin.user-image-library', $item)"
+                                        wire:navigate
+                                    >
+                                        Image library
+                                    </x-dashboard.gate.menu-item>
+
+                                    <x-dashboard.gate.menu-item
+                                        gate="content.video-library"
+                                        level="view"
+                                        icon="film"
+                                        :href="route('admin.user-video-library', $item)"
+                                        wire:navigate
+                                    >
+                                        Video library
+                                    </x-dashboard.gate.menu-item>
+
+                                    <flux:menu.separator />
+
+                                    {{-- Moving an account between workspaces is handing out
+                                         access, so this asks for full access to Users — the
+                                         gate the lockout guard protects. --}}
+                                    <x-dashboard.gate.menu-item
+                                        gate="users"
+                                        level="full"
+                                        icon="shield-check"
+                                        wire:click="openRoleManager({{ $item->id }})"
+                                    >
+                                        Manage access
+                                    </x-dashboard.gate.menu-item>
+                                </flux:menu>
+                            </flux:dropdown>
                         </x-table.cell>
                     </flux:table.row>
                 @empty

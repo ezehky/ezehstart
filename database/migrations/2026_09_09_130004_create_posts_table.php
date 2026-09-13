@@ -45,6 +45,11 @@ return new class extends Migration
             // top of the feed.
             $table->timestamp('published_at')->nullable()->index();
 
+            // When subscribers were told about this post. The stamp is the claim:
+            // a post unpublished and published again is not news twice, and two
+            // overlapping scheduler ticks cannot both announce it.
+            $table->timestamp('announced_at')->nullable();
+
             $table->boolean('is_featured')->default(StatusYes::NO)->index();
             $table->tinyInteger('status')->default(StatusPost::DRAFT)->index();
 

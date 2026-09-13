@@ -163,13 +163,15 @@ new class extends Component
 
         $this->post->read_minutes = Post::estimateReadMinutes($this->post->content);
 
-        $blog->applyStatus($this->post, $this->status);
-
         // An explicit date wins over the automatic stamp, which is what makes
-        // scheduling and back-dating possible.
+        // scheduling and back-dating possible. Applied before the status, because
+        // applyStatus() reads the date to decide whether a scheduled post is
+        // still waiting or is already due.
         if ($this->published_at) {
             $this->post->published_at = $this->published_at;
         }
+
+        $blog->applyStatus($this->post, $this->status);
 
         $affected = $activity->affectedColumns($this->post);
 
@@ -200,7 +202,14 @@ new class extends Component
 
         $activity->logActivity($action, " post: {$this->post->title}", $affected, model: $this->post);
 
-        $this->respondSuccess('The post has been saved.');
+        // Publishing by hand tells the subscribers, exactly as the scheduler
+        // does. announce() is the one that decides whether there is anything to
+        // say, so re-saving a live post does not send it twice.
+        $reached = $blog->announce($this->post);
+
+        $this->respondSuccess($reached
+            ? "The post has been saved and {$reached} subscriber(s) notified."
+            : 'The post has been saved.');
 
         return $this->redirectRoute('admin.blog.blogs', navigate: true);
     }

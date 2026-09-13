@@ -55,6 +55,12 @@ trait WithVideoLibrary
     public array $selected = [];
 
     /**
+     * The account whose library this screen is showing, when an administrator is
+     * looking at somebody else's. Null on every ordinary screen.
+     */
+    public ?int $ownerId = null;
+
+    /**
      * How many videos may be chosen at once. A page manages in bulk by default;
      * a picker is told what its caller wants.
      */
@@ -128,6 +134,20 @@ trait WithVideoLibrary
         $this->user = auth()->user();
     }
 
+    /**
+     * Whose library is being looked at, when it is not the viewer's own.
+     *
+     * Only ever set by the admin screen that exists for it. Null — every other
+     * screen — means the ordinary rules apply.
+     */
+    #[Computed]
+    public function owner(): ?User
+    {
+        return $this->ownerId
+            ? User::query()->whereKey($this->ownerId)->first()
+            : null;
+    }
+
     // ||||||||||||||||||||||||||||||||||||||||||||||||
     // READS
 
@@ -138,7 +158,7 @@ trait WithVideoLibrary
     public function videos(): LengthAwarePaginator
     {
         return app(VideoLibraryService::class)
-            ->libraryQuery($this->user, $this->currentFolder, $this->search ?: null, $this->sort)
+            ->libraryQuery($this->user, $this->currentFolder, $this->search ?: null, $this->sort, $this->owner)
             ->paginate($this->perPage());
     }
 
@@ -146,7 +166,7 @@ trait WithVideoLibrary
     public function currentFolder(): ?VideoFolder
     {
         return $this->folder
-            ? VideoFolder::query()->browsableBy($this->user)->whereKey($this->folder)->first()
+            ? VideoFolder::query()->browsableBy($this->user, $this->owner)->whereKey($this->folder)->first()
             : null;
     }
 
@@ -156,7 +176,7 @@ trait WithVideoLibrary
     #[Computed]
     public function folders(): Collection
     {
-        return app(VideoLibraryService::class)->folderOptions($this->user);
+        return app(VideoLibraryService::class)->folderOptions($this->user, $this->owner);
     }
 
     /**
@@ -256,7 +276,7 @@ trait WithVideoLibrary
     {
         $video = Video::query()->whereKey($videoId)->first();
 
-        abort_unless($video && $video->isVisibleTo($this->user), 404);
+        abort_unless($video && $video->isVisibleTo($this->user, $this->owner !== null), 404);
 
         // A single-pick caller gets its answer on the click; there is nothing to
         // confirm when only one video can win.
@@ -282,10 +302,68 @@ trait WithVideoLibrary
         $this->selected[] = $videoId;
     }
 
+    /**
+     * The ids on the page being looked at.
+     *
+     * Plain methods rather than computed properties: both derive from $selected,
+     * which changes inside the very actions that then re-render, and a cached
+     * answer from before the change is worse than recomputing an array_intersect.
+     *
+     * @return array<int, int>
+     */
+    public function pageVideoIds(): array
+    {
+        return $this->videos->pluck('id')->all();
+    }
+
+    public function allOnPageSelected(): bool
+    {
+        $ids = $this->pageVideoIds();
+
+        return $ids !== [] && array_diff($ids, $this->selected) === [];
+    }
+
+    /**
+     * Tick or clear every video on the page.
+     *
+     * Scoped to the page rather than the whole filtered result, for the same
+     * reason as the image library: "all" has to mean what somebody is looking at.
+     */
+    public function toggleSelectAll(): void
+    {
+        // A single-pick caller has nothing to select all of.
+        if (! $this->multiple) {
+            return;
+        }
+
+        $ids = $this->pageVideoIds();
+
+        if ($this->allOnPageSelected()) {
+            $this->selected = array_values(array_diff($this->selected, $ids));
+
+            unset($this->manageableSelection);
+
+            return;
+        }
+
+        $merged = array_values(array_unique([...$this->selected, ...$ids]));
+        $overflowed = $this->max !== null && \count($merged) > $this->max;
+
+        $this->selected = $overflowed ? \array_slice($merged, 0, $this->max) : $merged;
+
+        unset($this->manageableSelection);
+
+        // Said after the selection is set, so what did fit is kept rather than
+        // thrown away along with the message.
+        $this->respondError("You can choose up to {$this->max} video(s).", $overflowed);
+    }
+
     public function clearSelection(): void
     {
         $this->selected = [];
         $this->panel = null;
+
+        unset($this->manageableSelection);
     }
 
     /**
@@ -468,8 +546,11 @@ trait WithVideoLibrary
             $this->duration,
         );
 
+        // The edit is done, so the selection that aimed it has done its job.
+        $this->selected = [];
+
         $this->closePanel();
-        unset($this->videos);
+        unset($this->videos, $this->manageableSelection);
 
         return $this->respondSuccess('The video has been updated.');
     }
@@ -487,7 +568,7 @@ trait WithVideoLibrary
         $this->respondError('Choose a video to move.', $videos->isEmpty());
 
         $folder = $this->move_folder_id
-            ? VideoFolder::query()->browsableBy($this->user)->whereKey($this->move_folder_id)->first()
+            ? VideoFolder::query()->browsableBy($this->user, $this->owner)->whereKey($this->move_folder_id)->first()
             : null;
 
         // A folder they cannot browse is a folder they cannot file into, or the
@@ -496,8 +577,12 @@ trait WithVideoLibrary
 
         $moved = app(VideoLibraryService::class)->moveVideos($videos, $folder);
 
+        // Moved videos are usually gone from the folder being looked at, so a
+        // selection pointing at them is stale the moment this returns.
+        $this->selected = [];
+
         $this->closePanel();
-        unset($this->videos);
+        unset($this->videos, $this->manageableSelection);
 
         return $this->respondSuccess("{$moved} video(s) moved to ".($folder?->name ?? 'the library root').'.');
     }
@@ -562,7 +647,7 @@ trait WithVideoLibrary
     {
         $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
 
-        $folder = VideoFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
+        $folder = VideoFolder::query()->browsableBy($this->user, $this->owner)->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
         abort_unless($this->canManageFolder($folder), 403);

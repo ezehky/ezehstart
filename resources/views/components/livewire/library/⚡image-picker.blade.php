@@ -103,7 +103,7 @@ new class extends Component
         $images = Image::query()
             ->whereKey($this->selected)
             ->get()
-            ->filter(fn (Image $image) => $image->isVisibleTo($this->user))
+            ->filter(fn (Image $image) => $image->isVisibleTo($this->user, $this->owner !== null))
             ->values();
 
         $this->respondError('Choose an image first.', $images->isEmpty());

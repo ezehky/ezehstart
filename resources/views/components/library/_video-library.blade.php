@@ -315,6 +315,22 @@
                         :text="$search !== '' ? 'Nothing here matches that search.' : 'Switch to the Add a video tab and paste a link.'"
                     />
                 @else
+                    {{-- Only for a caller that can hold more than one video; a
+                         single-pick picker has nothing to select all of. --}}
+                    @if ($multiple)
+                        <div class="flex items-center justify-between gap-3 pb-1">
+                            <flux:checkbox
+                                wire:click="toggleSelectAll"
+                                :checked="$this->allOnPageSelected()"
+                                label="{{ $this->allOnPageSelected() ? 'Deselect all' : 'Select all' }}"
+                            />
+
+                            <flux:text size="sm" class="text-slate-500 dark:text-slate-400">
+                                {{ $this->videos->count() }} on this page
+                            </flux:text>
+                        </div>
+                    @endif
+
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($this->videos as $video)
                             @php($isSelected = in_array($video->id, $selected, true))

@@ -433,6 +433,33 @@ new class extends Component
                     Manage access
                 </x-dashboard.gate.button>
 
+                {{-- A member's uploads never appear in the admin library or picker, so
+                     these two links are the only way an administrator reaches them.
+                     Admins do not have a separate library of their own to look at. --}}
+                @if ($user->isUser())
+                    <x-dashboard.gate.button
+                        gate="content.image-library"
+                        level="view"
+                        icon="photo"
+                        variant="filled"
+                        :href="route('admin.user-image-library', $user)"
+                        wire:navigate
+                    >
+                        Image library
+                    </x-dashboard.gate.button>
+
+                    <x-dashboard.gate.button
+                        gate="content.video-library"
+                        level="view"
+                        icon="film"
+                        variant="filled"
+                        :href="route('admin.user-video-library', $user)"
+                        wire:navigate
+                    >
+                        Video library
+                    </x-dashboard.gate.button>
+                @endif
+
                 @unless ($user->status->inDeletionFlow())
                     <x-dashboard.gate.button
                         :gate="$this->gateKey()"

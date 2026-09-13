@@ -260,6 +260,22 @@
                         :text="$search !== '' ? 'Nothing here matches that search.' : 'Switch to the Upload tab and they will appear here.'"
                     />
                 @else
+                    {{-- Only for a caller that can hold more than one image; a
+                         single-pick picker has nothing to select all of. --}}
+                    @if ($multiple)
+                        <div class="flex items-center justify-between gap-3 pb-1">
+                            <flux:checkbox
+                                wire:click="toggleSelectAll"
+                                :checked="$this->allOnPageSelected()"
+                                label="{{ $this->allOnPageSelected() ? 'Deselect all' : 'Select all' }}"
+                            />
+
+                            <flux:text size="sm" class="text-slate-500 dark:text-slate-400">
+                                {{ $this->images->count() }} on this page
+                            </flux:text>
+                        </div>
+                    @endif
+
                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                         @foreach ($this->images as $image)
                             @php($isSelected = in_array($image->id, $selected, true))

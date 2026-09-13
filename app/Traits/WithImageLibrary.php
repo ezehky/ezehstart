@@ -50,6 +50,12 @@ trait WithImageLibrary
     public array $selected = [];
 
     /**
+     * The account whose library this screen is showing, when an administrator is
+     * looking at somebody else's. Null on every ordinary screen.
+     */
+    public ?int $ownerId = null;
+
+    /**
      * How many images may be chosen at once. A page manages in bulk by default;
      * a picker is told what its caller wants.
      */
@@ -112,6 +118,21 @@ trait WithImageLibrary
         $this->user = auth()->user();
     }
 
+    /**
+     * Whose library is being looked at, when it is not the viewer's own.
+     *
+     * Only ever set by the admin screen that exists for it. Null — every other
+     * screen — means the ordinary rules apply: a member sees their own library,
+     * an administrator sees the site's.
+     */
+    #[Computed]
+    public function owner(): ?User
+    {
+        return $this->ownerId
+            ? User::query()->whereKey($this->ownerId)->first()
+            : null;
+    }
+
     // ||||||||||||||||||||||||||||||||||||||||||||||||
     // READS
 
@@ -122,7 +143,7 @@ trait WithImageLibrary
     public function images(): LengthAwarePaginator
     {
         return app(ImageLibraryService::class)
-            ->libraryQuery($this->user, $this->currentFolder, $this->search ?: null, $this->sort)
+            ->libraryQuery($this->user, $this->currentFolder, $this->search ?: null, $this->sort, $this->owner)
             ->paginate($this->perPage());
     }
 
@@ -130,7 +151,7 @@ trait WithImageLibrary
     public function currentFolder(): ?ImageFolder
     {
         return $this->folder
-            ? ImageFolder::query()->browsableBy($this->user)->whereKey($this->folder)->first()
+            ? ImageFolder::query()->browsableBy($this->user, $this->owner)->whereKey($this->folder)->first()
             : null;
     }
 
@@ -140,7 +161,7 @@ trait WithImageLibrary
     #[Computed]
     public function folders(): Collection
     {
-        return app(ImageLibraryService::class)->folderOptions($this->user);
+        return app(ImageLibraryService::class)->folderOptions($this->user, $this->owner);
     }
 
     /**
@@ -246,7 +267,7 @@ trait WithImageLibrary
     {
         $image = Image::query()->whereKey($imageId)->first();
 
-        abort_unless($image && $image->isVisibleTo($this->user), 404);
+        abort_unless($image && $image->isVisibleTo($this->user, $this->owner !== null), 404);
 
         // A single-pick caller gets its answer on the click; there is nothing to
         // confirm when only one image can win.
@@ -272,10 +293,69 @@ trait WithImageLibrary
         $this->selected[] = $imageId;
     }
 
+    /**
+     * The ids on the page being looked at.
+     *
+     * Plain methods rather than computed properties: both derive from $selected,
+     * which changes inside the very actions that then re-render, and a cached
+     * answer from before the change is worse than recomputing an array_intersect.
+     *
+     * @return array<int, int>
+     */
+    public function pageImageIds(): array
+    {
+        return $this->images->pluck('id')->all();
+    }
+
+    public function allOnPageSelected(): bool
+    {
+        $ids = $this->pageImageIds();
+
+        return $ids !== [] && array_diff($ids, $this->selected) === [];
+    }
+
+    /**
+     * Tick or clear every image on the page.
+     *
+     * Scoped to the page rather than to the whole filtered result on purpose:
+     * "all" has to mean what somebody is actually looking at, or one click would
+     * arm a delete against images on pages they never opened.
+     */
+    public function toggleSelectAll(): void
+    {
+        // A single-pick caller has nothing to select all of.
+        if (! $this->multiple) {
+            return;
+        }
+
+        $ids = $this->pageImageIds();
+
+        if ($this->allOnPageSelected()) {
+            $this->selected = array_values(array_diff($this->selected, $ids));
+
+            unset($this->manageableSelection);
+
+            return;
+        }
+
+        $merged = array_values(array_unique([...$this->selected, ...$ids]));
+        $overflowed = $this->max !== null && \count($merged) > $this->max;
+
+        $this->selected = $overflowed ? \array_slice($merged, 0, $this->max) : $merged;
+
+        unset($this->manageableSelection);
+
+        // Said after the selection is set, so what did fit is kept rather than
+        // thrown away along with the message.
+        $this->respondError("You can choose up to {$this->max} image(s).", $overflowed);
+    }
+
     public function clearSelection(): void
     {
         $this->selected = [];
         $this->panel = null;
+
+        unset($this->manageableSelection);
     }
 
     /**
@@ -399,8 +479,12 @@ trait WithImageLibrary
             $this->alt_text,
         );
 
+        // The edit is done, so the selection that aimed it has done its job. Leaving
+        // it armed is how somebody moves or deletes the image they meant to rename.
+        $this->selected = [];
+
         $this->closePanel();
-        unset($this->images);
+        unset($this->images, $this->manageableSelection);
 
         return $this->respondSuccess('The image has been updated. Its URL has not changed.');
     }
@@ -418,7 +502,7 @@ trait WithImageLibrary
         $this->respondError('Choose an image to move.', $images->isEmpty());
 
         $folder = $this->move_folder_id
-            ? ImageFolder::query()->browsableBy($this->user)->whereKey($this->move_folder_id)->first()
+            ? ImageFolder::query()->browsableBy($this->user, $this->owner)->whereKey($this->move_folder_id)->first()
             : null;
 
         // A folder they cannot browse is a folder they cannot file into, or the
@@ -427,8 +511,12 @@ trait WithImageLibrary
 
         $moved = app(ImageLibraryService::class)->moveImages($images, $folder);
 
+        // Moved images are usually gone from the folder being looked at, so a
+        // selection pointing at them is stale the moment this returns.
+        $this->selected = [];
+
         $this->closePanel();
-        unset($this->images);
+        unset($this->images, $this->manageableSelection);
 
         return $this->respondSuccess("{$moved} image(s) moved to ".($folder?->name ?? 'the library root').'.');
     }
@@ -458,7 +546,7 @@ trait WithImageLibrary
 
         $this->selected = [];
         $this->closePanel();
-        unset($this->images, $this->remaining);
+        unset($this->images, $this->remaining, $this->manageableSelection);
 
         $this->respondError(
             'Still in use somewhere: '.implode(', ', $refused).'. Remove it from there first.',
@@ -493,7 +581,7 @@ trait WithImageLibrary
     {
         $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
 
-        $folder = ImageFolder::query()->browsableBy($this->user)->whereKey($folderId)->first();
+        $folder = ImageFolder::query()->browsableBy($this->user, $this->owner)->whereKey($folderId)->first();
 
         abort_unless((bool) $folder, 404);
         abort_unless($this->canManageFolder($folder), 403);

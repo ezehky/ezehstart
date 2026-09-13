@@ -24,6 +24,8 @@ enum NotificationTopicEnum: string
     case WELCOME = 'welcome';
     case ACCOUNT_UPDATED = 'account-updated';
     case SECURITY_ALERT = 'security-alert';
+    case NEW_POST = 'new-post';
+    case UPLOAD_MODIFIED = 'upload-modified';
 
     // Admin topics
     case ADMIN_NEW_ACCOUNT = 'admin.new-account';
@@ -52,6 +54,8 @@ enum NotificationTopicEnum: string
             self::WELCOME => 'Welcome aboard',
             self::ACCOUNT_UPDATED => 'Account updated',
             self::SECURITY_ALERT => 'Security alert',
+            self::NEW_POST => 'New post',
+            self::UPLOAD_MODIFIED => 'Your uploads changed',
             self::ADMIN_NEW_ACCOUNT => 'New account',
             self::ADMIN_UNASSIGNED_ACCOUNT => 'Admins without a role',
         };
@@ -63,6 +67,8 @@ enum NotificationTopicEnum: string
             self::WELCOME => 'sparkles',
             self::ACCOUNT_UPDATED => 'user-circle',
             self::SECURITY_ALERT => 'shield-exclamation',
+            self::NEW_POST => 'newspaper',
+            self::UPLOAD_MODIFIED => 'photo',
             self::ADMIN_NEW_ACCOUNT => 'user-plus',
             self::ADMIN_UNASSIGNED_ACCOUNT => 'exclamation-triangle',
         };
@@ -77,7 +83,8 @@ enum NotificationTopicEnum: string
             self::WELCOME, self::ADMIN_NEW_ACCOUNT => 'green',
             self::SECURITY_ALERT => 'red',
             self::ADMIN_UNASSIGNED_ACCOUNT => 'amber',
-            self::ACCOUNT_UPDATED => 'blue',
+            self::ACCOUNT_UPDATED, self::NEW_POST => 'blue',
+            self::UPLOAD_MODIFIED => 'amber',
         };
     }
 }

@@ -21,9 +21,17 @@ Route::prefix('/site-config')->name('config.')->group(function () {
 // each account may see, so there is nothing workspace-specific in the page.
 Route::livewire('/image-library', 'pages::shared.image-library')->name('image-library');
 
+// One member's library. Their uploads are private and deliberately absent from the
+// admin library and picker, so this is the only way in — reached from the user list
+// or from the account page, never by browsing.
+Route::livewire('/image-library/{user}', 'pages::shared.image-library')->name('user-image-library');
+
 // Video library. Embeds rather than uploads, but the same screen in both
 // workspaces for the same reason — the service decides what each account sees.
 Route::livewire('/video-library', 'pages::shared.video-library')->name('video-library');
+
+// The same again for one member's video references.
+Route::livewire('/video-library/{user}', 'pages::shared.video-library')->name('user-video-library');
 
 // Money
 Route::livewire('/transactions', 'pages::admin.transactions')->name('transactions');

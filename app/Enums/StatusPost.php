@@ -18,6 +18,14 @@ enum StatusPost: int
      */
     case ARCHIVED = 2;
 
+    /**
+     * Written, approved, and waiting for its date. Distinct from a draft because
+     * nobody has to remember to come back and press publish, and distinct from
+     * published because published_at alone cannot say whether a future date was
+     * deliberate or a typo.
+     */
+    case SCHEDULED = 3;
+
     public function isDraft(): bool
     {
         return $this === self::DRAFT;
@@ -31,5 +39,10 @@ enum StatusPost: int
     public function isArchived(): bool
     {
         return $this === self::ARCHIVED;
+    }
+
+    public function isScheduled(): bool
+    {
+        return $this === self::SCHEDULED;
     }
 }

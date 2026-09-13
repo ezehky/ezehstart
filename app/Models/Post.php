@@ -23,6 +23,7 @@ class Post extends Model
     {
         return [
             'published_at' => 'datetime',
+            'announced_at' => 'datetime',
             'is_featured' => StatusYes::class,
             'status' => StatusPost::class,
         ];
@@ -117,6 +118,30 @@ class Post extends Model
         $query->where('status', StatusPost::PUBLISHED)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
+    }
+
+    /**
+     * Scheduled posts whose moment has come.
+     *
+     * Unbounded at the far end deliberately: a post that should have gone out
+     * during an outage still should go out, unlike a reminder about a date that
+     * has already passed.
+     */
+    #[Scope]
+    protected function dueForPublishing(Builder $query): void
+    {
+        $query->where('status', StatusPost::SCHEDULED)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now());
+    }
+
+    /**
+     * Live posts nobody has been told about yet.
+     */
+    #[Scope]
+    protected function unannounced(Builder $query): void
+    {
+        $query->live()->whereNull('announced_at');
     }
 
     #[Scope]

@@ -91,18 +91,30 @@ class Video extends Model
     /**
      * Whether the given account may see this video.
      *
-     * Owner and administrator always can. Beyond that it is the video's own
-     * visibility that decides — never its folder's, so moving one between folders
-     * cannot change who can see it.
+     * The owner always can. Beyond that it is the video's own visibility that
+     * decides — never its folder's, so moving one between folders cannot change
+     * who can see it.
+     *
+     * @param  bool  $ownerScoped  True only when the caller is a screen that has
+     *                             already established a right to look at this
+     *                             owner's library — the admin's per-member view.
      */
-    public function isVisibleTo(?User $user): bool
+    public function isVisibleTo(?User $user, bool $ownerScoped = false): bool
     {
         if (! $user) {
             return $this->visibility->isPublic();
         }
 
-        if ($this->user_id === $user->id || $user->isAdmin()) {
+        if ($this->user_id === $user->id) {
             return true;
+        }
+
+        if ($user->isAdmin()) {
+            // The same rule the visibleTo scope applies, and it has to be here
+            // too: the scope keeps a member's uploads out of the grid, but this
+            // is what a picker asks before accepting an id somebody sent, and a
+            // row that is merely hidden is not a row that is guarded.
+            return $ownerScoped || ! $this->user?->isUser();
         }
 
         return match (true) {
@@ -145,9 +157,22 @@ class Video extends Model
      * media manager, and one that hides rows from them is not a manager.
      */
     #[Scope]
-    protected function visibleTo(Builder $query, User $user): void
+    protected function visibleTo(Builder $query, User $user, ?User $owner = null): void
     {
+        // One account's library, asked for by name — the admin's per-member
+        // screen. The caller has already established that this viewer may look.
+        if ($owner) {
+            $query->where('user_id', $owner->id);
+
+            return;
+        }
+
+        // An administrator sees the site's own library and deliberately not the
+        // members'. The reasoning is the same as for images: a member's
+        // references are theirs, and are reached through their own screen.
         if ($user->isAdmin()) {
+            $query->whereHas('user', fn (Builder $account) => $account->where('user_type', UserTypeEnum::ADMIN));
+
             return;
         }
 

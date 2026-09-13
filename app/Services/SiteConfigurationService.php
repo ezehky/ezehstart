@@ -107,6 +107,14 @@ class SiteConfigurationService
                 // A video costs no disk, so the ceiling is lower for a different
                 // reason: a library nobody can find anything in is not a library.
                 'user-video-limit' => 25,
+
+                // Telling a member when an administrator touched their files.
+                // Both channels are separate switches because they cost the
+                // recipient different amounts of attention.
+                'modification' => [
+                    'email' => true,
+                    'in-app' => true,
+                ],
             ],
         ];
     }

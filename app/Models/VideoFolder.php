@@ -125,9 +125,21 @@ class VideoFolder extends Model
      * site hides the site from them.
      */
     #[Scope]
-    protected function browsableBy(Builder $query, User $user): void
+    protected function browsableBy(Builder $query, User $user, ?User $owner = null): void
     {
+        if ($owner) {
+            $query->where('user_id', $owner->id);
+
+            return;
+        }
+
         if ($user->isAdmin()) {
+            // Null is a shared folder, which belongs to the platform rather than
+            // to a person, so it stays on the admin's screen.
+            $query->where(fn (Builder $inner) => $inner
+                ->whereNull('user_id')
+                ->orWhereHas('user', fn (Builder $account) => $account->where('user_type', UserTypeEnum::ADMIN)));
+
             return;
         }
 

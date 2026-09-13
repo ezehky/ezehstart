@@ -63,18 +63,30 @@ class Image extends Model
     /**
      * Whether the given account may see this image.
      *
-     * Owner and administrator always can. Beyond that it is the image's own
-     * visibility that decides — never its folder's, so moving a file between
-     * folders cannot change who can see it.
+     * The owner always can. Beyond that it is the image's own visibility that
+     * decides — never its folder's, so moving one between folders cannot change
+     * who can see it.
+     *
+     * @param  bool  $ownerScoped  True only when the caller is a screen that has
+     *                             already established a right to look at this
+     *                             owner's library — the admin's per-member view.
      */
-    public function isVisibleTo(?User $user): bool
+    public function isVisibleTo(?User $user, bool $ownerScoped = false): bool
     {
         if (! $user) {
             return $this->visibility->isPublic();
         }
 
-        if ($this->user_id === $user->id || $user->isAdmin()) {
+        if ($this->user_id === $user->id) {
             return true;
+        }
+
+        if ($user->isAdmin()) {
+            // The same rule the visibleTo scope applies, and it has to be here
+            // too: the scope keeps a member's uploads out of the grid, but this
+            // is what a picker asks before accepting an id somebody sent, and a
+            // row that is merely hidden is not a row that is guarded.
+            return $ownerScoped || ! $this->user?->isUser();
         }
 
         return match (true) {
@@ -113,13 +125,27 @@ class Image extends Model
      * Everything the given account is allowed to pick from: their own uploads,
      * anything public, and anything shared with their account type.
      *
-     * Administrators skip the filter entirely — the library is also the admin's
-     * media manager, and one that hides files from them is not a manager.
+     * An administrator sees the site's own library — images uploaded by admin
+     * accounts — and deliberately not the members'. A member's uploads are
+     * theirs: they do not belong in the admin picker, they are not the site's
+     * media, and twenty accounts' private files mixed into one grid is not a
+     * media manager. Reaching one member's library is a separate, deliberate act
+     * with its own screen, which is what $owner is for.
      */
     #[Scope]
-    protected function visibleTo(Builder $query, User $user): void
+    protected function visibleTo(Builder $query, User $user, ?User $owner = null): void
     {
+        // One account's library, asked for by name. The caller has already
+        // established that this viewer may look.
+        if ($owner) {
+            $query->where('user_id', $owner->id);
+
+            return;
+        }
+
         if ($user->isAdmin()) {
+            $query->whereHas('user', fn (Builder $account) => $account->where('user_type', UserTypeEnum::ADMIN));
+
             return;
         }
 

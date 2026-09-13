@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Enums\GateAccessEnum;
+use App\Enums\NotificationTopicEnum;
+use App\Enums\NotificationTypeEnum;
 use App\Enums\StatusPost;
+use App\Mail\NewPostEmail;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
@@ -40,6 +43,54 @@ class BlogService
         if ($status->isPublished() && $post->published_at === null) {
             $post->published_at = now();
         }
+
+        // A scheduled post whose date is in the past has nothing to wait for, so
+        // it is published rather than left for the sweep to pick up a tick later.
+        if ($status->isScheduled() && $post->published_at !== null && $post->published_at->isPast()) {
+            $post->status = StatusPost::PUBLISHED;
+        }
+    }
+
+    /**
+     * Tell the subscribers a post is up, once.
+     *
+     * The stamp is written before anything is sent and is the claim: two
+     * overlapping scheduler ticks cannot both announce the same post, and a post
+     * taken down and put back is not news a second time.
+     *
+     * Returns how many accounts were reached, or null when there was nothing to
+     * announce — already announced, or not actually live yet.
+     */
+    public function announce(Post $post): ?int
+    {
+        if (! $post->status->isPublished() || $post->announced_at !== null) {
+            return null;
+        }
+
+        if ($post->published_at === null || $post->published_at->isFuture()) {
+            return null;
+        }
+
+        // Claimed through a conditional update rather than a read-then-write: the
+        // where clause is what makes two simultaneous callers resolve to one.
+        $claimed = Post::query()
+            ->whereKey($post->id)
+            ->whereNull('announced_at')
+            ->update(['announced_at' => now()]);
+
+        if ($claimed === 0) {
+            return null;
+        }
+
+        $post->refresh();
+
+        return app(NotificationSubscriberService::class)->broadcast(
+            NotificationTypeEnum::ANNOUNCEMENTS,
+            NotificationTopicEnum::NEW_POST,
+            $post->title,
+            ['url' => route('blog.show', $post->slug)],
+            fn (User $recipient) => new NewPostEmail($recipient, $post),
+        );
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

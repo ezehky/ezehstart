@@ -27,3 +27,19 @@ Schedule::command('account:send-deletion-reminders')
 Schedule::command('account:process-deletions')
     ->dailyAt('08:15')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Blog schedule
+|--------------------------------------------------------------------------
+|
+| Every minute, because a post scheduled for 09:00 that appears at 09:15 has
+| missed the thing it was scheduled for. The command claims each post through
+| a conditional update, so overlapping ticks cannot publish one twice.
+|
+*/
+
+Schedule::command('blog:publish-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
