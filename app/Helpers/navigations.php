@@ -35,6 +35,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Security',
                         'link' => route('admin.config.security'),
                     ],
+                    'preferences' => [
+                        'label' => 'Preferences',
+                        'link' => route('admin.config.preferences'),
+                    ],
                     'social-handles' => [
                         'label' => 'Social handles',
                         'link' => route('admin.config.social-handles'),

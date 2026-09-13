@@ -285,3 +285,75 @@ test('a row that exists but was never confirmed does not gate sign-in', function
 
     $this->assertAuthenticatedAs($this->member);
 });
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// RECOVERY CODE DOWNLOAD
+
+test('the recovery code file lists every code', function () {
+    $service = app(TwoFactorService::class);
+    $twoFactor = $service->beginEnrolment($this->member);
+    $service->confirm($this->member->fresh(), currentOtp($twoFactor->secret));
+
+    $codes = (array) $this->member->fresh()->twoFactor->recovery_codes;
+    $document = $service->recoveryCodeDocument($codes);
+
+    expect($codes)->not->toBeEmpty()
+        ->and($service->recoveryCodeFilename())->toEndWith('-recovery-codes.txt');
+
+    foreach ($codes as $code) {
+        expect($document)->toContain($code);
+    }
+});
+
+test('a member can download the codes they have just been shown', function () {
+    $service = app(TwoFactorService::class);
+    $twoFactor = $service->beginEnrolment($this->member);
+
+    // Enrolled through the screen rather than the service, because the download
+    // is only offered while the generated set is still on the page.
+    $component = Livewire::actingAs($this->member->fresh())
+        ->test('pages::user.account.security-settings')
+        ->set('two_factor_code', currentOtp($twoFactor->secret))
+        ->call('confirmTwoFactor')
+        ->assertHasNoErrors()
+        ->call('downloadRecoveryCodes')
+        ->assertHasNoErrors();
+
+    $download = $component->effects['download'] ?? null;
+    $codes = (array) $this->member->fresh()->twoFactor->recovery_codes;
+
+    expect($download)->not->toBeNull()
+        ->and($download['name'])->toEndWith('-recovery-codes.txt')
+        ->and(base64_decode($download['content']))->toContain($codes[0]);
+});
+
+test('the download is refused while two factor is off', function () {
+    Livewire::actingAs($this->member)
+        ->test('pages::user.account.security-settings')
+        ->call('downloadRecoveryCodes')
+        ->assertNotFound();
+});
+
+test('the download is refused once the codes have left the screen', function () {
+    $service = app(TwoFactorService::class);
+    $twoFactor = $service->beginEnrolment($this->member);
+    $service->confirm($this->member->fresh(), currentOtp($twoFactor->secret));
+
+    // A fresh visit, which is what a reload is. The codes are stored and could be
+    // handed back, but "shown once" is the promise the screen makes.
+    Livewire::actingAs($this->member->fresh())
+        ->test('pages::user.account.security-settings')
+        ->call('downloadRecoveryCodes')
+        ->assertHasErrors();
+});
+
+test('the settings screen does not offer a download after a reload', function () {
+    $service = app(TwoFactorService::class);
+    $twoFactor = $service->beginEnrolment($this->member);
+    $service->confirm($this->member->fresh(), currentOtp($twoFactor->secret));
+
+    Livewire::actingAs($this->member->fresh())
+        ->test('pages::user.account.security-settings')
+        ->assertDontSee('Download as .txt')
+        ->assertDontSee('Copy codes');
+});

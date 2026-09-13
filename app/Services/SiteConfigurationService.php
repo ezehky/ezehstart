@@ -48,6 +48,11 @@ class SiteConfigurationService
                 // stripped; off removes the account and everything it owns. An
                 // account with no history is removed outright either way.
                 'anonymous-after-deletion' => true,
+
+                // A bottom bar on phones in the member workspace, instead of
+                // reaching for the drawer. Off by default: an install that wants
+                // only the drawer should not have to turn a second navigation off.
+                'mobile-floating-menu' => false,
             ],
 
             // Every switch here turns a whole sign-in feature on or off, so the

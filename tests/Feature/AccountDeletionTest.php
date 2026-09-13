@@ -1,15 +1,16 @@
 <?php
 
+use App\Enums\ActivityActionEnum;
 use App\Enums\DeletionReminderEnum;
 use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
 use App\Mail\AccountDeletionCancelledEmail;
 use App\Mail\AccountDeletionReminderEmail;
 use App\Mail\AccountDeletionScheduledEmail;
-use App\Models\ActivityLog;
 use App\Models\User;
 use App\Models\UserDeletionReminder;
 use App\Services\AccountDeletionService;
+use App\Services\ActivityLogService;
 use App\Services\ImageLibraryService;
 use App\Services\SiteConfigurationService;
 use App\Services\UserService;
@@ -44,6 +45,21 @@ function scheduledMember(int $daysFromNow = 30, array $attributes = []): User
         'deletion_scheduled_at' => now()->addDays($daysFromNow),
         ...$attributes,
     ]);
+}
+
+/**
+ * Give an account something the deletion sweep has to preserve.
+ *
+ * Written through the service rather than by inserting a row, so the fixture
+ * cannot drift from the columns an activity log actually requires.
+ */
+function givesTheAccountHistory(User $user): void
+{
+    auth()->login($user);
+
+    app(ActivityLogService::class)->logActivity(ActivityActionEnum::LOGIN);
+
+    auth()->logout();
 }
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -165,11 +181,7 @@ test('an account with no history is removed outright when its date passes', func
 test('an account with history is anonymized while the switch is on', function () {
     $pending = scheduledMember(-1);
 
-    ActivityLog::query()->create([
-        'user_id' => $pending->id,
-        'activity_log_action' => 'login',
-        'description' => 'Logged into the system.',
-    ]);
+    givesTheAccountHistory($pending);
 
     $this->artisan('account:process-deletions')->assertSuccessful();
 
@@ -188,11 +200,7 @@ test('an account with history is removed outright while the switch is off', func
 
     $pending = scheduledMember(-1);
 
-    ActivityLog::query()->create([
-        'user_id' => $pending->id,
-        'activity_log_action' => 'login',
-        'description' => 'Logged into the system.',
-    ]);
+    givesTheAccountHistory($pending);
 
     $this->artisan('account:process-deletions')->assertSuccessful();
 

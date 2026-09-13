@@ -5,6 +5,7 @@ use App\Enums\UserTypeEnum;
 use App\Models\NotificationType;
 use App\Services\SiteConfigurationService;
 use App\Services\UserService;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
@@ -119,4 +120,64 @@ test('profile completion reflects what has been filled in', function () {
     $this->member->userProfile()->create(['gender' => 'female', 'bio' => 'Builds things.']);
 
     expect($this->member->fresh()->profileCompletion())->toBe(100);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// THE PHONE NAVIGATION
+
+test('the floating menu is off until the site turns it on', function () {
+    app(SiteConfigurationService::class)->update(initials: true);
+
+    $this->actingAs($this->member)
+        ->get(route('user.dashboard'))
+        ->assertSuccessful()
+        ->assertDontSee('aria-label="Workspace navigation"', escape: false);
+});
+
+test('the floating menu appears in the member workspace once it is on', function () {
+    app(SiteConfigurationService::class)->update(['user' => ['mobile-floating-menu' => true]]);
+
+    $this->actingAs($this->member)
+        ->get(route('user.dashboard'))
+        ->assertSuccessful()
+        ->assertSee('aria-label="Workspace navigation"', escape: false)
+        ->assertSee('More');
+});
+
+test('the admin workspace keeps its drawer regardless', function () {
+    app(SiteConfigurationService::class)->update(['user' => ['mobile-floating-menu' => true]]);
+
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.dashboard'))
+        ->assertSuccessful()
+        ->assertDontSee('aria-label="Workspace navigation"', escape: false);
+});
+
+test('an administrator can open the preferences screen and set the menu', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    app(SiteConfigurationService::class)->update(initials: true);
+
+    $this->actingAs($admin)->get(route('admin.config.preferences'))->assertSuccessful();
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.configs.preferences')
+        ->set('config.user.mobile-floating-menu', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(kSiteFlag('user', 'mobile-floating-menu'))->toBeTrue();
+});
+
+test('the security screen no longer carries the workspace preference', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    app(SiteConfigurationService::class)->update(initials: true);
+
+    $this->actingAs($admin)
+        ->get(route('admin.config.security'))
+        ->assertSuccessful()
+        ->assertDontSee('Floating menu on phones');
 });

@@ -229,6 +229,44 @@ class TwoFactorService
         return $codes;
     }
 
+    /**
+     * The recovery codes written out as the text file somebody downloads.
+     *
+     * Built here rather than in the page so the wording is the same whichever
+     * screen offers the download, and so a test can assert on it without
+     * rendering anything.
+     *
+     * @param  array<int, string>  $codes
+     */
+    public function recoveryCodeDocument(array $codes): string
+    {
+        // Defaulted to the app name rather than read bare: kSiteConfig() hands back
+        // its array default for a key an install has never saved, and an unseeded
+        // site would otherwise interpolate an array into the heading.
+        $name = kSiteConfig('name', default: config('app.name'));
+
+        $lines = [
+            $name.' - two-factor recovery codes',
+            'Generated '.now()->format('M d, Y'),
+            '',
+            'Each code works once. Keep this file somewhere you can reach without',
+            'the device your authenticator app is on.',
+            '',
+            ...array_map(fn (string $code) => '  '.$code, $codes),
+            '',
+        ];
+
+        return implode(PHP_EOL, $lines);
+    }
+
+    /**
+     * What that file is called when it lands in somebody's downloads folder.
+     */
+    public function recoveryCodeFilename(): string
+    {
+        return kSlug(kSiteConfig('name', default: config('app.name'))).'-recovery-codes.txt';
+    }
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // REMEMBERED DEVICES
 

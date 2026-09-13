@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Jenssegers\Agent\Facades\Agent;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
@@ -184,6 +185,7 @@ new class extends Component
         $this->user->refresh();
 
         $this->recoveryCodes = (array) $this->user->twoFactor?->recovery_codes;
+        unset($this->recoveryCodesText);
 
         $this->reset('twoFactorQr', 'twoFactorSecret', 'two_factor_code');
         unset($this->twoFactorEnabled, $this->recoveryCodesLeft);
@@ -211,9 +213,59 @@ new class extends Component
         $this->recoveryCodes = app(TwoFactorService::class)->regenerateRecoveryCodes($this->user);
 
         $this->user->refresh();
-        unset($this->recoveryCodesLeft);
+        unset($this->recoveryCodesLeft, $this->recoveryCodesText);
 
         $this->respondSuccess('A new set of recovery codes has been generated. The old ones no longer work.');
+    }
+
+    /**
+     * The codes as one block of text, for the clipboard.
+     *
+     * Joined here rather than in the Alpine expression: a newline escape has to
+     * survive Blade and then the HTML attribute parser to get there, and a
+     * string literal broken in transit is a copy button that never works.
+     */
+    #[Computed]
+    public function recoveryCodesText(): string
+    {
+        return implode(PHP_EOL, $this->recoveryCodes);
+    }
+
+    /**
+     * Hand the codes over as a text file.
+     *
+     * Offered on the same terms as the copy button: only while the set is on
+     * screen, never again after a reload. Codes are stored encrypted rather than
+     * hashed, so handing them back later would be possible — it is deliberately
+     * not offered, because "shown once" is the promise the callout makes.
+     *
+     * The file is still built from the stored set rather than from the public
+     * property, which has been to the browser and back.
+     */
+    public function downloadRecoveryCodes(): ?StreamedResponse
+    {
+        abort_unless($this->twoFactorEnabled, 404);
+
+        $this->respondError(
+            'Recovery codes can only be downloaded when they are first shown.',
+            if: $this->recoveryCodes === [],
+        );
+
+        $service = app(TwoFactorService::class);
+        $codes = (array) $this->user->twoFactor?->recovery_codes;
+
+        $this->respondError('There are no recovery codes to download.', if: $codes === []);
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::DOWNLOAD,
+            ' their two-factor recovery codes',
+        );
+
+        return response()->streamDownload(
+            fn () => print $service->recoveryCodeDocument($codes),
+            $service->recoveryCodeFilename(),
+            ['Content-Type' => 'text/plain'],
+        );
     }
 
     public function disableTwoFactor(): void
@@ -449,10 +501,67 @@ new class extends Component
                         Each code works once, and this is the only time they are shown. Keep them
                         somewhere you can reach without this device.
                     </flux:callout.text>
-                    <div class="mt-3 grid grid-cols-2 gap-2 font-mono text-sm">
-                        @foreach ($recoveryCodes as $recoveryCode)
-                            <span class="rounded bg-white/60 px-2 py-1 dark:bg-slate-900/60">{{ $recoveryCode }}</span>
-                        @endforeach
+                    {{-- The text is built on the server and handed over by @js rather
+                         than joined in the expression: a newline escape does not
+                         reliably survive a Blade attribute, and a broken string
+                         literal here fails as a copy that silently never works. --}}
+                    <div
+                        x-data="{
+                            text: @js($this->recoveryCodesText),
+                            state: 'idle',
+                            copy() {
+                                this.write().then(() => this.settle('copied')).catch(() => this.settle('failed'))
+                            },
+                            write() {
+                                if (navigator.clipboard && window.isSecureContext) {
+                                    return navigator.clipboard.writeText(this.text)
+                                }
+
+                                return this.legacyWrite()
+                            },
+                            legacyWrite() {
+                                const field = document.createElement('textarea')
+
+                                field.value = this.text
+                                field.setAttribute('readonly', '')
+                                field.style.position = 'fixed'
+                                field.style.opacity = '0'
+                                document.body.appendChild(field)
+                                field.select()
+
+                                const copied = document.execCommand('copy')
+
+                                document.body.removeChild(field)
+
+                                return copied ? Promise.resolve() : Promise.reject()
+                            },
+                            settle(state) {
+                                this.state = state
+                                setTimeout(() => this.state = 'idle', 2500)
+                            },
+                        }"
+                    >
+                        <div class="mt-3 grid grid-cols-2 gap-2 font-mono text-sm">
+                            @foreach ($recoveryCodes as $recoveryCode)
+                                <span class="rounded bg-white/60 px-2 py-1 dark:bg-slate-900/60">{{ $recoveryCode }}</span>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-3">
+                            <flux:button
+                                size="sm"
+                                x-on:click="copy()"
+                                x-bind:icon="state === 'copied' ? 'check' : 'clipboard-document'"
+                            >
+                                <span x-show="state === 'idle'">Copy codes</span>
+                                <span x-show="state === 'copied'" x-cloak>Copied</span>
+                                <span x-show="state === 'failed'" x-cloak>Copy failed</span>
+                            </flux:button>
+
+                            <flux:button size="sm" icon="arrow-down-tray" wire:click="downloadRecoveryCodes">
+                                Download as .txt
+                            </flux:button>
+                        </div>
                     </div>
                 </flux:callout>
             @endif
