@@ -7,6 +7,7 @@ use App\Enums\UserTypeEnum;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\PasswordSecurityService;
 use App\Services\RoleService;
 use App\Traits\WithDataTable;
 use App\Traits\WithUserRoleManager;
@@ -264,6 +265,11 @@ new class extends Component
         $this->admin->phone_number = $this->phone_number;
         $this->admin->status = StatusUser::tryFrom((int) $this->status);
 
+        // Captured before the assignment below, because that is the last moment the
+        // hash being replaced is still readable. Null on a new account, which record()
+        // treats as nothing to remember.
+        $previousPassword = $this->admin->password;
+
         if ($this->password) {
             $this->admin->password = $this->password;
         }
@@ -294,6 +300,13 @@ new class extends Component
                 $affectedColumns,
                 $this->admin,
             );
+        }
+
+        // An administrator-set password still closes off the one it replaced. History
+        // that skips the passwords an admin set has holes an account can walk back
+        // through, which is the same as not having it.
+        if ($this->password) {
+            app(PasswordSecurityService::class)->record($this->admin, $previousPassword);
         }
 
         // A brand-new account goes through the service too, for the same reason: the

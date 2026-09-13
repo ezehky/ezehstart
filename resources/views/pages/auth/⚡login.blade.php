@@ -6,20 +6,16 @@ use App\Traits\WithAuthWorker;
 use App\Traits\WithCaptcha;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
     use WithAuthWorker, WithCaptcha;
 
-    #[Validate(['required', 'email'])]
     public string $email;
 
-    #[Validate(['required'])]
     public string $password;
 
-    #[Validate(['boolean'])]
     public bool $remember = false;
 
     public function mount()
@@ -40,9 +36,14 @@ new #[Layout('layouts::auth')] class extends Component
 
     protected function rules(): array
     {
-        // The #[Validate] attributes above carry the credential rules; this only
-        // adds the captcha, and only while it is being asked for.
-        return $this->captchaRules();
+        // Every rule this form has, in one method. Splitting them across property
+        // attributes and a rules() method gives the screen two places to be edited
+        // and one of them to be forgotten.
+        return $this->captchaRules([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+            'remember' => ['boolean'],
+        ]);
     }
 
     public function login()

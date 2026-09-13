@@ -5,6 +5,7 @@ use App\Enums\SocialHandleEnum;
 use App\Models\User;
 use App\Services\AccountOtpService;
 use App\Services\ActivityLogService;
+use App\Services\PasswordSecurityService;
 use App\Services\UserService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
@@ -156,7 +157,16 @@ new class extends Component
             'new_password' => ['required', 'string', 'confirmed', $this->passwordStrengthRule()],
         ]);
 
-        $this->user->forceFill(['password' => $this->new_password])->save();
+        // Checked after validation rather than as a rule, so somebody who typed a weak
+        // password gets told it is weak before being told it is also old.
+        $reuseError = $this->passwordReuseError($this->user, $this->new_password);
+
+        $this->respondError($reuseError ?? '', $reuseError !== null, field: 'new_password');
+
+        // Writes the new password and files the old hash away in one call — doing the
+        // two separately is how history ends up with a gap in it. This is the admin
+        // workspace's only password change, so it is the one that most needs to count.
+        app(PasswordSecurityService::class)->updatePassword($this->user, $this->new_password);
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSWORD_CHANGE, model: $this->user);
 

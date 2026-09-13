@@ -139,7 +139,7 @@ This is a **starter kit**, not an application: authentication, roles, two worksp
 
 If you read nothing else:
 
-1. **Never invent architecture.** `app/` has 13 folders. Use them.
+1. **Never invent architecture.** `app/` has 13 sanctioned folder names. Use them.
 2. **Every screen is a Livewire SFC** at `resources/views/pages/**/⚡name.blade.php`,
    routed with `Route::livewire('/path', 'pages::group.name')`.
 3. **Every status is an enum** using `WithEnumHelpers`, with one `is{CASE}()` per case.

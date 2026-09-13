@@ -58,13 +58,11 @@ Do **not** create any of them. If you think you need one, you need a **Service**
 [policies.md](policies.md) for what this project does instead.
 
 ### 2. Always reuse existing services
-Before writing any business logic, check `app/Services/`. Eighteen ship with the kit:
-`ActivityLogService`, `AdminActionService`, `UserService`, `RoleService`,
-`NotificationService`, `SiteConfigurationService`, `MarkdownService`,
-`PolicyContentService`, `AccountDeletionService`, `AccountOtpService`,
-`EmailVerificationOtpService`, `PasswordlessOtpService`, `PasswordSecurityService`,
-`TwoFactorService`, `SocialAccountService`, `ImageLibraryService`, `BlogService`,
-`TransactionService`. Resolve with `app(TheService::class)` — never `new`.
+Before writing any business logic, check `app/Services/`. Twenty-nine ship with the
+kit, covering accounts, roles and gates, the site configuration, both media libraries,
+the blog, the transaction ledger, every code-based sign-in flow, and the audit trail.
+Read the directory rather than a list here — a list is the thing that goes stale.
+Resolve with `app(TheService::class)` — never `new`.
 
 ### 3. Follow naming conventions exactly
 See [naming.md](naming.md). The two rules people get wrong:
@@ -80,10 +78,10 @@ See [naming.md](naming.md). The two rules people get wrong:
 - Run `vendor/bin/pint --dirty` after touching any PHP file.
 
 ### 5. Reuse traits
-`app/Traits/` holds 7 `With*` traits. `WithFormResponseMessage` is used by nearly every
+`app/Traits/` holds 23 `With*` traits. `WithFormResponseMessage` is used by nearly every
 form page. `WithEnumHelpers` is used by **every** enum. `WithDynamicModelFormatting` is
 used by almost every model. See [traits.md](traits.md). Never re-implement their
-behaviour inline. A capability shared by two or more pages becomes the eighth.
+behaviour inline. A capability shared by two or more pages becomes the twenty-fourth.
 
 ### 6. Prefer existing components over creating new ones
 Check `resources/views/components/` first: `dashboard/`, `form/`, `layouts/`, `lv/`,
@@ -151,7 +149,7 @@ Follow this order every time.
    `resources/views/pages/admin/configs/⚡site-config.blade.php`. A listing with
    filters and pagination? Open `resources/views/pages/admin/users/⚡users.blade.php`.
    A single-record view? `⚡user-view.blade.php`. Copy its shape.
-2. **Check for an existing enum** for any status/type/category field. Twenty-four ship
+2. **Check for an existing enum** for any status/type/category field. Twenty-eight ship
    with the kit; `StatusDefault` and `StatusYes` cover most on/off columns.
 3. **Check for an existing service** for the business logic.
 4. **Check for an existing trait** for shared page behaviour.

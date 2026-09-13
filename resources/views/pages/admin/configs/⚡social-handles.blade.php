@@ -24,6 +24,11 @@ new class extends Component
 
     public ?int $deletingIndex = null;
 
+    protected function configSubject(): string
+    {
+        return 'social handles';
+    }
+
     public function mount(): void
     {
         kSetSiteTitle('config', 'social-handles');

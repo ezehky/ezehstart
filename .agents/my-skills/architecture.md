@@ -23,26 +23,28 @@ Route (Route::livewire)
 ```
 app/
 ├── Casts/            MoneyCast, TimeCast — attribute casts only
-├── Console/Commands/ scheduled maintenance commands (empty in the starter)
-├── Contracts/        interfaces and abstracts (empty in the starter)
-├── Enums/            every status, type, category. 10 ship with the kit.
+├── Console/Commands/ scheduled maintenance commands — account deletions, scheduled posts
+├── Contracts/        interfaces and abstracts. Sanctioned, but not present until the
+│                     first one is written: git does not carry an empty directory.
+├── Enums/            every status, type, category. 28 ship with the kit.
 ├── Helpers/          4 autoloaded function files, all functions prefixed k
 ├── Http/
-│   ├── Controllers/  the base Controller only — authenticated screens use no controller
+│   ├── Controllers/  the public policy pages and the social callback only —
+│   │                 authenticated screens use no controller
 │   └── Middleware/   AdminMiddleware, UserMiddleware
-├── Mail/             6 Mailables, all queued
-├── Models/           User, UserProfile, Role, UserRole, ActivityLog,
-│                     NotificationSubscription
+├── Mail/             11 Mailables, all queued
+├── Models/           29, from User and Role through the image, video, blog and
+│                     transaction tables — see the directory for the list
 ├── Notifications/    GeneralNotification (database channel only)
 ├── Providers/        AppServiceProvider only
-├── Rules/            EmailRule, ImageRule, MoneyRule
-├── Services/         11 services, all #[Singleton]
-└── Traits/           7 With* traits
+├── Rules/            EmailRule, ImageRule, MoneyRule, and two more
+├── Services/         29 services, all #[Singleton]
+└── Traits/           23 With* traits
 ```
 
-`Console/Commands` and `Contracts` ship empty. They are part of the map so a scheduled
-command or a gateway interface has an obvious home — creating them is not "inventing
-architecture", creating a thirteenth sibling is.
+`Contracts` is the only one of these that may be missing on a fresh clone. It is part
+of the map so a gateway interface has an obvious home — creating it is not "inventing
+architecture", creating a fourteenth sibling is.
 
 ```
 resources/views/
@@ -58,11 +60,13 @@ resources/views/
 ├── flux/icon/        custom Flux icons (brand logos)
 ├── layouts/          app.blade.php, auth.blade.php  → the "layouts::" namespace
 ├── pages/            every routed screen → the "pages::" namespace
-│   ├── admin/{configs,users}/ + ⚡dashboard
+│   ├── admin/{configs,content,users}/ + ⚡dashboard, ⚡transactions
 │   ├── auth/         ⚡login, ⚡register, ⚡forgot-password, ⚡passwordless,
-│   │                 ⚡email-verification
-│   ├── shared/       ⚡profile — mounted by both workspaces
-│   └── user/account/ + ⚡dashboard
+│   │                 ⚡email-verification, ⚡two-factor-challenge
+│   ├── blog/         ⚡index, ⚡show — public and unauthenticated
+│   ├── shared/       ⚡profile, ⚡image-library, ⚡video-library — mounted by
+│   │                 both workspaces
+│   └── user/account/ + ⚡dashboard, ⚡transactions
 └── welcome.blade.php the public landing page
 ```
 

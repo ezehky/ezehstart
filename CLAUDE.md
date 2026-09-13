@@ -79,7 +79,8 @@ Change it before the kit becomes a real project.
 
 ## The rules people break most
 
-- **No new base folders under `app/`.** There are 13 and no `Actions`, `Repositories`,
+- **No new base folders under `app/`.** Thirteen names are sanctioned — `Contracts` is
+  one of them and is created on first use — and there is no `Actions`, `Repositories`,
   `Jobs`, `Events`, `Policies`, `Observers`, `Http/Requests`, or `Livewire`. See
   `.agents/my-skills/actions.md`, `repositories.md`, `jobs.md`, `events.md`,
   `policies.md` for what to do instead.
@@ -111,6 +112,15 @@ Change it before the kit becomes a real project.
 - **Never read an on/off site-config switch with `kSiteConfig()`.** Its `$default` fires
   on any falsy value, so a switch deliberately turned *off* reads back as its default.
   Use `kSiteFlag($group, $key, $default)`, which checks for the key's presence.
+- **Every emailed code has a guess allowance and a resend floor**, both from
+  `WithOtpGuard`: five wrong tries destroy the code, and another cannot be asked for
+  inside 60 seconds. A test that calls a resend twice gets a validation error, not a
+  second email — advance time or clear the cache between the two.
+- **Write a password only through `PasswordSecurityService`.** `updatePassword()` sets
+  it and files the old hash away in one step; `record()` is the same filing on its own,
+  for the admin screens that save a password inside a larger form. Assigning
+  `$user->password` by hand leaves a gap in the history chain, and a gap is a password
+  the account can quietly go back to.
 - Two-factor and social sign-in are **off by default**; strong passwords, password
   history and passwordless sign-in are **on**. Every switch closes its route as well as
   hiding its button — a route left reachable behind a hidden link is not disabled.

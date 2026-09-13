@@ -17,6 +17,11 @@ new class extends Component
 
     public mixed $faviconUpload = null;
 
+    protected function configSubject(): string
+    {
+        return 'site info';
+    }
+
     public function mount(): void
     {
         kSetSiteTitle('config', 'site-info');

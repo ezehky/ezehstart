@@ -11,7 +11,9 @@ Shared behaviour is composed with traits in `app/Traits/`, all named `With{Capab
 | `WithDynamicModelFormatting` | **almost every model** | magic `->fooMoney()`, `->fooNumber()`, `->fooUrl()`, `->fooHuman()`, `->fooDatetimeForUpdate()` |
 | `WithFormResponseMessage` | **every form page** | `respondSuccess()`, `respondError()`, `respondPrimary()`, `createAttributes()` |
 | `WithAuthWorker` | auth pages | `createUser()`, `loginUser()`, `userDashboardRedirect()`, `assignDefaultRole()`, `logActivity()` |
-| `WithPasswordTools` | any page taking a password | `passwordStrengthRule()`, `$passwordNote` |
+| `WithPasswordTools` | any page taking a password | `passwordStrengthRule()`, `passwordReuseError()`, `$passwordNote` |
+| `WithOtpGuard` | **every service that issues an emailed code** | the guess allowance and the resend floor — `startOtpWindow()`, `registerFailedAttempt()`, `secondsUntilResend()` |
+| `WithAccountOtp` | any page asking for a code | `sendAccountOtp()`, `sendVerificationOtp()` — the send with the floor already checked |
 | `WithUserRoleManager` | admin user listings | the whole "manage roles" modal — `roleUser`, `roleMatrix`, `grantRole()`, `revokeRole()`, `switchRole()`, `afterRoleChange()` hook |
 | `WithEmailResolver` | **every Mailable** | injects `$emailConfig` into the mail view |
 | `WithMetrics` | any screen with stat tiles | `metricMaker()` — see [dashboard.md](dashboard.md) |

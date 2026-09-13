@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Services\AccountDeletionService;
 use App\Services\AccountOtpService;
+use App\Traits\WithAccountOtp;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
 use Illuminate\Validation\Rule;
@@ -10,7 +11,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithFormResponseMessage;
+    use WithAccountOtp, WithFormResponseMessage;
 
     public User $user;
 
@@ -85,7 +86,7 @@ new class extends Component
         // No password on file (social-only account) — verify with an emailed OTP instead.
         $this->validate($this->confirmationRules(), attributes: ['confirmation_text' => 'confirmation']);
 
-        app(AccountOtpService::class)->send($this->user, 'delete-account');
+        $this->sendAccountOtp($this->user, 'delete-account', 'confirmation_text');
 
         $this->step = 2;
         $this->resetValidation();
@@ -93,7 +94,7 @@ new class extends Component
 
     public function resendOtp(): void
     {
-        app(AccountOtpService::class)->send($this->user, 'delete-account');
+        $this->sendAccountOtp($this->user, 'delete-account', 'otp');
 
         session()->flash('status', 'A new verification code has been sent to your email address.');
     }

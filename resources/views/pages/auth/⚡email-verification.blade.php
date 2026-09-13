@@ -2,13 +2,14 @@
 
 use App\Models\User;
 use App\Services\EmailVerificationOtpService;
+use App\Traits\WithAccountOtp;
 use App\Traits\WithFormResponseMessage;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
-    use WithFormResponseMessage;
+    use WithAccountOtp, WithFormResponseMessage;
 
     public User $user;
 
@@ -58,7 +59,7 @@ new #[Layout('layouts::auth')] class extends Component
             return;
         }
 
-        app(EmailVerificationOtpService::class)->sendResentOtpEmail($this->user);
+        $this->sendVerificationOtp($this->user, 'otp');
 
         session()->flash('status', 'We sent a new verification code to your email address.');
     }

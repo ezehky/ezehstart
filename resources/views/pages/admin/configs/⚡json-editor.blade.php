@@ -3,15 +3,25 @@
 use App\Enums\GateAccessEnum;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new class extends Component
 {
     use WithGateProps, WithSiteConfigProcessor;
 
-    #[Validate(['required', 'string'])]
     public string $rawConfig;
+
+    protected function rules(): array
+    {
+        return [
+            'rawConfig' => ['required', 'string'],
+        ];
+    }
+
+    protected function configSubject(): string
+    {
+        return 'raw JSON';
+    }
 
     public function mount(): void
     {

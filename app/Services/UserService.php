@@ -59,10 +59,10 @@ class UserService
 
     public function resetPassword(string $password = '12345'): void
     {
-        $this->user->password = $password;
-
-        // SAVE
-        $this->user->save();
+        // Through the service so the hash being replaced is remembered. An account
+        // whose password an administrator reset must not be able to set that same
+        // password back a moment later.
+        app(PasswordSecurityService::class)->updatePassword($this->user, $password);
 
         // Log Activity
         app(ActivityLogService::class)->logActivity(

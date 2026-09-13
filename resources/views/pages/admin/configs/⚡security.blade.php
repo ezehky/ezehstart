@@ -10,6 +10,11 @@ new class extends Component
 {
     use WithGateProps, WithSiteConfigProcessor;
 
+    protected function configSubject(): string
+    {
+        return 'security';
+    }
+
     public function mount(): void
     {
         kSetSiteTitle('config', 'security');

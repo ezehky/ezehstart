@@ -15,6 +15,11 @@ new class extends Component
 {
     use WithGateProps, WithSiteConfigProcessor;
 
+    protected function configSubject(): string
+    {
+        return 'preferences';
+    }
+
     public function mount(): void
     {
         kSetSiteTitle('config', 'preferences');

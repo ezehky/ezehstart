@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\EmailVerificationOtpEmail;
 use App\Mail\WelcomeEmail;
 use App\Models\User;
+use App\Traits\WithOtpGuard;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Mail;
 #[Singleton]
 class EmailVerificationOtpService
 {
+    use WithOtpGuard;
+
     public const EXPIRATION_MINUTES = 15;
 
     public function sendWelcomeEmail(User $user, bool $sendOtp = true): void
@@ -36,6 +39,12 @@ class EmailVerificationOtpService
 
         // If the cached OTP is not a string or does not match the provided OTP, return false
         if (! \is_string($cachedOtp) || ! Hash::check($otp, $cachedOtp)) {
+            // A spent allowance destroys the code rather than merely refusing this one
+            // guess, so the million-wide space cannot be walked inside the expiry.
+            if ($this->registerFailedAttempt($this->scope($user))) {
+                $this->forget($user);
+            }
+
             return false;
         }
 
@@ -43,10 +52,30 @@ class EmailVerificationOtpService
         $user->markEmailAsVerified();
 
         // Clear the cached OTP after successful verification
-        Cache::forget($this->cacheKey($user));
+        $this->forget($user);
 
         // Return true to indicate successful verification
         return true;
+    }
+
+    /**
+     * Seconds left before another code may be requested for this account.
+     */
+    public function secondsUntilResendFor(User $user): int
+    {
+        return $this->secondsUntilResend($this->scope($user));
+    }
+
+    public function forget(User $user): void
+    {
+        Cache::forget($this->cacheKey($user));
+
+        $this->forgetOtpAttempts($this->scope($user));
+    }
+
+    protected function otpLifetimeMinutes(): int
+    {
+        return self::EXPIRATION_MINUTES;
     }
 
     private function cacheOtp(User $user): string
@@ -59,11 +88,18 @@ class EmailVerificationOtpService
             now()->addMinutes(self::EXPIRATION_MINUTES),
         );
 
+        $this->startOtpWindow($this->scope($user));
+
         return $otp;
     }
 
     private function cacheKey(User $user): string
     {
         return 'email-verification-otp:'.$user->getKey();
+    }
+
+    private function scope(User $user): string
+    {
+        return 'email-verification:'.$user->getKey();
     }
 }

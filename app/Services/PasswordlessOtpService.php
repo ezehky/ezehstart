@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\PasswordlessOtpEmail;
+use App\Traits\WithOtpGuard;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -15,18 +16,9 @@ use Illuminate\Support\Facades\Mail;
 #[Singleton]
 class PasswordlessOtpService
 {
+    use WithOtpGuard;
+
     public const EXPIRATION_MINUTES = 10;
-
-    /**
-     * Wrong codes tolerated before the code is destroyed. A six-digit code only
-     * stays guessable while an attacker can keep trying it.
-     */
-    public const MAX_ATTEMPTS = 5;
-
-    /**
-     * Seconds a requester must wait before another code is issued for the address.
-     */
-    public const RESEND_THROTTLE_SECONDS = 60;
 
     /**
      * Issue a fresh code for this address and mail it. Only the hash is stored, so a
@@ -42,14 +34,8 @@ class PasswordlessOtpService
             now()->addMinutes(self::EXPIRATION_MINUTES),
         );
 
-        // A new code starts with a clean allowance.
-        Cache::forget($this->attemptsKey($email));
-
-        Cache::put(
-            $this->throttleKey($email),
-            now()->addSeconds(self::RESEND_THROTTLE_SECONDS)->timestamp,
-            now()->addSeconds(self::RESEND_THROTTLE_SECONDS),
-        );
+        // A new code opens a fresh resend window and starts with a clean allowance.
+        $this->startOtpWindow($this->scope($email));
 
         Mail::to($email)->sendNow(new PasswordlessOtpEmail(
             $name,
@@ -65,7 +51,11 @@ class PasswordlessOtpService
         $cachedOtp = Cache::get($this->codeKey($email));
 
         if (! \is_string($cachedOtp) || ! Hash::check($otp, $cachedOtp)) {
-            $this->registerFailedAttempt($email);
+            // Spending the allowance burns the code, so it cannot be brute forced
+            // inside its expiry window.
+            if ($this->registerFailedAttempt($this->scope($email))) {
+                $this->forget($email);
+            }
 
             return false;
         }
@@ -79,36 +69,21 @@ class PasswordlessOtpService
      * Seconds left before another code may be requested for this address, 0 when the
      * requester is free to ask again.
      */
-    public function secondsUntilResend(string $email): int
+    public function secondsUntilResendFor(string $email): int
     {
-        $availableAt = Cache::get($this->throttleKey($email));
-
-        return \is_numeric($availableAt) ? max(0, (int) $availableAt - now()->timestamp) : 0;
+        return $this->secondsUntilResend($this->scope($email));
     }
 
     public function forget(string $email): void
     {
         Cache::forget($this->codeKey($email));
-        Cache::forget($this->attemptsKey($email));
+
+        $this->forgetOtpAttempts($this->scope($email));
     }
 
-    /**
-     * Count the miss and burn the code once the allowance is spent, so the code
-     * cannot be brute forced inside its expiry window.
-     */
-    private function registerFailedAttempt(string $email): void
+    protected function otpLifetimeMinutes(): int
     {
-        $attempts = (int) Cache::get($this->attemptsKey($email)) + 1;
-
-        Cache::put(
-            $this->attemptsKey($email),
-            $attempts,
-            now()->addMinutes(self::EXPIRATION_MINUTES),
-        );
-
-        if ($attempts >= self::MAX_ATTEMPTS) {
-            Cache::forget($this->codeKey($email));
-        }
+        return self::EXPIRATION_MINUTES;
     }
 
     private function codeKey(string $email): string
@@ -116,14 +91,9 @@ class PasswordlessOtpService
         return 'passwordless-otp:'.$this->emailHash($email);
     }
 
-    private function attemptsKey(string $email): string
+    private function scope(string $email): string
     {
-        return 'passwordless-otp-attempts:'.$this->emailHash($email);
-    }
-
-    private function throttleKey(string $email): string
-    {
-        return 'passwordless-otp-throttle:'.$this->emailHash($email);
+        return 'passwordless:'.$this->emailHash($email);
     }
 
     /**

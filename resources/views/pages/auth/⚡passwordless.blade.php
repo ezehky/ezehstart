@@ -233,7 +233,7 @@ new #[Layout('layouts::auth')] class extends Component
     private function sendCode(): void
     {
         $service = app(PasswordlessOtpService::class);
-        $secondsRemaining = $service->secondsUntilResend($this->email);
+        $secondsRemaining = $service->secondsUntilResendFor($this->email);
 
         $this->respondError(
             "Please wait {$secondsRemaining} seconds before requesting another code.",

@@ -8,6 +8,7 @@ use App\Services\ActivityLogService;
 use App\Services\PasswordSecurityService;
 use App\Services\SocialAccountService;
 use App\Services\TwoFactorService;
+use App\Traits\WithAccountOtp;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
 use Carbon\Carbon;
@@ -20,7 +21,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new class extends Component
 {
-    use WithFormResponseMessage, WithPasswordTools;
+    use WithAccountOtp, WithFormResponseMessage, WithPasswordTools;
 
     public User $user;
 
@@ -59,7 +60,7 @@ new class extends Component
             $this->validate(['current_password' => ['required', 'string', 'current_password']]);
         }
 
-        app(AccountOtpService::class)->send($this->user, 'change-password');
+        $this->sendAccountOtp($this->user, 'change-password', 'current_password');
 
         $this->passwordStep = 2;
         $this->resetValidation();
@@ -67,7 +68,7 @@ new class extends Component
 
     public function passwordResendOtp(): void
     {
-        app(AccountOtpService::class)->send($this->user, 'change-password');
+        $this->sendAccountOtp($this->user, 'change-password', 'password_otp');
 
         session()->flash('status', 'A new verification code has been sent to your email address.');
     }
@@ -329,7 +330,7 @@ new class extends Component
             field: 'new_email'
         );
 
-        app(AccountOtpService::class)->send($this->user, 'change-email');
+        $this->sendAccountOtp($this->user, 'change-email', 'new_email');
 
         $this->emailStep = 2;
         $this->resetValidation();
@@ -337,7 +338,7 @@ new class extends Component
 
     public function emailResendOtp(): void
     {
-        app(AccountOtpService::class)->send($this->user, 'change-email');
+        $this->sendAccountOtp($this->user, 'change-email', 'email_otp');
 
         session()->flash('status', 'A new verification code has been sent to your current email address.');
     }

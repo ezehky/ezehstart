@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserProfile;
 use App\Services\ActivityLogService;
 use App\Services\GateService;
+use App\Services\PasswordSecurityService;
 use App\Services\UserService;
 use App\Traits\WithGateManager;
 use App\Traits\WithGateProps;
@@ -206,6 +207,10 @@ new class extends Component
             $this->user->status = StatusUser::tryFrom((int) $this->status);
         }
 
+        // Captured before the assignment below, because that is the last moment the
+        // hash being replaced is still readable.
+        $previousPassword = $this->user->password;
+
         if ($this->password) {
             $this->user->password = $this->password;
         }
@@ -223,6 +228,13 @@ new class extends Component
             $affectedColumns,
             $this->user,
         );
+
+        // An administrator-set password still closes off the one it replaced. History
+        // that skips the passwords an admin set has holes an account can walk back
+        // through, which is the same as not having it.
+        if ($this->password) {
+            app(PasswordSecurityService::class)->record($this->user, $previousPassword);
+        }
 
         Flux::modal('accountModal')->close();
 

@@ -1,16 +1,13 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
-use App\Mail\PasswordResetOtpEmail;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use App\Services\PasswordResetOtpService;
+use App\Services\PasswordSecurityService;
 use App\Traits\WithAuthWorker;
 use App\Traits\WithCaptcha;
 use App\Traits\WithPasswordTools;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -78,16 +75,11 @@ new #[Layout('layouts::auth')] class extends Component
     {
         $this->validate(['otp' => ['required', 'digits:6']]);
 
-        // Retrieve the email from the session
-        $reset = DB::table(config('auth.passwords.users.table'))->where('email', $this->email)->first();
-
-        // Check if the reset token has expired
-        $expiredAt = Carbon::now()->subMinutes(config('auth.passwords.users.expire'));
-
-        // Respond with an error if the reset token is invalid or expired
+        // The service counts the miss and destroys the code once the allowance is
+        // spent, so a wrong code here is not something that can be retried forever.
         $this->respondError(
             'That reset code is invalid or has expired.',
-            ! $reset || Carbon::parse($reset->created_at)->lt($expiredAt) || ! Hash::check($this->otp, $reset->token),
+            ! app(PasswordResetOtpService::class)->verify($this->email, $this->otp),
             fn () => $this->reset('otp'),
             'otp'
         );
@@ -104,11 +96,20 @@ new #[Layout('layouts::auth')] class extends Component
     {
         $this->validate(['password' => ['required', 'string', 'confirmed', $this->passwordStrengthRule()]]);
 
-        // Update the user's password
-        $this->user->forceFill(['password' => $this->password])->save();
+        // Checked after validation rather than as a rule, so somebody who typed a weak
+        // password gets told it is weak before being told it is also old. A reset is
+        // the same password write as the one on the security page and answers to the
+        // same history — otherwise the route around history is to forget on purpose.
+        $reuseError = $this->passwordReuseError($this->user, $this->password);
+
+        $this->respondError($reuseError ?? '', $reuseError !== null, field: 'password');
+
+        // Writes the new password and files the old hash away in one call — doing the
+        // two separately is how history ends up with a gap in it.
+        app(PasswordSecurityService::class)->updatePassword($this->user, $this->password);
 
         // Delete the password reset token from the database
-        DB::table(config('auth.passwords.users.table'))->where('email', $this->email)->delete();
+        app(PasswordResetOtpService::class)->forget($this->email);
 
         // Log Activity: Log the password reset activity
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSWORD_CHANGE, $this->email);
@@ -130,8 +131,8 @@ new #[Layout('layouts::auth')] class extends Component
 
         $this->dispatchNext($this->tag, $this->title, $this->description);
 
-        // Reset the step to 1 (email input) and update the tag, title, and description
-        DB::table(config('auth.passwords.users.table'))->where('email', $email)->delete();
+        // Reset the step to 1 (email input) and drop the outstanding code with it.
+        app(PasswordResetOtpService::class)->forget($email);
     }
 
     public function resendOtp()
@@ -146,21 +147,20 @@ new #[Layout('layouts::auth')] class extends Component
         // If the user does not exist, respond with an error message
         $this->respondError('invalid credentials', ! $this->user);
 
-        // Generate a six-digit OTP and store it in the password resets table
-        $otp = (string) random_int(100000, 999999);
+        $service = app(PasswordResetOtpService::class);
 
-        // Store the OTP in the password resets table with a hashed token
-        DB::table(config('auth.passwords.users.table'))
-            ->updateOrInsert(['email' => $this->email], ['token' => bcrypt($otp), 'created_at' => now()]);
+        // The resend floor. Without it the captcha on step one buys one pass at an
+        // inbox and the resend button turns that into as much mail as anybody cares
+        // to send, addressed to somebody who did not ask for any of it.
+        $secondsRemaining = $service->secondsUntilResendFor($this->email);
 
-        // Send the OTP email to the user
-        Mail::to($this->email)->sendNow(new PasswordResetOtpEmail($this->user, $otp));
+        $this->respondError(
+            "Please wait {$secondsRemaining} seconds before requesting another code.",
+            $secondsRemaining > 0,
+            field: $this->step === 1 ? 'email' : 'otp'
+        );
 
-        // Activity Log: Log the password reset request activity
-        app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSWORD_RESET_REQUEST, $this->email);
-
-        // Store the email in the session to pre-fill the reset form
-        session()->put('password_reset_email', $this->email);
+        $service->send($this->user);
     }
 };
 ?>
