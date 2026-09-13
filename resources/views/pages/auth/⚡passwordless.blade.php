@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Rules\EmailRule;
 use App\Services\PasswordlessOtpService;
 use App\Traits\WithAuthWorker;
+use App\Traits\WithCaptcha;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
-    use WithAuthWorker;
+    use WithAuthWorker, WithCaptcha;
 
     public string $email = '';
 
@@ -61,7 +62,10 @@ new #[Layout('layouts::auth')] class extends Component
      */
     public function submitEmail(): void
     {
-        $this->validate(['email' => ['required', 'email']]);
+        // The captcha sits on this step rather than on the code prompt: this is the
+        // one that puts mail in somebody else's inbox, and an address typed here
+        // does not have to belong to whoever typed it.
+        $this->validate($this->captchaRules(['email' => ['required', 'email']]));
 
         $user = User::query()->whereEmail($this->email)->first();
 
@@ -336,6 +340,10 @@ new #[Layout('layouts::auth')] class extends Component
                 icon="envelope"
             />
             <flux:error name="email" />
+
+            @if ($this->captchaRequired())
+                <x-form.captcha action="passwordless" />
+            @endif
 
             <flux:button type="submit" variant="primary" class="w-full">Send me a code</flux:button>
         </form>

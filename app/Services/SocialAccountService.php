@@ -30,20 +30,29 @@ class SocialAccountService
     }
 
     /**
-     * The providers this install can actually use.
+     * The providers this install can actually use: credentials in the environment
+     * and the provider's own switch left on.
      *
      * @return Collection<int, SocialProviderEnum>
      */
-    public function enabledProviders(): Collection
+    public function enabledProviders()
     {
         return collect(SocialProviderEnum::cases())
-            ->filter(fn (SocialProviderEnum $provider) => $provider->isConfigured())
+            ->filter(fn (SocialProviderEnum $provider) => $provider->isConfigured() && $provider->isEnabled())
             ->values();
     }
 
+    /**
+     * The same question for one provider, and what the redirect and callback
+     * routes abort on. Both switches and the credentials have to agree, or a
+     * provider taken off the sign-in page would still be reachable by typing its
+     * URL — which is a hidden button, not a disabled feature.
+     */
     public function isProviderEnabled(SocialProviderEnum $provider): bool
     {
-        return (bool) kSiteFlag('security', 'socialite', false) && $provider->isConfigured();
+        return (bool) kSiteFlag('security', 'socialite', false)
+            && $provider->isConfigured()
+            && $provider->isEnabled();
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

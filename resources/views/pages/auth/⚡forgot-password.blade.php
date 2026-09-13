@@ -5,6 +5,7 @@ use App\Mail\PasswordResetOtpEmail;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Traits\WithAuthWorker;
+use App\Traits\WithCaptcha;
 use App\Traits\WithPasswordTools;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
-    use WithAuthWorker, WithPasswordTools;
+    use WithAuthWorker, WithCaptcha, WithPasswordTools;
 
     public User $user;
 
@@ -48,9 +49,12 @@ new #[Layout('layouts::auth')] class extends Component
 
     public function step1(): void
     {
-        $this->validate([
+        // Step one is the step that sends mail to whatever address was typed, so it
+        // is the step the captcha guards. The code prompt after it is already
+        // bounded by a six-digit code with an expiry.
+        $this->validate($this->captchaRules([
             'email' => ['required', 'email', 'exists:users,email'],
-        ]);
+        ]));
 
         // Get the user by email
         $this->user = User::query()->where('email', $this->email)->first();
@@ -198,8 +202,7 @@ new #[Layout('layouts::auth')] class extends Component
         </form>
     @elseif ($step === 3)
         <form wire:submit.throttle.500ms="step3" class="mt-8 space-y-5">
-            <x-form.password label="New password" wire:model="password" />
-            <flux:text class="text-xs">{!! $passwordNote !!}</flux:text>
+            <x-form.password label="New password" wire:model="password" :note="$passwordNote" />
             <x-form.password label="Confirm new password" wire:model="password_confirmation" />
 
             <flux:button type="submit" variant="primary" class="w-full">Reset password</flux:button>
@@ -215,6 +218,10 @@ new #[Layout('layouts::auth')] class extends Component
                 placeholder="example@mail.com"
             />
             <flux:error name="email" />
+
+            @if ($this->captchaRequired())
+                <x-form.captcha action="password-reset" />
+            @endif
 
             <flux:button type="submit" variant="primary" class="w-full">Send reset code</flux:button>
         </form>

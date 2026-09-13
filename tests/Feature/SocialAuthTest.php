@@ -74,6 +74,31 @@ test('an unconfigured provider route is a 404, not a friendly error', function (
     $this->get(route('social.redirect', 'google'))->assertNotFound();
 });
 
+test('a provider an administrator switched off is not offered', function () {
+    app(SiteConfigurationService::class)->update([
+        'security' => ['socialite' => true, 'social-providers' => ['google' => false]],
+    ]);
+
+    expect(SocialProviderEnum::GOOGLE->isEnabled())->toBeFalse()
+        ->and(app(SocialAccountService::class)->enabledProviders())->not->toContain(SocialProviderEnum::GOOGLE);
+});
+
+test('switching a provider off closes its route, not just its button', function () {
+    app(SiteConfigurationService::class)->update([
+        'security' => ['socialite' => true, 'social-providers' => ['google' => false]],
+    ]);
+
+    $this->get(route('social.redirect', 'google'))->assertNotFound();
+});
+
+test('a provider left switched on is still offered', function () {
+    app(SiteConfigurationService::class)->update([
+        'security' => ['socialite' => true, 'social-providers' => ['google' => true]],
+    ]);
+
+    expect(app(SocialAccountService::class)->enabledProviders())->toContain(SocialProviderEnum::GOOGLE);
+});
+
 test('an unknown provider is a 404', function () {
     $this->get('/auth/myspace/redirect')->assertNotFound();
 });

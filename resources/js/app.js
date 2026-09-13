@@ -7,6 +7,7 @@ import chart from "./chart";
 import countdownTimer from "./countdown-timer";
 import floatingActions from "./floating-actions";
 import datePicker from "./date-picker";
+import turnstileWidget from "./turnstile";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
@@ -47,6 +48,13 @@ Alpine.data("floatingActions", floatingActions);
  * second calendar onto the same input.
  */
 Alpine.data("datePicker", datePicker);
+
+/**
+ * The Cloudflare Turnstile widget behind <x-form.captcha>. Registered once here so
+ * a Livewire re-render rebinds to the widget already on screen rather than booting
+ * a second challenge onto the same element.
+ */
+Alpine.data("turnstileWidget", turnstileWidget);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance

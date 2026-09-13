@@ -19,6 +19,9 @@
                     @isset($description)
                         <flux:text class="mt-3 dark:text-slate-400">{!! $description !!}</flux:text>
                     @endisset
+                    @session('status')
+                        <flux:callout color="lime" class="mt-6 text-sm">{!! session('status') !!}</flux:callout>
+                    @endsession
 
                     {{ $slot }}
 

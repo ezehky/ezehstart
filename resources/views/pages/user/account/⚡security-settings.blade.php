@@ -256,6 +256,12 @@ new class extends Component
         $this->respondSuccess('That account has been disconnected.');
     }
 
+    #[Computed]
+    public function enabledSocialProviders()
+    {
+        return app(SocialAccountService::class)->enabledProviders();
+    }
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||
     // Email change
 
@@ -410,8 +416,7 @@ new class extends Component
             </form>
         @else
             <form wire:submit="passwordStep3" class="max-w-sm space-y-4">
-                <x-form.password label="New password" wire:model="new_password" />
-                <flux:text class="text-xs">{!! $passwordNote !!}</flux:text>
+                <x-form.password label="New password" wire:model="new_password" :note="$passwordNote" />
                 <x-form.password label="Confirm new password" wire:model="new_password_confirmation" />
                 <div class="flex gap-3">
                     <flux:button type="submit" variant="primary">Save new password</flux:button>
@@ -506,7 +511,7 @@ new class extends Component
             </div>
 
             <ul class="divide-y divide-slate-100 dark:divide-slate-800">
-                @foreach (app(App\Services\SocialAccountService::class)->enabledProviders() as $provider)
+                @foreach ($this->enabledSocialProviders as $provider)
                     @php($connected = $this->connectedAccounts->get($provider->value))
                     <li wire:key="provider-{{ $provider->value }}" class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                         <div class="flex items-center gap-3">

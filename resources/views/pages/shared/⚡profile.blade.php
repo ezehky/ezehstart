@@ -291,8 +291,7 @@ new class extends Component
             </form>
         @else
             <form wire:submit="passwordStep3" class="max-w-sm space-y-4">
-                <x-form.password label="New password" wire:model="new_password" />
-                <flux:text class="text-xs">{!! $passwordNote !!}</flux:text>
+                <x-form.password label="New password" wire:model="new_password" :note="$passwordNote" />
                 <x-form.password label="Confirm new password" wire:model="new_password_confirmation" />
                 <div class="flex gap-3">
                     <flux:button type="submit" variant="primary">Save new password</flux:button>

@@ -7,6 +7,7 @@ use App\Mail\LoginEmail;
 use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Services\EmailVerificationOtpService;
+use App\Services\SiteConfigurationService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -140,4 +141,48 @@ test('a resent code uses the resend mailable', function () {
     Mail::assertSent(EmailVerificationOtpEmail::class, function (EmailVerificationOtpEmail $mail) use ($user) {
         return $mail->user->is($user) && preg_match('/^\d{6}$/', $mail->otp) === 1;
     });
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// WHAT THE GUEST SCREENS OFFER
+
+test('a switched-off feature is off both guest screens, not just one of them', function () {
+    app(SiteConfigurationService::class)->update([
+        'security' => ['passwordless-login' => false],
+    ]);
+
+    Livewire::test('pages::auth.login')->assertDontSee(route('passwordless'));
+    Livewire::test('pages::auth.register')->assertDontSee(route('passwordless'));
+});
+
+test('passwordless sign-in is linked from both guest screens while it is on', function () {
+    app(SiteConfigurationService::class)->update([
+        'security' => ['passwordless-login' => true],
+    ]);
+
+    Livewire::test('pages::auth.login')->assertSee(route('passwordless'));
+    Livewire::test('pages::auth.register')->assertSee(route('passwordless'));
+});
+
+test('social sign-in is offered on the registration screen as well as the sign-in one', function () {
+    config([
+        'services.google.client_id' => 'test-client-id',
+        'services.google.client_secret' => 'test-client-secret',
+    ]);
+
+    app(SiteConfigurationService::class)->update(['security' => ['socialite' => true]]);
+
+    Livewire::test('pages::auth.login')->assertSee(route('social.redirect', 'google'));
+    Livewire::test('pages::auth.register')->assertSee(route('social.redirect', 'google'));
+});
+
+test('the registration screen offers nothing social while the switch is off', function () {
+    config([
+        'services.google.client_id' => 'test-client-id',
+        'services.google.client_secret' => 'test-client-secret',
+    ]);
+
+    app(SiteConfigurationService::class)->update(['security' => ['socialite' => false]]);
+
+    Livewire::test('pages::auth.register')->assertDontSee(route('social.redirect', 'google'));
 });

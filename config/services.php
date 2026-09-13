@@ -68,4 +68,25 @@ return [
         'redirect' => env('GITHUB_REDIRECT_URI', '/auth/github/callback'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Turnstile
+    |--------------------------------------------------------------------------
+    |
+    | The captcha on the guest forms. The keys live here rather than in the site
+    | configuration because the secret is a credential, and site-configuration.json
+    | is an administrator-editable file — a secret an admin screen can read back is
+    | not a secret.
+    |
+    | CaptchaService::isConfigured() reads exactly this pair, and the site switch
+    | cannot turn the captcha on without it. Cloudflare's always-passes test pair is
+    | 1x00000000000000000000AA / 1x0000000000000000000000000000000AA.
+    |
+    */
+
+    'turnstile' => [
+        'key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
 ];

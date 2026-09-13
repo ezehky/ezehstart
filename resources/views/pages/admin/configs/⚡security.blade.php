@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\SocialProviderEnum;
+use App\Services\CaptchaService;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
 use Livewire\Component;
@@ -12,6 +14,31 @@ new class extends Component
     {
         kSetSiteTitle('config', 'security');
         $this->setPageGate('config.security');
+    }
+
+    /**
+     * Whether the Turnstile keys are in the environment. The switch is still
+     * saveable without them — an administrator may be setting the site up before
+     * the keys arrive — but the screen says so, because a switch that is on and
+     * does nothing is worse than one that is off.
+     */
+    public function captchaConfigured(): bool
+    {
+        return app(CaptchaService::class)->isConfigured();
+    }
+
+    /**
+     * The providers that have credentials, for the per-provider switches. A
+     * provider with nothing in .env has nothing to switch.
+     *
+     * @return array<int, SocialProviderEnum>
+     */
+    public function configuredProviders(): array
+    {
+        return array_filter(
+            SocialProviderEnum::cases(),
+            fn (SocialProviderEnum $provider) => $provider->isConfigured(),
+        );
     }
 
     /**
@@ -39,6 +66,7 @@ new class extends Component
             'config.security.two-factor' => ['required', 'boolean'],
             'config.security.socialite' => ['required', 'boolean'],
             'config.security.passwordless-login' => ['required', 'boolean'],
+            'config.security.captcha' => ['required', 'boolean'],
             // Bounded here as well as in the service: the service clamps whatever
             // it reads, and this stops a silly number being saved in the first place.
             'config.security.login-max-attempts' => ['required', 'integer', 'min:3', 'max:20'],
@@ -67,6 +95,14 @@ new class extends Component
         // history check itself is off.
         if ((bool) data_get($this->config, 'security.password-history')) {
             $rules['config.security.password-history-depth'] = ['required', 'integer', 'min:1', 'max:24'];
+        }
+
+        // One switch per provider, and only the providers that actually have
+        // credentials — the rest are not on the screen to be validated.
+        if ((bool) data_get($this->config, 'security.socialite')) {
+            foreach ($this->configuredProviders() as $provider) {
+                $rules["config.security.social-providers.{$provider->value}"] = ['required', 'boolean'];
+            }
         }
 
         return $rules;
@@ -208,6 +244,33 @@ new class extends Component
                     />
                 @endif
             </flux:card>
+            <flux:card class="space-y-4">
+                <flux:heading level="2" size="lg" class="mb-4">Socialite Sign-in</flux:heading>
+                <flux:switch
+                    wire:model.live="config.security.socialite"
+                    label="Offer social sign-in"
+                    description="Only providers with credentials in the environment are shown."
+                />
+
+                {{-- Credentials and permission are two different questions. A
+                     provider can be taken off the sign-in page for a while without
+                     anybody emptying .env, and the redirect route reads the same
+                     switch, so turning one off closes it rather than hiding it. --}}
+                @if (data_get($config, 'security.socialite'))
+                    @forelse ($this->configuredProviders() as $provider)
+                        <flux:switch
+                            wire:key="provider-{{ $provider->value }}"
+                            wire:model="config.security.social-providers.{{ $provider->value }}"
+                            label="{{ $provider->label() }}"
+                            class="ms-4"
+                        />
+                    @empty
+                        <flux:callout color="amber" class="text-sm">
+                            No provider has credentials in the environment yet, so nothing is offered.
+                        </flux:callout>
+                    @endforelse
+                @endif
+            </flux:card>
         </div>
         <div class="space-y-6">
             <flux:card class="space-y-4">
@@ -218,18 +281,27 @@ new class extends Component
                     label="Offer two-factor authentication"
                     description="Requires a TOTP authenticator app on the member's device."
                 />
-                <flux:separator variant="subtle" />
-                <flux:switch
-                    wire:model="config.security.socialite"
-                    label="Offer social sign-in"
-                    description="Only providers with credentials in the environment are shown."
-                />
+
                 <flux:separator variant="subtle" />
                 <flux:switch
                     wire:model="config.security.passwordless-login"
                     label="Offer passwordless sign-in"
                     description="Signing in with a six-digit code sent by email."
                 />
+
+                <flux:separator variant="subtle" />
+                <flux:switch
+                    wire:model="config.security.captcha"
+                    label="Require a captcha on the guest forms"
+                    description="Cloudflare Turnstile on registration, passwordless sign-in and password reset. The sign-in form only asks for it once an address has failed twice."
+                />
+
+                @unless ($this->captchaConfigured())
+                    <flux:callout color="amber" class="text-sm">
+                        TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are not set, so this
+                        stays off however it is saved here.
+                    </flux:callout>
+                @endunless
 
                 <flux:separator variant="subtle" />
                 <flux:heading level="3" size="sm">Sign-in throttle</flux:heading>

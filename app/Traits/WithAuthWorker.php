@@ -3,23 +3,71 @@
 namespace App\Traits;
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\SocialProviderEnum;
 use App\Mail\LoginEmail;
 use App\Models\Policy;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\EmailVerificationOtpService;
 use App\Services\PolicyContentService;
+use App\Services\SocialAccountService;
 use App\Services\TwoFactorService;
 use App\Services\UserService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Computed;
 
 trait WithAuthWorker
 {
     use WithFormResponseMessage;
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // WHAT THIS INSTALL OFFERS
+
+    /**
+     * Whether the six-digit email sign-in is on offer.
+     *
+     * Every screen that links to it asks here rather than reading the flag itself,
+     * so the switch cannot be honoured on one page and forgotten on the next — the
+     * passwordless route aborts on the same answer.
+     */
+    #[Computed]
+    public function passwordlessEnabled(): bool
+    {
+        return (bool) kSiteFlag('security', 'passwordless-login', true);
+    }
+
+    /**
+     * Whether two-factor authentication is on offer.
+     */
+    #[Computed]
+    public function twoFactorEnabled(): bool
+    {
+        return (bool) kSiteFlag('security', 'two-factor', false);
+    }
+
+    /**
+     * The providers this install can actually sign somebody in with. Empty
+     * whenever the master switch is off, the provider's own switch is off, or
+     * nothing has credentials — a button that lands on a provider error page is
+     * worse than no button.
+     *
+     * @return Collection<int, SocialProviderEnum>
+     */
+    #[Computed]
+    public function socialProviders()
+    {
+        $service = app(SocialAccountService::class);
+
+        return $service->isAvailable() ? $service->enabledProviders() : collect();
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // SIGN IN
 
     protected function userDashboardRedirect(array $with = [])
     {
@@ -229,5 +277,61 @@ trait WithAuthWorker
         $minutes = (int) kSiteFlag('security', 'login-decay-minutes', 1);
 
         return max(1, min($minutes ?: 1, 60)) * 60;
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // THE CAPTCHA CHALLENGE
+
+    /**
+     * A counter separate from the sign-in throttle, so the login screen can decide
+     * whether to show the captcha *before* an email has been typed.
+     *
+     * The sign-in throttle is keyed on the email and the IP together, which is
+     * right for locking one account out and useless for this — at first render
+     * there is no email yet, and a visitor who refreshed the page would be handed a
+     * clean slate. This counts failures by browser address alone: the question is
+     * whether whoever is at this address has been failing sign-ins, not which
+     * account they were aiming at.
+     */
+    protected function captchaThrottleKey(): string
+    {
+        return 'captcha|'.request()->ip();
+    }
+
+    /**
+     * How many failures an address is allowed before it has to prove it is a
+     * person. Two rather than the sign-in limit: the throttle exists to make
+     * guessing slow and the captcha to make it manual, and there is no reason to
+     * wait until the lockout is nearly spent to start asking.
+     */
+    protected function captchaAfterAttempts(): int
+    {
+        return 2;
+    }
+
+    /**
+     * Count a failed sign-in against the address. The window is the throttle's own,
+     * so the challenge and the lockout clear together.
+     */
+    protected function recordCaptchaFailure(): void
+    {
+        RateLimiter::hit($this->captchaThrottleKey(), $this->loginDecaySeconds());
+    }
+
+    /**
+     * Clear the count. A sign-in that works is the evidence the challenge was
+     * asking for.
+     */
+    protected function clearCaptchaFailures(): void
+    {
+        RateLimiter::clear($this->captchaThrottleKey());
+    }
+
+    /**
+     * Has this address failed often enough to be asked?
+     */
+    protected function captchaChallenged(): bool
+    {
+        return RateLimiter::attempts($this->captchaThrottleKey()) >= $this->captchaAfterAttempts();
     }
 }

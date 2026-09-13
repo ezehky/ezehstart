@@ -1,19 +1,17 @@
 <?php
 
-use App\Enums\SocialProviderEnum;
 use App\Models\User;
-use App\Services\SocialAccountService;
+use App\Services\CaptchaService;
 use App\Traits\WithAuthWorker;
-use Illuminate\Support\Collection;
+use App\Traits\WithCaptcha;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
-    use WithAuthWorker;
+    use WithAuthWorker, WithCaptcha;
 
     #[Validate(['required', 'email'])]
     public string $email;
@@ -30,23 +28,21 @@ new #[Layout('layouts::auth')] class extends Component
     }
 
     /**
-     * The providers this install can actually sign somebody in with. Empty
-     * whenever the feature is off or nothing has credentials.
-     *
-     * @return Collection<int, SocialProviderEnum>
+     * The captcha is not asked for on a first attempt. Somebody typing the right
+     * password should not have to argue with a widget; somebody who has already
+     * failed twice from this address should. captchaChallenged() counts by address
+     * alone, so refreshing the page does not clear the challenge.
      */
-    #[Computed]
-    public function socialProviders(): Collection
+    public function captchaRequired(): bool
     {
-        $service = app(SocialAccountService::class);
-
-        return $service->isAvailable() ? $service->enabledProviders() : collect();
+        return app(CaptchaService::class)->isAvailable() && $this->captchaChallenged();
     }
 
-    #[Computed]
-    public function passwordlessEnabled(): bool
+    protected function rules(): array
     {
-        return (bool) kSiteFlag('security', 'passwordless-login', true);
+        // The #[Validate] attributes above carry the credential rules; this only
+        // adds the captcha, and only while it is being asked for.
+        return $this->captchaRules();
     }
 
     public function login()
@@ -60,6 +56,12 @@ new #[Layout('layouts::auth')] class extends Component
         // Attempt to authenticate the user with the provided credentials
         if (! Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
             $this->recordFailedAttempt($this->email);
+
+            // Counted separately from the throttle so the widget can be decided on
+            // before an address has been typed. Hit before respondError() below,
+            // which throws — a failure that never reached the counter would let an
+            // attacker stay under the challenge for ever.
+            $this->recordCaptchaFailure();
 
             $this->reset('password');
 
@@ -80,6 +82,7 @@ new #[Layout('layouts::auth')] class extends Component
         // A correct password clears the count, so four mistypes followed by the
         // right one does not leave somebody throttled on their next sign-in.
         $this->clearRateLimit($this->email);
+        $this->clearCaptchaFailures();
 
         // The password was right, but on an account with a second factor that is
         // only half the answer. This stands the session back down and sends them
@@ -101,6 +104,8 @@ new #[Layout('layouts::auth')] class extends Component
 <x-slot:title>Sign in to your account</x-slot:title>
 <x-slot:description>Pick up where you left off.</x-slot:description>
 <x-slot:extra>
+    <x-auth.passwordless :enabled="$this->passwordlessEnabled" />
+    <x-auth.social-providers :providers="$this->socialProviders" />
     <flux:text class="mt-8 text-center dark:text-slate-400">
         New here?
         <flux:link href="{{ route('register') }}" variant="ghost">
@@ -109,63 +114,34 @@ new #[Layout('layouts::auth')] class extends Component
     </flux:text>
 </x-slot:extra>
 
-<div>
-    @session('status')
-        <flux:callout color="lime" class="mt-6 text-sm">{!! session('status') !!}</flux:callout>
-    @endsession
+<form wire:submit.throttle.1000ms="login" class="mt-8 space-y-5">
+    <flux:input
+        label="Email address"
+        wire:model="email"
+        type="email"
+        autofocus
+        placeholder="you@example.com"
+        icon="user"
+    />
 
-    <form wire:submit.throttle.1000ms="login" class="mt-8 space-y-5">
-        <flux:input
-            label="Email address"
-            wire:model="email"
-            type="email"
-            autofocus
-            placeholder="you@example.com"
-            icon="user"
-        />
-
-        <flux:field>
-            <div class="flex items-center justify-between gap-4 mb-2">
-                <flux:label>Password</flux:label>
-                <flux:link href="{{ route('password.request') }}" variant="ghost" class="text-sm">
-                    Forgot password?
-                </flux:link>
-            </div>
-            <x-form.password :label="null" wire:model="password" icon="lock-closed" />
-            <flux:error name="password" />
-        </flux:field>
-        <flux:switch wire:model="remember" label="Keep me signed in" />
-
-        <flux:button type="submit" variant="primary" class="w-full">Sign in</flux:button>
-
-        @if ($this->passwordlessEnabled)
-            <flux:button href="{{ route('passwordless') }}" icon="envelope" class="w-full">
-                Email me a sign-in code
-            </flux:button>
-        @endif
-    </form>
-
-    {{-- Social sign-in. Only rendered when the site switch is on and at least one
-         provider actually has credentials — a button that lands on a provider
-         error page is worse than no button. --}}
-    @if ($this->socialProviders->isNotEmpty())
-        <div class="mt-6 flex items-center gap-3">
-            <flux:separator class="grow" />
-            <flux:text size="sm" class="shrink-0">or continue with</flux:text>
-            <flux:separator class="grow" />
+    <flux:field>
+        <div class="flex items-center justify-between gap-4 mb-2">
+            <flux:label>Password</flux:label>
+            <flux:link href="{{ route('password.request') }}" variant="ghost" class="text-sm">
+                Forgot password?
+            </flux:link>
         </div>
+        <x-form.password :label="null" wire:model="password" icon="lock-closed" />
+        <flux:error name="password" />
+    </flux:field>
+    <flux:switch wire:model="remember" label="Keep me signed in" />
 
-        <div class="mt-6 space-y-3">
-            @foreach ($this->socialProviders as $provider)
-                <flux:button
-                    wire:key="social-{{ $provider->value }}"
-                    href="{{ route('social.redirect', $provider->value) }}"
-                    class="w-full"
-                >
-                    {{ $provider->label() }}
-                </flux:button>
-            @endforeach
-        </div>
+    {{-- Only after this address has been failing sign-ins. Hiding it is the
+            courtesy; rules() is the boundary, and the two ask the same method. --}}
+    @if ($this->captchaRequired())
+        <x-form.captcha action="login" />
     @endif
-</div>
+
+    <flux:button type="submit" variant="primary" class="w-full">Sign in</flux:button>
+</form>
 

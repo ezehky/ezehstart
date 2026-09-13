@@ -2,6 +2,7 @@
 
 use App\Rules\EmailRule;
 use App\Traits\WithAuthWorker;
+use App\Traits\WithCaptcha;
 use App\Traits\WithPasswordTools;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -9,7 +10,7 @@ use Livewire\Component;
 
 new #[Layout('layouts::auth')] class extends Component
 {
-    use WithAuthWorker, WithPasswordTools;
+    use WithAuthWorker, WithCaptcha, WithPasswordTools;
 
     public string $name;
 
@@ -34,7 +35,10 @@ new #[Layout('layouts::auth')] class extends Component
 
     protected function rules(): array
     {
-        return [
+        // Registration is asked for a captcha on every attempt rather than after a
+        // failure. There is nothing to fail here — a script that posts this form
+        // gets an account, and the first attempt is the one worth stopping.
+        return $this->captchaRules([
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
@@ -51,7 +55,7 @@ new #[Layout('layouts::auth')] class extends Component
                 $this->passwordStrengthRule(),
             ],
             'agreed_to_terms' => ['accepted'],
-        ];
+        ]);
     }
 
     protected function messages(): array
@@ -99,6 +103,8 @@ new #[Layout('layouts::auth')] class extends Component
 <x-slot:title>Create your account</x-slot:title>
 <x-slot:description>It takes less than a minute.</x-slot:description>
 <x-slot:extra>
+    <x-auth.passwordless :enabled="$this->passwordlessEnabled" label="Sign up without password." />
+    <x-auth.social-providers :providers="$this->socialProviders" />
     <flux:text class="mt-8 text-center dark:text-slate-400">
         Already have an account?
         <flux:link href="{{ route('login') }}" variant="ghost">
@@ -126,22 +132,21 @@ new #[Layout('layouts::auth')] class extends Component
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
             <flux:field>
                 <flux:label>Password</flux:label>
-                <x-form.password wire:model="password" :label="null" />
+                <x-form.password wire:model="password" :label="null" :note="$passwordNote" />
             </flux:field>
             <x-form.password label="Confirm password" wire:model="password_confirmation" />
         </div>
         <flux:error name="password" />
-        <flux:text class="text-xs mt-1 font-semibold">{!! $passwordNote !!}</flux:text>
     </div>
 
     <x-form.consent-field />
 
+    @if ($this->captchaRequired())
+        <x-form.captcha action="register" />
+    @endif
+
     <flux:button type="submit" variant="primary" class="w-full">
         Create account
-    </flux:button>
-
-    <flux:button href="{{ route('passwordless') }}" icon="envelope" class="w-full">
-        Sign up without a password
     </flux:button>
 
     @script

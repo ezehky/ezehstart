@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\SocialProviderEnum;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -61,8 +62,22 @@ class SiteConfigurationService
                 'password-history-depth' => 5,
 
                 'two-factor' => false,
-                'socialite' => false,
                 'passwordless-login' => true,
+
+                // Social sign-in. The master switch, then one switch per provider
+                // so a provider that has credentials can still be taken off the
+                // sign-in page without anybody editing .env. Keyed by the enum case
+                // value and built from the cases, so adding a provider adds its
+                // switch here and on the admin screen at the same time.
+                'socialite' => false,
+                'social-providers' => collect(SocialProviderEnum::cases())
+                    ->mapWithKeys(fn (SocialProviderEnum $provider) => [$provider->value => true])
+                    ->all(),
+
+                // The captcha on the guest forms. Off until somebody turns it on,
+                // and it stays off regardless while the Turnstile keys are missing
+                // from the environment — see CaptchaService::isAvailable().
+                'captcha' => false,
 
                 // The login throttle. Deliberately configurable so a site under a
                 // live attack can be tightened without a deploy — but the defaults

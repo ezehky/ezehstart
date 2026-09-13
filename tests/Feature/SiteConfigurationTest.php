@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserTypeEnum;
+use App\Services\CaptchaService;
 use App\Services\SiteConfigurationService;
 use Livewire\Livewire;
 
@@ -99,6 +100,50 @@ test('strict verification is only asked for while verification is on', function 
         ->set('config.email-settings.verification-strict', null)
         ->call('save')
         ->assertHasNoErrors();
+});
+
+test('the captcha switch saves, and stays off without the keys behind it', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.security')
+        ->set('config.security.captcha', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(kSiteFlag('security', 'captcha', false))->toBeTrue()
+        // Saved on, but the feature is still off: the keys are not in the
+        // environment, and the screen says so rather than pretending otherwise.
+        ->and(app(CaptchaService::class)->isAvailable())->toBeFalse();
+});
+
+test('a provider switch is only asked for while social sign-in is on', function () {
+    config(['services.google.client_id' => 'test-client-id']);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.security')
+        ->set('config.security.socialite', false)
+        ->set('config.security.social-providers.google', null)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.security')
+        ->set('config.security.socialite', true)
+        ->set('config.security.social-providers.google', null)
+        ->call('save')
+        ->assertHasErrors('config.security.social-providers.google');
+});
+
+test('a provider turned off stays off after a save', function () {
+    config(['services.google.client_id' => 'test-client-id']);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.configs.security')
+        ->set('config.security.socialite', true)
+        ->set('config.security.social-providers.google', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(data_get(kSiteFlag('security', 'social-providers', []), 'google'))->toBeFalse();
 });
 
 test('a switch turned off stays off after a save', function () {

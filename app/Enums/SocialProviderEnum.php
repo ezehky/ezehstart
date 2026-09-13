@@ -45,6 +45,30 @@ enum SocialProviderEnum: string
     }
 
     /**
+     * Whether an administrator has left this provider switched on.
+     *
+     * Credentials and permission are two different questions. Somebody may hold a
+     * working Google app and still want the button off the sign-in page for a
+     * while, and making them empty .env to do it is not a setting.
+     *
+     * The switches live together under security.social-providers, keyed by case
+     * value. The key's presence is what is checked rather than its truthiness — a
+     * provider deliberately turned off is a false, and asking for it with a default
+     * would read that back as the default instead. An install that has never saved
+     * the group offers every provider it has credentials for.
+     */
+    public function isEnabled(): bool
+    {
+        $providers = kSiteFlag('security', 'social-providers', []);
+
+        if (! \is_array($providers) || ! \array_key_exists($this->value, $providers)) {
+            return true;
+        }
+
+        return (bool) $providers[$this->value];
+    }
+
+    /**
      * The Flux icon rendered on the provider's sign-in button.
      */
     public function icon(): string
