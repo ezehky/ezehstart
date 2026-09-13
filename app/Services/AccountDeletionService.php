@@ -13,6 +13,7 @@ use App\Models\Video;
 use App\Models\VideoUsage;
 use Carbon\CarbonInterface;
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
@@ -230,18 +231,21 @@ class AccountDeletionService
      * outright, and the two tables (notifications and sessions) that point at a
      * user without a foreign key to enforce it.
      */
-    public function hardDelete(User $user): void
+    public function hardDelete(User $user, ActivityActionEnum $action = ActivityActionEnum::ACCOUNT_DELETE, ?string $description = null): void
     {
-        DB::transaction(function () use ($user) {
+        DB::transaction(function () use ($user, $action, $description) {
             kDeleteFile($user->avatar);
 
             $this->purgeLibraries($user);
 
             // Written before the row goes, and cascaded away with it. It is here
             // for the case where an administrator is the one signed in — then the
-            // log belongs to them and survives.
+            // log belongs to them and survives. The action is a parameter because
+            // the sweep fulfilling a request somebody made and an administrator
+            // purging a shell they chose not to keep are not the same event.
             app(ActivityLogService::class)->logActivity(
-                ActivityActionEnum::ACCOUNT_DELETE,
+                $action,
+                $description,
                 model: $user,
             );
 
@@ -292,5 +296,79 @@ class AccountDeletionService
             VideoUsage::query()->whereIn('video_id', $videos)->delete();
             Video::query()->whereIn('id', $videos)->delete();
         }
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // AFTER THE SWEEP
+
+    /**
+     * Every anonymized account, newest first.
+     *
+     * These are soft-deleted rows, so nothing else in the admin surface can see them —
+     * the default scope hides them from the users listing, the metrics and the search.
+     * That is the whole reason the deleted-accounts screen exists: without it an
+     * anonymized shell is a row nobody can account for and nobody can finish removing.
+     *
+     * @return Builder<User>
+     */
+    public function trashedQuery(): Builder
+    {
+        return User::query()->onlyTrashed();
+    }
+
+    /**
+     * Put an anonymized account row back.
+     *
+     * This restores the **record**, not the person. anonymize() already overwrote the
+     * name, the email and the password before the row was trashed, so there is nothing
+     * here that hands anybody their account back — the status stays DELETED and the
+     * password stays null. What it buys is history that resolves again: a transaction or
+     * an audit entry pointing at a trashed user renders as nobody at all.
+     */
+    public function restore(User $user): void
+    {
+        if (! $user->trashed()) {
+            return;
+        }
+
+        $user->restore();
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::RESTORE,
+            " account record: {$user->email}",
+            model: $user,
+        );
+    }
+
+    /**
+     * Finish the erasure an anonymize() only went halfway through.
+     *
+     * Anonymizing is the compromise struck for accounts with history. Purging is the
+     * decision to stop keeping even that, and it takes the history with it — so it is
+     * deliberately a separate, full-access action rather than something the nightly
+     * sweep ever does on its own.
+     */
+    public function purge(User $user): void
+    {
+        // Named rather than left to the default description: the defaults here are
+        // written in the account holder's voice ("their account"), and this is an
+        // administrator acting on somebody else's record.
+        $this->hardDelete($user, ActivityActionEnum::FORCE_DELETE, " account: {$user->email}");
+    }
+
+    /**
+     * Why this account cannot be purged, or null when it can.
+     *
+     * A live account is not something this screen removes: it has its own deletion
+     * flow, with a grace period the account holder controls, and going around that
+     * from here would be the one delete nobody consented to.
+     */
+    public function purgeBlockedReason(User $user): ?string
+    {
+        if (! $user->trashed()) {
+            return 'Only an account that has already been deleted can be purged from here.';
+        }
+
+        return null;
     }
 }

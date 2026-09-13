@@ -5,6 +5,7 @@ use App\Http\Controllers\PolicyPageController;
 use App\Http\Controllers\SocialAuthController;
 use App\Models\User;
 use App\Services\AccountDeletionService;
+use App\Services\ImpersonationService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -82,12 +83,29 @@ Route::get('/account/restore/{user}', function (User $user) {
     $message = 'Welcome back. Your account is no longer scheduled for deletion.';
 
     return auth()->id() === $user->id
-        ? redirect()->route($user->user_type->dashboardRoute())->with('message', $message)
+        ? redirect()->to($user->user_type->dashboardRoute())->with('message', $message)
         : redirect()->route('login')->with('message', $message);
 })->middleware('signed')->name('account.restore');
 
 // General Auth Routes
 Route::middleware('auth')->group(function (): void {
+    // Hand the session back to the administrator who started impersonating.
+    //
+    // In the auth group rather than an admin one: while it is running the signed-in
+    // account *is* the member, so an admin-only middleware would refuse the one route
+    // that ends it and strand the administrator inside somebody else's account.
+    Route::get('/stop-impersonating', function () {
+        $service = app(ImpersonationService::class);
+
+        abort_unless($service->isImpersonating(), 404);
+
+        $redirect = $service->stop();
+
+        return $redirect
+            ? redirect()->to($redirect)->with('message', 'You are back on your own account.')
+            : redirect()->route('login')->with('message', 'That session has ended. Please sign in again.');
+    })->name('impersonation.stop');
+
     // Logout Route
     Route::get('/logout', function () {
         // Log out the user and invalidate the session

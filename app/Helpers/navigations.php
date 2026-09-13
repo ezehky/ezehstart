@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\CategoryGroupEnum;
+use App\Services\AccountDataExportService;
 
 /**
  * Get page navigation links for a given key.
@@ -112,6 +113,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Activity logs',
                         'link' => route('admin.activity-logs'),
                     ],
+                    'deleted-accounts' => [
+                        'label' => 'Deleted accounts',
+                        'link' => route('admin.deleted-accounts'),
+                    ],
                 ],
                 'icon' => 'users',
             ],
@@ -157,6 +162,11 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                     'security-settings' => [
                         'label' => 'Security',
                         'link' => route('user.security-settings'),
+                    ],
+                    'download-data' => [
+                        'label' => 'Download my data',
+                        'link' => route('user.download-data'),
+                        'check' => app(AccountDataExportService::class)->isEnabled(),
                     ],
                     'delete-account' => [
                         'label' => 'Delete account',

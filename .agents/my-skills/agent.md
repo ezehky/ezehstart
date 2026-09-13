@@ -58,7 +58,7 @@ Do **not** create any of them. If you think you need one, you need a **Service**
 [policies.md](policies.md) for what this project does instead.
 
 ### 2. Always reuse existing services
-Before writing any business logic, check `app/Services/`. Twenty-nine ship with the
+Before writing any business logic, check `app/Services/`. Thirty-one ship with the
 kit, covering accounts, roles and gates, the site configuration, both media libraries,
 the blog, the transaction ledger, every code-based sign-in flow, and the audit trail.
 Read the directory rather than a list here — a list is the thing that goes stale.

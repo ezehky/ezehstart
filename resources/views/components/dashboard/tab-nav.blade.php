@@ -15,6 +15,7 @@ if ($isUser) {
         'profile' => ['label' => 'Profile', 'icon' => 'user-circle', 'route' => route('user.profile')],
         'account-settings' => ['label' => 'Settings', 'icon' => 'adjustments-horizontal', 'route' => route('user.account-settings')],
         'security-settings' => ['label' => 'Security', 'icon' => 'shield-check', 'route' => route('user.security-settings')],
+        'download-data' => ['label' => 'My data', 'icon' => 'arrow-down-tray', 'route' => route('user.download-data')],
         'delete-account' => ['label' => 'Delete account', 'icon' => 'trash', 'route' => route('user.delete-account')],
     ];
 
@@ -28,6 +29,12 @@ if ($isUser) {
         ! data_get($userSettings, 'can-delete-account', false)
     ) {
         unset($tabs['delete-account']);
+    }
+
+    // Same reasoning, and the same helper: the switch closes the route too, so a tab
+    // left on the screen would lead somewhere that answers 404.
+    if (! app(\App\Services\AccountDataExportService::class)->isEnabled()) {
+        unset($tabs['download-data']);
     }
 }
 

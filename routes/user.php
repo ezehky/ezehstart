@@ -10,6 +10,10 @@ Route::livewire('/account-settings', 'pages::user.account.account-settings')->na
 Route::livewire('/security-settings', 'pages::user.account.security-settings')->name('security-settings');
 Route::livewire('/delete-account', 'pages::user.account.delete-account')->name('delete-account');
 
+// A copy of what is held about the account. Behind the user.allow-data-download
+// switch, which closes this route as well as hiding the tab.
+Route::livewire('/download-data', 'pages::user.account.download-data')->name('download-data');
+
 // Money
 Route::livewire('/transactions', 'pages::user.transactions')->name('transactions');
 

@@ -9,6 +9,7 @@ use App\Services\ActivityLogService;
 use App\Services\GateService;
 use App\Services\PasswordSecurityService;
 use App\Services\UserService;
+use App\Services\ImpersonationService;
 use App\Traits\WithGateManager;
 use App\Traits\WithGateProps;
 use App\Traits\WithUserRoleManager;
@@ -243,6 +244,26 @@ new class extends Component
         return $this->respondSuccess('Account has been successfully updated.');
     }
 
+    /**
+     * Sign in as this account to see what they see.
+     *
+     * Members only, and the service is what refuses an administrator — the button being
+     * absent on an admin's record is a courtesy, not the boundary.
+     */
+    public function impersonate()
+    {
+        $this->checkGate(GateAccessEnum::FULL);
+
+        $service = app(ImpersonationService::class);
+
+        $reason = $service->blockedReason($this->user);
+        $this->respondError($reason ?? '', if: $reason !== null);
+
+        // A full redirect rather than a Livewire one: the session's identity changes
+        // here, and every gate, nav tree and shared view binding is resolved from it.
+        return redirect()->to($service->start($this->user));
+    }
+
     public function editSettings(): void
     {
         $this->respondError(
@@ -444,6 +465,21 @@ new class extends Component
                 >
                     Manage access
                 </x-dashboard.gate.button>
+
+                {{-- Members only. An administrator cannot be impersonated at all, so the
+                     control is absent rather than shown and refused. --}}
+                @if ($user->isUser())
+                    <x-dashboard.gate.button
+                        :gate="$pageGate"
+                        :level="$gateFull"
+                        icon="eye"
+                        variant="filled"
+                        wire:click="impersonate"
+                        wire:confirm="View the site as {{ $user->name }}? Everything you do will be recorded against your own account."
+                    >
+                        View as this member
+                    </x-dashboard.gate.button>
+                @endif
 
                 {{-- A member's uploads never appear in the admin library or picker, so
                      these two links are the only way an administrator reaches them.

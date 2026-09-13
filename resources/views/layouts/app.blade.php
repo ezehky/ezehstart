@@ -26,6 +26,35 @@
         </div>
 
         <div class="min-h-screen lg:pl-64">
+            {{-- Impersonation. Deliberately above the chrome and in a colour nothing else
+                 in the app uses: the failure mode of this feature is an administrator
+                 forgetting which account they are in, so the notice does not scroll away
+                 and is not a toast. It sits outside <main> so it survives every screen. --}}
+            @php($impersonation = app(\App\Services\ImpersonationService::class))
+            @if ($impersonation->isImpersonating())
+                <div class="sticky top-0 z-40 flex flex-col gap-2 border-b border-amber-500/40 bg-amber-500 px-4 py-2.5 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+                    <div class="flex items-start gap-2">
+                        <flux:icon icon="eye" variant="mini" class="mt-0.5 shrink-0" />
+                        <span>
+                            You are viewing the site as <strong>{{ auth()->user()?->name }}</strong>.
+                            Anything you do here is recorded against
+                            {{ $impersonation->impersonator()?->name ?? 'your account' }}.
+                            <span class="whitespace-nowrap">Ends in {{ $impersonation->minutesRemaining() }} min.</span>
+                        </span>
+                    </div>
+
+                    {{-- A plain link, not wire:navigate: the route swaps the session's
+                         identity, and a SPA visit would leave the page it came from
+                         rendered for an account that is no longer signed in. --}}
+                    <a
+                        href="{{ route('impersonation.stop') }}"
+                        class="shrink-0 self-start rounded-md bg-amber-950 px-3 py-1.5 font-medium text-amber-50 hover:bg-amber-900 sm:self-auto"
+                    >
+                        Return to my account
+                    </a>
+                </div>
+            @endif
+
             <x-dashboard.top-navigation :current-type="$currentType" />
             <main class="mx-auto w-full max-w-[1600px] px-4 py-7 sm:px-6 lg:px-8">
                 @session('status')

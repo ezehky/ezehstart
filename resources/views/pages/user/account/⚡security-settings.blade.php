@@ -8,6 +8,7 @@ use App\Services\ActivityLogService;
 use App\Services\PasswordSecurityService;
 use App\Services\SocialAccountService;
 use App\Services\TwoFactorService;
+use App\Services\ImpersonationService;
 use App\Traits\WithAccountOtp;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
@@ -45,6 +46,11 @@ new class extends Component
 
     public function mount(): void
     {
+        // Closed while somebody is being impersonated. Impersonation is for looking at
+        // what a member sees, and this screen changes what an account *is* — a support
+        // session must not be able to take one over.
+        abort_if(app(ImpersonationService::class)->isImpersonating(), 404);
+
         $this->user = auth()->user();
 
         kSetSiteTitle('profile', 'security');

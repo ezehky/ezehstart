@@ -31,6 +31,8 @@ project.
 | Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages. The seeded **Author** role narrows an account to the posts it wrote and gives it a public byline — bio and social handles on `user_profiles` |
 | Money | `transactions` plus gateways, metas, evidence, balances and charges; balances derived from confirmed rows, never stored |
 | Reference | 250 countries seeded from `database/data/countries.json` — no network call at seed time |
+| Support | **Impersonation** — an admin views the site as a member, both ends logged, expiring after an hour, with every account-altering screen closed while it runs. Never admin→admin |
+| Accounts | Deletion is a grace period, then anonymize-or-remove. Anonymized rows are soft-deleted and surface only on **Deleted accounts**, where they can be restored or purged. An account holder can also **download a copy** of what is held about them, behind `user.allow-data-download` |
 
 | | |
 | --- | --- |
@@ -112,6 +114,25 @@ Change it before the kit becomes a real project.
 - **Never read an on/off site-config switch with `kSiteConfig()`.** Its `$default` fires
   on any falsy value, so a switch deliberately turned *off* reads back as its default.
   Use `kSiteFlag($group, $key, $default)`, which checks for the key's presence.
+- **Impersonation swaps the signed-in account, so nothing about the request is the
+  admin any more.** `ImpersonationService::isImpersonating()` is the only way to tell.
+  While it runs the session passes `UserMiddleware`, never `AdminMiddleware` — which is
+  why the hour expiry is checked there. Any new screen that *changes* an account rather
+  than showing it needs `abort_if(app(ImpersonationService::class)->isImpersonating(), 404)`
+  in `mount()`, the way the security, delete-account and download-data screens do.
+- **`UserTypeEnum::dashboardRoute()` returns a URL, not a route name.** Pass it to
+  `redirect()->to()`; `redirect()->route()` throws.
+- **Anonymized accounts are soft-deleted, so every ordinary query misses them.** The
+  users listing, its metrics and its search all read through the default scope. Reach
+  them with `AccountDeletionService::trashedQuery()`, which is what the Deleted accounts
+  screen does — a plain `User::find()` answers null for all of them.
+- **A new gateable screen starts closed for narrow roles and open for broad ones.** A
+  child key with no gate of its own inherits its parent, so `users.deleted-accounts`
+  opens for a role holding `users`, and stays shut for one holding only
+  `users.users-list`. Nothing needs granting for the protected role; a custom role does.
+- **Activity log retention is off by default** (`security.activity-log-retention-days`
+  at 0). Throwing away an audit trail is a decision, so the nightly `activity:prune-logs`
+  does nothing until somebody sets a window, and anything above 0 is floored at 30 days.
 - **Every emailed code has a guess allowance and a resend floor**, both from
   `WithOtpGuard`: five wrong tries destroy the code, and another cannot be asked for
   inside 60 seconds. A test that calls a resend twice gets a validation error, not a

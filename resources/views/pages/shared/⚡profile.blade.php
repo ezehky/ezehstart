@@ -7,6 +7,7 @@ use App\Services\AccountOtpService;
 use App\Services\ActivityLogService;
 use App\Services\PasswordSecurityService;
 use App\Services\UserService;
+use App\Services\ImpersonationService;
 use App\Traits\WithFormResponseMessage;
 use App\Traits\WithPasswordTools;
 use Livewire\Attributes\Computed;
@@ -118,6 +119,14 @@ new class extends Component
 
     public function passwordStep1(): void
     {
+        // The one write on this screen that changes what the account *is*. The
+        // security screen is closed outright while impersonating; this screen stays
+        // open because looking at a profile is the point, so the method guards itself.
+        $this->respondError(
+            'You cannot change a password while viewing the site as somebody else.',
+            if: app(ImpersonationService::class)->isImpersonating(),
+        );
+
         // Social-only accounts have no password yet — nothing to verify, so skip straight to the OTP.
         if ($this->user->password) {
             $this->validate(['current_password' => ['required', 'string', 'current_password']]);

@@ -51,4 +51,9 @@ Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');
 Route::livewire('/users', 'pages::admin.users.users')->name('users');
 Route::livewire('/roles', 'pages::admin.users.roles')->name('roles');
 Route::livewire('/activity-logs', 'pages::admin.users.activity-logs')->name('activity-logs');
+
+// Accounts that reached the end of their deletion window and were anonymized rather
+// than removed. Soft-deleted rows, so every other screen's default scope hides them —
+// this is the only way to see or finish removing one.
+Route::livewire('/deleted-accounts', 'pages::admin.users.trashed-accounts')->name('deleted-accounts');
 Route::livewire('/user/{user}', 'pages::admin.users.user-view')->name('user');

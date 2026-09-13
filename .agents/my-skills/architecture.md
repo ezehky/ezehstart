@@ -38,7 +38,7 @@ app/
 ├── Notifications/    GeneralNotification (database channel only)
 ├── Providers/        AppServiceProvider only
 ├── Rules/            EmailRule, ImageRule, MoneyRule, and two more
-├── Services/         29 services, all #[Singleton]
+├── Services/         31 services, all #[Singleton]
 └── Traits/           23 With* traits
 ```
 

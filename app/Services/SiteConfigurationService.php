@@ -53,6 +53,12 @@ class SiteConfigurationService
                 // reaching for the drawer. Off by default: an install that wants
                 // only the drawer should not have to turn a second navigation off.
                 'mobile-floating-menu' => false,
+
+                // Whether an account holder may download a copy of what is held
+                // about them. On by default, because the deletion right ships on
+                // by default and half of a data right is a worse position than
+                // neither — an install that must withhold it can turn it off.
+                'allow-data-download' => true,
             ],
 
             // Every switch here turns a whole sign-in feature on or off, so the
@@ -95,6 +101,11 @@ class SiteConfigurationService
                 // are the values to keep unless there is a reason not to.
                 'login-max-attempts' => 5,
                 'login-decay-minutes' => 1,
+
+                // How many days of audit trail to keep. Zero means forever, and is the
+                // default: an install should not quietly start throwing away the log
+                // somebody will one day need, so the window is opted into.
+                'activity-log-retention-days' => 0,
             ],
 
             // Limits applied to users only. Administrators upload against the

@@ -59,8 +59,18 @@ enum ActivityActionEnum: string
     case ACCOUNT_ANONYMIZE = 'account.anonymize';
     case ACCOUNT_DELETE = 'account.delete';
 
+    // The other half of the deletion right: a copy of what is held, rather
+    // than the destruction of it.
+    case ACCOUNT_DATA_EXPORT = 'account.data-export';
+
     // Admin Operation cases
     case PASSWORD_RESET = 'password-reset';
+
+    // Impersonation. Both ends are their own case: "who was acting as whom, and
+    // from when until when" is the question the log has to answer afterwards, and
+    // a single event cannot answer it.
+    case IMPERSONATION_START = 'impersonation.start';
+    case IMPERSONATION_STOP = 'impersonation.stop';
 
     // Site configuration
     case CONFIG_UPDATE = 'config.update';
@@ -188,6 +198,11 @@ enum ActivityActionEnum: string
             self::TAG_DELETE,
             self::NOTIFICATION_TYPE_DELETE => 'Deleted ',
 
+            // Restore and purge. Both read as sentences somebody will scan for, so
+            // neither is folded into the plain Updated/Deleted arms above.
+            self::RESTORE => 'Restored ',
+            self::FORCE_DELETE => 'Permanently deleted ',
+
             // Uploads
             self::IMAGE_UPLOAD => 'Uploaded ',
 
@@ -201,6 +216,10 @@ enum ActivityActionEnum: string
             // Connected accounts
             self::SOCIAL_ACCOUNT_LINK => 'Connected ',
             self::SOCIAL_ACCOUNT_UNLINK => 'Disconnected ',
+
+            // Reads as "Started acting as Ada Lovelace (ada@example.test)".
+            self::IMPERSONATION_START => 'Started acting as',
+            self::IMPERSONATION_STOP => 'Stopped acting as',
 
             // Files. A spreadsheet in or out is a whole-screen action rather than
             // one about a single row, so the subject is the count and the filename.
@@ -237,6 +256,7 @@ enum ActivityActionEnum: string
             self::ACCOUNT_DELETE_CANCEL => 'Cancelled the deletion of their account.',
             self::ACCOUNT_ANONYMIZE => 'Deleted their account (data anonymized).',
             self::ACCOUNT_DELETE => 'Permanently deleted their account.',
+            self::ACCOUNT_DATA_EXPORT => 'Downloaded a copy of their account data.',
 
             self::TWO_FACTOR_ENABLE => 'Turned on two-factor authentication.',
             self::TWO_FACTOR_DISABLE => 'Turned off two-factor authentication.',

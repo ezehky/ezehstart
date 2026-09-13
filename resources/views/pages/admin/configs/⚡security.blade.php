@@ -61,6 +61,7 @@ new class extends Component
 
             // User
             'config.user.account-deletion' => ['required', 'boolean'],
+            'config.user.allow-data-download' => ['required', 'boolean'],
 
             // Security. Every one of these closes a route as well as hiding a
             // button, so turning one off is a real change rather than cosmetic.
@@ -76,6 +77,10 @@ new class extends Component
             // it reads, and this stops a silly number being saved in the first place.
             'config.security.login-max-attempts' => ['required', 'integer', 'min:3', 'max:20'],
             'config.security.login-decay-minutes' => ['required', 'integer', 'min:1', 'max:60'],
+
+            // Zero is "keep forever". Anything above it is floored at 30 days by the
+            // service as well — a one-day audit trail is not a setting, it is a mistake.
+            'config.security.activity-log-retention-days' => ['required', 'integer', 'min:0', 'max:3650'],
 
             // Uploads
             'config.uploads.user-image-limit' => ['required', 'integer', 'min:0', 'max:10000'],
@@ -171,6 +176,14 @@ new class extends Component
                         description="Keep the account row with its personal details stripped, so history that points at it stays readable. Off removes the account and everything it owns, including its library files."
                     />
                 @endif
+            </flux:card>
+            <flux:card class="space-y-2">
+                <flux:heading level="2" size="lg" class="mb-4">Account data</flux:heading>
+                <flux:switch
+                    wire:model="config.user.allow-data-download"
+                    label="Allow data download"
+                    description="Users may download a copy of what is held about them — profile, consents, transactions and library index, as one JSON file. Security material is never included. Turning this off closes the route as well as hiding the tab."
+                />
             </flux:card>
         </div>
         <div class="lg:col-span-2 space-y-6">
@@ -338,6 +351,23 @@ new class extends Component
                         placeholder="e.g. 1"
                         min="1"
                         max="60"
+                    />
+                </div>
+
+                <flux:separator variant="subtle" />
+                <flux:heading level="3" size="sm">Audit trail retention</flux:heading>
+                <flux:text class="mt-1">
+                    How many days of activity log to keep. Leave it at 0 to keep everything —
+                    the nightly sweep then does nothing. Anything above 0 is held to a floor of
+                    30 days, and entries older than the window are deleted for good.
+                </flux:text>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <x-form.number-field
+                        wire:model="config.security.activity-log-retention-days"
+                        label="Days to keep"
+                        placeholder="0 keeps everything"
+                        min="0"
+                        max="3650"
                     />
                 </div>
             </flux:card>

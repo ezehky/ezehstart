@@ -61,6 +61,20 @@ class ActivityLogService
     }
 
     // Getters
+
+    /**
+     * How many days of audit trail to keep, 0 when it is kept forever.
+     *
+     * Clamped rather than trusted: the value comes from a JSON file an administrator
+     * edits, and a stray 1 would quietly shred the trail on the next nightly run.
+     */
+    public function retentionDays(): int
+    {
+        $days = (int) kSiteFlag('security', 'activity-log-retention-days', 0);
+
+        return $days <= 0 ? 0 : max(30, min($days, 3650));
+    }
+
     public function getActivityLogsForUser(User $user, ?array $columns = null, int $limit = 6)
     {
         $columns ??= [
@@ -158,5 +172,38 @@ class ActivityLogService
             'description' => $description,
             ...$data,
         ]);
+    }
+
+    /**
+     * Delete audit entries older than the retention window and report how many went.
+     *
+     * Bounded on both sides rather than "everything before the cutoff": a table that
+     * has never been pruned can hold years, and one unbounded delete on it is a lock
+     * held long enough to take the site down. Each pass takes a chunk and the caller
+     * keeps asking until a pass comes back short.
+     */
+    public function prune(?int $days = null, int $chunk = 1000): int
+    {
+        $days ??= $this->retentionDays();
+
+        // Zero is "keep forever", and it is the default. Pruning an audit trail is a
+        // decision somebody has to make on purpose.
+        if ($days <= 0) {
+            return 0;
+        }
+
+        $cutoff = now()->subDays($days);
+        $deleted = 0;
+
+        do {
+            $passed = ActivityLog::query()
+                ->where('created_at', '<', $cutoff)
+                ->limit($chunk)
+                ->delete();
+
+            $deleted += $passed;
+        } while ($passed >= $chunk);
+
+        return $deleted;
     }
 }

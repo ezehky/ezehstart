@@ -27,13 +27,14 @@ class SendClassReminderCommand extends Command
 }
 ```
 
-### The three existing commands
+### The commands that ship
 
 | Command | Signature | Purpose |
 | --- | --- | --- |
-| `SyncCohortStatusCommand` | `training:sync-cohort-status` | Move cohorts through their lifecycle by date |
-| `SyncClassSessionStatusCommand` | `training:sync-class-status` | Same for class sessions |
-| `SendClassReminderCommand` | `training:send-class-reminders` | 1-day / 5-hour / 1-hour class reminders |
+| `SendAccountDeletionReminderCommand` | `account:send-deletion-reminders` | Warn accounts before the deletion sweep reaches them |
+| `ProcessAccountDeletionsCommand` | `account:process-deletions` | Anonymize or remove accounts whose grace period has run out |
+| `PublishScheduledPostsCommand` | `blog:publish-scheduled` | Publish posts whose scheduled date has arrived, and tell subscribers |
+| `PruneActivityLogsCommand` | `activity:prune-logs` | Delete audit entries past the configured retention window. Does nothing until a window is set |
 
 ### Conventions
 

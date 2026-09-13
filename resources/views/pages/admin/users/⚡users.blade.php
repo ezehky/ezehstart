@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\GateAccessEnum;
 use App\Enums\StatusUser;
 use App\Models\User;
+use App\Services\ImpersonationService;
 use App\Traits\WithDataTable;
 use App\Traits\WithUserRoleManager;
 use Illuminate\Database\Eloquent\Builder;
@@ -139,6 +141,27 @@ new class extends Component
         ];
     }
 
+    /**
+     * Sign in as this member to see what they see.
+     *
+     * Full access to the members listing, which is the same bar as deleting one: the
+     * two are comparably powerful, and the button being hidden stops nobody who can
+     * open a console.
+     */
+    public function impersonate(User $user)
+    {
+        $this->checkGate(GateAccessEnum::FULL);
+
+        $service = app(ImpersonationService::class);
+
+        $reason = $service->blockedReason($user);
+        $this->respondError($reason ?? '', if: $reason !== null);
+
+        // A full redirect rather than a Livewire one: the session's identity changes
+        // here, and every gate, nav tree and shared view binding is resolved from it.
+        return redirect()->to($service->start($user));
+    }
+
     protected function afterRoleChange(): void
     {
         unset($this->users, $this->metrics);
@@ -270,6 +293,21 @@ new class extends Component
                                         wire:navigate
                                     >
                                         Video library
+                                    </x-dashboard.gate.menu-item>
+
+                                    <flux:menu.separator />
+
+                                    {{-- Signing in as somebody is the strongest thing on
+                                         this menu, so it asks for full access and the
+                                         method checks again behind it. --}}
+                                    <x-dashboard.gate.menu-item
+                                        :gate="$pageGate"
+                                        :level="$gateFull"
+                                        icon="eye"
+                                        wire:click="impersonate({{ $item->id }})"
+                                        wire:confirm="View the site as {{ $item->name }}? Everything you do will be recorded against your own account."
+                                    >
+                                        View as this member
                                     </x-dashboard.gate.menu-item>
 
                                     <flux:menu.separator />

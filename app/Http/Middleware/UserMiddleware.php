@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\UserTypeEnum;
+use App\Services\ImpersonationService;
 use App\Services\UserService;
 use Closure;
 use Illuminate\Http\Request;
@@ -17,6 +18,18 @@ class UserMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // An impersonation sitting that has run out ends here, before the request is
+        // served. This is the only middleware it passes through — while it is running
+        // the signed-in account is the member, so AdminMiddleware never sees it.
+        $impersonation = app(ImpersonationService::class);
+
+        if ($impersonation->hasExpired()) {
+            $impersonation->stop();
+
+            return redirect()->route('admin.dashboard')
+                ->with('message', 'That impersonation session timed out and you are back on your own account.');
+        }
+
         // Check the account is signed in and belongs in this workspace
         $result = app(UserService::class)->middlewareGeneralCheck(UserTypeEnum::USER);
 

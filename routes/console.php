@@ -43,3 +43,19 @@ Schedule::command('blog:publish-scheduled')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+|--------------------------------------------------------------------------
+| Audit trail retention
+|--------------------------------------------------------------------------
+|
+| Off unless somebody sets a window on the security screen, because throwing
+| away an audit trail is a decision rather than a default. Runs before the
+| account sweep so the entries the sweep writes are never the ones it prunes.
+|
+*/
+
+Schedule::command('activity:prune-logs')
+    ->dailyAt('07:45')
+    ->withoutOverlapping()
+    ->runInBackground();

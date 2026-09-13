@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Services\AccountDeletionService;
 use App\Services\AccountOtpService;
+use App\Services\ImpersonationService;
 use App\Traits\WithAccountOtp;
 use App\Traits\WithFormResponseMessage;
 use Flux\Flux;
@@ -25,6 +26,11 @@ new class extends Component
 
     public function mount(): void
     {
+        // Closed while somebody is being impersonated. Impersonation is for looking at
+        // what a member sees, and this screen changes what an account *is* — a support
+        // session must not be able to take one over.
+        abort_if(app(ImpersonationService::class)->isImpersonating(), 404);
+
         $this->user = auth()->user();
         $this->user->load('userProfile:id,user_id,settings');
 
