@@ -28,8 +28,12 @@ class ImageLibraryService
 {
     /**
      * Where uploads land on the public disk.
+     *
+     * Public because DemoSeeder clears this directory between runs, and a
+     * seeder repeating the literal is a seeder that keeps deleting the wrong
+     * folder the day this changes.
      */
-    private const STORAGE_PATH = 'library';
+    public const STORAGE_PATH = 'library';
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // LIMITS

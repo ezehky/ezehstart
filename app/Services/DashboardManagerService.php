@@ -27,6 +27,15 @@ use Illuminate\Support\Facades\Storage;
 class DashboardManagerService
 {
     /**
+     * Where the per-account files live on the default disk.
+     *
+     * Public because DemoSeeder clears this directory between runs, and a seeder
+     * repeating the literal is a seeder that keeps deleting the wrong folder the
+     * day this changes.
+     */
+    public const STORAGE_PATH = 'dashboard-manager';
+
+    /**
      * Files already read this request, keyed by account. The service is a singleton,
      * so a screen asking for three sections reads the disk once.
      *
@@ -98,7 +107,7 @@ class DashboardManagerService
     {
         $user ??= auth()->user();
 
-        return 'dashboard-manager/user-'.($user?->getKey() ?? 'guest').'.json';
+        return self::STORAGE_PATH.'/user-'.($user?->getKey() ?? 'guest').'.json';
     }
 
     /**
