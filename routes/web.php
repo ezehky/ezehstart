@@ -6,7 +6,6 @@ use App\Http\Controllers\SocialAuthController;
 use App\Models\User;
 use App\Services\AccountDeletionService;
 use App\Services\ImpersonationService;
-use App\Services\NewsletterService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -27,11 +26,9 @@ foreach (PolicyTypeEnum::cases() as $policyType) {
 // the link has to work straight from an email, for somebody who never had an
 // account and for somebody who is signed in as a different one. Unsubscribing is
 // not a change that needs proving twice, so the signature is the whole check.
-Route::get('/unsubscribe/{user:email}', function (User $user) {
-    app(NewsletterService::class)->unsubscribe($user->email);
-
-    return view('site.unsubscribed', ['email' => $user->email]);
-})->middleware('signed')->name('newsletter.unsubscribe');
+Route::livewire('/unsubscribe/{user:email}', 'pages::site.unsubscribe')
+    ->middleware('signed')
+    ->name('newsletter.unsubscribe');
 
 // Blog. Public and unauthenticated — the show page refuses anything that is not
 // live, so drafts and scheduled posts are not reachable by guessing a slug.

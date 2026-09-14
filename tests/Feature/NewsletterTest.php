@@ -3,6 +3,7 @@
 use App\Enums\NotificationTopicEnum;
 use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
+use App\Models\NotificationType;
 use App\Models\User;
 use App\Services\NewsletterService;
 use App\Services\NotificationSubscriberService;
@@ -418,4 +419,59 @@ test('a silly popup delay is refused at the screen as well as clamped in the ser
         ->set('config.preferences.newsletter.popup-delay', 9999)
         ->call('save')
         ->assertHasErrors('config.preferences.newsletter.popup-delay');
+});
+
+test('the unsubscribe link takes the newsletter off before the page paints', function () {
+    $service = app(NewsletterService::class);
+
+    newsletterConfig();
+
+    $subscriber = $service->subscribe('reader@example.test');
+
+    $this->get($service->unsubscribeUrl($subscriber))
+        ->assertOk()
+        ->assertSee('You are unsubscribed');
+
+    expect($service->isSubscribed('reader@example.test'))->toBeFalse();
+});
+
+test('the unsubscribe page offers every active type as a box to tick', function () {
+    $service = app(NewsletterService::class);
+
+    newsletterConfig();
+
+    $subscriber = $service->subscribe('reader@example.test');
+
+    // Arriving is already the unsubscribe, so the newsletter box starts clear
+    // while the types nobody asked about are left as they were.
+    $component = Livewire::test('pages::site.unsubscribe', ['user' => $subscriber]);
+
+    $preferences = $component->get('preferences');
+
+    expect($preferences)->toHaveCount(NotificationType::query()->active()->count())
+        ->and(array_filter($preferences))->not->toBeEmpty();
+
+    $component->call('unsubscribeAll')->assertHasNoErrors();
+
+    expect(array_filter($subscriber->notificationPreferences()->get()
+        ->pluck('status')->map->boolValue()->all()))->toBeEmpty();
+});
+
+test('a box ticked back on puts the newsletter back', function () {
+    $service = app(NewsletterService::class);
+
+    newsletterConfig();
+
+    $subscriber = $service->subscribe('reader@example.test');
+
+    $type = NotificationType::query()
+        ->where('notification_type', NewsletterService::TYPE->value)
+        ->first();
+
+    Livewire::test('pages::site.unsubscribe', ['user' => $subscriber])
+        ->set("preferences.{$type->id}", true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($service->isSubscribed('reader@example.test'))->toBeTrue();
 });

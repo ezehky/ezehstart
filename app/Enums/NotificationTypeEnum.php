@@ -24,4 +24,27 @@ enum NotificationTypeEnum: string
             self::SECURITY => 'Sign-in alerts and changes to your credentials.',
         };
     }
+
+    // The newsletter is a public opt-in, so it is offered to all visitors and not
+    public function forAll()
+    {
+        return \in_array(
+            $this,
+            [
+                self::EMAIL,
+                self::ANNOUNCEMENTS,
+                self::SECURITY,
+            ], true);
+    }
+
+    // The other two types are only offered to logged-in users, so they are not
+    public function forLoggedInUsers()
+    {
+        return \in_array(
+            $this,
+            [
+                self::EMAIL,
+                self::SECURITY,
+            ], true);
+    }
 }
