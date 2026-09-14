@@ -10,14 +10,12 @@ use App\Models\User;
 use App\Notifications\GeneralNotification;
 use App\Services\ImageLibraryService;
 use App\Services\SiteConfigurationService;
-use App\Traits\WithFormResponseMessage;
-use App\Traits\WithImagePicker;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Component;
 use Livewire\Livewire;
+use Tests\Fixtures\SlotHolder;
 
 beforeEach(function () {
     // The library writes to the public disk; faking it keeps the suite from
@@ -664,45 +662,6 @@ test('the page and the picker offer the same library actions', function () {
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // SLOTS
-
-/**
- * A stand-in for any screen that holds images: one slot backed by a column, one
- * that takes several and lives only in image_usages. The real screens hold one
- * or two, so this is where the combinations WithImagePicker promises are put
- * through their paces.
- */
-class SlotHolder extends Component
-{
-    use WithFormResponseMessage;
-    use WithImagePicker;
-
-    public ?int $image_id = null;
-
-    public ?int $record_id = null;
-
-    protected function imageSlots(): array
-    {
-        return [
-            'cover' => ['multiple' => false, 'property' => 'image_id'],
-            'gallery' => ['multiple' => true, 'max' => 3],
-        ];
-    }
-
-    public function loadFrom(): void
-    {
-        $this->loadImageSlots(Post::query()->findOrFail($this->record_id));
-    }
-
-    public function persist(): void
-    {
-        $this->syncImageSlots(Post::query()->findOrFail($this->record_id));
-    }
-
-    public function render()
-    {
-        return '<div></div>';
-    }
-}
 
 function slotPost(User $user): Post
 {
