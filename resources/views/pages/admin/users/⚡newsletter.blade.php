@@ -137,7 +137,7 @@ new class extends Component
     }
 
     /**
-     * @return iterable<int, \Illuminate\Database\Eloquent\Model>
+     * @return iterable<int, Model>
      */
     protected function tableRows(): iterable
     {

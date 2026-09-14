@@ -51,7 +51,7 @@ class PolicyPageController extends Controller
             url: $type->url(),
         );
 
-        return view('legal', [
+        return view('site.legal', [
             'title' => $title,
             'intro' => $policy?->intro,
             'version' => $policy?->version,

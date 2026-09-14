@@ -11,14 +11,14 @@ use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::view('/', 'site.welcome')->name('home');
 
 // Legal pages. One route per policy type, named after the case, so /terms is
 // route('terms') and adding a case to the enum publishes a page without anything
 // here needing an edit. The type is bound as a route default rather than a URL
 // segment, which keeps the URLs flat and the route names stable.
 foreach (PolicyTypeEnum::cases() as $policyType) {
-    Route::get('/'.$policyType->value, PolicyPageController::class)
+    Route::get("/{$policyType->value}", PolicyPageController::class)
         ->defaults('type', $policyType->value)
         ->name($policyType->routeName());
 }
@@ -30,13 +30,13 @@ foreach (PolicyTypeEnum::cases() as $policyType) {
 Route::get('/unsubscribe/{user:email}', function (User $user) {
     app(NewsletterService::class)->unsubscribe($user->email);
 
-    return view('unsubscribed', ['email' => $user->email]);
+    return view('site.unsubscribed', ['email' => $user->email]);
 })->middleware('signed')->name('newsletter.unsubscribe');
 
 // Blog. Public and unauthenticated — the show page refuses anything that is not
 // live, so drafts and scheduled posts are not reachable by guessing a slug.
-Route::livewire('/blog', 'pages::blog.index')->name('blog.index');
-Route::livewire('/blog/{post:slug}', 'pages::blog.show')->name('blog.show');
+Route::livewire('/blog', 'pages::site.blog.index')->name('blog.index');
+Route::livewire('/blog/{post:slug}', 'pages::site.blog.show')->name('blog.show');
 
 // Authentication Routes
 Route::middleware('guest')->group(function (): void {
