@@ -132,6 +132,20 @@ enum ActivityActionEnum: string
     case NOTIFICATION_TYPE_UPDATE = 'notification-type.update';
     case NOTIFICATION_TYPE_DELETE = 'notification-type.delete';
 
+    // Email marketing
+    case EMAIL_TEMPLATE_CREATE = 'email-template.create';
+    case EMAIL_TEMPLATE_UPDATE = 'email-template.update';
+    case EMAIL_TEMPLATE_DELETE = 'email-template.delete';
+    case EMAIL_SECTION_CREATE = 'email-section.create';
+    case EMAIL_SECTION_UPDATE = 'email-section.update';
+    case EMAIL_SECTION_DELETE = 'email-section.delete';
+    case EMAIL_CAMPAIGN_CREATE = 'email-campaign.create';
+    case EMAIL_CAMPAIGN_UPDATE = 'email-campaign.update';
+    case EMAIL_CAMPAIGN_DELETE = 'email-campaign.delete';
+    case EMAIL_CAMPAIGN_TEST_SEND = 'email-campaign.test-send';
+    case EMAIL_CAMPAIGN_SCHEDULE = 'email-campaign.schedule';
+    case EMAIL_CAMPAIGN_SEND = 'email-campaign.send';
+
     // Money. Every one of these is an administrator moving somebody else's money
     // and each needs to be individually answerable for.
     case TRANSACTION_CREATE = 'transaction.create';

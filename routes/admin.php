@@ -51,6 +51,27 @@ Route::prefix('blog')->name('blog.')->group(function () {
     Route::livewire('/posts/{post}/edit', 'pages::admin.content.post-edit')->name('edit');
 });
 
+// Email Marketing. Campaign details/builder/recipients/review is one wizard over a
+// single growing record rather than four routes — see ⚡campaign-builder.blade.php.
+Route::prefix('marketing')->name('marketing.')->group(function () {
+    Route::livewire('/campaigns', 'pages::admin.marketing.campaigns')->name('campaigns');
+    Route::livewire('/campaigns/new', 'pages::admin.marketing.campaign-builder')->name('campaigns.create');
+    Route::livewire('/campaigns/{campaign}/edit', 'pages::admin.marketing.campaign-builder')->name('campaigns.edit');
+
+    Route::livewire('/templates', 'pages::admin.marketing.templates')->name('templates');
+    Route::livewire('/templates/new', 'pages::admin.marketing.template-builder')->name('templates.create');
+    Route::livewire('/templates/{template}/edit', 'pages::admin.marketing.template-builder')->name('templates.edit');
+
+    Route::livewire('/sections', 'pages::admin.marketing.sections')->name('sections');
+    Route::livewire('/sections/new', 'pages::admin.marketing.section-editor')->name('sections.create');
+    Route::livewire('/sections/{section}/edit', 'pages::admin.marketing.section-editor')->name('sections.edit');
+
+    Route::livewire('/sent', 'pages::admin.marketing.sent')->name('sent');
+    Route::livewire('/sent/{campaign}', 'pages::admin.marketing.sent-view')->name('sent.show');
+
+    Route::livewire('/settings', 'pages::admin.marketing.settings')->name('settings');
+});
+
 // User Management Routes
 Route::livewire('/admins', 'pages::admin.users.admins')->name('admins');
 Route::livewire('/users', 'pages::admin.users.users')->name('users');

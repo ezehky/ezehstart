@@ -46,6 +46,23 @@ Schedule::command('blog:publish-scheduled')
 
 /*
 |--------------------------------------------------------------------------
+| Email campaign schedule
+|--------------------------------------------------------------------------
+|
+| Every minute for the same reason as the blog schedule — a campaign
+| scheduled for 10:00 that starts at 10:15 has missed its moment. The same
+| tick also works through every campaign already sending, in chunks, so a
+| large audience is delivered over several ticks rather than one long request.
+|
+*/
+
+Schedule::command('email:send-campaigns')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+/*
+|--------------------------------------------------------------------------
 | Audit trail retention
 |--------------------------------------------------------------------------
 |

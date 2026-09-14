@@ -42,6 +42,7 @@ return [
         'published' => 'success',
         'completed' => 'success',
         'present' => 'success',
+        'sent' => 'success',
         // DANGER
         'canceled' => 'danger',
         'cancelled' => 'danger',
@@ -59,6 +60,7 @@ return [
         'banned' => 'danger',
         'no' => 'danger',
         'absent' => 'danger',
+        'bounced' => 'danger',
         // WARNING
         'pending' => 'warning',
         'queued' => 'warning',
@@ -73,6 +75,7 @@ return [
         'late' => 'warning',
         'draft' => 'warning',
         'pending-deletion' => 'warning',
+        'sending' => 'warning',
         // PRIMARY
         'created' => 'primary',
         'archived' => 'primary',

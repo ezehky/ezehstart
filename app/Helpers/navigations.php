@@ -99,6 +99,32 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 ],
                 'icon' => 'newspaper',
             ],
+            'marketing' => [
+                'label' => 'Email Marketing',
+                'children' => [
+                    'campaigns' => [
+                        'label' => 'Campaigns',
+                        'link' => route('admin.marketing.campaigns'),
+                    ],
+                    'templates' => [
+                        'label' => 'Templates',
+                        'link' => route('admin.marketing.templates'),
+                    ],
+                    'sections' => [
+                        'label' => 'Saved sections',
+                        'link' => route('admin.marketing.sections'),
+                    ],
+                    'sent' => [
+                        'label' => 'Sent',
+                        'link' => route('admin.marketing.sent'),
+                    ],
+                    'settings' => [
+                        'label' => 'Settings',
+                        'link' => route('admin.marketing.settings'),
+                    ],
+                ],
+                'icon' => 'megaphone',
+            ],
             'transactions' => [
                 'label' => 'Transactions',
                 'link' => route('admin.transactions'),
