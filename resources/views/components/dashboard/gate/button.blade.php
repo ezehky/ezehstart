@@ -25,7 +25,7 @@
      @if ($tooltip)
         <flux:tooltip :content="$tooltip">
      @endif
-    <flux:button {{ $attributes }}>{{ $slot }}</flux:button>
+    <flux:button {{ $attributes->merge(['variant' => 'primary', 'type' => 'submit']) }}>{{ $slot }}</flux:button>
     @if ($tooltip)
         </flux:tooltip>
     @endif

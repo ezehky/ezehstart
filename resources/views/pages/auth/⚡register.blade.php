@@ -40,12 +40,8 @@ new #[Layout('layouts::auth')] class extends Component
         return $this->captchaRules([
             'name' => ['required', 'string', 'max:255'],
             'email' => [
-                'required',
-                'string',
-                'email',
-                'max:50',
-                $this->emailAvailableRule(),
                 new EmailRule,
+                $this->emailAvailableRule(),
             ],
             'password' => [
                 'required',

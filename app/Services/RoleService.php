@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ActivityActionEnum;
 use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
+use App\Enums\StatusYes;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
 use App\Models\User;
@@ -87,7 +88,7 @@ class RoleService
 
         // Re-asserted rather than only set on create: an install that lost this flag
         // — a hand-edited row, a bad import — is one delete away from being locked out.
-        $record->is_protected = true;
+        $record->is_protected = StatusYes::YES;
         $record->save();
 
         return $record;
@@ -116,7 +117,7 @@ class RoleService
                 'content.image-library' => GateAccessEnum::CREATE->value,
             ];
             $record->status = StatusDefault::ACTIVE;
-            $record->is_protected = false;
+            $record->is_protected = StatusYes::NO;
             $record->save();
         }
 
@@ -135,7 +136,7 @@ class RoleService
             'description' => $description ? trim($description) : null,
             'gates' => [],
             'status' => StatusDefault::ACTIVE,
-            'is_protected' => false,
+            'is_protected' => StatusYes::NO,
         ]);
 
         app(ActivityLogService::class)->logActivity(

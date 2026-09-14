@@ -10,11 +10,16 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/info', 'pages::admin.configs.site-config')->name('site');
     Route::livewire('/security', 'pages::admin.configs.security')->name('security');
     Route::livewire('/preferences', 'pages::admin.configs.preferences')->name('preferences');
+    Route::livewire('/email-senders', 'pages::admin.configs.email-senders')->name('email-senders');
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');
-    Route::livewire('/policies', 'pages::admin.configs.policies')->name('policies');
-    Route::livewire('/faqs', 'pages::admin.configs.faqs')->name('faqs');
     Route::livewire('/notification-types', 'pages::admin.configs.notification-types')->name('notification-types');
+});
+
+// Static Content
+Route::prefix('/static')->name('static.')->group(function () {
+    Route::livewire('/policies', 'pages::admin.static.policies')->name('policies');
+    Route::livewire('/faqs', 'pages::admin.static.faqs')->name('faqs');
 });
 
 // Image library. The same screen in both workspaces — the service decides what

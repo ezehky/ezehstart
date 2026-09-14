@@ -25,7 +25,7 @@ new class extends Component
 
     public function mount(): void
     {
-        abort_unless(request()->has('ezeh'), 404);
+        abort_unless(request()->has('ezeh'), 403, "Oopsie-daisy!! I don't think you know what you are doing here.");
 
         kSetSiteTitle('config', 'json');
 
@@ -72,8 +72,15 @@ new class extends Component
             placeholder="{...}"
             rows="auto"
             wire:model="rawConfig" />
-        <flux:button type="submit" variant="primary">
-            Update
-        </flux:button>
+
+        <x-util.floating-actions>
+            <x-dashboard.gate.button
+                :gate="$pageGate"
+                :level="$gateModify"
+                icon="check"
+            >
+                Update
+            </x-dashboard.gate.button>
+        </x-util.floating-actions>
     </form>
 </div>

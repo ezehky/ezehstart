@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
+use App\Enums\StatusYes;
 use App\Services\GateService;
 use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -36,7 +37,7 @@ class Role extends Model
     {
         return [
             'status' => StatusDefault::class,
-            'is_protected' => 'boolean',
+            'is_protected' => StatusYes::class,
             'gates' => AsArrayObject::class,
         ];
     }
@@ -102,6 +103,6 @@ class Role extends Model
     #[Scope]
     protected function isProtected(Builder $builder): void
     {
-        $builder->where('is_protected', true);
+        $builder->where('is_protected', StatusYes::YES);
     }
 }

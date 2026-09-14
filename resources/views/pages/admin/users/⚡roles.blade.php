@@ -293,7 +293,7 @@ new class extends Component
                     <flux:table.row wire:key="role-{{ $item->id }}">
                         <x-table.cell column="name">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <flux:badge size="sm" :color="$item->is_protected ? 'purple' : 'blue'">
+                                <flux:badge size="sm" :color="$item->is_protected->boolValue() ? 'purple' : 'blue'">
                                     {{ $item->name }}
                                 </flux:badge>
 
@@ -301,7 +301,7 @@ new class extends Component
                                     <flux:badge size="sm" color="amber">Off</flux:badge>
                                 @endunless
 
-                                @if ($item->is_protected)
+                                @if ($item->is_protected->boolValue())
                                     <flux:tooltip content="Cannot be deleted or switched off — it is what keeps this install administrable.">
                                         <flux:icon name="lock-closed" class="size-4 text-slate-400" />
                                     </flux:tooltip>
@@ -352,7 +352,7 @@ new class extends Component
                                     title="Edit role"
                                 />
 
-                                @unless ($item->is_protected)
+                                @unless ($item->is_protected->boolValue())
                                     <x-dashboard.gate.button
                                         gate="users.roles"
                                         level="full"
@@ -404,7 +404,7 @@ new class extends Component
                     wire:model="active"
                     label="Active role"
                     description="Switching a role off takes its access away from everybody on it, without unpicking who holds what."
-                    :disabled="$role->is_protected"
+                    :disabled="$role->is_protected->boolValue()"
                 />
             @endif
 

@@ -273,6 +273,11 @@ if (! function_exists('kGate')) {
             return false;
         }
 
+        // Pass protected role: administrators
+        if ($user->isAdministrator()) {
+            return true;
+        }
+
         $level = $level instanceof GateAccessEnum
             ? $level
             : (GateAccessEnum::tryFrom($level) ?? GateAccessEnum::VIEW);

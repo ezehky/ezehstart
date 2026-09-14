@@ -137,55 +137,55 @@ new class extends Component
 
 <form wire:submit="save" class="space-y-6">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="space-y-6">
-            <flux:card class="space-y-2">
-                <flux:heading level="2" size="lg" class="mb-4">Email Verification</flux:heading>
+        <flux:card class="space-y-2">
+            <flux:heading level="2" size="lg" class="mb-4">Email Verification</flux:heading>
+            <flux:switch
+                wire:model.live="config.email-settings.verification"
+                label="Enabled"
+                description="Turn on email verification for new users."
+            />
+
+            @if (data_get($config, 'email-settings.verification'))
                 <flux:switch
-                    wire:model.live="config.email-settings.verification"
-                    label="Enabled"
-                    description="Turn on email verification for new users."
+                    wire:model="config.email-settings.verification-strict"
+                    label="Strict email verification"
+                    description="Users cannot reach their workspace until the address is verified."
+                />
+            @endif
+        </flux:card>
+        <flux:card class="space-y-2">
+            <flux:heading level="2" size="lg" class="mb-4">Account deletion</flux:heading>
+            <flux:switch
+                wire:model.live="config.user.account-deletion"
+                label="Enabled"
+                description="Users may delete their own account."
+            />
+            @if (data_get($config, 'user.account-deletion'))
+                <x-form.number-field
+                    wire:model="config.user.account-deletion-days"
+                    label="Account deletion days"
+                    placeholder="e.g. 30"
+                    min="1"
+                    max="365"
                 />
 
-                @if (data_get($config, 'email-settings.verification'))
-                    <flux:switch
-                        wire:model="config.email-settings.verification-strict"
-                        label="Strict email verification"
-                        description="Users cannot reach their workspace until the address is verified."
-                    />
-                @endif
-            </flux:card>
-            <flux:card class="space-y-2">
-                <flux:heading level="2" size="lg" class="mb-4">Account deletion</flux:heading>
                 <flux:switch
-                    wire:model.live="config.user.account-deletion"
-                    label="Enabled"
-                    description="Users may delete their own account."
+                    wire:model="config.user.anonymous-after-deletion"
+                    label="Anonymize instead of deleting"
+                    description="Keep the account row with its personal details stripped, so history that points at it stays readable. Off removes the account and everything it owns, including its library files."
                 />
-                @if (data_get($config, 'user.account-deletion'))
-                    <x-form.number-field
-                        wire:model="config.user.account-deletion-days"
-                        label="Account deletion days"
-                        placeholder="e.g. 30"
-                        min="1"
-                        max="365"
-                    />
-
-                    <flux:switch
-                        wire:model="config.user.anonymous-after-deletion"
-                        label="Anonymize instead of deleting"
-                        description="Keep the account row with its personal details stripped, so history that points at it stays readable. Off removes the account and everything it owns, including its library files."
-                    />
-                @endif
-            </flux:card>
-            <flux:card class="space-y-2">
-                <flux:heading level="2" size="lg" class="mb-4">Account data</flux:heading>
-                <flux:switch
-                    wire:model="config.user.allow-data-download"
-                    label="Allow data download"
-                    description="Users may download a copy of what is held about them — profile, consents, transactions and library index, as one JSON file. Security material is never included. Turning this off closes the route as well as hiding the tab."
-                />
-            </flux:card>
-        </div>
+            @endif
+        </flux:card>
+        <flux:card class="space-y-2">
+            <flux:heading level="2" size="lg" class="mb-4">Account data</flux:heading>
+            <flux:switch
+                wire:model="config.user.allow-data-download"
+                label="Allow data download"
+                description="Users may download a copy of what is held about them — profile, consents, transactions and library index, as one JSON file. Security material is never included. Turning this off closes the route as well as hiding the tab."
+            />
+        </flux:card>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
             <flux:card class="space-y-3">
                 <div class="mb-4">
@@ -374,15 +374,9 @@ new class extends Component
         </div>
     </div>
 
-    <div class="flex justify-end">
-        <x-dashboard.gate.button
-            :gate="$pageGate"
-            :level="$gateModify"
-            type="submit"
-            variant="primary"
-            icon="check"
-        >
+    <x-util.floating-actions position="end">
+        <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" icon="check">
             Save changes
         </x-dashboard.gate.button>
-    </div>
+    </x-util.floating-actions>
 </form>

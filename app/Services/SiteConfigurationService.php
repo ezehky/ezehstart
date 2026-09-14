@@ -143,9 +143,9 @@ class SiteConfigurationService
                 ->mapWithKeys(fn (EmailSenderEnum $sender) => [
                     $sender->value => [
                         'from' => $sender->isCustom() ?
-                            kStripDomainProtocols(character: '') :
+                            config('app.url') :
                             kStripDomainProtocols(prefix: $sender->value),
-                        'from-name' => config('app.name'),
+                        'from-name' => null,
                         'reply-to' => null,
                         'reply-to-name' => null,
                     ],

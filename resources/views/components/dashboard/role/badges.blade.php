@@ -21,7 +21,7 @@
             @if (! $role->grantsAccess())
                 <flux:badge size="sm" color="amber">{{ $role->name }} (off)</flux:badge>
             @else
-                <flux:badge size="sm" :color="$role->is_protected ? 'purple' : 'blue'">
+                <flux:badge size="sm" :color="$role->is_protected->boolValue() ? 'purple' : 'blue'">
                     {{ $role->name }}
                 </flux:badge>
             @endif

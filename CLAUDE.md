@@ -103,7 +103,7 @@ Change it before the kit becomes a real project.
 ## Things that will bite you
 
 - `EmailRule` does a live DNS MX lookup. It is off under test; pass
-  `new EmailRule(verifyMailServer: true)` to exercise it.
+  `new EmailRule(required: true, max: 190, verifyMailServer: true)` to exercise it.
 - The site configuration is a JSON file on the local disk, not a table — `RefreshDatabase`
   does not reset it. `tests/Pest.php` fakes the disk for every feature test.
 - `kSiteConfig()` is never empty once the app has booted: the cache layer injects

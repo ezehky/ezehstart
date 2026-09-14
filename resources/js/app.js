@@ -36,13 +36,6 @@ Alpine.data("chart", chart);
 Alpine.data("countdownTimer", countdownTimer);
 
 /**
- * The docking action bar behind <x-util.floating-actions>. Registered once here so
- * a Livewire re-render rebinds the observers to the element still on screen rather
- * than leaving the old pair watching a node that has been patched away.
- */
-Alpine.data("floatingActions", floatingActions);
-
-/**
  * The calendar behind <x-form.date-field>. Registered once here so a Livewire
  * re-render reopens the month the field is already showing rather than booting a
  * second calendar onto the same input.

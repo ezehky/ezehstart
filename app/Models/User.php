@@ -79,6 +79,12 @@ class User extends Authenticatable
         return $this->user_type === $type;
     }
 
+    public function isAdministrator(): bool
+    {
+        return $this->user_type->carriesRole() &&
+            $this->roles()->isProtected()->exists();
+    }
+
     /**
      * This administrator's own gate override as a plain array, for merging and
      * counting.

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\StatusDefault;
+use App\Enums\StatusYes;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -36,7 +37,7 @@ return new class extends Migration
             // A protected role cannot be renamed away, deleted, or deactivated. The
             // install ships exactly one so there is always somewhere for the last
             // full-access administrator to stand.
-            $table->boolean('is_protected')->default(false);
+            $table->boolean('is_protected')->default(StatusYes::NO);
 
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

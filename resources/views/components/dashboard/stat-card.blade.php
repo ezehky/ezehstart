@@ -86,8 +86,8 @@
 
     @if ($hasTrend)
         {{-- Bled to the card's edges: the shape is the point, and a sparkline inset
-             from the text above it reads as a second, smaller chart. --}}
-        <x-chart :value="$trend" gutter="0 0 1 0" class="-mx-6 -mb-6 mt-4 h-14">
+             from the text above it reads as a second, smaller chart. -mb-6 --}}
+        <x-chart :value="$trend" gutter="0 0 1 0" class="-mx-6 mt-4 h-14">
             <x-chart.svg>
                 <x-chart.area :field="$trendField" :opacity="0.12" class="{{ $trendClasses }}" />
                 <x-chart.line :field="$trendField" :width="2" class="{{ $trendClasses }}" />

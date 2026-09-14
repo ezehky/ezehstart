@@ -41,8 +41,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('config', 'faqs');
-        $this->setPageGate('config.faqs');
+        kSetSiteTitle('static', 'faqs');
+        $this->setPageGate('static.faqs');
     }
 
     /**

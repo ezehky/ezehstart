@@ -27,6 +27,8 @@ class EmailRule implements ValidationRule
     ];
 
     /**
+     * @param  bool  $required  default true
+     * @param  int  $max  Maximum length
      * @param  bool|null  $verifyMailServer  Whether to ask DNS if the domain actually
      *                                       accepts mail. It is a network call inside
      *                                       validation, so it is off under test — where
@@ -34,8 +36,11 @@ class EmailRule implements ValidationRule
      *                                       suite would need a working resolver to pass.
      *                                       Pass true to exercise it deliberately.
      */
-    public function __construct(private readonly ?bool $verifyMailServer = null)
-    {
+    public function __construct(
+        private readonly bool $required = true,
+        private readonly int $max = 190, //
+        private readonly ?bool $verifyMailServer = null
+    ) {
         $this->loadDisposableList();
     }
 
@@ -60,8 +65,22 @@ class EmailRule implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
+        // Check if the field is required and the value is null
+        if ($this->required && $value === null) {
+            $fail('The :attribute field is required.');
+
+            return;
+        }
+
+        // Check if the value exceeds the maximum length
+        if ($value !== null && \strlen($value) > $this->max) {
+            $fail("The :attribute should not be greater than {$this->max} characters.");
+
+            return;
+        }
+
         // Basic syntax check
-        if (! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        if ($value !== null && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
             $fail('The :attribute must be a valid email address.');
         }
 
@@ -74,7 +93,7 @@ class EmailRule implements ValidationRule
         }
 
         // Check DNS MX record (mail server exists)
-        if ($this->shouldVerifyMailServer() && ! checkdnsrr($domain, 'MX')) {
+        if (app()->isProduction() && $this->shouldVerifyMailServer() && ! checkdnsrr($domain, 'MX')) {
             $fail('The email does not appear to accept emails.');
         }
     }

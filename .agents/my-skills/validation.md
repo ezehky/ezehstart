@@ -39,7 +39,7 @@ Rule::unique(Faq::class, 'question')->ignore($this->faq?->id)
 Rule::unique(Cohort::class, 'name')->where('training_id', $this->cohort->training_id)->ignore($this->cohort->id)
 new ImageRule(required: false, size: 1024)
 new MoneyRule(user: $user, min: 1000, max: 100000, percentFee: 2)
-new EmailRule
+new EmailRule(required: true, max: 190, verifyMailServer: true)
 ```
 
 ### Uniqueness
@@ -78,7 +78,7 @@ the call site.
 **`EmailRule`** — syntax + disposable-domain + MX check. No constructor arguments.
 
 ```php
-'email' => ['required', new EmailRule],
+'email' => ['required', new EmailRule(required: true, max: 190, verifyMailServer: true)],
 ```
 
 **`ImageRule`** — required flag, KB size cap, extra mime types.

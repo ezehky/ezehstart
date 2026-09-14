@@ -106,12 +106,8 @@ new #[Layout('layouts::auth')] class extends Component
         $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => [
-                'required',
-                'string',
-                'email',
-                'max:50',
-                $this->emailAvailableRule(),
                 new EmailRule,
+                $this->emailAvailableRule(),
             ],
             'agreed_to_terms' => ['accepted'],
         ]);

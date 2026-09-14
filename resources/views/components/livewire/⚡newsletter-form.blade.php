@@ -29,7 +29,7 @@ new class extends Component
     protected function rules(): array
     {
         return $this->captchaRules([
-            'email' => ['required', 'email', 'max:190', new EmailRule],
+            'email' => new EmailRule,
         ]);
     }
 

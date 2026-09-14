@@ -40,6 +40,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Preferences',
                         'link' => route('admin.config.preferences'),
                     ],
+                    'email-senders' => [
+                        'label' => 'Email Senders',
+                        'link' => route('admin.config.email-senders'),
+                    ],
                     'social-handles' => [
                         'label' => 'Social handles',
                         'link' => route('admin.config.social-handles'),
@@ -48,20 +52,26 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'JSON Editor',
                         'link' => route('admin.config.json'),
                     ],
-                    'policies' => [
-                        'label' => 'Policies',
-                        'link' => route('admin.config.policies'),
-                    ],
-                    'faqs' => [
-                        'label' => 'FAQs',
-                        'link' => route('admin.config.faqs'),
-                    ],
                     'notification-types' => [
                         'label' => 'Notification types',
                         'link' => route('admin.config.notification-types'),
                     ],
                 ],
                 'icon' => 'cog-6-tooth',
+            ],
+            'statics' => [
+                'label' => 'Statics',
+                'children' => [
+                    'faqs' => [
+                        'label' => 'FAQs',
+                        'link' => route('admin.static.faqs'),
+                    ],
+                    'policies' => [
+                        'label' => 'Policies',
+                        'link' => route('admin.static.policies'),
+                    ],
+                ],
+                'icon' => 'document-text',
             ],
             'content' => [
                 'label' => 'Content',

@@ -230,7 +230,7 @@ test('the access modal moves an account between workspaces', function () {
 test('the protected role is created with every gate', function () {
     $role = app(RoleService::class)->protectedRole();
 
-    expect($role->is_protected)->toBeTrue()
+    expect($role->is_protected->boolValue())->toBeTrue()
         ->and($role->slug)->toBe(RoleService::PROTECTED_SLUG)
         ->and($role->gatesArray())->toBe(app(GateService::class)->fullAccessMap());
 });
@@ -330,7 +330,7 @@ test('the author role ships able to write posts and nothing else', function () {
     $author = userOfType(UserTypeEnum::ADMIN, ['email' => 'author@example.test'], $role);
 
     expect($role->slug)->toBe(RoleService::AUTHOR_SLUG)
-        ->and($role->is_protected)->toBeFalse()
+        ->and($role->is_protected->boolValue())->toBeFalse()
         ->and(kGate('content.blogs', GateAccessEnum::CREATE, $author))->toBeTrue()
         ->and(kGate('content.blogs', GateAccessEnum::FULL, $author))->toBeFalse()
         ->and(kGate('users', user: $author))->toBeFalse();
