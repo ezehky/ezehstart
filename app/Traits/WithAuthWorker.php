@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Enums\ActivityActionEnum;
 use App\Enums\SocialProviderEnum;
+use App\Enums\StatusUser;
 use App\Mail\LoginEmail;
 use App\Models\Policy;
 use App\Models\User;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Livewire\Attributes\Computed;
 
 trait WithAuthWorker
@@ -82,11 +85,31 @@ trait WithAuthWorker
     }
 
     /**
+     * The email rule every sign-up form uses.
+     *
+     * A plain unique() would refuse an address that is on the newsletter list,
+     * because that address already has a users row — see
+     * StatusUser::NEWSLETTER_SUBSCRIBER. Those rows are not accounts and must not
+     * stand in the way of somebody opening one; createUser() claims the row
+     * instead of writing a second.
+     */
+    protected function emailAvailableRule(): Unique
+    {
+        return Rule::unique('users', 'email')
+            ->where(fn ($query) => $query->where('status', '!=', StatusUser::NEWSLETTER_SUBSCRIBER->value));
+    }
+
+    /**
      * Register an account and everything that has to exist alongside it.
      *
      * The user, their profile and their consent records are written together, so a
      * failure halfway through cannot leave an account that exists without the record
      * of what it agreed to. Mail is sent after the commit, never inside it.
+     *
+     * An address already on the newsletter list is claimed rather than duplicated:
+     * the row keeps its id and its notification preferences, so somebody who signed
+     * up for the newsletter in March and registered in June is one row that is still
+     * subscribed, not two rows the unique index would have refused anyway.
      *
      * Self-registration only ever makes a member. users carry no role — the type
      * column defaults to UserTypeEnum::USER and there is nothing else to assign.
@@ -103,14 +126,31 @@ trait WithAuthWorker
 
         try {
             $user = DB::transaction(function () use ($data, $profileData, $userService, $consentPolicies) {
-                // Create the user
-                $user = User::query()->create([
-                    ...$data,
-                    'ip_address' => request()->ip(),
-                ]);
+                // Create the user, or take over the newsletter row that already
+                // holds this address. Status is set explicitly on the claim: the
+                // column default only applies to an insert, and the row being
+                // claimed is carrying NEWSLETTER_SUBSCRIBER.
+                $claimable = User::query()
+                    ->where('email', $data['email'] ?? '')
+                    ->where('status', StatusUser::NEWSLETTER_SUBSCRIBER)
+                    ->first();
 
-                // Create the user profile if provided
-                $user->userProfile()->create([...$profileData, 'settings' => $userService->profileDefaultSettings()]);
+                $user = $claimable ?: new User;
+
+                $user->fill([
+                    ...$data,
+                    'status' => StatusUser::ACTIVE,
+                    'ip_address' => request()->ip(),
+                ])->save();
+
+                // Create the user profile if provided. updateOrCreate rather than
+                // create because a claimed row is not guaranteed to be profileless
+                // forever — the relation is one-to-one, and a second row here would
+                // be a duplicate nothing else in the app expects.
+                $user->userProfile()->updateOrCreate(
+                    [],
+                    [...$profileData, 'settings' => $userService->profileDefaultSettings()],
+                );
 
                 // The account and its consent records are written together. An
                 // account that exists without the record of what it agreed to is

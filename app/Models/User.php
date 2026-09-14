@@ -287,7 +287,31 @@ class User extends Authenticatable
     #[Scope]
     protected function users(Builder $builder): void
     {
-        $builder->where('user_type', UserTypeEnum::USER);
+        $builder->where('user_type', UserTypeEnum::USER)->registered();
+    }
+
+    /**
+     * Rows that are accounts, as opposed to addresses the site is holding.
+     *
+     * A newsletter sign-up is a users row with no password and no verified
+     * address — see StatusUser::NEWSLETTER_SUBSCRIBER for why it lives here. It
+     * carries the member type like any other member, so every listing, metric and
+     * trend that means "our members" has to say so, or the numbers become a count
+     * of the mailing list instead.
+     */
+    #[Scope]
+    protected function registered(Builder $builder): void
+    {
+        $builder->where('status', '!=', StatusUser::NEWSLETTER_SUBSCRIBER);
+    }
+
+    /**
+     * The mailing list, for the admin screens that report on it.
+     */
+    #[Scope]
+    protected function newsletterSubscribers(Builder $builder): void
+    {
+        $builder->where('status', StatusUser::NEWSLETTER_SUBSCRIBER);
     }
 
     /**

@@ -44,12 +44,18 @@ class NotificationSubscriberService
      * Suspended and deleted accounts are left out: a notification is a message to
      * somebody who can act on it, and neither of those can sign in to do so.
      *
+     * Newsletter subscribers are in, and are the reason this takes a list rather
+     * than one status. An address that asked for the newsletter without opening an
+     * account is a recipient — it is the only kind of recipient a newsletter has
+     * before anybody registers — and leaving it out here would mean the send had
+     * to read a second list of its own.
+     *
      * @return Builder<User>
      */
     public function subscriberQuery(NotificationTypeEnum $type): Builder
     {
         return User::query()
-            ->where('status', StatusUser::ACTIVE)
+            ->whereIn('status', [StatusUser::ACTIVE, StatusUser::NEWSLETTER_SUBSCRIBER])
             ->whereHas(
                 'notificationPreferences',
                 fn (Builder $preference) => $preference
@@ -102,7 +108,8 @@ class NotificationSubscriberService
         $reached = 0;
 
         $this->subscriberQuery($type)
-            ->select(['id', 'name', 'email'])
+            // status comes along because deliver() decides the bell on it.
+            ->select(['id', 'name', 'email', 'status'])
             ->chunkById(self::CHUNK, function (Collection $recipients) use ($topic, $message, $data, $mailFor, $inApp, &$reached) {
                 foreach ($recipients as $recipient) {
                     if ($this->deliver($recipient, $topic, $message, $data, $mailFor, $inApp)) {
@@ -171,6 +178,13 @@ class NotificationSubscriberService
         bool $inApp,
     ): bool {
         $delivered = false;
+
+        // A newsletter subscriber has no workspace to open, so the bell entry would
+        // be a row nobody can ever read. Email is the only channel that reaches
+        // them, and the caller does not have to know which kind of recipient it got.
+        if ($inApp && ! $recipient->status->isRegistered()) {
+            $inApp = false;
+        }
 
         if ($inApp) {
             try {

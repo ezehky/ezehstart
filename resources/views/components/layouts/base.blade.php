@@ -66,6 +66,12 @@
     >
         {{ $slot }}
 
+        {{-- The cookie notice sits in the base shell rather than the public one:
+             the session cookie it is about is set by signing in, so a notice that
+             only appeared on the marketing pages would be describing the one part
+             of the site that does not set it. --}}
+        <x-site.cookie-banner />
+
         {{-- TOAST --}}
         @persist('toast')
             <flux:toast.group expanded>

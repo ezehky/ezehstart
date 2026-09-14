@@ -4,7 +4,6 @@ use App\Rules\EmailRule;
 use App\Traits\WithAuthWorker;
 use App\Traits\WithCaptcha;
 use App\Traits\WithPasswordTools;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -45,7 +44,7 @@ new #[Layout('layouts::auth')] class extends Component
                 'string',
                 'email',
                 'max:50',
-                Rule::unique('users', 'email'),
+                $this->emailAvailableRule(),
                 new EmailRule,
             ],
             'password' => [

@@ -59,6 +59,16 @@ new #[Layout('layouts::auth')] class extends Component
         // If the user does not exist, respond with an error message
         $this->respondError('invalid credentials', ! $this->user, field: 'email');
 
+        // An address on the newsletter list passes the exists check but has no
+        // account and no password to reset. Letting the flow run would set a
+        // password on a row that cannot sign in — and hand a reset code to an
+        // address that never asked for one.
+        $this->respondError(
+            'That address is on our newsletter list but does not have an account yet. Please register to create one.',
+            $this->user->status->isNewsletterSubscriber(),
+            field: 'email'
+        );
+
         // Send the OTP to the user's email
         $this->sendOtp();
 

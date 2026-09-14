@@ -4,6 +4,8 @@
 @php($policies = App\Enums\PolicyTypeEnum::cases())
 
 <footer class="mx-auto w-full max-w-6xl px-6 py-8">
+    <x-site.newsletter />
+
     <flux:separator variant="subtle" />
 
     <div class="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -23,3 +25,10 @@
         </nav>
     </div>
 </footer>
+
+{{-- Rendered from here for the same reason the legal links are built from the enum:
+     the footer is the one block every public shell includes, so a popup placed here
+     reaches the home page, the blog and the legal pages without three edits — and
+     stays out of the two signed-in workspaces, which do not render a footer. It is
+     fixed to the viewport, so sitting at the end of the document costs it nothing. --}}
+<x-site.newsletter-popup />

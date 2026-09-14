@@ -7,7 +7,7 @@
 
      Off unless the site turns it on: some installs want the drawer and nothing
      else, and a workspace with both is a workspace with two answers to the same
-     question. See user => mobile-floating-menu. --}}
+     question. See preferences => mobile-floating-menu. --}}
 @props(['navigationLinks'])
 
 @php

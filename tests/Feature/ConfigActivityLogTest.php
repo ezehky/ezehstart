@@ -79,7 +79,7 @@ test('each configuration screen names itself in the entry', function () {
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.configs.preferences')
-        ->set('config.user.mobile-floating-menu', true)
+        ->set('config.preferences.mobile-floating-menu', true)
         ->call('save')
         ->assertHasNoErrors();
 

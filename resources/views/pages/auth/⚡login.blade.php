@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\StatusUser;
 use App\Models\User;
 use App\Services\CaptchaService;
 use App\Traits\WithAuthWorker;
@@ -66,15 +67,27 @@ new #[Layout('layouts::auth')] class extends Component
 
             $this->reset('password');
 
+            // An address on the newsletter list has a users row but no account, so
+            // no password will ever match it. Saying "wrong credentials" would send
+            // somebody looking for a password they never set — the answer is to
+            // register, which claims that row rather than colliding with it.
+            $subscriberOnly = User::query()
+                ->whereEmail($this->email)
+                ->where('status', StatusUser::NEWSLETTER_SUBSCRIBER)
+                ->exists();
+
             // Accounts created passwordlessly or through a social provider hold no
             // password at all, so point them at the flow that does work for them
             // rather than at a credential mismatch they cannot resolve.
-            $hasNoPassword = User::query()->whereEmail($this->email)->whereNull('password')->exists();
+            $hasNoPassword = ! $subscriberOnly
+                && User::query()->whereEmail($this->email)->whereNull('password')->exists();
 
             $this->respondError(
-                $hasNoPassword
-                    ? 'This account has no password yet. Sign in with an email code, or reset your password to set one.'
-                    : 'The provided credentials do not match our records.',
+                match (true) {
+                    $subscriberOnly => 'That address is on our newsletter list but does not have an account yet. Please register to create one.',
+                    $hasNoPassword => 'This account has no password yet. Sign in with an email code, or reset your password to set one.',
+                    default => 'The provided credentials do not match our records.',
+                },
                 true,
                 field: 'email'
             );

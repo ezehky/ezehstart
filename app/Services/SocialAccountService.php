@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ActivityActionEnum;
 use App\Enums\SocialProviderEnum;
 use App\Enums\StatusDefault;
+use App\Enums\StatusUser;
 use App\Models\User;
 use App\Models\UserConnectedAccount;
 use Illuminate\Container\Attributes\Singleton;
@@ -100,6 +101,18 @@ class SocialAccountService
         $user = User::query()->where('email', $email)->first();
 
         if ($user) {
+            // An address that was only on the newsletter list becomes a real
+            // account here: the provider has just proved the visitor owns it, which
+            // is the same proof registration asks for. The row is claimed rather
+            // than duplicated, so the subscription comes with it.
+            if ($user->status->isNewsletterSubscriber()) {
+                $user->forceFill([
+                    'status' => StatusUser::ACTIVE,
+                    'name' => $socialiteUser->getName() ?: $user->name,
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ])->save();
+            }
+
             $this->link($user, $provider, $socialiteUser);
 
             return ['user' => $user, 'error' => null, 'created' => false];

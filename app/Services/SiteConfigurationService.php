@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EmailSenderEnum;
 use App\Enums\SocialProviderEnum;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Arr;
@@ -48,11 +49,6 @@ class SiteConfigurationService
                 // stripped; off removes the account and everything it owns. An
                 // account with no history is removed outright either way.
                 'anonymous-after-deletion' => true,
-
-                // A bottom bar on phones in the member workspace, instead of
-                // reaching for the drawer. Off by default: an install that wants
-                // only the drawer should not have to turn a second navigation off.
-                'mobile-floating-menu' => false,
 
                 // Whether an account holder may download a copy of what is held
                 // about them. On by default, because the deletion right ships on
@@ -127,6 +123,34 @@ class SiteConfigurationService
                     'in-app' => true,
                 ],
             ],
+
+            'preferences' => [
+                'accept-cookies' => true,
+                'newsletter' => [
+                    'status' => true,
+                    'popup' => true,
+                    'popup-delay' => 5, // seconds
+                    'footer' => true,
+                ],
+
+                // A bottom bar on phones in the member workspace, instead of
+                // reaching for the drawer. Off by default: an install that wants
+                // only the drawer should not have to turn a second navigation off.
+                'mobile-floating-menu' => false,
+            ],
+
+            'email-senders' => collect(EmailSenderEnum::cases())
+                ->mapWithKeys(fn (EmailSenderEnum $sender) => [
+                    $sender->value => [
+                        'from' => $sender->isCustom() ?
+                            kStripDomainProtocols(character: '') :
+                            kStripDomainProtocols(prefix: $sender->value),
+                        'from-name' => config('app.name'),
+                        'reply-to' => null,
+                        'reply-to-name' => null,
+                    ],
+                ])
+                ->toArray(),
         ];
     }
 

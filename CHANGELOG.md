@@ -9,7 +9,48 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+Larger than a minor, and it renames things that already shipped — `users.type`,
+`UserRoleEnum`, the `user_roles` table, `admin.members`. By the rule at the top of this
+file that makes the next release a major. See **Upgrading**.
+
 ### Added
+
+#### Newsletter and the cookie notice
+
+The two switches under `preferences` that had nowhere to be turned on and nothing
+reading them. Both now have an admin card on **Site configuration → Preferences** and
+a consumer on the public pages.
+
+- **A newsletter sign-up with no subscribers table.** An address is a `users` row —
+  the account if one exists, and a new `StatusUser::NEWSLETTER_SUBSCRIBER` row if not —
+  and the subscription itself is the `ANNOUNCEMENTS` switch in
+  `notification_preferences` that every account already carries. One address is one
+  row, and a send reads the list every other announcement reads rather than a second
+  one that would have to be kept in step with it.
+- **Registering later claims the row.** `WithAuthWorker::createUser()` takes over a
+  newsletter row for the same address instead of colliding with the unique index, so
+  somebody who signed up in March and registered in June keeps their id and their
+  subscription. `emailAvailableRule()` is what stops `unique:users,email` refusing them
+  in the first place, and the password, passwordless and social flows all go through it.
+- **A subscriber row is not an account.** No password, no verified address, and the
+  sign-in flows say so rather than reporting a credential mismatch for a password that
+  was never set. `User::registered()` keeps them out of the members listing, its
+  metrics, the admin dashboard counts and the sign-up trends;
+  `StatusUser::forSelect()` keeps the status off the dropdowns, because it is what a
+  row *is* until somebody registers rather than something an administrator assigns.
+- **Two placements, two switches.** `preferences.newsletter.footer` puts a block above
+  the legal links on every public page; `preferences.newsletter.popup` puts a corner
+  card up after `popup-delay` seconds. A corner card rather than a modal: a modal that
+  appears on a timer has to take focus from somebody mid-sentence to stay usable from a
+  keyboard. Dismissal is per-browser, in `localStorage`.
+- **`preferences.accept-cookies`** renders a notice in the base shell — every page,
+  not just the public ones, because the session cookie it describes is set by signing
+  in. It is a notice, not a consent gate: this kit sets session and CSRF cookies and
+  nothing else. An install that adds analytics needs a real choice and should turn this
+  off and put one in its place.
+- **`NewsletterService`** is `#[Singleton]` and owns every read of the four nested
+  switches. They sit a level deeper than `kSiteFlag()` reaches, and reading one with
+  `kSiteConfig()` would hand back the default the moment somebody turned it off.
 
 #### Video library
 
@@ -39,13 +80,265 @@ visibility rules, same usage-backed delete guard — a screen that already knows
   costs no disk — but a library nobody can find anything in is not a library.
 - The tiptap editor gained a video button, and `/video-library` is in both workspaces.
 
+#### Data tables
+
+Every listing in the kit was building the same six things by hand. **`WithDataTable`**
+owns them once: row selection, a bulk bar, a column manager, sorting, a date range, and
+taking the whole listing away as a file. All of it is optional — a page gets checkboxes
+only where it renders them, and bulk delete only where `tableDeletable()` says so.
+
+- **`columnMaker()`, `filterMaker()` and `metricMaker()`** replace the loose arrays
+  these used to be. A key spelled wrong in an array is silently ignored; a named
+  argument is a fatal error, and a tone outside the palette says so rather than
+  rendering grey.
+- **`<x-table.*>`** — `columns`, `rows`, `cell`, `select`, `bulk-bar`,
+  `active-filters`, `column-manager`, `export-modal`, `summary` and `empty`. A listing
+  is assembled from these rather than from a table written out again per screen.
+- **Exports in three formats** through **`ExportService`** — CSV and XLSX via
+  `SpreadsheetService`, PDF through a print view, because a PDF is a document rather
+  than a sheet and wants a heading and a date on it. What can leave is what the account
+  can already see: the gate and the column list decide the file.
+- **Imports** through **`WithFileImport`**, which is the same file work in reverse. A
+  bad row does not stop the run — half a file rejected because line 40 has a typo is an
+  import nobody finishes — so each row is tried on its own and the failures come back
+  named for the screen to show.
+- **`WithStatusToggle`** flips a row between active and inactive from the listing,
+  through `<x-util.e-badge>`. Same gate, same activity log, same toast as the edit form
+  it saves somebody opening.
+
+#### Account deletion, end to end
+
+Deletion was a button. It is now a window, with a way back out of it.
+
+- **The grace period.** Asking to be deleted moves the account to `PENDING_DELETION`
+  and stamps `deletion_scheduled_at`. Nothing is destroyed until that date passes, and
+  cancelling puts everything back — which is the entire point of the delay.
+  `config.user.account-deletion-days` sets the window, clamped to 1–365 in code so a
+  hand-edited JSON file cannot schedule a deletion for the next tick.
+- **`account:process-deletions`**, nightly, does the work at the end of the window:
+  anonymize where there is history worth keeping, remove outright where there is not.
+- **`account:send-deletion-reminders`** warns at five days and one day
+  (`DeletionReminderEnum`), recording each send in **`user_deletion_reminders`** so a
+  retried schedule cannot mail the same warning twice.
+- **A signed restore link in the email.** `/account/restore/{user}` — somebody who
+  changed their mind should not have to sign in to an account that is on its way out.
+- **Deleted accounts** (`admin.deleted-accounts`), where anonymized rows surface at
+  all. They are soft-deleted, so every other listing's default scope hides them:
+  `AccountDeletionService::trashedQuery()` is the only way to reach one, and this screen
+  is where it is restored or purged for good.
+- Three mails — scheduled, reminder, cancelled — and `--dry-run` on both commands.
+
+#### A copy of what is held about you
+
+**`AccountDataExportService`** and `/app/account/download-data`, behind
+`config.user.allow-data-download`. The companion to deletion: a kit that ships "delete
+what you hold about me" without "show me what you hold about me" is half of the
+obligation.
+
+One JSON document rather than a spreadsheet, because an account is a profile plus a
+ledger plus a consent history plus two library indexes — several shapes at once, which
+is what a nested document is for and what a CSV cannot be. The password hash and its
+history, the two-factor secret, the recovery codes and the admin gate map are
+deliberately **left out**: they are *about* the account without belonging to the
+person, and including them only widens the blast radius of one leaked export.
+
+#### Impersonation
+
+**`ImpersonationService`** — an administrator signs in as a member to see what they
+see, because "the button does not work" is unanswerable from the outside. It is also
+the most dangerous thing an admin can do, so every part of it is built assuming it will
+one day be abused or forgotten about:
+
+- **Never admin to admin.** Becoming a peer is privilege escalation with a support
+  story attached, and the audit trail would name the wrong person for everything that
+  followed.
+- **The real identity lives in the session**, never in a signed URL or a query
+  parameter. A token in a link is a token that gets copied, logged and replayed.
+- **Both ends are logged as the administrator** — before the swap and after it — so the
+  trail reads "X started acting as Y" rather than going quiet.
+- **It expires after an hour.** While it runs the session passes `UserMiddleware` and
+  never `AdminMiddleware`, which is why the expiry is checked there.
+- **Account-altering screens are closed**, each with an `abort_if` in `mount()` rather
+  than a hidden button. Impersonation is for looking.
+
+#### Authors
+
+A seeded **Author** role (`RoleService::authorRole()`), matched by slug rather than by
+gate: plenty of roles reach the blog, but only this one says the person *is* an author,
+which is what decides whose byline carries a bio and which posts they are held to. The
+role can be renamed, re-gated or deleted freely; the slug is what the blog is written
+against. Bio and social handles live on `user_profiles`, and `<x-site.author-card>`
+renders the byline on the public post page.
+
+#### Scheduled posts and announcements
+
+- **`blog:publish-scheduled`**, every minute — a post scheduled for 09:00 that appears
+  at 09:15 has missed the thing it was scheduled for. Each post is claimed before it is
+  published, so two overlapping runs cannot announce it twice.
+- **`NotificationSubscriberService`** fans an announcement out to everybody subscribed
+  to a notification type, in chunks. It deliberately knows nothing about posts: a
+  release note, a price change and a maintenance window all want the same machinery,
+  and each should be a caller rather than a copy. Subscription is the
+  `notification_preferences` row an account already owns, so there is no second list to
+  keep in step with the settings screen.
+- `NewPostEmail` and its template.
+
+#### Captcha on the guest forms
+
+**`CaptchaService`**, **`CaptchaRule`**, **`WithCaptcha`** and `<x-form.captcha>`,
+backed by Cloudflare Turnstile. Deliberately a per-form check rather than a challenge
+in front of the whole site: a site-wide challenge is a setting on a Cloudflare-proxied
+domain rather than something an administrator switches on from this dashboard, and the
+middleware version of it would sit in front of every Livewire round trip, the social
+callback and every gateway webhook. The form is what is being abused, so the form is
+where the token is checked.
+
+The widget and the rule are added together by `captchaRules()`, never separately — a
+page that renders the widget without the rule is decorated rather than protected, and
+one that adds the rule without the widget cannot be submitted. Off until switched on,
+and off regardless while the Turnstile keys are missing, because a switch turned on
+against empty credentials would make every guest form on the install unsubmittable.
+
+#### Guards on every emailed code
+
+**`WithOtpGuard`** gives all four code flows the same two bounds: five wrong guesses
+destroy the outstanding code, and another cannot be asked for inside 60 seconds. A
+six-digit code is a million guesses wide, so an expiry is not on its own a bound —
+given an unlimited guess rate the whole space fits inside the window. Destroying the
+code is what closes that, and the resend floor is what stops the destruction being
+undone by simply asking for another.
+
+**`PasswordResetOtpService`** moves the forgotten-password code into Laravel's own
+`password_reset_tokens` table, so the broker's `expire` setting stays the one place the
+lifetime is configured and a pending reset survives a cache flush. Only the hash is
+stored. **`WithAccountOtp`** puts the resend floor in one place rather than at the five
+call sites that were each remembering it.
+
+#### Activity log retention
+
+`activity:prune-logs`, nightly, and `config.security.activity-log-retention-days`.
+**Off by default at 0**: throwing away an audit trail is a decision somebody makes, not
+something an install should start doing quietly. Anything above 0 is floored at 30
+days, and `--days` prunes once without changing the setting that would then prune every
+night.
+
+#### Trends and metrics
+
+- **`TrendService`** and `TrendPeriodEnum` — the series behind every sparkline. A total
+  says where something stands; the line says whether it got there steadily or in one
+  week. Bucketing a date column the way the driver spells it, reading the window in one
+  grouped query and padding the buckets nothing landed in is the same six steps every
+  time, and an unpadded gap draws a line climbing through months that never happened.
+- **`WithMetrics`** and a reworked `<x-dashboard.stat-card>` — one tile, named
+  arguments, a tone from the palette, an optional trend.
+
+#### Per-account dashboard arrangements
+
+**`DashboardManagerService`** — what one account has arranged for itself, as a JSON file
+per account on the same disk the site configuration uses. These are preferences:
+nothing joins on them, nothing reports on them, and a column somebody hid is not worth a
+migration, an index and a row per account per screen. The column manager saves as each
+switch is thrown, and what it stores is the list of columns put *away* — so a column
+added to a screen next month appears for everybody rather than staying hidden from the
+people who use that screen most.
+
+#### Site configuration, split up
+
+One long form became four screens under `/app-splash/site-config`: **Info**,
+**Security**, **Preferences**, and a raw **JSON editor** for the key no screen has grown
+a field for yet. **`WithSiteConfigProcessor`** carries the save and the audit entry, and
+its `configSubject()` is abstract rather than defaulted — these switches close sign-in
+routes and set the password policy, so a new configuration screen has to say what it is
+answerable for instead of logging as "something".
+
+New keys: `security.captcha`, `security.activity-log-retention-days`,
+`user.account-deletion-days`, `user.anonymous-after-deletion`,
+`user.allow-data-download`, `uploads.user-video-limit`,
+`preferences.mobile-floating-menu`, `preferences.accept-cookies`,
+`preferences.newsletter.*`.
+
+#### Components
+
+- **`<x-form.date-field>`** — a date field with a calendar, for the Flux tier that has
+  none. Single or range, and the value is a plain `YYYY-MM-DD` string, which is what
+  makes a date filter read like every other filter in the project. The binding runs both
+  ways, so a property cleared on the server empties the box rather than leaving a range
+  printed in a field the listing below has stopped honouring.
+- **`<x-util.e-badge>`** — an enum as a badge, or as a switch where the page can flip
+  it. The switch appears only for a two-case enum that answers a boolean question, and
+  an account below the level sees the badge instead.
+- **`<x-util.countdown>`** — the shared timer behind the resend floor, the impersonation
+  expiry and the deletion window.
+- **`<x-util.floating-actions>`** — a long form's action bar, pinned while its resting
+  place is off screen and dropped back into the page the moment you scroll to it. The
+  space it leaves is held open, so nothing jumps.
+- **`<x-dashboard.page-header>`** and **`<x-dashboard.breadcrumb>`** — the block every
+  dashboard screen opens with. Passing nothing is the normal case: `kSetSiteTitle()` has
+  already named the page, and this is what finally renders it.
+- **`<x-dashboard.gate.button>`**, **`<x-dashboard.gate.menu-item>`** and
+  **`WithGateProps`** — `setPageGate()` names the gate a screen sits behind and closes
+  the screen to an account that does not hold it. Hiding the sidebar entry was always a
+  courtesy; a page whose key is only remembered for its buttons is still reachable by
+  anyone who types the URL.
+- **`<x-dashboard.mobile-menu>`** and a floating bottom bar for the member workspace,
+  behind `config.preferences.mobile-floating-menu` and off by default — an install that wants
+  only the drawer should not have to turn a second navigation off.
+- **`<x-site.author-card>`**, **`<x-dashboard.role.badges>`**,
+  **`<x-transaction.amount>`**, **`<x-auth.passwordless>`**,
+  **`<x-auth.social-providers>`**.
+- **Recovery codes download** as a text file from the two-factor screen, and
+  **`UploadModifiedEmail`** tells a member when somebody at the site changed something
+  in their library — their uploads are private to them, so a change they did not make is
+  something they should hear about rather than discover.
+
+#### Demo seeders
+
+`DemoSeeder`, and the `DemoUserSeeder`, `DemoContentSeeder` and `DemoTransactionSeeder`
+under it — everything a developer wants on screen and nothing an install needs, so
+deliberately absent from `DatabaseSeeder`:
+
+```bash
+php artisan db:seed --class=DemoSeeder
+```
+
+A fresh install gets roles, countries, notification types and one administrator. It does
+not get twenty invented people, a ledger full of invented money, or placeholder legal
+copy nobody wrote. Every seeder under it matches on a natural key, so a second run
+refreshes rather than doubles, and the uploaded images and saved dashboard arrangements
+are cleared first.
+
 ### Changed
 
-- **`ImageVisibilityEnum` is now `MediaVisibilityEnum`.** Both libraries answer "who
-  may see this" identically, and two copies would drift the first time either gained a
-  case. Stored values are untouched — `private`, `role`, `public` — so this is a rename
-  in code only, with no migration. `description()` takes the noun to use, because
-  "Only you and administrators can see this image" is wrong on a video screen.
+- **An admin now carries any number of roles.** `user_roles` — a pivot with a status
+  column — is replaced by **`role_user`**, a plain made-or-unmade pivot, unique on the
+  pair. The maps merge with the **highest access winning each key**, so a second role
+  only ever widens what somebody reaches, which is what makes "Media as well as Support"
+  something an administrator can express without inventing a third role that is the sum
+  of the two. The personal override sits on top of the merged result and is the only
+  thing that can narrow it. `UserRoleService` and the `UserRole` model are gone;
+  **`RoleService`** replaces both, and every guard on it answers in a sentence rather
+  than a boolean so the screen can say *why*.
+- **`UserRoleEnum` is now `UserTypeEnum`, and `users.type` is now `users.user_type`.**
+  Type is the workspace an account signs in to and is fixed in code; a role is a row an
+  administrator creates. One name for both was where the confusion came from — and
+  `type` was a reserved word in the column besides.
+- **`ImageVisibilityEnum` is now `MediaVisibilityEnum`.** Both libraries answer "who may
+  see this" identically, and two copies would drift the first time either gained a case.
+  Stored values are untouched — `private`, `role`, `public` — so this is a rename in code
+  only, with no migration. `description()` takes the noun to use, because "Only you and
+  administrators can see this image" is wrong on a video screen.
+- **`<x-status>` is now `<x-util.e-badge>`**, and it can be a switch as well as a badge.
+- **Admin routes regrouped.** `admin.members` → `admin.users`, `admin.site-config` →
+  `admin.config.site`, and the rest of the configuration screens moved under the
+  `admin.config.` prefix. `admin.deleted-accounts` is new, as are the per-member library
+  routes `admin.user-image-library` and `admin.user-video-library` — a member's uploads
+  are private and deliberately absent from the admin library and picker, so those routes
+  are the only way in, reached from the account page and never by browsing.
+- **`<x-dashboard.gates-modal>` → `<x-dashboard.gate.modal>`** and
+  **`<x-dashboard.user-roles-modal>` → `<x-dashboard.role.modal>`**.
+- **The admins listing absorbed the unassigned-accounts screen** as a "No live role"
+  filter. A separate page for one filtered view of a list that now has filters was a
+  second screen to keep in step for no gain.
 
 ### Fixed
 
@@ -68,6 +361,68 @@ visibility rules, same usage-backed delete guard — a screen that already knows
   documented `rich-text:flush` event had no dispatcher anywhere. The editor now pushes
   on every change; the entanglement is deferred and the wrapper is `wire:ignore`, so
   that costs no request per keystroke.
+- **Sign-in sent some accounts to the wrong workspace.** The redirect still read the
+  old `type` reference after the rename, so the fallback ran instead of the match.
+  Remember that `UserTypeEnum::dashboardRoute()` returns a URL, not a route name — pass
+  it to `redirect()->to()`.
+
+### Removed
+
+- **`UserRole`, `UserRoleService` and the `user_roles` table** — see Changed.
+- **The unassigned-accounts screen**, now a filter on the admins listing.
+- **`<x-dashboard.user-role>`** and **`<x-status>`**.
+
+### Dependencies
+
+Added `spatie/laravel-pdf` with `dompdf/dompdf` for PDF exports, and
+`openspout/openspout` for CSV and XLSX in both directions — openspout streams a workbook
+a row at a time rather than loading it into memory, which is what keeps an import of any
+size flat on memory.
+
+dompdf ships with the kit and needs nothing installed. The other laravel-pdf drivers —
+browsershot, gotenberg, chrome, weasyprint — each need their own package and binaries;
+`LARAVEL_PDF_DRIVER` picks between them.
+
+### Upgrading
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+**This is the release that renames things.** `users.type` → `users.user_type`,
+`user_roles` → `role_user`, `UserRoleEnum` → `UserTypeEnum`, `admin.members` →
+`admin.users`, `admin.site-config` → `admin.config.site`, `ImageVisibilityEnum` →
+`MediaVisibilityEnum`, `<x-status>` → `<x-util.e-badge>`. A project already built on
+1.2.0 has to sweep for each of those; a project starting here has nothing to do.
+
+Role assignments do not carry across: `user_roles` held a status column and `role_user`
+does not, because an inactive assignment and no assignment grant exactly the same access
+and only one of the two can be reasoned about. Re-assign from **Admins → Manage roles**,
+where an account can now hold several.
+
+Two new environment keys, both optional:
+
+```env
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+LARAVEL_PDF_DRIVER=dompdf
+```
+
+The captcha switch does nothing until both Turnstile keys are present — deliberately,
+because a switch turned on against empty credentials renders a widget that can never
+issue a token, and every guest form on the install becomes unsubmittable.
+
+Four scheduled commands are new, and they need a scheduler actually running:
+`account:send-deletion-reminders` and `account:process-deletions` nightly,
+`blog:publish-scheduled` every minute, and `activity:prune-logs` nightly — the last of
+which does nothing until somebody sets a retention window. Each takes `--dry-run`.
+
+Defaults worth knowing before an install goes live: account deletion is **on**,
+anonymize-after-deletion is **on**, the data download is **on**, the captcha is **off**,
+the mobile floating menu is **off**, and activity-log retention is **off** — keep
+everything.
+
+Suite at this point: 742 tests, 1848 assertions, all passing.
 
 ## [1.2.0] - 2026-09-09
 

@@ -135,7 +135,7 @@ test('the floating menu is off until the site turns it on', function () {
 });
 
 test('the floating menu appears in the member workspace once it is on', function () {
-    app(SiteConfigurationService::class)->update(['user' => ['mobile-floating-menu' => true]]);
+    app(SiteConfigurationService::class)->update(['preferences' => ['mobile-floating-menu' => true]]);
 
     $this->actingAs($this->member)
         ->get(route('user.dashboard'))
@@ -145,7 +145,7 @@ test('the floating menu appears in the member workspace once it is on', function
 });
 
 test('the admin workspace keeps its drawer regardless', function () {
-    app(SiteConfigurationService::class)->update(['user' => ['mobile-floating-menu' => true]]);
+    app(SiteConfigurationService::class)->update(['preferences' => ['mobile-floating-menu' => true]]);
 
     $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
 
@@ -164,11 +164,11 @@ test('an administrator can open the preferences screen and set the menu', functi
 
     Livewire::actingAs($admin)
         ->test('pages::admin.configs.preferences')
-        ->set('config.user.mobile-floating-menu', true)
+        ->set('config.preferences.mobile-floating-menu', true)
         ->call('save')
         ->assertHasNoErrors();
 
-    expect(kSiteFlag('user', 'mobile-floating-menu'))->toBeTrue();
+    expect(kSiteFlag('preferences', 'mobile-floating-menu'))->toBeTrue();
 });
 
 test('the security screen no longer carries the workspace preference', function () {

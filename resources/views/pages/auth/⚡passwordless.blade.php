@@ -7,7 +7,6 @@ use App\Traits\WithAuthWorker;
 use App\Traits\WithCaptcha;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -71,7 +70,12 @@ new #[Layout('layouts::auth')] class extends Component
 
         // Unknown address: the account details have to be collected before a code is
         // issued, so acceptance of the policies is on record before anything exists.
-        if (! $user) {
+        //
+        // An address that is only on the newsletter list counts as unknown here. The
+        // row exists, but there is no account behind it and nothing was ever agreed
+        // to — so this goes through registration, and createUser() claims that row
+        // rather than writing a second one for the same address.
+        if (! $user || $user->status->isNewsletterSubscriber()) {
             $this->isNewAccount = true;
 
             $this->moveTo(
@@ -106,7 +110,7 @@ new #[Layout('layouts::auth')] class extends Component
                 'string',
                 'email',
                 'max:50',
-                Rule::unique('users', 'email'),
+                $this->emailAvailableRule(),
                 new EmailRule,
             ],
             'agreed_to_terms' => ['accepted'],

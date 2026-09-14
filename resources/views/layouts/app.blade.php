@@ -84,7 +84,7 @@
             {{-- The phone navigation, members only and off unless the site turns it
                  on. The admin workspace keeps the drawer: its tree is deeper than a
                  five-slot bar can honestly represent. --}}
-            @if ($currentType->isUser() && kSiteFlag('user', 'mobile-floating-menu', false))
+            @if ($currentType->isUser() && kSiteFlag('preferences', 'mobile-floating-menu', false))
                 <x-dashboard.mobile-menu :$navigationLinks />
             @endif
         </div>

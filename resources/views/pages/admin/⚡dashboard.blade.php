@@ -29,11 +29,14 @@ new class extends Component
     #[Computed]
     public function metrics(): array
     {
-        $accountsCount = User::query()->count();
+        // registered() throughout: a newsletter address is a users row with no
+        // account behind it, and counting one as an account would make every
+        // number here a count of the mailing list instead.
+        $accountsCount = User::query()->registered()->count();
         $adminsCount = User::query()->admins()->count();
         $membersCount = User::query()->users()->count();
         $suspendedCount = User::query()->where('status', StatusUser::SUSPENDED)->count();
-        $unverifiedCount = User::query()->whereNull('email_verified_at')->count();
+        $unverifiedCount = User::query()->registered()->whereNull('email_verified_at')->count();
         $strandedCount = User::query()->withoutLiveRole()->count();
 
         $trends = $this->signupTrends;
@@ -98,7 +101,9 @@ new class extends Component
     public function signupTrends(): array
     {
         return app(TrendService::class)->trends(
-            User::query(),
+            // Sign-ups, not sign-ups plus newsletter addresses — the same
+            // exclusion the counts above make.
+            User::query()->registered(),
             splitBy: ['user_type'],
             series: [
                 'all' => [],
