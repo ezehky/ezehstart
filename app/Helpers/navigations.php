@@ -123,6 +123,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Activity logs',
                         'link' => route('admin.activity-logs'),
                     ],
+                    'newsletter' => [
+                        'label' => 'Newsletter',
+                        'link' => route('admin.newsletter'),
+                    ],
                     'deleted-accounts' => [
                         'label' => 'Deleted accounts',
                         'link' => route('admin.deleted-accounts'),

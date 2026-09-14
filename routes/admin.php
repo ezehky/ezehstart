@@ -57,6 +57,10 @@ Route::livewire('/users', 'pages::admin.users.users')->name('users');
 Route::livewire('/roles', 'pages::admin.users.roles')->name('roles');
 Route::livewire('/activity-logs', 'pages::admin.users.activity-logs')->name('activity-logs');
 
+// Who gets the newsletter. Accounts and address-only rows in one listing, because
+// the send does not tell them apart — see NewsletterService.
+Route::livewire('/newsletter', 'pages::admin.users.newsletter')->name('newsletter');
+
 // Accounts that reached the end of their deletion window and were anonymized rather
 // than removed. Soft-deleted rows, so every other screen's default scope hides them —
 // this is the only way to see or finish removing one.

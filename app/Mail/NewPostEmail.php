@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\Post;
 use App\Models\User;
+use App\Services\NewsletterService;
 use App\Traits\WithEmailResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,6 +42,10 @@ class NewPostEmail extends Mailable implements ShouldQueue
             view: 'emails.blog.new-post',
             with: [
                 'url' => route('blog.show', $this->post->slug),
+
+                // This is a subscription, so the layout's unsubscribe line is asked
+                // for. A transactional mail passes nothing and gets no link.
+                'unsubscribeUrl' => app(NewsletterService::class)->unsubscribeUrl($this->user),
             ],
         );
     }

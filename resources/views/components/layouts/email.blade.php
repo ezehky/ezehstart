@@ -2,6 +2,14 @@
     'title' => '',
     'preheader' => '',
     'emailConfig' => [],
+
+    // A signed unsubscribe link, from NewsletterService::unsubscribeUrl().
+    //
+    // Opt-in per mailable rather than always on: most of what this layout carries
+    // is transactional — a sign-in code, a security alert, a receipt — and offering
+    // to unsubscribe from those is offering something the site will not honour.
+    // Only mail somebody subscribed to should pass it.
+    'unsubscribeUrl' => null,
 ])
 
 @php
@@ -73,6 +81,13 @@
                                     {{ $supportEmail }}
                                 </a>.
                             </p>
+                            @if ($unsubscribeUrl)
+                                <p class="email-footer-text">
+                                    Not interested any more?
+                                    <a href="{{ $unsubscribeUrl }}" class="email-footer-link">Unsubscribe</a>.
+                                    Account and security emails are not affected.
+                                </p>
+                            @endif
                             <p class="email-footer-copy">&copy; {{ date('Y') }} {{ $siteName }}. All rights reserved.</p>
                         </td>
                     </tr>

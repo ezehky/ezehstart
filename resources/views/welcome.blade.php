@@ -50,6 +50,8 @@
             </div>
         </main>
 
+        <x-site.latest-posts />
+
         <x-site.faq :faqs="$faqs" />
 
         <x-site.footer />

@@ -45,7 +45,7 @@ trait WithEmailResolver
      */
     protected Address $emailFrom;
 
-    protected string $queueName = 'default';
+    protected ?string $queueName = null;
 
     protected array $replyToArray = [];
 
@@ -58,7 +58,7 @@ trait WithEmailResolver
      * @param  array|null  $extraReplyTo  Optional extra reply-to addresses. [email => name, email, ...]
      */
     protected function setEmailFrom(
-        EmailSenderEnum $sender = EmailSenderEnum::Default,
+        EmailSenderEnum $sender = EmailSenderEnum::DEFAULT,
         ?string $username = null, // Username for custom sender, e.g., "ezehstart"
         ?string $fromName = null,
         ?array $extraReplyTo = null //

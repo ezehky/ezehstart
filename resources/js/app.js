@@ -5,7 +5,6 @@ import {
 import richText from "./rich-text";
 import chart from "./chart";
 import countdownTimer from "./countdown-timer";
-import floatingActions from "./floating-actions";
 import datePicker from "./date-picker";
 import turnstileWidget from "./turnstile";
 // ||||||||||||||||||||||||||

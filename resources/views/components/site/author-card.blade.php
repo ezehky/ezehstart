@@ -12,7 +12,7 @@
 @php($profile = $user?->userProfile)
 @php($links = $profile?->socialLinks() ?? [])
 
-@if ($user && ($profile?->bio || $links))
+@if ($user && ($profile?->bio || $profile?->work || $links))
     <section class="mt-12 rounded-xl border border-slate-200 p-6 dark:border-slate-800">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
             <img
@@ -26,6 +26,9 @@
                 <div>
                     <p class="text-xs uppercase tracking-wide text-slate-400">Written by</p>
                     <flux:heading level="2" size="lg">{{ $user->name }}</flux:heading>
+                    @if ($profile?->work)
+                        <flux:text class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $profile->work }}</flux:text>
+                    @endif
                 </div>
 
                 @if ($profile?->bio)

@@ -92,11 +92,12 @@ class UserService
      *
      * @param  array<string, string|null>  $socials  Keyed by SocialHandleEnum value.
      */
-    public function updateAuthorProfile(User $user, ?string $bio, array $socials): bool
+    public function updateAuthorProfile(User $user, ?string $bio, array $socials, ?string $work = null): bool
     {
         $profile = UserProfile::query()->firstOrNew(['user_id' => $user->id]);
 
         $profile->bio = filled($bio) ? trim($bio) : null;
+        $profile->work = filled($work) ? trim($work) : null;
         $profile->socials = collect($socials)
             ->only(collect(SocialHandleEnum::profiles())->map(fn (SocialHandleEnum $case) => $case->value)->all())
             ->map(fn ($handle) => trim((string) $handle))

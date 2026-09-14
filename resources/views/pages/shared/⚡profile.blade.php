@@ -25,6 +25,11 @@ new class extends Component
     public ?string $bio = null;
 
     /**
+     * The line under the byline — a job title, not a second bio.
+     */
+    public ?string $work = null;
+
+    /**
      * Handles keyed by SocialHandleEnum value, stored exactly as typed — "@someone",
      * "someone" or a full URL all work, and the address is rebuilt on render.
      *
@@ -87,11 +92,12 @@ new class extends Component
 
         $this->validate([
             'bio' => ['nullable', 'string', 'max:1000'],
+            'work' => ['nullable', 'string', 'max:255'],
             'socials' => ['array'],
             'socials.*' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $changed = app(UserService::class)->updateAuthorProfile($this->user, $this->bio, $this->socials);
+        $changed = app(UserService::class)->updateAuthorProfile($this->user, $this->bio, $this->socials, $this->work);
 
         $this->respondPrimary(if: ! $changed);
 
@@ -111,6 +117,7 @@ new class extends Component
         $stored = $profile?->socialsArray() ?? [];
 
         $this->bio = $profile?->bio;
+        $this->work = $profile?->work;
 
         foreach (SocialHandleEnum::profiles() as $platform) {
             $this->socials[$platform->value] = (string) ($stored[$platform->value] ?? '');
@@ -255,6 +262,13 @@ new class extends Component
             </div>
 
             <form wire:submit="saveAuthorProfile" class="space-y-6">
+                <flux:input
+                    wire:model="work"
+                    label="Role"
+                    placeholder="e.g. Staff writer"
+                    description="Sits beside your name on the author card."
+                />
+
                 <flux:textarea
                     wire:model="bio"
                     label="Bio"

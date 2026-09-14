@@ -9,6 +9,7 @@ use App\Models\NotificationType;
 use App\Models\User;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -155,6 +156,18 @@ class NewsletterService
     public function subscriberCount(): int
     {
         return app(NotificationSubscriberService::class)->subscriberCount(self::TYPE);
+    }
+
+    /**
+     * A one-click unsubscribe link for this recipient.
+     *
+     * Signed rather than guessable, and deliberately without an expiry: the link
+     * lives in an email somebody may open a year later, and an unsubscribe that has
+     * timed out is an unsubscribe that does not work.
+     */
+    public function unsubscribeUrl(User $user): string
+    {
+        return URL::signedRoute('newsletter.unsubscribe', $user);
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

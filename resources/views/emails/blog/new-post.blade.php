@@ -1,5 +1,6 @@
 <x-layouts.email
     :$emailConfig
+    :unsubscribe-url="$unsubscribeUrl"
     title="{{ $post->title }}"
     preheader="{{ \Illuminate\Support\Str::limit(strip_tags((string) $post->excerpt), 120) }}"
 >
@@ -31,7 +32,7 @@
     </table>
 
     <p class="para-flush text-soft">
-        You are getting this because you are subscribed to announcements. You can turn them off
-        from your account settings at any time.
+        You are getting this because you are subscribed to announcements — from your account
+        settings, or from the sign-up form on the site.
     </p>
 </x-layouts.email>
