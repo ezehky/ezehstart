@@ -2,6 +2,7 @@
 
 use App\Enums\EmailBlockTypeEnum;
 use App\Enums\EmailRecipientTypeEnum;
+use App\Enums\EmailRecurrenceEnum;
 use App\Enums\EmailSectionTypeEnum;
 use App\Enums\NotificationTypeEnum;
 use App\Enums\StatusEmailCampaign;
@@ -12,6 +13,7 @@ use App\Models\EmailCampaign;
 use App\Models\EmailSection;
 use App\Models\EmailTemplate;
 use App\Services\EmailCampaignService;
+use App\Services\EmailRenderService;
 use App\Services\EmailSectionService;
 use App\Services\EmailTemplateService;
 use App\Services\SiteConfigurationService;
@@ -410,4 +412,211 @@ test('sending a large audience is refused without the extra confirmation checked
     $component->instance()->confirm_large_send = false;
 
     expect(app(EmailCampaignService::class)->estimateRecipients($campaign))->toBe(0);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SAVED SECTIONS IN A RENDER
+
+test('a saved section block renders the section body, not just its name', function () {
+    $section = EmailSection::create([
+        'name' => 'Promo',
+        'email_section_type' => EmailSectionTypeEnum::CUSTOM,
+        'content' => ['blocks' => [
+            ['id' => 's1', 'type' => 'paragraph', 'data' => ['text' => 'Sale ends Friday.']],
+        ]],
+    ]);
+
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'section', 'data' => ['email_section_id' => $section->id]],
+    ]]]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('Sale ends Friday.');
+});
+
+test('the footer section is rendered under the body', function () {
+    $footer = EmailSection::create([
+        'name' => 'Default Footer',
+        'email_section_type' => EmailSectionTypeEnum::FOOTER,
+        'content' => ['blocks' => [
+            ['id' => 'f1', 'type' => 'paragraph', 'data' => ['text' => 'Unsubscribe any time.']],
+        ]],
+    ]);
+
+    $campaign = marketingCampaign(['footer_section_id' => $footer->id]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('Unsubscribe any time.')
+        ->and(strpos($html, 'Hello'))->toBeLessThan(strpos($html, 'Unsubscribe any time.'));
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// ADDRESS ENTRY
+
+test('one paste of a mixed list becomes one address per chip', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => marketingCampaign()])
+        ->set('step', 'recipients')
+        ->set('email_recipient_type', 'specific')
+        ->set('recipient_email_input', "one@example.test, two@example.test; three@example.test\nfour@example.test five@example.test")
+        ->call('addRecipientEmail')
+        ->assertSet('recipient_emails', [
+            'one@example.test',
+            'two@example.test',
+            'three@example.test',
+            'four@example.test',
+            'five@example.test',
+        ])
+        ->assertSet('recipient_email_input', '');
+});
+
+test('a duplicate address is not added twice', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => marketingCampaign()])
+        ->set('step', 'recipients')
+        ->set('recipient_email_input', 'one@example.test one@example.test')
+        ->call('addRecipientEmail')
+        ->assertSet('recipient_emails', ['one@example.test']);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// BLOCK EDITING
+
+test('reordering by drag moves the block to the dropped position', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'a', 'type' => 'heading', 'data' => ['text' => 'First']],
+        ['id' => 'b', 'type' => 'paragraph', 'data' => ['text' => 'Second']],
+        ['id' => 'c', 'type' => 'paragraph', 'data' => ['text' => 'Third']],
+    ]]]);
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('reorderBlocks', 'c', 0);
+
+    expect(collect($component->get('blocks'))->pluck('id')->all())->toBe(['c', 'a', 'b']);
+});
+
+test('removing a block image leaves the rest of its settings alone', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'a', 'type' => 'image', 'data' => ['image_id' => 7, 'alt' => 'A picture', 'link_url' => 'https://example.test']],
+    ]]]);
+
+    $blocks = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('removeBlockImage', 0)
+        ->get('blocks');
+
+    expect($blocks[0]['data']['image_id'])->toBeNull()
+        ->and($blocks[0]['data']['alt'])->toBe('A picture')
+        ->and($blocks[0]['data']['link_url'])->toBe('https://example.test');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SENDER
+
+test('the from-email select offers the mailer address even with nothing configured', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $options = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => marketingCampaign()])
+        ->instance()
+        ->senderOptions;
+
+    expect($options)->toHaveKey(config('mail.from.address'));
+});
+
+test('a sender address that is not an address at all is refused', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => marketingCampaign()])
+        ->set('step', 'review')
+        ->set('from_name', 'Sender')
+        ->set('from_email', 'not an address')
+        ->call('saveSenderDetails')
+        ->assertHasErrors();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// RECURRENCE
+
+test('a finished campaign that does not repeat spawns nothing', function () {
+    $campaign = marketingCampaign(['status' => StatusEmailCampaign::SENT, 'sent_at' => now()]);
+
+    expect(app(EmailCampaignService::class)->spawnNextOccurrence($campaign))->toBeNull();
+});
+
+test('a weekly campaign spawns the next occurrence a week on', function () {
+    $campaign = marketingCampaign([
+        'status' => StatusEmailCampaign::SENT,
+        'email_recurrence' => EmailRecurrenceEnum::WEEKLY,
+        'scheduled_at' => now()->addHour(),
+        'sent_at' => now(),
+    ]);
+
+    $next = app(EmailCampaignService::class)->spawnNextOccurrence($campaign);
+
+    expect($next)->not->toBeNull()
+        ->and($next->status)->toBe(StatusEmailCampaign::SCHEDULED)
+        ->and($next->scheduled_at->toDateString())->toBe($campaign->scheduled_at->copy()->addWeek()->toDateString())
+        ->and($next->content)->toBe($campaign->content)
+        ->and($next->recurs_from_id)->toBe($campaign->id)
+        ->and($next->sent_at)->toBeNull();
+});
+
+test('a repeat stops once its end date has passed', function () {
+    $campaign = marketingCampaign([
+        'status' => StatusEmailCampaign::SENT,
+        'email_recurrence' => EmailRecurrenceEnum::WEEKLY,
+        'scheduled_at' => now(),
+        'recurrence_ends_at' => now()->addDays(3),
+        'sent_at' => now(),
+    ]);
+
+    expect(app(EmailCampaignService::class)->spawnNextOccurrence($campaign))->toBeNull();
+});
+
+test('every occurrence of a series points back at the first send', function () {
+    $first = marketingCampaign([
+        'status' => StatusEmailCampaign::SENT,
+        'email_recurrence' => EmailRecurrenceEnum::DAILY,
+        'scheduled_at' => now(),
+        'sent_at' => now(),
+    ]);
+
+    $second = app(EmailCampaignService::class)->spawnNextOccurrence($first);
+    $second->update(['status' => StatusEmailCampaign::SENT, 'sent_at' => now()]);
+
+    $third = app(EmailCampaignService::class)->spawnNextOccurrence($second->fresh());
+
+    expect($second->recurs_from_id)->toBe($first->id)
+        ->and($third->recurs_from_id)->toBe($first->id);
+});
+
+test('finishing a recurring send leaves the sent campaign alone and schedules a copy', function () {
+    userOfType(UserTypeEnum::USER);
+
+    $campaign = marketingCampaign([
+        'email_recurrence' => EmailRecurrenceEnum::DAILY,
+        'scheduled_at' => now(),
+    ]);
+
+    $service = app(EmailCampaignService::class);
+    $service->startSending($campaign);
+    $service->processDueBatch();
+
+    expect($campaign->fresh()->status)->toBe(StatusEmailCampaign::SENT)
+        ->and(EmailCampaign::query()->where('recurs_from_id', $campaign->id)->count())->toBe(1);
+
+    Mail::assertQueued(CampaignEmail::class, 1);
 });

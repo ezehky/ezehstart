@@ -5,6 +5,7 @@ use App\Enums\NotificationTypeEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusPost;
 use App\Enums\StatusUser;
+use App\Enums\StatusYes;
 use App\Enums\UserTypeEnum;
 use App\Mail\NewPostEmail;
 use App\Models\NotificationType;
@@ -43,6 +44,10 @@ function subscribedMember(array $attributes = []): User
     return $member;
 }
 
+/**
+ * Announcing is opt-in, so every post here asks for it — a post that does not is
+ * the subject of its own test rather than the default the rest are written against.
+ */
 function scheduledPost(string $when = '+1 hour', array $attributes = []): Post
 {
     return Post::query()->create([
@@ -53,6 +58,7 @@ function scheduledPost(string $when = '+1 hour', array $attributes = []): Post
         'content' => '<p>The body.</p>',
         'status' => StatusPost::SCHEDULED,
         'published_at' => now()->modify($when),
+        'send_email' => StatusYes::YES,
         ...$attributes,
     ]);
 }
@@ -205,6 +211,36 @@ test('a post is never announced twice', function () {
     $this->artisan('blog:publish-scheduled')->assertSuccessful();
 
     expect(app(BlogService::class)->announce($post->fresh()))->toBeNull();
+
+    Mail::assertQueued(NewPostEmail::class, 1);
+});
+
+test('a post published without the email tick tells nobody', function () {
+    subscribedMember();
+    $post = scheduledPost('-1 minute', ['send_email' => StatusYes::NO]);
+
+    $this->artisan('blog:publish-scheduled')->assertSuccessful();
+
+    $fresh = $post->fresh();
+
+    // Published, and deliberately quiet: the stamp is only written by a send.
+    expect($fresh->status)->toBe(StatusPost::PUBLISHED)
+        ->and($fresh->announced_at)->toBeNull();
+
+    Mail::assertNothingQueued();
+});
+
+test('ticking the email box later still sends, once', function () {
+    subscribedMember();
+    $post = scheduledPost('-1 minute', ['send_email' => StatusYes::NO]);
+
+    $this->artisan('blog:publish-scheduled')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+
+    $post->refresh()->forceFill(['send_email' => StatusYes::YES])->save();
+
+    expect(app(BlogService::class)->announce($post))->toBe(1);
 
     Mail::assertQueued(NewPostEmail::class, 1);
 });

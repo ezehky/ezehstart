@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EmailRecipientTypeEnum;
+use App\Enums\EmailRecurrenceEnum;
 use App\Enums\StatusEmailCampaign;
 use App\Enums\StatusEmailCampaignRecipient;
 use App\Traits\WithDynamicModelFormatting;
@@ -30,8 +31,10 @@ class EmailCampaign extends Model
             'design' => 'array',
             'recipient_config' => 'array',
             'email_recipient_type' => EmailRecipientTypeEnum::class,
+            'email_recurrence' => EmailRecurrenceEnum::class,
             'status' => StatusEmailCampaign::class,
             'scheduled_at' => 'datetime',
+            'recurrence_ends_at' => 'datetime',
             'sent_at' => 'datetime',
         ];
     }
@@ -77,6 +80,19 @@ class EmailCampaign extends Model
     public function recipients(): HasMany
     {
         return $this->hasMany(EmailCampaignRecipient::class);
+    }
+
+    /**
+     * The occurrence this one was copied from, and the ones copied from it.
+     */
+    public function recursFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'recurs_from_id');
+    }
+
+    public function occurrences(): HasMany
+    {
+        return $this->hasMany(self::class, 'recurs_from_id');
     }
 
     // Scopes

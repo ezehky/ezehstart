@@ -12,8 +12,9 @@ use Livewire\Attributes\On;
  * each carrying its own copy.
  *
  * A block is `['id' => uuid, 'type' => EmailBlockTypeEnum::value, 'data' => [...]]`.
- * Reordering is move-up/move-down rather than drag-and-drop — see the plan this
- * feature shipped from — so every method here works off a plain array index.
+ * Reordering is either drag-and-drop (`wire:sort` calls reorderBlocks() with the
+ * dragged block's id and its new position) or the move-up/move-down buttons, which
+ * stay for keyboard and touch. Everything else here works off a plain array index.
  *
  *     public array $blocks = [];
  *     public ?string $selectedBlockId = null;
@@ -110,6 +111,32 @@ trait WithBlockEditor
     }
 
     /**
+     * The drag-and-drop landing. `wire:sort` hands back the dragged block's own id
+     * and the index it was dropped at, rather than the whole new order — an id is
+     * the only thing that survives a canvas re-render mid-drag.
+     */
+    public function reorderBlocks(string $blockId, int $position): void
+    {
+        $from = null;
+
+        foreach ($this->blocks as $index => $block) {
+            if ($block['id'] === $blockId) {
+                $from = $index;
+
+                break;
+            }
+        }
+
+        if ($from === null) {
+            return;
+        }
+
+        $moved = array_splice($this->blocks, $from, 1);
+
+        array_splice($this->blocks, max(0, min($position, count($this->blocks))), 0, $moved);
+    }
+
+    /**
      * Append a variable token to the end of one block's text field — the
      * "+ Personalize" control's wire:click target.
      */
@@ -133,6 +160,18 @@ trait WithBlockEditor
     public function chooseImage(string $blockKey): void
     {
         $this->dispatch('open-image-picker', slot: $blockKey, multiple: false, max: 1, selected: []);
+    }
+
+    /**
+     * Clear one image block's picture without clearing the alt text, link and
+     * sizing around it — the picker has no "nothing" to choose, so removing is a
+     * control of its own next to it.
+     */
+    public function removeBlockImage(int $index): void
+    {
+        if (isset($this->blocks[$index]['data'])) {
+            $this->blocks[$index]['data']['image_id'] = null;
+        }
     }
 
     /**

@@ -35,6 +35,14 @@ new class extends Component
 
     public bool $is_featured = false;
 
+    /**
+     * Whether saving this post should email the subscribers. Publishing on its own
+     * no longer does — see BlogService::announce(). Only ever offered while the
+     * status actually reaches the public, and only while the post has not been
+     * announced already, because there is no un-sending it.
+     */
+    public bool $send_email = false;
+
     public StatusPost $status = StatusPost::DRAFT;
 
     public ?string $published_at = null;
@@ -74,6 +82,7 @@ new class extends Component
             ]));
 
             $this->is_featured = $this->post->is_featured->boolValue();
+            $this->send_email = $this->post->send_email?->boolValue() ?? false;
             $this->published_at = $this->post->published_at?->format('Y-m-d\TH:i');
 
             $this->loadTaxonomy($this->post);
@@ -123,6 +132,7 @@ new class extends Component
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],
             'is_featured' => ['boolean'],
+            'send_email' => ['boolean'],
             'status' => ['required', Rule::enum(StatusPost::class)],
             'published_at' => ['nullable', 'date'],
         ];
@@ -159,6 +169,9 @@ new class extends Component
             'meta_title' => $this->meta_title ?: null,
             'meta_description' => $this->meta_description ?: null,
             'is_featured' => StatusYes::from((int) $this->is_featured),
+            // A draft carries the tick forward untouched, so scheduling a post
+            // now and letting the sweep publish it still sends what was asked for.
+            'send_email' => StatusYes::from((int) $this->send_email),
         ]);
 
         $this->post->read_minutes = Post::estimateReadMinutes($this->post->content);
@@ -203,8 +216,9 @@ new class extends Component
         $activity->logActivity($action, " post: {$this->post->title}", $affected, model: $this->post);
 
         // Publishing by hand tells the subscribers, exactly as the scheduler
-        // does. announce() is the one that decides whether there is anything to
-        // say, so re-saving a live post does not send it twice.
+        // does — and only when the author asked for it. announce() is the one that
+        // decides whether there is anything to say, so re-saving a live post does
+        // not send it twice.
         $reached = $blog->announce($this->post);
 
         $this->respondSuccess($reached
@@ -269,7 +283,7 @@ new class extends Component
             <flux:card class="space-y-4">
                 <flux:heading level="2" size="sm">Publishing</flux:heading>
 
-                <flux:select wire:model="status" label="Status">
+                <flux:select wire:model.live="status" label="Status">
                     @foreach (StatusPost::cases() as $case)
                         <flux:select.option value="{{ $case->value }}">{{ $case->label() }}</flux:select.option>
                     @endforeach
@@ -283,6 +297,23 @@ new class extends Component
                 />
 
                 <flux:switch wire:model="is_featured" label="Feature this post" />
+
+                {{-- Sending is opt-in, and only offered where it can actually
+                     happen: a draft has no audience, and an announced post has
+                     already gone out. --}}
+                @if ($status->isPublished() || $status->isScheduled())
+                    @if ($post?->announced_at)
+                        <flux:callout icon="check-circle" color="lime" class="text-xs">
+                            Emailed to subscribers on {{ $post->announced_at->format('M d, Y 	 H:i') }}.
+                        </flux:callout>
+                    @else
+                        <flux:switch
+                            wire:model="send_email"
+                            label="Email this post to subscribers"
+                            description="Sent once, when the post goes live. Leave off to publish quietly."
+                        />
+                    @endif
+                @endif
 
                 <flux:button type="submit" variant="primary" icon="check" class="w-full">Save post</flux:button>
             </flux:card>

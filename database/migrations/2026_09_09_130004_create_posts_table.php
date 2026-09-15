@@ -50,6 +50,11 @@ return new class extends Migration
             // overlapping scheduler ticks cannot both announce it.
             $table->timestamp('announced_at')->nullable();
 
+            // Telling the subscribers is a decision the author makes on the post,
+            // not something publishing does on its own — announce() refuses unless
+            // this was ticked, so the scheduler honours it too.
+            $table->boolean('send_email')->default(StatusYes::NO);
+
             $table->boolean('is_featured')->default(StatusYes::NO)->index();
             $table->tinyInteger('status')->default(StatusPost::DRAFT)->index();
 

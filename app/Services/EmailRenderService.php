@@ -58,7 +58,9 @@ class EmailRenderService
             return '';
         }
 
-        return $this->renderBlocks($footer->content ?? [], $recipient);
+        // A section stores {"blocks": [...]}, the same shape a campaign does — the
+        // blocks live one key in, never at the top of the column.
+        return $this->renderBlocks($footer->content['blocks'] ?? [], $recipient);
     }
 
     /**
@@ -79,7 +81,9 @@ class EmailRenderService
         return match ($type) {
             EmailBlockTypeEnum::HEADING => $this->row(sprintf(
                 '<%1$s style="margin:0;font-family:Arial,sans-serif;text-align:%2$s;color:%3$s;">%4$s</%1$s>',
-                in_array($data['level'] ?? 'h1', ['h1', 'h2', 'h3'], true) ? $data['level'] : 'h1',
+                // Read once, then checked: `$data['level'] ?? 'h1'` passing the
+                // check says nothing about the key existing.
+                in_array($level = $data['level'] ?? 'h1', ['h1', 'h2', 'h3'], true) ? $level : 'h1',
                 $data['align'] ?? 'center',
                 $data['color'] ?? '#0F172A',
                 $text($data['text'] ?? ''),
@@ -260,7 +264,7 @@ class EmailRenderService
 
         $section = EmailSection::query()->find($data['email_section_id']);
 
-        return $section ? $this->renderBlocks($section->content ?? [], $recipient) : '';
+        return $section ? $this->renderBlocks($section->content['blocks'] ?? [], $recipient) : '';
     }
 
     /**

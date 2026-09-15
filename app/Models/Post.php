@@ -25,6 +25,7 @@ class Post extends Model
             'published_at' => 'datetime',
             'announced_at' => 'datetime',
             'is_featured' => StatusYes::class,
+            'send_email' => StatusYes::class,
             'status' => StatusPost::class,
         ];
     }

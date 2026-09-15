@@ -40,20 +40,16 @@
                     <span class="block text-xs text-slate-500 dark:text-slate-400">Enter one or more recipients directly.</span>
 
                     @if ($email_recipient_type === 'specific')
-                        <span class="mt-3 flex flex-wrap gap-1.5 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-                            @foreach ($recipient_emails as $email)
-                                <flux:badge size="sm">
-                                    {{ $email }}
-                                    <button type="button" wire:click="removeRecipientEmail('{{ $email }}')" class="ms-1">&times;</button>
-                                </flux:badge>
-                            @endforeach
-                            <input
-                                type="email"
-                                wire:model="recipient_email_input"
-                                wire:keydown.enter.prevent="addRecipientEmail"
-                                placeholder="Add an email and press Enter"
-                                class="min-w-40 flex-1 border-0 bg-transparent p-1 text-sm outline-none"
-                            >
+                        <span class="mt-3 block">
+                            @include('pages.admin.marketing.partials._email-chips', [
+                                'emails' => $recipient_emails,
+                                'model' => 'recipient_email_input',
+                                'add' => 'addRecipientEmail',
+                                'remove' => 'removeRecipientEmail',
+                            ])
+                            <span class="mt-1 block text-[11px] text-slate-400">
+                                Paste a whole list — commas, semicolons, spaces or one per line all work.
+                            </span>
                         </span>
                     @endif
                 </span>

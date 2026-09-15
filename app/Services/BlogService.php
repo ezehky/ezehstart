@@ -58,11 +58,20 @@ class BlogService
      * overlapping scheduler ticks cannot both announce the same post, and a post
      * taken down and put back is not news a second time.
      *
+     * Publishing does not send anything on its own. The author ticks "Email this
+     * post to subscribers" alongside the status, and that tick is what this reads —
+     * so the scheduled sweep sends exactly what the editor asked for, and a post
+     * published quietly stays quiet.
+     *
      * Returns how many accounts were reached, or null when there was nothing to
-     * announce — already announced, or not actually live yet.
+     * announce — not asked for, already announced, or not actually live yet.
      */
     public function announce(Post $post): ?int
     {
+        if (! $post->send_email?->isYes()) {
+            return null;
+        }
+
         if (! $post->status->isPublished() || $post->announced_at !== null) {
             return null;
         }

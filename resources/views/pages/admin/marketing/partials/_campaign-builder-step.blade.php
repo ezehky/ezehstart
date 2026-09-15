@@ -13,7 +13,13 @@
         </div>
     </div>
 
-    @include('pages.admin.marketing.partials._builder', ['allowSectionBlocks' => true])
+    {{-- The three panes fill what the full-screen chrome leaves, rather than a
+         fraction of the viewport: this screen is the window now, so a canvas that
+         stopped at 75vh would leave a band of nothing under it. --}}
+    @include('pages.admin.marketing.partials._builder', [
+        'allowSectionBlocks' => true,
+        'canvasHeight' => 'h-[calc(100vh-20rem)] min-h-96',
+    ])
 
     <div class="flex justify-between">
         <flux:button wire:click="$set('step', 'details')" variant="ghost" icon="arrow-left">Back</flux:button>

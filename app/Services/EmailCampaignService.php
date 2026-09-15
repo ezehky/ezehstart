@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\EmailRecurrenceEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusEmailCampaign;
 use App\Enums\StatusEmailCampaignRecipient;
@@ -285,5 +286,80 @@ class EmailCampaignService
         $campaign->status = $reachedAnyone ? StatusEmailCampaign::SENT : StatusEmailCampaign::FAILED;
         $campaign->sent_at = now();
         $campaign->save();
+
+        $this->spawnNextOccurrence($campaign);
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // RECURRENCE
+
+    /**
+     * Queue up the next run of a repeating campaign, as a scheduled copy.
+     *
+     * The campaign that just went out is left alone: it is the record of what was
+     * sent, to whom, and when, and rewinding it to SCHEDULED would throw that away.
+     * The copy carries the content, design, audience and sender forward and points
+     * back at the first send of the series through `recurs_from_id`.
+     *
+     * Returns the new occurrence, or null when the series has run out — either it
+     * never repeated, or its end date has passed.
+     */
+    public function spawnNextOccurrence(EmailCampaign $campaign): ?EmailCampaign
+    {
+        $recurrence = $campaign->email_recurrence ?? EmailRecurrenceEnum::NONE;
+
+        if ($recurrence->isNone()) {
+            return null;
+        }
+
+        // Measured from the moment this occurrence was meant to go out rather than
+        // from when it actually finished, so a send held up by a backed-up queue
+        // does not drag the whole series later and later.
+        $from = $campaign->scheduled_at ?? $campaign->sent_at ?? now();
+        $at = $recurrence->next(Carbon::parse($from));
+
+        if ($at === null) {
+            return null;
+        }
+
+        // A series scheduled during an outage can have fallen several occurrences
+        // behind. Skip forward to the next one that is actually still ahead rather
+        // than sending the backlog.
+        while ($at->isPast()) {
+            $next = $recurrence->next($at);
+
+            if ($next === null || $next->lessThanOrEqualTo($at)) {
+                return null;
+            }
+
+            $at = $next;
+        }
+
+        if ($campaign->recurrence_ends_at && $at->greaterThan($campaign->recurrence_ends_at)) {
+            return null;
+        }
+
+        $occurrence = $campaign->replicate([
+            'status',
+            'scheduled_at',
+            'sent_at',
+            'estimated_recipients',
+            'recurs_from_id',
+        ]);
+
+        $occurrence->status = StatusEmailCampaign::SCHEDULED;
+        $occurrence->scheduled_at = $at;
+        $occurrence->sent_at = null;
+        $occurrence->estimated_recipients = null;
+        $occurrence->recurs_from_id = $campaign->recurs_from_id ?? $campaign->id;
+        $occurrence->save();
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::EMAIL_CAMPAIGN_SCHEDULE,
+            " the next {$recurrence->label(lowercase: true)} run of \"{$campaign->name}\" for {$at->toDayDateTimeString()}",
+            model: $occurrence,
+        );
+
+        return $occurrence;
     }
 }

@@ -79,17 +79,42 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
+        @php($image = ! empty($blocks[$index]['data']['image_id']) ? \App\Models\Image::find($blocks[$index]['data']['image_id']) : null)
         <div class="space-y-4">
             <div>
                 <flux:label>Image</flux:label>
-                <div class="mt-1 flex items-center gap-2">
+
+                {{-- The chosen file's own address, shown because the picker closes
+                     without saying which row it handed back and the canvas preview
+                     is too small to tell two similar images apart. --}}
+                @if ($image)
+                    <div class="mt-1 flex items-start gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                        <img src="{{ $image->url() }}" alt="" class="size-12 shrink-0 rounded object-cover">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-xs font-medium text-slate-700 dark:text-slate-200">{{ $image->title }}</p>
+                            <p class="break-all text-[11px] text-slate-400" title="{{ $image->url() }}">{{ $image->url() }}</p>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="mt-2 flex flex-wrap items-center gap-2">
                     <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}')">
-                        {{ ($blocks[$index]['data']['image_id'] ?? null) ? 'Change image' : 'Select from Media Library' }}
+                        {{ $image ? 'Change image' : 'Select from Media Library' }}
                     </flux:button>
+                    @if ($image)
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage({{ $index }})">
+                            Remove image
+                        </flux:button>
+                    @endif
                 </div>
             </div>
             <flux:input wire:model.live="{{ $prefix }}.alt" label="Alt text" />
-            <flux:input wire:model.live="{{ $prefix }}.link_url" label="Link URL" placeholder="https://" />
+            <flux:input
+                wire:model.live="{{ $prefix }}.link_url"
+                label="Link URL"
+                description="Where clicking the image takes the reader. Leave empty for a plain picture."
+                placeholder="https://"
+            />
             <div class="grid grid-cols-2 gap-3">
                 <flux:input wire:model.live="{{ $prefix }}.width" label="Width" placeholder="100%" />
                 <flux:input type="number" min="0" max="40" wire:model.live="{{ $prefix }}.radius" label="Border radius" />

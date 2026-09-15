@@ -41,6 +41,74 @@ trait WithEmailResolver
     }
 
     /**
+     * Every address the site is actually configured to send as, as
+     * [email => label].
+     *
+     * The same `email-senders` configuration setEmailFrom() reads, asked the other
+     * way round: a screen that lets somebody *choose* a sender needs the list, not
+     * one resolved answer. A campaign's "From" is a select over this rather than a
+     * free-text box, because an address the mail service has never been told about
+     * is a campaign that silently lands in spam.
+     *
+     * @return array<string, string>
+     */
+    protected function senderAddressOptions(): array
+    {
+        $siteName = (string) (kSiteConfig('name') ?: config('app.name'));
+        $options = [];
+
+        foreach (EmailSenderEnum::cases() as $sender) {
+            // The custom sender holds a domain, not an address — it has no address
+            // of its own until somebody names the part before the "@", which is
+            // what customSenderDomain() is for.
+            if ($sender->isCustom()) {
+                continue;
+            }
+
+            $from = kSiteConfig("email-senders.{$sender->value}.from");
+
+            if (! $from || ! filter_var($from, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            $name = kSiteConfig("email-senders.{$sender->value}.from-name") ?: $siteName;
+
+            $options[$from] = "{$name} <{$from}>";
+        }
+
+        // The mailer's own address is always a legitimate sender, and on a site
+        // that has configured nothing yet it is the only one.
+        $fallback = (string) config('mail.from.address');
+
+        if ($fallback && ! isset($options[$fallback])) {
+            $options[$fallback] = "{$siteName} <{$fallback}>";
+        }
+
+        return $options;
+    }
+
+    /**
+     * The bare domain behind the custom sender — "yourdomain.com" from the URL the
+     * Email Senders screen stores — or null when none is configured.
+     *
+     * Anything@this is a valid sender, so a screen offering it pairs the domain
+     * with a box for the part before the "@", exactly as setEmailFrom() does with
+     * its $username.
+     */
+    protected function customSenderDomain(): ?string
+    {
+        $from = kSiteConfig('email-senders.'.EmailSenderEnum::CUSTOM->value.'.from');
+
+        if (! $from) {
+            return null;
+        }
+
+        $domain = kStripDomainProtocols($from);
+
+        return $domain !== '' ? $domain : null;
+    }
+
+    /**
      * The email "from" address.
      */
     protected Address $emailFrom;

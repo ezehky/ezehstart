@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\EmailRecipientTypeEnum;
+use App\Enums\EmailRecurrenceEnum;
 use App\Enums\StatusEmailCampaign;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -50,6 +51,18 @@ return new class extends Migration
             $table->timestamp('scheduled_at')->nullable()->index();
             $table->string('timezone')->nullable();
             $table->timestamp('sent_at')->nullable();
+
+            // A repeat never re-sends this row. Finishing a recurring campaign
+            // copies it into the next occurrence — see
+            // EmailCampaignService::spawnNextOccurrence() — which is what keeps the
+            // Sent listing an honest record of what actually went out and when.
+            $table->string('email_recurrence', 20)->default(EmailRecurrenceEnum::NONE);
+            $table->timestamp('recurrence_ends_at')->nullable();
+
+            // The occurrence this one was copied from, so a series can be followed
+            // backwards. Nulls rather than cascades: deleting the first send of a
+            // series must not take the rest of the archive with it.
+            $table->foreignId('recurs_from_id')->nullable()->constrained('email_campaigns')->nullOnDelete();
 
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

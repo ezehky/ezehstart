@@ -1,17 +1,22 @@
 <?php
 
+use App\Enums\ActivityActionEnum;
+use App\Enums\EmailRecurrenceEnum;
 use App\Enums\EmailSectionTypeEnum;
 use App\Enums\GateAccessEnum;
 use App\Models\EmailCampaign;
+use App\Models\EmailSection;
 use App\Models\EmailTemplate;
 use App\Models\NotificationType;
 use App\Models\User;
 use App\Rules\EmailRule;
 use App\Services\ActivityLogService;
 use App\Services\EmailCampaignService;
+use App\Services\EmailRenderService;
 use App\Services\EmailSectionService;
 use App\Services\EmailTemplateService;
 use App\Traits\WithBlockEditor;
+use App\Traits\WithEmailResolver;
 use App\Traits\WithGateProps;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -21,7 +26,7 @@ use Livewire\Component;
 
 new class extends Component
 {
-    use WithBlockEditor, WithGateProps;
+    use WithBlockEditor, WithEmailResolver, WithGateProps;
 
     public ?EmailCampaign $campaign = null;
 
@@ -56,6 +61,13 @@ new class extends Component
 
     public string $from_email = '';
 
+    /**
+     * The part before the "@" when the chosen sender is the site's own domain. A
+     * domain is not an address — WithEmailResolver::setEmailFrom() asks for exactly
+     * the same thing before it will build one.
+     */
+    public string $from_username = '';
+
     public ?string $reply_to = null;
 
     public string $send_option = 'now';
@@ -66,6 +78,10 @@ new class extends Component
 
     public string $timezone;
 
+    public string $email_recurrence = 'none';
+
+    public ?string $recurrence_ends_at = null;
+
     public array $test_emails = [];
 
     public string $test_email_input = '';
@@ -75,6 +91,12 @@ new class extends Component
     public bool $confirm_large_send = false;
 
     public const LARGE_AUDIENCE = 1000;
+
+    /**
+     * The select value standing for "an address on our own domain". Not an address
+     * itself — choosing it reveals the username box that completes one.
+     */
+    public const CUSTOM_SENDER = '__custom__';
 
     public function largeAudienceThreshold(): int
     {
@@ -94,6 +116,8 @@ new class extends Component
             $this->step = $this->step ?: 'builder';
         } else {
             $this->step = 'details';
+            $this->from_email = (string) array_key_first($this->senderOptions);
+            $this->from_name = (string) (kSiteConfig('name') ?: config('app.name'));
         }
     }
 
@@ -111,8 +135,25 @@ new class extends Component
         $this->recipient_emails = $campaign->recipient_config['emails'] ?? [];
         $this->notification_type_values = $campaign->recipient_config['notification_types'] ?? [];
         $this->from_name = $campaign->from_name;
-        $this->from_email = $campaign->from_email;
         $this->reply_to = $campaign->reply_to;
+        $this->email_recurrence = ($campaign->email_recurrence ?? EmailRecurrenceEnum::NONE)->value;
+        $this->recurrence_ends_at = $campaign->recurrence_ends_at?->format('Y-m-d');
+
+        // An address that is no longer one of the configured senders is left showing
+        // as it was saved rather than silently swapped for something else — which
+        // sender replaces it is the administrator's decision, not this screen's.
+        $domain = $this->customSenderDomain();
+
+        if (isset($this->senderOptions[$campaign->from_email])) {
+            $this->from_email = $campaign->from_email;
+        } elseif ($domain && str_ends_with((string) $campaign->from_email, '@'.$domain)) {
+            $this->from_email = self::CUSTOM_SENDER;
+            $this->from_username = strstr((string) $campaign->from_email, '@', true) ?: '';
+        } else {
+            // An empty column would leave the select on nothing at all, which reads
+            // as a choice somebody made rather than one nobody has made yet.
+            $this->from_email = (string) ($campaign->from_email ?: array_key_first($this->senderOptions));
+        }
 
         if ($campaign->scheduled_at) {
             $this->send_option = 'schedule';
@@ -121,6 +162,9 @@ new class extends Component
             $this->timezone = $campaign->timezone ?? $this->timezone;
         }
     }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // LOOKUPS
 
     #[Computed]
     public function templates()
@@ -138,6 +182,56 @@ new class extends Component
     public function notificationTypes()
     {
         return NotificationType::query()->active()->get();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function senderOptions(): array
+    {
+        return $this->senderAddressOptions();
+    }
+
+    #[Computed]
+    public function senderDomain(): ?string
+    {
+        return $this->customSenderDomain();
+    }
+
+    /**
+     * What actually goes in the "From" header — the selected address, or the one
+     * built out of the username and the site's own domain.
+     */
+    private function resolvedFromEmail(): string
+    {
+        if ($this->from_email !== self::CUSTOM_SENDER) {
+            return trim($this->from_email);
+        }
+
+        $domain = $this->senderDomain;
+        $username = trim($this->from_username);
+
+        return $domain && $username ? "{$username}@{$domain}" : '';
+    }
+
+    /**
+     * Whether the screen holds anything the campaign row does not. The close button
+     * asks this before it lets the page go — everything in a builder lives in
+     * component state until a Save Draft, and a closed tab is not a save.
+     */
+    public function hasUnsavedChanges(): bool
+    {
+        if (! $this->campaign) {
+            return $this->name !== '' || $this->subject !== '' || $this->blocks !== [];
+        }
+
+        return $this->name !== $this->campaign->name
+            || $this->subject !== $this->campaign->subject
+            || (string) $this->preview_text !== (string) $this->campaign->preview_text
+            || $this->blocks !== ($this->campaign->content['blocks'] ?? [])
+            || $this->design !== ($this->campaign->design ?? [])
+            || $this->footer_section_id !== $this->campaign->footer_section_id;
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -179,7 +273,9 @@ new class extends Component
 
         $affected = $activity->affectedColumns($this->campaign);
         $this->campaign->save();
-        $activity->logActivity(\App\Enums\ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
+        $activity->logActivity(ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
+
+        $this->dispatch('builder-saved');
 
         $this->step = 'builder';
     }
@@ -195,13 +291,13 @@ new class extends Component
             return;
         }
 
-        $section = \App\Models\EmailSection::create([
+        $section = EmailSection::create([
             'name' => 'New section from '.$this->name,
             'email_section_type' => EmailSectionTypeEnum::CUSTOM->value,
             'content' => ['blocks' => [$this->blocks[$index]]],
         ]);
 
-        app(ActivityLogService::class)->logActivity(\App\Enums\ActivityActionEnum::EMAIL_SECTION_CREATE, " section: {$section->name}", model: $section);
+        app(ActivityLogService::class)->logActivity(ActivityActionEnum::EMAIL_SECTION_CREATE, " section: {$section->name}", model: $section);
 
         $this->respondSuccess('Saved as a reusable section. Rename it from Saved Sections.');
     }
@@ -216,7 +312,7 @@ new class extends Component
     #[Computed]
     public function previewHtml(): string
     {
-        return app(\App\Services\EmailRenderService::class)->renderCampaign($this->campaign)['html'];
+        return app(EmailRenderService::class)->renderCampaign($this->campaign)['html'];
     }
 
     public function saveBuilder(?string $nextStep = null): void
@@ -233,7 +329,13 @@ new class extends Component
 
         $affected = $activity->affectedColumns($this->campaign);
         $this->campaign->save();
-        $activity->logActivity(\App\Enums\ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
+        $activity->logActivity(ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
+
+        // The preview reads the saved row, so a stale render would show the admin
+        // the draft they had before this save rather than the one they just made.
+        unset($this->previewHtml);
+
+        $this->dispatch('builder-saved');
 
         $this->respondSuccess('Draft saved.', flash: false);
 
@@ -245,21 +347,67 @@ new class extends Component
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // STEP 3 — RECIPIENTS
 
+    /**
+     * Pull every address out of one piece of typed or pasted text.
+     *
+     * A pasted list arrives separated however the place it was copied from
+     * separated it — commas, semicolons, newlines, tabs, angle brackets, or plain
+     * spaces — and a phone keyboard has no convenient Enter, so a space has to end
+     * an address too. Both address fields on this screen come through here rather
+     * than each parsing its own.
+     *
+     * @return array<int, string>
+     */
+    private function parseEmails(string $raw): array
+    {
+        return collect(preg_split('/[\s,;<>]+/', $raw) ?: [])
+            ->map(fn (string $email) => trim($email, " \t\n\r\0\x0B\"'"))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, string>  $existing
+     * @return array{0: array<int, string>, 1: int}
+     */
+    private function mergeEmails(array $existing, string $raw): array
+    {
+        $rejected = 0;
+
+        foreach ($this->parseEmails($raw) as $email) {
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $rejected++;
+
+                continue;
+            }
+
+            if (! in_array($email, $existing, true)) {
+                $existing[] = $email;
+            }
+        }
+
+        return [$existing, $rejected];
+    }
+
     public function addRecipientEmail(): void
     {
-        $email = trim($this->recipient_email_input);
+        $raw = $this->recipient_email_input;
         $this->recipient_email_input = '';
 
-        $this->respondError('That does not look like a valid email address.', ! filter_var($email, FILTER_VALIDATE_EMAIL));
+        [$this->recipient_emails, $rejected] = $this->mergeEmails($this->recipient_emails, $raw);
 
-        if (! in_array($email, $this->recipient_emails, true)) {
-            $this->recipient_emails[] = $email;
-        }
+        unset($this->estimatedRecipients);
+
+        $this->respondError("Skipped {$rejected} entry(s) that are not valid email addresses.", $rejected > 0);
     }
 
     public function removeRecipientEmail(string $email): void
     {
         $this->recipient_emails = array_values(array_diff($this->recipient_emails, [$email]));
+
+        unset($this->estimatedRecipients);
     }
 
     private function syncRecipientFieldsToCampaign(): void
@@ -290,9 +438,11 @@ new class extends Component
         $activity = app(ActivityLogService::class);
         $affected = $activity->affectedColumns($this->campaign);
         $this->campaign->save();
-        $activity->logActivity(\App\Enums\ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
+        $activity->logActivity(ActivityActionEnum::EMAIL_CAMPAIGN_UPDATE, " campaign: {$this->campaign->name}", $affected, model: $this->campaign);
 
         unset($this->estimatedRecipients);
+
+        $this->dispatch('builder-saved');
 
         $this->step = 'review';
     }
@@ -302,29 +452,41 @@ new class extends Component
 
     public function saveSenderDetails(): void
     {
+        $resolved = $this->resolvedFromEmail();
+
+        $this->respondError(
+            'Name the part before the "@" for an address on your own domain.',
+            $this->from_email === self::CUSTOM_SENDER && $resolved === '',
+        );
+
         $this->validate([
             'from_name' => ['required', 'string', 'max:255'],
-            'from_email' => [new EmailRule(true)],
             'reply_to' => [new EmailRule(false)],
+            'email_recurrence' => ['required', Rule::enum(EmailRecurrenceEnum::class)],
+            'recurrence_ends_at' => ['nullable', 'date'],
         ]);
+
+        $this->respondError('That does not look like a valid sending address.', ! filter_var($resolved, FILTER_VALIDATE_EMAIL));
 
         $this->campaign->fill([
             'from_name' => $this->from_name,
-            'from_email' => $this->from_email,
+            'from_email' => $resolved,
             'reply_to' => $this->reply_to,
+            'email_recurrence' => $this->email_recurrence,
+            'recurrence_ends_at' => $this->recurrence_ends_at ?: null,
         ])->save();
+
+        $this->dispatch('builder-saved');
     }
 
     public function addTestEmail(): void
     {
-        $email = trim($this->test_email_input);
+        $raw = $this->test_email_input;
         $this->test_email_input = '';
 
-        $this->respondError('That does not look like a valid email address.', ! filter_var($email, FILTER_VALIDATE_EMAIL));
+        [$this->test_emails, $rejected] = $this->mergeEmails($this->test_emails, $raw);
 
-        if (! in_array($email, $this->test_emails, true)) {
-            $this->test_emails[] = $email;
-        }
+        $this->respondError("Skipped {$rejected} entry(s) that are not valid email addresses.", $rejected > 0);
     }
 
     public function removeTestEmail(string $email): void
@@ -380,6 +542,16 @@ new class extends Component
 
         $this->respondError('This campaign has no recipients yet.', $estimate === 0);
 
+        // A repeating send needs a first moment to count the next one from, and
+        // sending immediately is that moment. Worked out from scheduled_at rather
+        // than from whenever the queue happened to drain, so the series keeps its
+        // time of day.
+        if (EmailRecurrenceEnum::from($this->email_recurrence)->isRepeating() && $this->campaign->scheduled_at === null) {
+            $this->campaign->scheduled_at = now();
+            $this->campaign->timezone = $this->timezone;
+            $this->campaign->save();
+        }
+
         app(EmailCampaignService::class)->startSending($this->campaign);
 
         $this->respondSuccess('Sending started.', flash: true);
@@ -388,18 +560,36 @@ new class extends Component
 };
 ?>
 
-<div class="space-y-6">
-    @include('pages.admin.marketing.partials._campaign-toolbar')
+{{--
+    A builder fills the window. It is its own workspace rather than a page inside
+    the dashboard chrome: a 640px canvas with a palette either side has nothing
+    left over for a sidebar, and the step the admin is on is the only navigation
+    that means anything while they are here. Closing is the way out, and it asks
+    first — see hasUnsavedChanges().
 
-    @if ($step === 'details')
-        @include('pages.admin.marketing.partials._campaign-details')
-    @elseif ($step === 'builder')
-        @include('pages.admin.marketing.partials._campaign-builder-step')
-    @elseif ($step === 'recipients')
-        @include('pages.admin.marketing.partials._campaign-recipients')
-    @elseif ($step === 'review')
-        @include('pages.admin.marketing.partials._campaign-review')
-    @endif
+    `dirty` starts from the server's answer and is set again by any typing, because
+    between two Livewire round trips the browser is the only one that knows.
+--}}
+<div
+    x-data="{ dirty: @js($this->hasUnsavedChanges()) }"
+    x-on:input.capture="dirty = true"
+    x-on:builder-saved.window="dirty = false"
+    x-on:beforeunload.window="if (dirty) { $event.preventDefault(); $event.returnValue = '' }"
+    class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950"
+>
+    @include('pages.admin.marketing.partials._campaign-toolbar', ['closeRoute' => route('admin.marketing.campaigns')])
+
+    <div class="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        @if ($step === 'details')
+            @include('pages.admin.marketing.partials._campaign-details')
+        @elseif ($step === 'builder')
+            @include('pages.admin.marketing.partials._campaign-builder-step')
+        @elseif ($step === 'recipients')
+            @include('pages.admin.marketing.partials._campaign-recipients')
+        @elseif ($step === 'review')
+            @include('pages.admin.marketing.partials._campaign-review')
+        @endif
+    </div>
 
     <livewire:livewire.library.image-picker />
 
@@ -407,7 +597,9 @@ new class extends Component
         <flux:modal name="previewModal" class="modal-lg">
             <div class="space-y-4">
                 <flux:heading size="lg">Preview</flux:heading>
-                <div class="mx-auto max-h-[70vh] max-w-[700px] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                {{-- The iframe does its own scrolling. A scrollable wrapper around
+                     it would put a second bar alongside the first. --}}
+                <div class="mx-auto w-full max-w-[700px] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                     <iframe srcdoc="{{ $this->previewHtml }}" class="h-[70vh] w-full" title="Email preview"></iframe>
                 </div>
             </div>

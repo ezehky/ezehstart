@@ -59,7 +59,10 @@ class EmailTemplateService
             'subject' => $details['subject'],
             'preview_text' => $details['preview_text'] ?? null,
             'from_name' => (string) kSiteConfig('email-senders.default.from-name', default: kSiteConfig('name')),
-            'from_email' => (string) kSiteConfig('email-senders.default.from'),
+            // A blank sender is a campaign that cannot go out, so an install that
+            // has not filled in Email Senders yet falls back to the mailer's own
+            // address — the same one WithEmailResolver::setEmailFrom() falls back to.
+            'from_email' => (string) (kSiteConfig('email-senders.default.from') ?: config('mail.from.address')),
             'reply_to' => kSiteConfig('email-senders.default.reply-to') ?: null,
             'content' => $template?->content ?? ['blocks' => []],
             'design' => $template?->design ?? [],
