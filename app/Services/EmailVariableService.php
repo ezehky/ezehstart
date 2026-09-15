@@ -67,9 +67,14 @@ class EmailVariableService
             'site' => [
                 'name' => (string) kSiteConfig('name'),
                 'url' => config('app.url'),
-                'logo' => (string) kSiteConfig('logo'),
                 'email' => (string) kSiteConfig('email'),
                 'contact_email' => (string) kSiteConfig('contact-email'),
+                // kSiteConfig()'s own default is an empty array, and phone/address
+                // both start as an empty string — falsy, so an unconfigured
+                // install would otherwise get that array back and (string) it,
+                // an "Array to string conversion" error rather than "".
+                'phone' => (string) kSiteConfig('phone', default: ''),
+                'address' => (string) kSiteConfig('address', default: ''),
                 'social' => $this->socialUrls(),
                 'social_links' => $this->socialLinksHtml(),
             ],
@@ -136,6 +141,11 @@ class EmailVariableService
     /**
      * The tokens the "+ Personalize" dropdown offers, [token => label].
      *
+     * Site identity that is a piece of text — a name, an address — belongs here.
+     * Anything visual (the logo, the favicon, a social icon) is a block on the
+     * canvas instead (see EmailBlockTypeEnum's "Site Config" group), not a token
+     * dropped into running text.
+     *
      * @return array<string, string>
      */
     public function knownTokens(): array
@@ -146,9 +156,10 @@ class EmailVariableService
             '{{user.email}}' => 'Email address',
             '{{site.name}}' => 'Site name',
             '{{site.url}}' => 'Site URL',
-            '{{site.logo}}' => 'Site logo URL',
             '{{site.email}}' => 'Site email',
             '{{site.contact_email}}' => 'Support email',
+            '{{site.phone}}' => 'Site phone',
+            '{{site.address}}' => 'Site address',
             '{{unsubscribe_url}}' => 'Unsubscribe link',
         ];
 

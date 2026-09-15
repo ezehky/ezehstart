@@ -28,7 +28,7 @@
 
 <div class="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-[240px_1fr_300px] dark:border-slate-800">
     {{-- PALETTE --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-e dark:border-slate-800 dark:bg-slate-950">
+    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-e dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
         @foreach ($palette as $group => $cases)
             <p class="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-400 first:mt-0">{{ $group }}</p>
             <div class="grid grid-cols-2 gap-2">
@@ -47,16 +47,29 @@
     </div>
 
     {{-- CANVAS --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto bg-slate-100 p-6 dark:bg-slate-900">
+    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto bg-slate-100 p-6 dark:bg-slate-900 custom-scrollbar">
+        {{-- The canvas is a single column of blocks, with the selected block's
+             settings in the right-hand pane. The canvas itself is not a form —
+             the settings are, and they are keyed to the selected block so that
+             Livewire's morph keeps the right fields bound to the right block. --}}
         {{-- wire:sort reorders by the dragged block's id, never by index: the canvas
              re-renders on every selection, and an index captured before the drag
              would already be stale by the time it landed. The grip is pinned as the
              handle in the config rather than left to be inferred: on an empty
              canvas there is no handle in the DOM to infer it from, and the whole
              block would become draggable — which would swallow the click that
-             selects it. --}}
+             selects it.
+
+             The action is named bare ("reorderBlocks"), never called with
+             ($item, $position): Livewire rewrites every identifier in an action
+             expression to $wire.<name>, so those two become $wire.$item and
+             $wire.$position — always undefined — and every drop was silently
+             dropped. Named bare, the dragged id and its new position arrive as
+             reorderBlocks()'s two real arguments. wire:sort:item is written bare
+             too, never quoted: it is handed over as the literal attribute text and
+             never parsed as JavaScript, so a quoted id never matches on drop. --}}
         <div
-            wire:sort="$wire.reorderBlocks($item, $position)"
+            wire:sort="reorderBlocks"
             wire:sort:config="{ handle: '[wire\\:sort\\:handle]' }"
             class="mx-auto w-full max-w-[640px] rounded-md bg-white shadow-sm"
         >
@@ -66,7 +79,7 @@
 
                 <div
                     wire:key="block-{{ $block['id'] }}"
-                    wire:sort:item="'{{ $block['id'] }}'"
+                    wire:sort:item="{{ $block['id'] }}"
                     wire:click="selectBlock('{{ $block['id'] }}')"
                     @class([
                         'group relative cursor-pointer',
@@ -113,7 +126,7 @@
     </div>
 
     {{-- SETTINGS --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950">
+    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
         @if (! $selected)
             <div class="py-10 text-center">
                 <flux:icon name="cursor-arrow-rays" class="mx-auto size-6 text-slate-300" />

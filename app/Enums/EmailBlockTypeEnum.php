@@ -37,6 +37,17 @@ enum EmailBlockTypeEnum: string
     // A reference to a saved EmailSection (header, footer, CTA, promo, custom).
     case SECTION = 'section';
 
+    // Site Config group — each reads straight from kSiteConfig() at render time
+    // rather than copying a value in, so a logo or social handle changed after
+    // this block was placed reaches the email without anybody reopening it.
+    case LOGO = 'logo';
+
+    case LOGO_DARK = 'logo_dark';
+
+    case FAVICON = 'favicon';
+
+    case SOCIALS = 'socials';
+
     public function isHeading(): bool
     {
         return $this === self::HEADING;
@@ -92,6 +103,26 @@ enum EmailBlockTypeEnum: string
         return $this === self::SECTION;
     }
 
+    public function isLogo(): bool
+    {
+        return $this === self::LOGO;
+    }
+
+    public function isLogoDark(): bool
+    {
+        return $this === self::LOGO_DARK;
+    }
+
+    public function isFavicon(): bool
+    {
+        return $this === self::FAVICON;
+    }
+
+    public function isSocials(): bool
+    {
+        return $this === self::SOCIALS;
+    }
+
     /**
      * The block palette's grouping — see resources/views/components/marketing/blocks.
      */
@@ -101,6 +132,7 @@ enum EmailBlockTypeEnum: string
             self::HEADING, self::PARAGRAPH, self::BUTTON, self::DIVIDER, self::SPACER, self::IMAGE, self::HTML => 'Basic',
             self::DYNAMIC_CONTENT, self::RELATED_CONTENT => 'Dynamic Content',
             self::COLUMNS => 'Layout',
+            self::LOGO, self::LOGO_DARK, self::FAVICON, self::SOCIALS => 'Site Config',
             self::SECTION => 'Saved',
         };
     }
@@ -119,6 +151,9 @@ enum EmailBlockTypeEnum: string
             self::RELATED_CONTENT => 'squares-2x2',
             self::COLUMNS => 'view-columns',
             self::SECTION => 'rectangle-stack',
+            self::LOGO, self::LOGO_DARK => 'photo',
+            self::FAVICON => 'star',
+            self::SOCIALS => 'share',
         };
     }
 
@@ -139,8 +174,20 @@ enum EmailBlockTypeEnum: string
             self::HTML => ['html' => ''],
             self::DYNAMIC_CONTENT => ['content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null, 'tag_id' => null, 'limit' => 1, 'layout' => 'featured', 'show_image' => true, 'show_excerpt' => true, 'show_date' => false, 'button_text' => 'Read More'],
             self::RELATED_CONTENT => ['content_type' => 'post', 'source' => 'same_category', 'source_content_id' => null, 'limit' => 3, 'heading' => 'You May Also Like', 'button_text' => 'Read More'],
-            self::COLUMNS => ['columns' => [['text' => 'First column'], ['text' => 'Second column']]],
+            self::COLUMNS => ['background' => null, 'background_image_id' => null, 'columns' => [
+                ['type' => 'text', 'text' => 'First column', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
+                ['type' => 'text', 'text' => 'Second column', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
+            ]],
             self::SECTION => ['email_section_id' => null],
+            self::LOGO, self::LOGO_DARK => ['width' => '160px', 'align' => 'center', 'link_url' => '{{site.url}}'],
+            self::FAVICON => ['width' => '32px', 'align' => 'center'],
+            self::SOCIALS => [
+                'source' => 'config',
+                'style' => 'image',
+                'variant' => 'default',
+                'align' => 'center',
+                'custom_links' => [],
+            ],
         };
     }
 }

@@ -520,6 +520,135 @@ test('the builder saves page and letter background settings onto the design, and
         ->and($html)->toContain('background:#222222');
 });
 
+test('the design dropdown\'s brand colour, radius and accent bar reach the render', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+    $campaign = marketingCampaign();
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->set('design.brand', '#FF0000')
+        ->set('design.container_radius', 16)
+        ->set('design.accent_bar', true)
+        ->call('saveBuilder');
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign->fresh())['html'];
+
+    expect($html)->toContain('border-radius:16px')
+        ->and($html)->toContain('background:#FF0000;');
+});
+
+test('a columns block honours a per-column and a row background', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'columns', 'data' => [
+            'background' => '#EEEEEE',
+            'background_image_id' => null,
+            'columns' => [
+                ['type' => 'text', 'text' => 'Left', 'image_id' => null, 'alt' => '', 'background' => '#ABCDEF', 'background_image_id' => null],
+                ['type' => 'text', 'text' => 'Right', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
+            ],
+        ]],
+    ]]]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('background-color:#EEEEEE')
+        ->and($html)->toContain('background-color:#ABCDEF');
+});
+
+test('the dynamic content layout actually changes what gets rendered', function () {
+    blogPost();
+
+    $featured = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'dynamic_content', 'data' => [
+            'content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null,
+            'tag_id' => null, 'limit' => 1, 'layout' => 'featured', 'show_image' => false,
+            'show_excerpt' => false, 'show_date' => false, 'button_text' => 'Read More',
+        ]],
+    ]]]);
+
+    $grid = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'dynamic_content', 'data' => [
+            'content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null,
+            'tag_id' => null, 'limit' => 1, 'layout' => 'grid-3', 'show_image' => false,
+            'show_excerpt' => false, 'show_date' => false, 'button_text' => 'Read More',
+        ]],
+    ]]]);
+
+    $featuredHtml = app(EmailRenderService::class)->renderCampaign($featured)['html'];
+    $gridHtml = app(EmailRenderService::class)->renderCampaign($grid)['html'];
+
+    // "featured" wraps its one card in a plain <div>, never a <table> — the grid
+    // layouts are what reach for a <table role="presentation"> row of <td>s.
+    expect($featuredHtml)->not->toContain('<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="top" width="33%"')
+        ->and($gridHtml)->toContain('<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="top" width="33%"');
+});
+
+test('the Logo, Favicon and Socials blocks read straight from Site Config at render time', function () {
+    $configs = app(SiteConfigurationService::class)->getConfigs(raw: true);
+    app(SiteConfigurationService::class)->update([...$configs, 'social-handles' => [
+        ['platform' => 'facebook', 'url' => 'https://facebook.com/acme'],
+    ]]);
+
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'socials', 'data' => [
+            'source' => 'config', 'style' => 'text', 'variant' => 'default', 'align' => 'center', 'custom_links' => [],
+        ]],
+    ]]]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('https://facebook.com/acme');
+});
+
+test('a custom social link list is used instead of Site Config when the source is set to custom', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'socials', 'data' => [
+            'source' => 'custom', 'style' => 'text', 'variant' => 'default', 'align' => 'center',
+            'custom_links' => [['label' => 'Our Discord', 'url' => 'https://discord.gg/acme', 'platform' => '']],
+        ]],
+    ]]]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('https://discord.gg/acme')
+        ->and($html)->toContain('Our Discord');
+});
+
+test('the personalize token list offers the text-based site fields but not the logo', function () {
+    $tokens = app(EmailVariableService::class)->knownTokens();
+
+    expect($tokens)->toHaveKey('{{site.phone}}')
+        ->and($tokens)->toHaveKey('{{site.address}}')
+        ->and($tokens)->toHaveKey('{{site.contact_email}}')
+        ->and($tokens)->not->toHaveKey('{{site.logo}}');
+});
+
+test('adding and removing a column keeps at least one column and caps at four', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'columns', 'data' => EmailBlockTypeEnum::COLUMNS->defaultData()],
+    ]]]);
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('addColumn', 0)
+        ->call('addColumn', 0);
+
+    expect($component->get('blocks.0.data.columns'))->toHaveCount(4);
+
+    $component->call('addColumn', 0);
+    expect($component->get('blocks.0.data.columns'))->toHaveCount(4);
+
+    $component->call('removeColumn', 0, 0)
+        ->call('removeColumn', 0, 0)
+        ->call('removeColumn', 0, 0);
+
+    expect($component->get('blocks.0.data.columns'))->toHaveCount(1);
+
+    $component->call('removeColumn', 0, 0);
+    expect($component->get('blocks.0.data.columns'))->toHaveCount(1);
+});
+
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // ADDRESS ENTRY
 
@@ -581,7 +710,7 @@ test('removing a block image leaves the rest of its settings alone', function ()
 
     $blocks = Livewire::actingAs($admin)
         ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
-        ->call('removeBlockImage', 0)
+        ->call('removeBlockImage', 'block-0')
         ->get('blocks');
 
     expect($blocks[0]['data']['image_id'])->toBeNull()

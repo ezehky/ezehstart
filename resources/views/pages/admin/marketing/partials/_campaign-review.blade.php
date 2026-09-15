@@ -147,8 +147,15 @@
         </flux:card>
     </div>
 
-    <div class="lg:col-span-2">
+    <div class="lg:col-span-2 flex justify-between">
         <flux:button wire:click="$set('step', 'recipients')" variant="ghost" icon="arrow-left">Back</flux:button>
+
+        {{-- Scheduled_at is deliberately not part of this: saving it outside
+             schedule() would leave a campaign that looks scheduled — the
+             sending queue reads status = SCHEDULED, which only schedule()
+             sets. This saves everything on the step that IS safe as a draft:
+             the same fields as "Save sender details" above. --}}
+        <flux:button wire:click="saveSenderDetails" variant="ghost" icon="check">Save</flux:button>
     </div>
 </div>
 

@@ -102,7 +102,7 @@
                         {{ $image ? 'Change image' : 'Select from Media Library' }}
                     </flux:button>
                     @if ($image)
-                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage({{ $index }})">
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}')">
                             Remove image
                         </flux:button>
                     @endif
@@ -220,10 +220,160 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::COLUMNS)
-        <div class="space-y-3">
+        @php($rowBgImage = ! empty($blocks[$index]['data']['background_image_id']) ? \App\Models\Image::find($blocks[$index]['data']['background_image_id']) : null)
+        <div class="space-y-5">
+            {{-- The row itself is a container too, not just its columns — a promo
+                 banner is one wide background image behind two columns of text as
+                 often as it is two separately-coloured columns. --}}
+            <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                <flux:label>Row background</flux:label>
+                <div class="grid grid-cols-2 gap-2">
+                    <flux:input type="color" wire:model.live="{{ $prefix }}.background" placeholder="None" />
+                    <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-bg')">
+                        {{ $rowBgImage ? 'Change image' : 'Background image' }}
+                    </flux:button>
+                </div>
+                @if ($rowBgImage)
+                    <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-bg')">
+                        Remove background image
+                    </flux:button>
+                @endif
+            </div>
+
             @foreach ($blocks[$index]['data']['columns'] ?? [] as $columnIndex => $column)
-                <flux:textarea wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.text" :label="'Column '.($columnIndex + 1)" rows="3" />
+                @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
+                @php($colImage = ! empty($column['image_id']) ? \App\Models\Image::find($column['image_id']) : null)
+                <div class="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="column-{{ $columnIndex }}">
+                    <div class="flex items-center justify-between">
+                        <flux:label>Column {{ $columnIndex + 1 }}</flux:label>
+                        @if (count($blocks[$index]['data']['columns']) > 1)
+                            <flux:button size="xs" variant="ghost" icon="trash" wire:click="removeColumn({{ $index }}, {{ $columnIndex }})" aria-label="Remove column" />
+                        @endif
+                    </div>
+
+                    <flux:select wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.type" label="Contains" size="sm">
+                        <flux:select.option value="text">Text</flux:select.option>
+                        <flux:select.option value="image">Image</flux:select.option>
+                    </flux:select>
+
+                    @if (($column['type'] ?? 'text') === 'image')
+                        @if ($colImage)
+                            <div class="flex items-start gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+                                <img src="{{ $colImage->url() }}" alt="" class="size-10 shrink-0 rounded object-cover">
+                                <p class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300">{{ $colImage->title }}</p>
+                            </div>
+                        @endif
+                        <div class="flex flex-wrap items-center gap-2">
+                            <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-col-{{ $columnIndex }}')">
+                                {{ $colImage ? 'Change image' : 'Select from Media Library' }}
+                            </flux:button>
+                            @if ($colImage)
+                                <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-col-{{ $columnIndex }}')">
+                                    Remove
+                                </flux:button>
+                            @endif
+                        </div>
+                        <flux:input wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.alt" label="Alt text" size="sm" />
+                    @else
+                        <flux:textarea wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.text" label="Text" rows="3" />
+                    @endif
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <flux:input type="color" wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background" label="Background" size="sm" />
+                        <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-col-{{ $columnIndex }}-bg')">
+                            {{ $colBgImage ? 'Change bg' : 'Bg image' }}
+                        </flux:button>
+                    </div>
+                    @if ($colBgImage)
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-col-{{ $columnIndex }}-bg')">
+                            Remove background image
+                        </flux:button>
+                    @endif
+                </div>
             @endforeach
+
+            @if (count($blocks[$index]['data']['columns'] ?? []) < 4)
+                <flux:button size="sm" variant="ghost" icon="plus" wire:click="addColumn({{ $index }})">Add column</flux:button>
+            @endif
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::LOGO)
+    @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)
+        <div class="space-y-4">
+            <p class="text-xs text-slate-500">
+                Pulled straight from {{ $case->isLogoDark() ? 'the dark logo' : 'the logo' }} in Site Config — Configuration → Site Settings, not from this block.
+            </p>
+            <flux:input wire:model.live="{{ $prefix }}.width" label="Width" placeholder="160px" />
+            <flux:select wire:model.live="{{ $prefix }}.align" label="Alignment">
+                <flux:select.option value="left">Left</flux:select.option>
+                <flux:select.option value="center">Center</flux:select.option>
+                <flux:select.option value="right">Right</flux:select.option>
+            </flux:select>
+            <flux:input wire:model.live="{{ $prefix }}.link_url" label="Link URL" placeholder="&#123;&#123;site.url&#125;&#125;" />
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::FAVICON)
+        <div class="space-y-4">
+            <p class="text-xs text-slate-500">Pulled straight from the favicon in Site Config — Configuration → Site Settings.</p>
+            <flux:input wire:model.live="{{ $prefix }}.width" label="Width" placeholder="32px" />
+            <flux:select wire:model.live="{{ $prefix }}.align" label="Alignment">
+                <flux:select.option value="left">Left</flux:select.option>
+                <flux:select.option value="center">Center</flux:select.option>
+                <flux:select.option value="right">Right</flux:select.option>
+            </flux:select>
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
+        <div class="space-y-4">
+            <flux:select wire:model.live="{{ $prefix }}.source" label="Links">
+                <flux:select.option value="config">Use Site Config's socials</flux:select.option>
+                <flux:select.option value="custom">Add my own</flux:select.option>
+            </flux:select>
+
+            @if (($blocks[$index]['data']['source'] ?? 'config') === 'custom')
+                <div class="space-y-2">
+                    @foreach ($blocks[$index]['data']['custom_links'] ?? [] as $linkIndex => $link)
+                        <div class="flex items-end gap-2" wire:key="social-link-{{ $linkIndex }}">
+                            <flux:select wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.platform" label="Icon" size="sm" class="w-32">
+                                <flux:select.option value="">None</flux:select.option>
+                                @foreach (\App\Enums\SocialHandleEnum::cases() as $handle)
+                                    <flux:select.option value="{{ $handle->value }}">{{ $handle->label() }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                            <flux:input wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.label" label="Label" size="sm" placeholder="e.g. Our blog" />
+                            <flux:input wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.url" label="URL" size="sm" />
+                            <flux:button size="sm" variant="ghost" icon="trash" wire:click="removeSocialLink({{ $index }}, {{ $linkIndex }})" aria-label="Remove link" />
+                        </div>
+                    @endforeach
+                    <flux:button size="sm" variant="ghost" icon="plus" wire:click="addSocialLink({{ $index }})">Add link</flux:button>
+                </div>
+            @else
+                <p class="text-xs text-slate-500">
+                    Reads whatever is saved under Configuration → Social Handles. Add or edit them there.
+                </p>
+            @endif
+
+            <flux:select wire:model.live="{{ $prefix }}.style" label="Button style">
+                <flux:select.option value="image">Icon image</flux:select.option>
+                <flux:select.option value="text">Name only</flux:select.option>
+            </flux:select>
+
+            @if (($blocks[$index]['data']['style'] ?? 'image') === 'image')
+                <flux:select wire:model.live="{{ $prefix }}.variant" label="Icon color">
+                    <flux:select.option value="default">Brand colours</flux:select.option>
+                    <flux:select.option value="white">White</flux:select.option>
+                    <flux:select.option value="black">Black</flux:select.option>
+                </flux:select>
+            @endif
+
+            <flux:select wire:model.live="{{ $prefix }}.align" label="Alignment">
+                <flux:select.option value="left">Left</flux:select.option>
+                <flux:select.option value="center">Center</flux:select.option>
+                <flux:select.option value="right">Right</flux:select.option>
+            </flux:select>
         </div>
         @break
 

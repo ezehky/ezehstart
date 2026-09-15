@@ -76,10 +76,76 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::COLUMNS)
-        <div class="grid gap-3" style="grid-template-columns: repeat({{ count($data['columns'] ?? []) ?: 2 }}, 1fr)">
+        @php($rowBgImage = ! empty($data['background_image_id']) ? \App\Models\Image::find($data['background_image_id']) : null)
+        <div
+            class="grid gap-3 rounded p-2"
+            style="grid-template-columns: repeat({{ count($data['columns'] ?? []) ?: 2 }}, 1fr); background-color: {{ $data['background'] ?? 'transparent' }}; {{ $rowBgImage ? 'background-image:url('.$rowBgImage->url().');background-size:cover;background-position:center;' : '' }}"
+        >
             @foreach ($data['columns'] ?? [] as $column)
-                <div class="rounded border border-dashed border-slate-200 p-2 text-xs text-slate-500 dark:border-slate-700">{{ $column['text'] ?? '' }}</div>
+                @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
+                <div
+                    class="rounded border border-dashed border-slate-200 p-2 text-xs text-slate-500 dark:border-slate-700"
+                    style="background-color: {{ $column['background'] ?? 'transparent' }}; {{ $colBgImage ? 'background-image:url('.$colBgImage->url().');background-size:cover;background-position:center;' : '' }}"
+                >
+                    @if (($column['type'] ?? 'text') === 'image')
+                        @php($colImage = ! empty($column['image_id']) ? \App\Models\Image::find($column['image_id']) : null)
+                        @if ($colImage)
+                            <img src="{{ $colImage->url() }}" alt="" class="w-full rounded">
+                        @else
+                            <flux:icon name="photo" class="mx-auto size-4 text-slate-300" />
+                        @endif
+                    @else
+                        {{ $column['text'] ?? '' }}
+                    @endif
+                </div>
             @endforeach
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::LOGO)
+    @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)
+        @php($src = kSiteConfig($case->isLogoDark() ? 'logo-dark' : 'logo'))
+        <div class="{{ $align }}">
+            @if ($src)
+                <img src="{{ $src }}" alt="" style="width: {{ $data['width'] ?? '160px' }}" class="inline-block">
+            @else
+                <div class="inline-flex items-center gap-1 rounded border border-dashed border-slate-200 px-2 py-1 text-xs text-slate-400 dark:border-slate-700">
+                    <flux:icon name="photo" class="size-3.5" /> No {{ $case->isLogoDark() ? 'dark logo' : 'logo' }} set in Site Config
+                </div>
+            @endif
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::FAVICON)
+        @php($src = kSiteConfig('favicon'))
+        <div class="{{ $align }}">
+            @if ($src)
+                <img src="{{ $src }}" alt="" style="width: {{ $data['width'] ?? '32px' }}" class="inline-block">
+            @else
+                <div class="inline-flex items-center gap-1 rounded border border-dashed border-slate-200 px-2 py-1 text-xs text-slate-400 dark:border-slate-700">
+                    <flux:icon name="star" class="size-3.5" /> No favicon set in Site Config
+                </div>
+            @endif
+        </div>
+        @break
+
+    @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
+        @php($links = ($data['source'] ?? 'config') === 'custom' ? ($data['custom_links'] ?? []) : (array) kSiteConfig('social-handles', default: []))
+        <div class="flex {{ ($data['align'] ?? 'center') === 'left' ? 'justify-start' : (($data['align'] ?? 'center') === 'right' ? 'justify-end' : 'justify-center') }} gap-2">
+            @forelse ($links as $link)
+                @php($handle = \App\Enums\SocialHandleEnum::tryFrom($link['platform'] ?? ''))
+                @if (($data['style'] ?? 'image') === 'image' && $handle)
+                    <div class="flex size-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                        <flux:icon :name="$handle->icon()" class="size-3.5 text-slate-500 dark:text-slate-300" />
+                    </div>
+                @else
+                    <span class="rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {{ $link['label'] ?? $handle?->label() ?? $link['platform'] ?? 'Link' }}
+                    </span>
+                @endif
+            @empty
+                <p class="text-xs text-slate-400">No social links configured.</p>
+            @endforelse
         </div>
         @break
 

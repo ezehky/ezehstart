@@ -585,7 +585,12 @@ new class extends Component
 >
     @include('pages.admin.marketing.partials._campaign-toolbar', ['closeRoute' => route('admin.marketing.campaigns')])
 
-    <div class="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+    <div
+        @class([
+            'flex-1 overflow-y-auto px-4 sm:px-6',
+            'py-6' => $step !== 'builder',
+        ])
+    class="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         @if ($step === 'details')
             @include('pages.admin.marketing.partials._campaign-details')
         @elseif ($step === 'builder')

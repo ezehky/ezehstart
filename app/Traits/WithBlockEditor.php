@@ -167,15 +167,13 @@ trait WithBlockEditor
     }
 
     /**
-     * Clear one image block's picture without clearing the alt text, link and
+     * Clear one image slot's picture without clearing the alt text, link and
      * sizing around it — the picker has no "nothing" to choose, so removing is a
      * control of its own next to it.
      */
-    public function removeBlockImage(int $index): void
+    public function removeBlockImage(string $slot): void
     {
-        if (isset($this->blocks[$index]['data'])) {
-            $this->blocks[$index]['data']['image_id'] = null;
-        }
+        $this->applyImageSlot($slot, null);
     }
 
     /**
@@ -184,15 +182,104 @@ trait WithBlockEditor
     #[On('imagesSelected')]
     public function whenBlockImageSelected(array $ids, array $urls = [], ?string $slot = null): void
     {
-        if ($slot === null || ! str_starts_with($slot, 'block-')) {
+        if ($slot === null) {
             return;
         }
 
-        $index = (int) substr($slot, strlen('block-'));
+        $this->applyImageSlot($slot, $ids[0] ?? null);
+    }
 
-        if (isset($this->blocks[$index])) {
-            $this->blocks[$index]['data']['image_id'] = $ids[0] ?? null;
+    /**
+     * Every image control on the canvas — a block's own picture, a column's
+     * picture, or either one's background image — shares this one picker, keyed
+     * by a slot string rather than each having its own pair of methods. The slot
+     * encodes where the id lands: "block-3" is the block's own image_id,
+     * "block-3-bg" its background_image_id, "block-3-col-1" column 1's image_id,
+     * "block-3-col-1-bg" column 1's background_image_id.
+     */
+    private function applyImageSlot(string $slot, ?int $imageId): void
+    {
+        if (! preg_match('/^block-(?<block>\d+)(?:-col-(?<column>\d+))?(?<bg>-bg)?$/', $slot, $m)) {
+            return;
         }
+
+        $index = (int) $m['block'];
+
+        if (! isset($this->blocks[$index]['data'])) {
+            return;
+        }
+
+        $field = ($m['bg'] ?? '') !== '' ? 'background_image_id' : 'image_id';
+
+        if (isset($m['column']) && $m['column'] !== '') {
+            $column = (int) $m['column'];
+
+            if (isset($this->blocks[$index]['data']['columns'][$column])) {
+                $this->blocks[$index]['data']['columns'][$column][$field] = $imageId;
+            }
+
+            return;
+        }
+
+        $this->blocks[$index]['data'][$field] = $imageId;
+    }
+
+    /**
+     * Add a column to a Columns block, up to four — a row wide enough to hold a
+     * fifth would stop reading as a row in most inboxes' width. New columns start
+     * as text, empty, with no background of their own.
+     */
+    public function addColumn(int $index): void
+    {
+        if (! isset($this->blocks[$index]['data']['columns']) || count($this->blocks[$index]['data']['columns']) >= 4) {
+            return;
+        }
+
+        $this->blocks[$index]['data']['columns'][] = [
+            'type' => 'text',
+            'text' => '',
+            'image_id' => null,
+            'alt' => '',
+            'background' => null,
+            'background_image_id' => null,
+        ];
+    }
+
+    /**
+     * Remove one column from a Columns block, never down to zero — an empty
+     * columns block has nothing left to render.
+     */
+    public function removeColumn(int $index, int $column): void
+    {
+        if (! isset($this->blocks[$index]['data']['columns']) || count($this->blocks[$index]['data']['columns']) <= 1) {
+            return;
+        }
+
+        unset($this->blocks[$index]['data']['columns'][$column]);
+        $this->blocks[$index]['data']['columns'] = array_values($this->blocks[$index]['data']['columns']);
+    }
+
+    /**
+     * Add a row to a Socials block's own link list — only reachable while its
+     * source is "custom"; a "config" block has nothing of its own to add to.
+     */
+    public function addSocialLink(int $index): void
+    {
+        if (! isset($this->blocks[$index]['data']['custom_links'])) {
+            return;
+        }
+
+        $this->blocks[$index]['data']['custom_links'][] = ['label' => '', 'url' => '', 'platform' => ''];
+    }
+
+    public function removeSocialLink(int $index, int $link): void
+    {
+        if (! isset($this->blocks[$index]['data']['custom_links'][$link])) {
+            return;
+        }
+
+        unset($this->blocks[$index]['data']['custom_links'][$link]);
+        $this->blocks[$index]['data']['custom_links'] = array_values($this->blocks[$index]['data']['custom_links']);
     }
 
     protected function selectedBlockIndex(): ?int
