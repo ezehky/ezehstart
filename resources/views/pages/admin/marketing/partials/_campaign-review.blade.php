@@ -4,7 +4,7 @@
             <flux:heading level="2" size="lg">Email settings</flux:heading>
 
             <flux:input wire:model="from_name" label="From name" />
-            <flux:input wire:model="from_email" label="From email" description="Must match a verified sending address — see Email Settings." />
+            <flux:input wire:model="from_email" label="From email" description="Must match a verified sending address. See Email Settings." />
             <flux:input wire:model="reply_to" label="Reply-to (optional)" />
 
             <flux:button wire:click="saveSenderDetails" variant="ghost" size="sm" icon="check">Save sender details</flux:button>
