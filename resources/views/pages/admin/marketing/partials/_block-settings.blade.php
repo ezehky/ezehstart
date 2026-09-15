@@ -34,9 +34,9 @@
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <flux:label>Text</flux:label>
-                    @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'text'])
+                    @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'text', 'richtext' => true])
                 </div>
-                <flux:textarea wire:model.live="{{ $prefix }}.text" rows="4" />
+                <x-form.rich-text wire:model="{{ $prefix }}.text" />
             </div>
             <flux:select wire:model.live="{{ $prefix }}.align" label="Alignment">
                 <flux:select.option value="left">Left</flux:select.option>

@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
             NotificationTypeSeeder::class,
             CountrySeeder::class,
             UserSeeder::class,
+            EmailSectionSeeder::class,
         ];
 
         $this->call($seeders);

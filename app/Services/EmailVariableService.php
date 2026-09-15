@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\SocialHandleEnum;
 use App\Models\User;
 use Illuminate\Container\Attributes\Singleton;
 
@@ -20,9 +21,22 @@ class EmailVariableService
     private const PATTERN = '/\{\{\s*([a-zA-Z0-9_.]+)\s*(?:\|\s*default:\s*[\'"]([^\'\"]*)[\'"]\s*)?\}\}/';
 
     /**
-     * @param  array<string, mixed>  $context  Dot-path values, e.g. ['user' => ['first_name' => 'Judith'], 'post' => [...]].
+     * The one token whose substituted value is already-safe markup rather than
+     * text an admin typed — see baseContext(). Only this path skips escaping in
+     * `html: true` mode.
      */
-    public function resolve(?string $text, array $context = [], ?User $recipient = null): string
+    private const RAW_HTML_TOKEN = 'site.social_links';
+
+    /**
+     * @param  array<string, mixed>  $context  Dot-path values, e.g. ['user' => ['first_name' => 'Judith'], 'post' => [...]].
+     * @param  bool  $html  When true, a substituted value is HTML-escaped before
+     *                      insertion — the text is about to be dropped into HTML
+     *                      (a richtext paragraph or an HTML block) rather than
+     *                      escaped as a whole afterward. site.social_links is the
+     *                      one exception: it is server-built markup, never typed
+     *                      by an admin, so it is inserted raw.
+     */
+    public function resolve(?string $text, array $context = [], ?User $recipient = null, bool $html = false): string
     {
         if ($text === null || $text === '') {
             return (string) $text;
@@ -30,13 +44,14 @@ class EmailVariableService
 
         $context = [...$this->baseContext($recipient), ...$context];
 
-        return preg_replace_callback(self::PATTERN, function (array $matches) use ($context) {
+        return preg_replace_callback(self::PATTERN, function (array $matches) use ($context, $html) {
             $path = $matches[1];
             $default = $matches[2] ?? '';
 
             $value = data_get($context, $path);
+            $resolved = $value !== null && $value !== '' ? (string) $value : $default;
 
-            return $value !== null && $value !== '' ? (string) $value : $default;
+            return $html && $path !== self::RAW_HTML_TOKEN ? e($resolved) : $resolved;
         }, $text) ?? $text;
     }
 
@@ -52,6 +67,11 @@ class EmailVariableService
             'site' => [
                 'name' => (string) kSiteConfig('name'),
                 'url' => config('app.url'),
+                'logo' => (string) kSiteConfig('logo'),
+                'email' => (string) kSiteConfig('email'),
+                'contact_email' => (string) kSiteConfig('contact-email'),
+                'social' => $this->socialUrls(),
+                'social_links' => $this->socialLinksHtml(),
             ],
             'unsubscribe_url' => '#',
         ];
@@ -69,6 +89,45 @@ class EmailVariableService
         return $context;
     }
 
+    /**
+     * The configured social handles, keyed by platform, as {{site.social.facebook}}
+     * and friends resolve to.
+     *
+     * @return array<string, string>
+     */
+    private function socialUrls(): array
+    {
+        return collect($this->socialHandles())
+            ->mapWithKeys(fn (array $handle) => [$handle['platform'] => $handle['url']])
+            ->all();
+    }
+
+    /**
+     * A small row of plain-text social links, already escaped on the way in — the
+     * one token that is inserted raw in html mode (see resolve()) because it is
+     * built here, not typed by an admin. Empty on an install with no handles
+     * configured, which renders as nothing rather than a broken row.
+     */
+    private function socialLinksHtml(): string
+    {
+        $links = collect($this->socialHandles())
+            ->map(function (array $handle) {
+                $label = SocialHandleEnum::tryFrom($handle['platform'])?->label() ?? $handle['platform'];
+
+                return sprintf('<a href="%s" style="color:inherit;text-decoration:underline;">%s</a>', e($handle['url']), e($label));
+            });
+
+        return $links->implode(' &middot; ');
+    }
+
+    /**
+     * @return array<int, array{platform: string, url: string}>
+     */
+    private function socialHandles(): array
+    {
+        return (array) kSiteConfig('social-handles', default: []);
+    }
+
     private function firstName(?string $name): string
     {
         return trim(explode(' ', (string) $name, 2)[0] ?? '');
@@ -81,13 +140,29 @@ class EmailVariableService
      */
     public function knownTokens(): array
     {
-        return [
+        $tokens = [
             '{{user.first_name | default: "there"}}' => 'First name',
             '{{user.name}}' => 'Full name',
             '{{user.email}}' => 'Email address',
             '{{site.name}}' => 'Site name',
             '{{site.url}}' => 'Site URL',
+            '{{site.logo}}' => 'Site logo URL',
+            '{{site.email}}' => 'Site email',
+            '{{site.contact_email}}' => 'Support email',
             '{{unsubscribe_url}}' => 'Unsubscribe link',
         ];
+
+        $handles = collect($this->socialHandles());
+
+        foreach ($handles as $handle) {
+            $label = SocialHandleEnum::tryFrom($handle['platform'])?->label() ?? $handle['platform'];
+            $tokens["{{site.social.{$handle['platform']}}}"] = "{$label} link";
+        }
+
+        if ($handles->isNotEmpty()) {
+            $tokens['{{site.social_links}}'] = 'Social links row';
+        }
+
+        return $tokens;
     }
 }

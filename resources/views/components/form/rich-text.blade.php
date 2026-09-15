@@ -33,6 +33,7 @@
         x-data="{ content: @entangle($wireModel), ...richText(@js($placeholder)) }"
         x-on:image-picked.window="insertImage($event.detail.url, $event.detail.alt)"
         x-on:video-picked.window="insertVideo($event.detail.url)"
+        x-on:personalize-token.window="insertToken($event.detail.token)"
         class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
     >
         {{-- Toolbar. Every control carries a tooltip: the row is nearly all icons,

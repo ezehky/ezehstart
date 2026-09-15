@@ -14,7 +14,11 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::PARAGRAPH)
-        <p class="{{ $align }} text-[14px] leading-relaxed" style="color: {{ $data['color'] ?? '#475569' }}">{{ $data['text'] ?? '' }}</p>
+        {{-- Trusted here: this is the admin's own live, unsaved input in their own
+             session, the same trust level the rich-text editor itself renders at.
+             The escaped/sanitized version is what actually ships — see
+             EmailRenderService::renderBlock(). --}}
+        <div class="{{ $align }} text-[14px] leading-relaxed" style="color: {{ $data['color'] ?? '#475569' }}">{!! $data['text'] ?? '' !!}</div>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::BUTTON)

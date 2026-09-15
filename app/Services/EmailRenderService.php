@@ -90,10 +90,10 @@ class EmailRenderService
             ), '34px 40px 10px'),
 
             EmailBlockTypeEnum::PARAGRAPH => $this->row(sprintf(
-                '<p style="margin:0;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;text-align:%s;color:%s;">%s</p>',
+                '<div style="margin:0;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;text-align:%s;color:%s;">%s</div>',
                 $data['align'] ?? 'left',
                 $data['color'] ?? '#475569',
-                nl2br($text($data['text'] ?? '')),
+                $this->sanitize($variables->resolve($data['text'] ?? '', recipient: $recipient, html: true)),
             ), '10px 40px'),
 
             EmailBlockTypeEnum::BUTTON => $this->row(sprintf(
@@ -119,7 +119,10 @@ class EmailRenderService
 
             EmailBlockTypeEnum::IMAGE => $this->renderImage($data, $text),
 
-            EmailBlockTypeEnum::HTML => $this->row($this->sanitize($data['html'] ?? ''), '10px 40px'),
+            EmailBlockTypeEnum::HTML => $this->row(
+                $this->sanitize($variables->resolve($data['html'] ?? '', recipient: $recipient, html: true)),
+                '10px 40px',
+            ),
 
             EmailBlockTypeEnum::DYNAMIC_CONTENT => $this->renderDynamicContent($data),
 

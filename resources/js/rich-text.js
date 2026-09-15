@@ -298,5 +298,22 @@ export default (placeholder = "") => {
             editor.chain().focus().setVideoEmbed(url).run();
             this.push();
         },
+
+        /**
+         * Insert a merge token ("{{user.first_name}}") at the caret — the
+         * "+ Personalize" menu's action on a richtext field.
+         *
+         * This editor is wire:ignore'd with no watcher on its entangled content
+         * (see the class docblock), so a token appended server-side would land in
+         * the Livewire property but never reach the document on screen, and get
+         * silently overwritten by the next push(). Inserting through the editor's
+         * own API keeps both in step the same way typing does.
+         */
+        insertToken(token) {
+            if (!editor || !token) return;
+
+            editor.chain().focus().insertContent(token).run();
+            this.push();
+        },
     };
 };

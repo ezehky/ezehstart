@@ -152,12 +152,15 @@ new class extends Component
     <div class="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
         <flux:card class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <flux:input wire:model="name" label="Template name" placeholder="e.g. Newsletter Template" />
-            <flux:select wire:model="footer_section_id" label="Footer">
-                <flux:select.option value="">No footer</flux:select.option>
-                @foreach ($this->footers as $footer)
-                    <flux:select.option value="{{ $footer->id }}">{{ $footer->name }}</flux:select.option>
-                @endforeach
-            </flux:select>
+            <div class="flex items-end gap-2">
+                <flux:select wire:model="footer_section_id" label="Footer" class="flex-1">
+                    <flux:select.option value="">No footer</flux:select.option>
+                    @foreach ($this->footers as $footer)
+                        <flux:select.option value="{{ $footer->id }}">{{ $footer->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+                @include('pages.admin.marketing.partials._design-settings')
+            </div>
             <flux:input wire:model="description" label="Description" class="sm:col-span-2" />
         </flux:card>
 

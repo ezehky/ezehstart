@@ -16,8 +16,10 @@ use App\Services\EmailCampaignService;
 use App\Services\EmailRenderService;
 use App\Services\EmailSectionService;
 use App\Services\EmailTemplateService;
+use App\Services\EmailVariableService;
 use App\Services\SiteConfigurationService;
 use App\Services\UserService;
+use Database\Seeders\EmailSectionSeeder;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
@@ -135,6 +137,26 @@ test('an unused section deletes cleanly', function () {
 
     expect(app(EmailSectionService::class)->delete($section))->toBeNull();
     expect(EmailSection::find($section->id))->toBeNull();
+});
+
+test('the section seeder ships one default Header, Footer, CTA and Promo, and never duplicates them', function () {
+    (new EmailSectionSeeder)->run();
+
+    foreach ([EmailSectionTypeEnum::HEADER, EmailSectionTypeEnum::FOOTER, EmailSectionTypeEnum::CTA, EmailSectionTypeEnum::PROMO] as $type) {
+        expect(EmailSection::query()->ofType($type)->defaults()->count())->toBe(1);
+    }
+
+    expect(EmailSection::query()->ofType(EmailSectionTypeEnum::CUSTOM)->count())->toBe(0);
+
+    // Re-running must not duplicate, and must not touch a type an admin already
+    // built their own section for.
+    $custom = EmailSection::query()->ofType(EmailSectionTypeEnum::CTA)->first();
+    $custom->update(['name' => 'My Own CTA']);
+
+    (new EmailSectionSeeder)->run();
+
+    expect(EmailSection::query()->ofType(EmailSectionTypeEnum::CTA)->count())->toBe(1)
+        ->and(EmailSection::query()->ofType(EmailSectionTypeEnum::CTA)->first()->name)->toBe('My Own CTA');
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -435,6 +457,34 @@ test('a saved section block renders the section body, not just its name', functi
     expect($html)->toContain('Sale ends Friday.');
 });
 
+test('a paragraph block renders as sanitized html, with an unsubscribe token resolved inside a link', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'paragraph', 'data' => [
+            'text' => '<p>If you no longer wish to receive these, <a href="{{unsubscribe_url}}">unsubscribe here</a>.</p><script>alert(1)</script>',
+        ]],
+    ]]]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('<a href="#">unsubscribe here</a>')
+        ->and($html)->not->toContain('<script>');
+});
+
+test('a typed token value is html-escaped in html mode, but the server-built social links row is inserted raw', function () {
+    $configs = app(SiteConfigurationService::class)->getConfigs(raw: true);
+    app(SiteConfigurationService::class)->update([...$configs, 'social-handles' => [
+        ['platform' => 'facebook', 'url' => 'https://facebook.com/acme'],
+    ]]);
+
+    $variables = app(EmailVariableService::class);
+
+    expect($variables->resolve('{{site.name}}', context: ['site' => ['name' => '<b>Acme</b>']], html: true))
+        ->toBe('&lt;b&gt;Acme&lt;/b&gt;')
+        ->and($variables->resolve('{{site.social_links}}', html: true))->toContain('<a href="https://facebook.com/acme"')
+        ->and($variables->knownTokens())->toHaveKey('{{site.social.facebook}}')
+        ->and($variables->knownTokens())->toHaveKey('{{site.social_links}}');
+});
+
 test('the footer section is rendered under the body', function () {
     $footer = EmailSection::create([
         'name' => 'Default Footer',
@@ -450,6 +500,24 @@ test('the footer section is rendered under the body', function () {
 
     expect($html)->toContain('Unsubscribe any time.')
         ->and(strpos($html, 'Hello'))->toBeLessThan(strpos($html, 'Unsubscribe any time.'));
+});
+
+test('the builder saves page and letter background settings onto the design, and the render reflects them', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+    $campaign = marketingCampaign();
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->set('design.background', '#111111')
+        ->set('design.container_background', '#222222')
+        ->call('saveBuilder');
+
+    expect($campaign->fresh()->design)->toMatchArray(['background' => '#111111', 'container_background' => '#222222']);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign->fresh())['html'];
+
+    expect($html)->toContain('background:#111111')
+        ->and($html)->toContain('background:#222222');
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
