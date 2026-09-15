@@ -557,6 +557,12 @@ new class extends Component
         $this->respondSuccess('Sending started.', flash: true);
         $this->redirectRoute('admin.marketing.campaigns', navigate: true);
     }
+
+    #[Computed]
+    public function timezones(): array
+    {
+        return DateTimeZone::listIdentifiers();
+    }
 };
 ?>
 
@@ -587,7 +593,7 @@ new class extends Component
         @elseif ($step === 'recipients')
             @include('pages.admin.marketing.partials._campaign-recipients')
         @elseif ($step === 'review')
-            @include('pages.admin.marketing.partials._campaign-review')
+            @include('pages.admin.marketing.partials._campaign-review', ['timezones' => $this->timezones])
         @endif
     </div>
 

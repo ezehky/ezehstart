@@ -16,6 +16,7 @@ enum SocialHandleEnum: string
     case YOUTUBE = 'youtube';
     case LINKEDIN = 'linkedin';
     case WHATSAPP_GROUP = 'whatsapp-group';
+    case PINTEREST = 'pinterest';
 
     public function icon(): string
     {
@@ -127,6 +128,7 @@ enum SocialHandleEnum: string
             self::WHATSAPP_GROUP,
             self::WHATSAPP_SUPPORT,
             self::WHATSAPP_CHANNEL => "https://wa.me/{$handle}",
+            self::PINTEREST => "https://pinterest.com/{$handle}",
         };
     }
 }

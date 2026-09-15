@@ -1,35 +1,39 @@
 @php($recurrence = \App\Enums\EmailRecurrenceEnum::from($email_recurrence))
 @php($customSender = $this::CUSTOM_SENDER)
 
-<div class="mx-auto grid max-w-4xl grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+{{-- max-w-4xl --}}
+
+<div class="mx-auto grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
     <div class="space-y-6">
         <flux:card class="space-y-4">
             <flux:heading level="2" size="lg">Email settings</flux:heading>
 
-            <flux:input wire:model="from_name" label="From name" />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <flux:input wire:model="from_name" label="From name" />
 
-            {{-- A select, not a box. An address the mail service has never been told
-                 to send for is a campaign that lands in spam, so the only choices
-                 are the ones Email Senders has actually been configured with. --}}
-            <flux:select
-                wire:model.live="from_email"
-                label="From email"
-                description="Set these up once under Configuration → Email Senders."
-            >
-                @foreach ($this->senderOptions as $address => $label)
-                    <flux:select.option value="{{ $address }}">{{ $label }}</flux:select.option>
-                @endforeach
+                {{-- A select, not a box. An address the mail service has never been told
+                    to send for is a campaign that lands in spam, so the only choices
+                    are the ones Email Senders has actually been configured with. --}}
+                <flux:select
+                    wire:model.live="from_email"
+                    label="From email"
+                    description:trailing="Set these up once under Configuration → Email Senders."
+                >
+                    @foreach ($this->senderOptions as $address => $label)
+                        <flux:select.option value="{{ $address }}">{{ $label }}</flux:select.option>
+                    @endforeach
 
-                @if ($this->senderDomain)
-                    <flux:select.option value="{{ $customSender }}">
-                        An address at &#64;{{ $this->senderDomain }}
-                    </flux:select.option>
-                @endif
+                    @if ($this->senderDomain)
+                        <flux:select.option value="{{ $customSender }}">
+                            An address at &#64;{{ $this->senderDomain }}
+                        </flux:select.option>
+                    @endif
 
-                @if ($from_email !== $customSender && $from_email !== '' && ! isset($this->senderOptions[$from_email]))
-                    <flux:select.option value="{{ $from_email }}">{{ $from_email }} (not configured)</flux:select.option>
-                @endif
-            </flux:select>
+                    @if ($from_email !== $customSender && $from_email !== '' && ! isset($this->senderOptions[$from_email]))
+                        <flux:select.option value="{{ $from_email }}">{{ $from_email }} (not configured)</flux:select.option>
+                    @endif
+                </flux:select>
+            </div>
 
             @if ($from_email === $customSender)
                 <flux:input
@@ -40,7 +44,7 @@
                 />
             @endif
 
-            <flux:input wire:model="reply_to" label="Reply-to (optional)" />
+            <flux:input wire:model="reply_to" label="Reply-to (optional)" placeholder="e.g example@mail.com" />
 
             <flux:button wire:click="saveSenderDetails" variant="ghost" size="sm" icon="check">Save sender details</flux:button>
         </flux:card>
@@ -49,7 +53,7 @@
             <flux:heading level="3" size="md">Email preview</flux:heading>
             {{-- The iframe scrolls its own document. Wrapping it in a scrollable box
                  too puts a second bar right beside the first. --}}
-            <div class="mx-auto w-full max-w-[500px] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+            <div class="mx-auto w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                 <iframe srcdoc="{{ $this->previewHtml }}" class="h-[420px] w-full" title="Email preview"></iframe>
             </div>
         </flux:card>
@@ -100,7 +104,12 @@
                     <flux:input type="date" wire:model="scheduled_date" label="Date" />
                     <flux:input type="time" wire:model="scheduled_time" label="Time" />
                 </div>
-                <flux:input wire:model="timezone" label="Timezone" placeholder="e.g. Africa/Lagos" />
+
+                <flux:select wire:model="timezone" label="Timezone">
+                    @foreach ($timezones as $tz)
+                        <flux:select.option value="{{ $tz }}">{{ $tz }}</flux:select.option>
+                    @endforeach
+                </flux:select>
             @endif
 
             {{-- A repeat does not re-send this campaign. Each run finishes as its own

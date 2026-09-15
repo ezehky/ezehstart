@@ -314,10 +314,12 @@ new class extends Component
                         />
                     @endif
                 @endif
-
-                <flux:button type="submit" variant="primary" icon="check" class="w-full">Save post</flux:button>
             </flux:card>
         </div>
+
+        <x-util.floating-actions>
+            <flux:button type="submit" variant="primary" icon="check" class="w-full">Save post</flux:button>
+        </x-util.floating-actions>
     </form>
 
     <livewire:livewire.library.image-picker />
