@@ -335,6 +335,30 @@ test('sending a campaign with nobody to reach is refused', function () {
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // EVERY SCREEN RENDERS
 
+test('a new template starts on the details step and moves to the builder once created', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.template-builder');
+
+    expect($component->get('step'))->toBe('details');
+
+    $component->set('name', 'Newsletter Base')
+        ->set('description', 'Starter for the monthly send')
+        ->call('saveDetails');
+
+    $template = EmailTemplate::query()->where('name', 'Newsletter Base')->first();
+
+    expect($template)->not->toBeNull()
+        ->and($template->description)->toBe('Starter for the monthly send');
+
+    // Reopening the same (now-existing) template lands straight on the builder
+    // step rather than asking for the details again.
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.template-builder', ['template' => $template])
+        ->assertSet('step', 'builder');
+});
+
 test('the template builder renders with every block type present', function () {
     $admin = userOfType(UserTypeEnum::ADMIN);
 
@@ -395,11 +419,14 @@ test('choosing an image for a block sets it via the shared picker', function () 
 
     $component = Livewire::actingAs($admin)
         ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
-        ->call('addBlock', 'image')
-        ->call('chooseImage', 'block-0')
-        ->assertDispatched('open-image-picker', slot: 'block-0', multiple: false, max: 1, selected: []);
+        ->call('addBlock', 'image');
 
-    $component->call('whenBlockImageSelected', [42], [], 'block-0');
+    $slot = 'img:'.$component->get('blocks.0.id');
+
+    $component->call('chooseImage', $slot)
+        ->assertDispatched('open-image-picker', slot: $slot, multiple: false, max: 1, selected: []);
+
+    $component->call('whenBlockImageSelected', [42], [], $slot);
 
     expect($component->get('blocks.0.data.image_id'))->toBe(42);
 });
@@ -537,14 +564,26 @@ test('the design dropdown\'s brand colour, radius and accent bar reach the rende
         ->and($html)->toContain('background:#FF0000;');
 });
 
-test('a columns block honours a per-column and a row background', function () {
+test('a columns block honours a per-column and a row background, and renders each column\'s nested blocks', function () {
     $campaign = marketingCampaign(['content' => ['blocks' => [
         ['id' => 'b1', 'type' => 'columns', 'data' => [
             'background' => '#EEEEEE',
             'background_image_id' => null,
             'columns' => [
-                ['type' => 'text', 'text' => 'Left', 'image_id' => null, 'alt' => '', 'background' => '#ABCDEF', 'background_image_id' => null],
-                ['type' => 'text', 'text' => 'Right', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
+                [
+                    'background' => '#ABCDEF',
+                    'background_image_id' => null,
+                    'blocks' => [
+                        ['id' => 'c1', 'type' => 'paragraph', 'data' => ['text' => 'Left column text', 'align' => 'left', 'color' => '#475569']],
+                    ],
+                ],
+                [
+                    'background' => null,
+                    'background_image_id' => null,
+                    'blocks' => [
+                        ['id' => 'c2', 'type' => 'button', 'data' => ['text' => 'Right button', 'url' => 'https://example.test', 'align' => 'center', 'background' => '#A3E635', 'color' => '#0F172A', 'new_tab' => false]],
+                    ],
+                ],
             ],
         ]],
     ]]]);
@@ -552,7 +591,9 @@ test('a columns block honours a per-column and a row background', function () {
     $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
 
     expect($html)->toContain('background-color:#EEEEEE')
-        ->and($html)->toContain('background-color:#ABCDEF');
+        ->and($html)->toContain('background-color:#ABCDEF')
+        ->and($html)->toContain('Left column text')
+        ->and($html)->toContain('Right button');
 });
 
 test('the dynamic content layout actually changes what gets rendered', function () {
@@ -649,6 +690,73 @@ test('adding and removing a column keeps at least one column and caps at four', 
     expect($component->get('blocks.0.data.columns'))->toHaveCount(1);
 });
 
+test('a column acts as a container: blocks can be added, reordered, duplicated and removed inside it', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'columns', 'data' => EmailBlockTypeEnum::COLUMNS->defaultData()],
+    ]]]);
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('addColumnBlock', 'heading', 0, 0)
+        ->call('addColumnBlock', 'paragraph', 0, 0);
+
+    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2)
+        ->and($component->get('blocks.0.data.columns.0.blocks.0.type'))->toBe('heading')
+        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('paragraph')
+        // Selecting the block it just added, the same way addBlock() does for a
+        // top-level block, is what lets its settings show up in the right pane
+        // immediately.
+        ->and($component->get('selectedBlockId'))->toBe($component->get('blocks.0.data.columns.0.blocks.1.id'));
+
+    // A Columns or Section type reaching addColumnBlock directly (bypassing the
+    // palette, which never renders them as nestable) is silently ignored.
+    $component->call('addColumnBlock', 'columns', 0, 0)
+        ->call('addColumnBlock', 'section', 0, 0);
+    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2);
+
+    $component->call('moveColumnBlockUp', 0, 0, 1);
+    expect($component->get('blocks.0.data.columns.0.blocks.0.type'))->toBe('paragraph')
+        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('heading');
+
+    $component->call('duplicateColumnBlock', 0, 0, 0);
+    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(3)
+        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('paragraph');
+
+    $component->call('removeColumnBlock', 0, 0, 2);
+    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2);
+
+    // Removing the currently-selected nested block clears the selection rather
+    // than leaving it pointing at an id that no longer exists.
+    $remainingId = $component->get('blocks.0.data.columns.0.blocks.0.id');
+    $component->call('selectBlock', $remainingId)->call('removeColumnBlock', 0, 0, 0);
+    expect($component->get('selectedBlockId'))->toBeNull();
+});
+
+test('a column\'s own image and background-image slots resolve through the shared picker by block id', function () {
+    $campaign = marketingCampaign(['content' => ['blocks' => [
+        ['id' => 'b1', 'type' => 'columns', 'data' => [
+            'background' => null,
+            'background_image_id' => null,
+            'columns' => [
+                ['background' => null, 'background_image_id' => null, 'blocks' => [
+                    ['id' => 'img1', 'type' => 'image', 'data' => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => '100%', 'align' => 'center', 'radius' => 8]],
+                ]],
+                ['background' => null, 'background_image_id' => null, 'blocks' => []],
+            ],
+        ]],
+    ]]]);
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('whenBlockImageSelected', [11], [], 'img:img1')
+        ->call('whenBlockImageSelected', [22], [], 'colbg:b1:1');
+
+    expect($component->get('blocks.0.data.columns.0.blocks.0.data.image_id'))->toBe(11)
+        ->and($component->get('blocks.0.data.columns.1.background_image_id'))->toBe(22);
+});
+
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // ADDRESS ENTRY
 
@@ -710,7 +818,7 @@ test('removing a block image leaves the rest of its settings alone', function ()
 
     $blocks = Livewire::actingAs($admin)
         ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
-        ->call('removeBlockImage', 'block-0')
+        ->call('removeBlockImage', 'img:a')
         ->get('blocks');
 
     expect($blocks[0]['data']['image_id'])->toBeNull()

@@ -13,6 +13,11 @@
         $canvasHeight         ?string an override for the three panes' height class,
                                        so the full-screen builders can fill the
                                        window rather than 75vh of it
+        $design               ?array  the page design (from _design-settings.blade.php),
+                                       painted onto the canvas so it matches what
+                                       EmailRenderService::document() renders — absent
+                                       on the section editor, which has no page design
+                                       of its own, so every read below falls back
 --}}
 
 @php
@@ -22,8 +27,24 @@
         ))
         ->groupBy(fn ($case) => $case->group());
 
+    // $selectedIndex is only meaningful for a TOP-LEVEL selection — used solely to
+    // insert a new palette block after whichever block is currently selected. A
+    // nested selection (a block inside a column) leaves it null, so a palette
+    // click then just appends at the end rather than trying to slot a top-level
+    // block into the middle of a column.
     $selectedIndex = $this->selectedBlockIndex();
-    $selected = $selectedIndex !== null ? $blocks[$selectedIndex] : null;
+    $selected = $this->selectedBlockId ? $this->findBlock($this->selectedBlockId) : null;
+
+    // $design only exists on hosts that carry a page design (the campaign and
+    // template builders) — the saved section editor has no page around its
+    // blocks, so this reads as an empty array there and every value below falls
+    // back to the same defaults EmailRenderService::document() renders with.
+    $design ??= [];
+    $letterFont = match ($design['font_family'] ?? 'sans') {
+        'serif' => 'Georgia, "Times New Roman", serif',
+        'mono' => '"Courier New", Courier, monospace',
+        default => 'Arial, Helvetica, sans-serif',
+    };
 @endphp
 
 <div class="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-[240px_1fr_300px] dark:border-slate-800">
@@ -47,7 +68,10 @@
     </div>
 
     {{-- CANVAS --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto bg-slate-100 p-6 dark:bg-slate-900 custom-scrollbar">
+    {{-- The page background behind the letter is the one design value shown even
+         where the canvas can't fit a full page — a flat colour swatch, not the
+         actual body tag, so it stays readable in both themes when left unset. --}}
+    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto p-6 custom-scrollbar" style="background: {{ $design['background'] ?? '#F1F5F9' }};">
         {{-- The canvas is a single column of blocks, with the selected block's
              settings in the right-hand pane. The canvas itself is not a form —
              the settings are, and they are keyed to the selected block so that
@@ -67,55 +91,47 @@
              dropped. Named bare, the dragged id and its new position arrive as
              reorderBlocks()'s two real arguments. wire:sort:item is written bare
              too, never quoted: it is handed over as the literal attribute text and
-             never parsed as JavaScript, so a quoted id never matches on drop. --}}
+             never parsed as JavaScript, so a quoted id never matches on drop.
+
+             Everything below the accent bar is styled from $design inline, not
+             Tailwind classes: these are the same values EmailRenderService::document()
+             renders with, chosen freely as hex/px by the admin, so a fixed Tailwind
+             swatch could never track them. --}}
         <div
             wire:sort="reorderBlocks"
             wire:sort:config="{ handle: '[wire\\:sort\\:handle]' }"
-            class="mx-auto w-full max-w-[640px] rounded-md bg-white shadow-sm"
+            class="mx-auto w-full overflow-hidden shadow-sm"
+            style="max-width: {{ (int) ($design['container_width'] ?? 640) }}px; background: {{ $design['container_background'] ?? '#FFFFFF' }}; border-radius: {{ (int) ($design['container_radius'] ?? 6) }}px; font-family: {{ $letterFont }};"
         >
+            @if (! empty($design['accent_bar']))
+                <div style="height: 6px; background: {{ $design['brand'] ?? '#65A30D' }};"></div>
+            @endif
+
             @forelse ($blocks as $index => $block)
                 @php($case = \App\Enums\EmailBlockTypeEnum::tryFrom($block['type']))
                 @continue(! $case)
 
-                <div
-                    wire:key="block-{{ $block['id'] }}"
-                    wire:sort:item="{{ $block['id'] }}"
-                    wire:click="selectBlock('{{ $block['id'] }}')"
-                    @class([
-                        'group relative cursor-pointer',
-                        'outline outline-2 outline-offset-[-2px] outline-lime-500' => $selectedBlockId === $block['id'],
+                @if ($case === \App\Enums\EmailBlockTypeEnum::COLUMNS)
+                    @include('pages.admin.marketing.partials._columns-canvas-item', [
+                        'block' => $block,
+                        'index' => $index,
+                        'selectedBlockId' => $selectedBlockId,
                     ])
-                >
-                    <div @class([
-                        'pointer-events-none absolute -top-3 start-2.5 z-10 rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
-                        'opacity-100' => $selectedBlockId === $block['id'],
-                    ])>{{ $case->label() }}</div>
-
-                    <div @class([
-                        'absolute -top-3 end-2.5 z-10 flex gap-0.5 rounded bg-slate-900 p-0.5 opacity-0 group-hover:opacity-100',
-                        'opacity-100' => $selectedBlockId === $block['id'],
-                    ])>
-                        <button type="button" wire:sort:handle class="cursor-grab rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white active:cursor-grabbing" aria-label="Drag to reorder">
-                            <flux:icon name="bars-3" class="size-3" />
-                        </button>
-                        <button type="button" wire:click.stop="moveBlockUp({{ $index }})" class="rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white" aria-label="Move up">
-                            <flux:icon name="chevron-up" class="size-3" />
-                        </button>
-                        <button type="button" wire:click.stop="moveBlockDown({{ $index }})" class="rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white" aria-label="Move down">
-                            <flux:icon name="chevron-down" class="size-3" />
-                        </button>
-                        <button type="button" wire:click.stop="duplicateBlock({{ $index }})" class="rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white" aria-label="Duplicate">
-                            <flux:icon name="document-duplicate" class="size-3" />
-                        </button>
-                        <button type="button" wire:click.stop="removeBlock({{ $index }})" class="rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white" aria-label="Delete">
-                            <flux:icon name="trash" class="size-3" />
-                        </button>
-                    </div>
-
-                    <div class="pointer-events-none p-6">
-                        @include('pages.admin.marketing.partials._block-preview', ['case' => $case, 'data' => $block['data']])
-                    </div>
-                </div>
+                @else
+                    @include('pages.admin.marketing.partials._block-canvas-item', [
+                        'block' => $block,
+                        'case' => $case,
+                        'selectedBlockId' => $selectedBlockId,
+                        'sortItem' => $block['id'],
+                        'controls' => [
+                            'select' => "selectBlock('{$block['id']}')",
+                            'moveUp' => "moveBlockUp({$index})",
+                            'moveDown' => "moveBlockDown({$index})",
+                            'duplicate' => "duplicateBlock({$index})",
+                            'remove' => "removeBlock({$index})",
+                        ],
+                    ])
+                @endif
             @empty
                 <div class="p-10 text-center">
                     <flux:icon name="rectangle-stack" class="mx-auto size-8 text-slate-300" />
@@ -145,7 +161,12 @@
                 <p class="font-medium text-slate-950 dark:text-white">{{ $blockCase->label() }} settings</p>
             </div>
 
-            @include('pages.admin.marketing.partials._block-settings', ['case' => $blockCase, 'index' => $selectedIndex])
+            @include('pages.admin.marketing.partials._block-settings', [
+                'case' => $blockCase,
+                'block' => $selected,
+                'prefix' => $this->pathFor($selected['id']).'.data',
+                'index' => $selectedIndex,
+            ])
             </div>
         @endif
     </div>

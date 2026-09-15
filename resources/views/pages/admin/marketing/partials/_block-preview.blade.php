@@ -22,8 +22,11 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::BUTTON)
-        <div class="{{ $align }}">
-            <span class="inline-block rounded-lg px-5 py-2.5 text-[13px] font-bold" style="background: {{ $data['background'] ?? '#A3E635' }}; color: {{ $data['color'] ?? '#0F172A' }}">
+        <div class="{{ ! empty($data['full_width']) ? '' : $align }}">
+            <span
+                @class(['rounded-lg px-5 py-2.5 text-center text-[13px] font-bold', 'block' => ! empty($data['full_width']), 'inline-block' => empty($data['full_width'])])
+                style="background: {{ $data['background'] ?? '#A3E635' }}; color: {{ $data['color'] ?? '#0F172A' }}"
+            >
                 {{ $data['text'] ?? 'Click here' }}
             </span>
         </div>
@@ -75,32 +78,9 @@
         </div>
         @break
 
-    @case(\App\Enums\EmailBlockTypeEnum::COLUMNS)
-        @php($rowBgImage = ! empty($data['background_image_id']) ? \App\Models\Image::find($data['background_image_id']) : null)
-        <div
-            class="grid gap-3 rounded p-2"
-            style="grid-template-columns: repeat({{ count($data['columns'] ?? []) ?: 2 }}, 1fr); background-color: {{ $data['background'] ?? 'transparent' }}; {{ $rowBgImage ? 'background-image:url('.$rowBgImage->url().');background-size:cover;background-position:center;' : '' }}"
-        >
-            @foreach ($data['columns'] ?? [] as $column)
-                @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
-                <div
-                    class="rounded border border-dashed border-slate-200 p-2 text-xs text-slate-500 dark:border-slate-700"
-                    style="background-color: {{ $column['background'] ?? 'transparent' }}; {{ $colBgImage ? 'background-image:url('.$colBgImage->url().');background-size:cover;background-position:center;' : '' }}"
-                >
-                    @if (($column['type'] ?? 'text') === 'image')
-                        @php($colImage = ! empty($column['image_id']) ? \App\Models\Image::find($column['image_id']) : null)
-                        @if ($colImage)
-                            <img src="{{ $colImage->url() }}" alt="" class="w-full rounded">
-                        @else
-                            <flux:icon name="photo" class="mx-auto size-4 text-slate-300" />
-                        @endif
-                    @else
-                        {{ $column['text'] ?? '' }}
-                    @endif
-                </div>
-            @endforeach
-        </div>
-        @break
+    {{-- COLUMNS has no case here: it's a container, rendered directly by
+         _columns-canvas-item.blade.php (each column's children are individually
+         selectable on canvas) rather than through this non-interactive preview. --}}
 
     @case(\App\Enums\EmailBlockTypeEnum::LOGO)
     @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)

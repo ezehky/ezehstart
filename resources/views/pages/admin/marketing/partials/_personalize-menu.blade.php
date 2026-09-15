@@ -1,7 +1,7 @@
 {{--
     The "+ Personalize" control on a text field.
 
-        @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'text'])
+        @include('pages.admin.marketing.partials._personalize-menu', ['block' => $block, 'field' => 'text'])
 
     Pass richtext: true for a field backed by <x-form.rich-text> (currently only
     the Paragraph block). That editor is `wire:ignore`d and has no watcher on its
@@ -23,7 +23,7 @@
                     {{ $label }}
                 </flux:menu.item>
             @else
-                <flux:menu.item wire:click="insertToken({{ $index }}, '{{ $field }}', '{{ $token }}')">
+                <flux:menu.item wire:click="insertToken('{{ $block['id'] }}', '{{ $field }}', '{{ $token }}')">
                     {{ $label }}
                 </flux:menu.item>
             @endif

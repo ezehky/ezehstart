@@ -1,9 +1,21 @@
 {{--
     The selected block's settings, one @case per EmailBlockTypeEnum. Every field binds
-    straight to `blocks.{{ $index }}.data.*` — see WithBlockEditor.
+    to `$prefix.*`, which the caller (_builder.blade.php) computes via
+    WithBlockEditor::pathFor() — "blocks.2.data" for a top-level block,
+    "blocks.2.data.columns.1.blocks.0.data" for a block nested inside a column, so
+    the same @switch below works unmodified regardless of where the block lives.
+
+    Expects:
+        $case    EmailBlockTypeEnum
+        $block   array   the selected block itself (id/type/data)
+        $prefix  string  the Livewire binding-path prefix, ending in ".data"
+        $index   int     the selected block's TOP-LEVEL index — only meaningful
+                           (and only used) by the COLUMNS case's addColumn()/
+                           removeColumn()/addColumnBlock() calls, since a Columns
+                           block is never itself nested inside another one
 --}}
 
-@php($prefix = "blocks.{$index}.data")
+@php($data = $block['data'] ?? [])
 
 @switch($case)
     @case(\App\Enums\EmailBlockTypeEnum::HEADING)
@@ -11,7 +23,7 @@
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <flux:label>Heading text</flux:label>
-                    @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'text'])
+                    @include('pages.admin.marketing.partials._personalize-menu', ['block' => $block, 'field' => 'text'])
                 </div>
                 <flux:textarea wire:model.live="{{ $prefix }}.text" rows="2" />
             </div>
@@ -34,7 +46,7 @@
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <flux:label>Text</flux:label>
-                    @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'text', 'richtext' => true])
+                    @include('pages.admin.marketing.partials._personalize-menu', ['block' => $block, 'field' => 'text', 'richtext' => true])
                 </div>
                 <x-form.rich-text wire:model="{{ $prefix }}.text" />
             </div>
@@ -53,11 +65,12 @@
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <flux:label>URL</flux:label>
-                    @include('pages.admin.marketing.partials._personalize-menu', ['index' => $index, 'field' => 'url'])
+                    @include('pages.admin.marketing.partials._personalize-menu', ['block' => $block, 'field' => 'url'])
                 </div>
                 <flux:input wire:model.live="{{ $prefix }}.url" placeholder="https:// or &#123;&#123;unsubscribe_url&#125;&#125;" />
             </div>
             <flux:checkbox wire:model.live="{{ $prefix }}.new_tab" label="Open in new tab" />
+            <flux:switch wire:model.live="{{ $prefix }}.full_width" label="Full width" description="Stretches to the letter's full content width." />
             <flux:select wire:model.live="{{ $prefix }}.align" label="Alignment">
                 <flux:select.option value="left">Left</flux:select.option>
                 <flux:select.option value="center">Center</flux:select.option>
@@ -79,7 +92,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
-        @php($image = ! empty($blocks[$index]['data']['image_id']) ? \App\Models\Image::find($blocks[$index]['data']['image_id']) : null)
+        @php($image = ! empty($data['image_id']) ? \App\Models\Image::find($data['image_id']) : null)
         <div class="space-y-4">
             <div>
                 <flux:label>Image</flux:label>
@@ -98,11 +111,11 @@
                 @endif
 
                 <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}')">
+                    <flux:button size="sm" icon="photo" wire:click="chooseImage('img:{{ $block['id'] }}')">
                         {{ $image ? 'Change image' : 'Select from Media Library' }}
                     </flux:button>
                     @if ($image)
-                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}')">
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('img:{{ $block['id'] }}')">
                             Remove image
                         </flux:button>
                     @endif
@@ -138,7 +151,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::DYNAMIC_CONTENT)
-        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider($blocks[$index]['data']['content_type'] ?? 'post'))
+        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider($data['content_type'] ?? 'post'))
         <div class="space-y-4">
             <flux:select wire:model.live="{{ $prefix }}.content_type" label="Content type">
                 @foreach (app(\App\Services\DynamicContentRegistryService::class)->options() as $key => $label)
@@ -153,21 +166,21 @@
                 <flux:select.option value="tag">By tag</flux:select.option>
             </flux:select>
 
-            @if (($blocks[$index]['data']['mode'] ?? 'latest') === 'specific')
+            @if (($data['mode'] ?? 'latest') === 'specific')
                 <flux:select wire:model.live="{{ $prefix }}.content_id" label="Item">
                     <flux:select.option value="">Choose one</flux:select.option>
                     @foreach ($provider?->latest(50) ?? [] as $item)
                         <flux:select.option value="{{ $item->id }}">{{ $provider->toCard($item)['title'] }}</flux:select.option>
                     @endforeach
                 </flux:select>
-            @elseif (($blocks[$index]['data']['mode'] ?? '') === 'category')
+            @elseif (($data['mode'] ?? '') === 'category')
                 <flux:select wire:model.live="{{ $prefix }}.category_id" label="Category">
                     <flux:select.option value="">Choose one</flux:select.option>
                     @foreach ($provider?->categories() ?? [] as $id => $label)
                         <flux:select.option value="{{ $id }}">{{ $label }}</flux:select.option>
                     @endforeach
                 </flux:select>
-            @elseif (($blocks[$index]['data']['mode'] ?? '') === 'tag')
+            @elseif (($data['mode'] ?? '') === 'tag')
                 <flux:select wire:model.live="{{ $prefix }}.tag_id" label="Tag">
                     <flux:select.option value="">Choose one</flux:select.option>
                     @foreach ($provider?->tags() ?? [] as $id => $label)
@@ -176,7 +189,7 @@
                 </flux:select>
             @endif
 
-            @unless (($blocks[$index]['data']['mode'] ?? '') === 'specific')
+            @unless (($data['mode'] ?? '') === 'specific')
                 <flux:input type="number" min="1" max="6" wire:model.live="{{ $prefix }}.limit" label="Number of items" />
             @endunless
 
@@ -198,7 +211,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::RELATED_CONTENT)
-        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider($blocks[$index]['data']['content_type'] ?? 'post'))
+        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider($data['content_type'] ?? 'post'))
         <div class="space-y-4">
             <flux:select wire:model.live="{{ $prefix }}.content_type" label="Content type">
                 @foreach (app(\App\Services\DynamicContentRegistryService::class)->options() as $key => $label)
@@ -220,79 +233,57 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::COLUMNS)
-        @php($rowBgImage = ! empty($blocks[$index]['data']['background_image_id']) ? \App\Models\Image::find($blocks[$index]['data']['background_image_id']) : null)
+        @php($rowBgImage = ! empty($data['background_image_id']) ? \App\Models\Image::find($data['background_image_id']) : null)
         <div class="space-y-5">
             {{-- The row itself is a container too, not just its columns — a promo
-                 banner is one wide background image behind two columns of text as
-                 often as it is two separately-coloured columns. --}}
+                 banner is one wide background image behind two columns of content
+                 as often as it is two separately-coloured columns. --}}
             <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                 <flux:label>Row background</flux:label>
                 <div class="grid grid-cols-2 gap-2">
                     <flux:input type="color" wire:model.live="{{ $prefix }}.background" placeholder="None" />
-                    <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-bg')">
+                    <flux:button size="sm" icon="photo" wire:click="chooseImage('bg:{{ $block['id'] }}')">
                         {{ $rowBgImage ? 'Change image' : 'Background image' }}
                     </flux:button>
                 </div>
                 @if ($rowBgImage)
-                    <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-bg')">
+                    <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('bg:{{ $block['id'] }}')">
                         Remove background image
                     </flux:button>
                 @endif
             </div>
 
-            @foreach ($blocks[$index]['data']['columns'] ?? [] as $columnIndex => $column)
+            {{-- Each column's actual content — its blocks — is added and edited
+                 straight on the canvas (see _columns-canvas-item.blade.php), the
+                 same way top-level blocks are. This panel only ever covers what a
+                 column can't show on its own: the column's own background. --}}
+            @foreach ($data['columns'] ?? [] as $columnIndex => $column)
                 @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
-                @php($colImage = ! empty($column['image_id']) ? \App\Models\Image::find($column['image_id']) : null)
-                <div class="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="column-{{ $columnIndex }}">
+                <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="column-{{ $columnIndex }}">
                     <div class="flex items-center justify-between">
                         <flux:label>Column {{ $columnIndex + 1 }}</flux:label>
-                        @if (count($blocks[$index]['data']['columns']) > 1)
+                        @if (count($data['columns']) > 1)
                             <flux:button size="xs" variant="ghost" icon="trash" wire:click="removeColumn({{ $index }}, {{ $columnIndex }})" aria-label="Remove column" />
                         @endif
                     </div>
 
-                    <flux:select wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.type" label="Contains" size="sm">
-                        <flux:select.option value="text">Text</flux:select.option>
-                        <flux:select.option value="image">Image</flux:select.option>
-                    </flux:select>
-
-                    @if (($column['type'] ?? 'text') === 'image')
-                        @if ($colImage)
-                            <div class="flex items-start gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-                                <img src="{{ $colImage->url() }}" alt="" class="size-10 shrink-0 rounded object-cover">
-                                <p class="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300">{{ $colImage->title }}</p>
-                            </div>
-                        @endif
-                        <div class="flex flex-wrap items-center gap-2">
-                            <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-col-{{ $columnIndex }}')">
-                                {{ $colImage ? 'Change image' : 'Select from Media Library' }}
-                            </flux:button>
-                            @if ($colImage)
-                                <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-col-{{ $columnIndex }}')">
-                                    Remove
-                                </flux:button>
-                            @endif
-                        </div>
-                        <flux:input wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.alt" label="Alt text" size="sm" />
-                    @else
-                        <flux:textarea wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.text" label="Text" rows="3" />
-                    @endif
+                    <p class="text-xs text-slate-500">{{ count($column['blocks'] ?? []) }} block(s) — add and edit them on the canvas.</p>
 
                     <div class="grid grid-cols-2 gap-2">
                         <flux:input type="color" wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background" label="Background" size="sm" />
-                        <flux:button size="sm" icon="photo" wire:click="chooseImage('block-{{ $index }}-col-{{ $columnIndex }}-bg')">
+                        <flux:button size="sm" icon="photo" wire:click="chooseImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')">
                             {{ $colBgImage ? 'Change bg' : 'Bg image' }}
                         </flux:button>
                     </div>
                     @if ($colBgImage)
-                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('block-{{ $index }}-col-{{ $columnIndex }}-bg')">
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="removeBlockImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')">
                             Remove background image
                         </flux:button>
                     @endif
                 </div>
             @endforeach
 
-            @if (count($blocks[$index]['data']['columns'] ?? []) < 4)
+            @if (count($data['columns'] ?? []) < 4)
                 <flux:button size="sm" variant="ghost" icon="plus" wire:click="addColumn({{ $index }})">Add column</flux:button>
             @endif
         </div>
@@ -333,9 +324,9 @@
                 <flux:select.option value="custom">Add my own</flux:select.option>
             </flux:select>
 
-            @if (($blocks[$index]['data']['source'] ?? 'config') === 'custom')
+            @if (($data['source'] ?? 'config') === 'custom')
                 <div class="space-y-2">
-                    @foreach ($blocks[$index]['data']['custom_links'] ?? [] as $linkIndex => $link)
+                    @foreach ($data['custom_links'] ?? [] as $linkIndex => $link)
                         <div class="flex items-end gap-2" wire:key="social-link-{{ $linkIndex }}">
                             <flux:select wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.platform" label="Icon" size="sm" class="w-32">
                                 <flux:select.option value="">None</flux:select.option>
@@ -345,10 +336,10 @@
                             </flux:select>
                             <flux:input wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.label" label="Label" size="sm" placeholder="e.g. Our blog" />
                             <flux:input wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.url" label="URL" size="sm" />
-                            <flux:button size="sm" variant="ghost" icon="trash" wire:click="removeSocialLink({{ $index }}, {{ $linkIndex }})" aria-label="Remove link" />
+                            <flux:button size="sm" variant="ghost" icon="trash" wire:click="removeSocialLink('{{ $block['id'] }}', {{ $linkIndex }})" aria-label="Remove link" />
                         </div>
                     @endforeach
-                    <flux:button size="sm" variant="ghost" icon="plus" wire:click="addSocialLink({{ $index }})">Add link</flux:button>
+                    <flux:button size="sm" variant="ghost" icon="plus" wire:click="addSocialLink('{{ $block['id'] }}')">Add link</flux:button>
                 </div>
             @else
                 <p class="text-xs text-slate-500">
@@ -361,7 +352,7 @@
                 <flux:select.option value="text">Name only</flux:select.option>
             </flux:select>
 
-            @if (($blocks[$index]['data']['style'] ?? 'image') === 'image')
+            @if (($data['style'] ?? 'image') === 'image')
                 <flux:select wire:model.live="{{ $prefix }}.variant" label="Icon color">
                     <flux:select.option value="default">Brand colours</flux:select.option>
                     <flux:select.option value="white">White</flux:select.option>
@@ -386,3 +377,11 @@
         </flux:select>
         @break
 @endswitch
+
+@unless (in_array($case, [\App\Enums\EmailBlockTypeEnum::SPACER, \App\Enums\EmailBlockTypeEnum::SECTION], true))
+    {{-- Every block but Spacer (which is nothing but its own height) and Section
+         (a reference — the blocks it points at carry their own) gets the same one
+         editable clearance: the space below it, before the next block starts. --}}
+    <flux:separator variant="subtle" class="my-4" />
+    <flux:input type="number" min="0" max="120" wire:model.live="{{ $prefix }}.spacing" label="Spacing (px)" description="Space below this block." />
+@endunless

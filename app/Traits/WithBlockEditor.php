@@ -30,6 +30,17 @@ use Livewire\Attributes\On;
  *         <div wire:key="block-{{ $block['id'] }}">...</div>
  *
  *     @endforeach
+ *
+ * A Columns block is the one exception to "flat array of top-level blocks": each of
+ * its `data.columns` entries is itself `['background' => ?, 'background_image_id' =>
+ * ?, 'blocks' => [...]]`, holding its own list of blocks in exactly the same shape as
+ * the top level. Nesting stops there — a column's own blocks are never Columns or
+ * Section (see EmailBlockTypeEnum::nestable()), so every lookup below only ever has
+ * to look one level down, never recurse arbitrarily deep. Everything that touches a
+ * block by id rather than a top-level index (pathFor(), findBlock(), the image-slot
+ * and list-field helpers) exists because of that one extra level: a plain int index
+ * stops being enough once the same id might live inside a column instead of at the
+ * top.
  */
 trait WithBlockEditor
 {
@@ -113,7 +124,9 @@ trait WithBlockEditor
     /**
      * The drag-and-drop landing. `wire:sort` hands back the dragged block's own id
      * and the index it was dropped at, rather than the whole new order — an id is
-     * the only thing that survives a canvas re-render mid-drag.
+     * the only thing that survives a canvas re-render mid-drag. Only top-level
+     * blocks are draggable this way; a column's children reorder with the
+     * move-up/move-down pair instead (see moveColumnBlockUp()/Down()).
      */
     public function reorderBlocks(?string $blockId, ?int $position): void
     {
@@ -141,29 +154,128 @@ trait WithBlockEditor
     }
 
     /**
-     * Append a variable token to the end of one block's text field — the
-     * "+ Personalize" control's wire:click target.
+     * Add a block straight into one column of a Columns block — the canvas's own
+     * per-column appender, the equivalent of addBlock() for anything that isn't
+     * top-level. Silently ignores a type EmailBlockTypeEnum::nestable() doesn't
+     * list rather than trusting the click came from that same list: the palette
+     * only ever renders nestable() cases, but the action name is still reachable
+     * directly.
      */
-    public function insertToken(int $index, string $field, string $token): void
+    public function addColumnBlock(string $type, int $index, int $column): void
     {
-        if (! isset($this->blocks[$index]['data'][$field])) {
+        $case = EmailBlockTypeEnum::tryFrom($type);
+
+        if (! $case || ! in_array($case, EmailBlockTypeEnum::nestable(), true)) {
             return;
         }
 
-        $current = (string) $this->blocks[$index]['data'][$field];
+        if (! isset($this->blocks[$index]['data']['columns'][$column])) {
+            return;
+        }
 
-        $this->blocks[$index]['data'][$field] = trim($current.' '.$token);
+        $block = ['id' => (string) Str::uuid(), 'type' => $case->value, 'data' => $case->defaultData()];
+
+        $this->blocks[$index]['data']['columns'][$column]['blocks'][] = $block;
+        $this->selectedBlockId = $block['id'];
+        $this->blockSettingsTab = 'content';
+    }
+
+    public function removeColumnBlock(int $index, int $column, int $child): void
+    {
+        if (! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child])) {
+            return;
+        }
+
+        if ($this->blocks[$index]['data']['columns'][$column]['blocks'][$child]['id'] === $this->selectedBlockId) {
+            $this->selectedBlockId = null;
+        }
+
+        unset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child]);
+        $this->blocks[$index]['data']['columns'][$column]['blocks'] = array_values($this->blocks[$index]['data']['columns'][$column]['blocks']);
+    }
+
+    public function duplicateColumnBlock(int $index, int $column, int $child): void
+    {
+        if (! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child])) {
+            return;
+        }
+
+        $copy = $this->blocks[$index]['data']['columns'][$column]['blocks'][$child];
+        $copy['id'] = (string) Str::uuid();
+
+        array_splice($this->blocks[$index]['data']['columns'][$column]['blocks'], $child + 1, 0, [$copy]);
+
+        $this->selectedBlockId = $copy['id'];
+    }
+
+    public function moveColumnBlockUp(int $index, int $column, int $child): void
+    {
+        if ($child <= 0 || ! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1])) {
+            return;
+        }
+
+        [
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1],
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+        ] = [
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1],
+        ];
+    }
+
+    public function moveColumnBlockDown(int $index, int $column, int $child): void
+    {
+        $count = count($this->blocks[$index]['data']['columns'][$column]['blocks'] ?? []);
+
+        if ($child >= $count - 1) {
+            return;
+        }
+
+        [
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child + 1],
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+        ] = [
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child + 1],
+        ];
     }
 
     /**
-     * Open the shared media library picker for one image block. The slot name
-     * encodes the block's index ("block-3") rather than going through
-     * WithImagePicker's declared slots — an email can hold any number of image
-     * blocks, so there is no fixed slot list to declare them against.
+     * Append a variable token to the end of one block's text field — the
+     * "+ Personalize" control's wire:click target. Takes a block id rather than a
+     * top-level index because the field it is appending to might belong to a
+     * block nested inside a column.
      */
-    public function chooseImage(string $blockKey): void
+    public function insertToken(string $blockId, string $field, string $token): void
     {
-        $this->dispatch('open-image-picker', slot: $blockKey, multiple: false, max: 1, selected: []);
+        $block = $this->findBlock($blockId);
+
+        if (! $block || ! isset($block['data'][$field])) {
+            return;
+        }
+
+        $current = (string) $block['data'][$field];
+
+        $this->setBlockDataField($blockId, $field, trim($current.' '.$token));
+    }
+
+    /**
+     * Open the shared media library picker for one image slot. The slot name
+     * carries both which value it fills and where that value lives, rather than
+     * going through WithImagePicker's declared slots — an email can hold any
+     * number of image-bearing blocks and columns, so there is no fixed slot list
+     * to declare them against:
+     *
+     *     "img:{blockId}"              a block's own image_id
+     *     "bg:{blockId}"                a block's own background_image_id
+     *     "colbg:{blockId}:{column}"    one column's background_image_id, on the
+     *                                    Columns block identified by blockId —
+     *                                    columns have no id of their own, so this
+     *                                    one case stays positional
+     */
+    public function chooseImage(string $slot): void
+    {
+        $this->dispatch('open-image-picker', slot: $slot, multiple: false, max: 1, selected: []);
     }
 
     /**
@@ -189,45 +301,27 @@ trait WithBlockEditor
         $this->applyImageSlot($slot, $ids[0] ?? null);
     }
 
-    /**
-     * Every image control on the canvas — a block's own picture, a column's
-     * picture, or either one's background image — shares this one picker, keyed
-     * by a slot string rather than each having its own pair of methods. The slot
-     * encodes where the id lands: "block-3" is the block's own image_id,
-     * "block-3-bg" its background_image_id, "block-3-col-1" column 1's image_id,
-     * "block-3-col-1-bg" column 1's background_image_id.
-     */
     private function applyImageSlot(string $slot, ?int $imageId): void
     {
-        if (! preg_match('/^block-(?<block>\d+)(?:-col-(?<column>\d+))?(?<bg>-bg)?$/', $slot, $m)) {
-            return;
-        }
-
-        $index = (int) $m['block'];
-
-        if (! isset($this->blocks[$index]['data'])) {
-            return;
-        }
-
-        $field = ($m['bg'] ?? '') !== '' ? 'background_image_id' : 'image_id';
-
-        if (isset($m['column']) && $m['column'] !== '') {
-            $column = (int) $m['column'];
-
-            if (isset($this->blocks[$index]['data']['columns'][$column])) {
-                $this->blocks[$index]['data']['columns'][$column][$field] = $imageId;
+        if (preg_match('/^colbg:(?<id>.+):(?<column>\d+)$/', $slot, $m)) {
+            foreach ($this->blocks as $index => $block) {
+                if ($block['id'] === $m['id'] && isset($this->blocks[$index]['data']['columns'][(int) $m['column']])) {
+                    $this->blocks[$index]['data']['columns'][(int) $m['column']]['background_image_id'] = $imageId;
+                }
             }
 
             return;
         }
 
-        $this->blocks[$index]['data'][$field] = $imageId;
+        if (preg_match('/^(?<scope>img|bg):(?<id>.+)$/', $slot, $m)) {
+            $this->setBlockDataField($m['id'], $m['scope'] === 'bg' ? 'background_image_id' : 'image_id', $imageId);
+        }
     }
 
     /**
      * Add a column to a Columns block, up to four — a row wide enough to hold a
      * fifth would stop reading as a row in most inboxes' width. New columns start
-     * as text, empty, with no background of their own.
+     * empty, with no background and no blocks of their own.
      */
     public function addColumn(int $index): void
     {
@@ -236,12 +330,9 @@ trait WithBlockEditor
         }
 
         $this->blocks[$index]['data']['columns'][] = [
-            'type' => 'text',
-            'text' => '',
-            'image_id' => null,
-            'alt' => '',
             'background' => null,
             'background_image_id' => null,
+            'blocks' => [],
         ];
     }
 
@@ -262,24 +353,45 @@ trait WithBlockEditor
     /**
      * Add a row to a Socials block's own link list — only reachable while its
      * source is "custom"; a "config" block has nothing of its own to add to.
+     * Takes a block id, not a top-level index, since the Socials block itself
+     * might now be nested inside a column.
      */
-    public function addSocialLink(int $index): void
+    public function addSocialLink(string $blockId): void
     {
-        if (! isset($this->blocks[$index]['data']['custom_links'])) {
-            return;
-        }
-
-        $this->blocks[$index]['data']['custom_links'][] = ['label' => '', 'url' => '', 'platform' => ''];
+        $this->pushBlockDataListItem($blockId, 'custom_links', ['label' => '', 'url' => '', 'platform' => '']);
     }
 
-    public function removeSocialLink(int $index, int $link): void
+    public function removeSocialLink(string $blockId, int $link): void
     {
-        if (! isset($this->blocks[$index]['data']['custom_links'][$link])) {
+        $this->removeBlockDataListItem($blockId, 'custom_links', $link);
+    }
+
+    private function pushBlockDataListItem(string $blockId, string $field, array $item): void
+    {
+        $block = $this->findBlock($blockId);
+
+        if (! $block) {
             return;
         }
 
-        unset($this->blocks[$index]['data']['custom_links'][$link]);
-        $this->blocks[$index]['data']['custom_links'] = array_values($this->blocks[$index]['data']['custom_links']);
+        $list = $block['data'][$field] ?? [];
+        $list[] = $item;
+
+        $this->setBlockDataField($blockId, $field, $list);
+    }
+
+    private function removeBlockDataListItem(string $blockId, string $field, int $itemIndex): void
+    {
+        $block = $this->findBlock($blockId);
+
+        if (! $block || ! isset($block['data'][$field][$itemIndex])) {
+            return;
+        }
+
+        $list = $block['data'][$field];
+        unset($list[$itemIndex]);
+
+        $this->setBlockDataField($blockId, $field, array_values($list));
     }
 
     protected function selectedBlockIndex(): ?int
@@ -298,9 +410,88 @@ trait WithBlockEditor
      */
     public function selectedBlock(): ?array
     {
-        $index = $this->selectedBlockIndex();
+        return $this->selectedBlockId ? $this->findBlock($this->selectedBlockId) : null;
+    }
 
-        return $index === null ? null : $this->blocks[$index];
+    /**
+     * A block by id, wherever it lives — top-level or one column deep. Blade reads
+     * this for the settings panel and for every id-keyed lookup (an image's own
+     * row, a Socials block's link list) rather than indexing into $blocks
+     * directly, which only ever finds a top-level block.
+     *
+     * @return array{id: string, type: string, data: array<string, mixed>}|null
+     */
+    public function findBlock(string $blockId): ?array
+    {
+        foreach ($this->blocks as $block) {
+            if ($block['id'] === $blockId) {
+                return $block;
+            }
+
+            foreach ($block['data']['columns'] ?? [] as $column) {
+                foreach ($column['blocks'] ?? [] as $child) {
+                    if ($child['id'] === $blockId) {
+                        return $child;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The Livewire binding-path prefix for one block's own array entry — the
+     * settings panel appends ".data" itself. "blocks.2" for a top-level block,
+     * "blocks.2.data.columns.1.blocks.0" for the first child of the second column
+     * of the Columns block at top-level index 2. Columns can't nest, so a match
+     * found inside a column's children is always exactly this shape — never
+     * deeper.
+     */
+    public function pathFor(string $blockId): ?string
+    {
+        foreach ($this->blocks as $index => $block) {
+            if ($block['id'] === $blockId) {
+                return "blocks.{$index}";
+            }
+
+            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
+                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+                    if ($child['id'] === $blockId) {
+                        return "blocks.{$index}.data.columns.{$columnIndex}.blocks.{$childIndex}";
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Writes one field on a block's own data, wherever that block lives — the
+     * shared landing spot for the image-slot and list-field helpers above, none
+     * of which know or care whether the block they're touching is top-level or a
+     * column's child.
+     */
+    private function setBlockDataField(string $blockId, string $field, mixed $value): void
+    {
+        foreach ($this->blocks as $index => $block) {
+            if ($block['id'] === $blockId) {
+                $this->blocks[$index]['data'][$field] = $value;
+
+                return;
+            }
+
+            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
+                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+                    if ($child['id'] === $blockId) {
+                        $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['data'][$field] = $value;
+
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     /**

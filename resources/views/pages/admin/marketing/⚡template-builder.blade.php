@@ -9,6 +9,7 @@ use App\Services\EmailSectionService;
 use App\Traits\WithBlockEditor;
 use App\Traits\WithGateProps;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new class extends Component
@@ -17,10 +18,15 @@ new class extends Component
 
     public ?EmailTemplate $template = null;
 
+    #[Url]
+    public string $step = '';
+
+    // Step 1 — details
     public string $name = '';
 
     public ?string $description = null;
 
+    // Step 2 — builder
     public ?int $footer_section_id = null;
 
     public array $design = [];
@@ -38,6 +44,9 @@ new class extends Component
             $this->footer_section_id = $this->template->footer_section_id;
             $this->design = $this->template->design ?? [];
             $this->blocks = $this->template->content['blocks'] ?? [];
+            $this->step = $this->step ?: 'builder';
+        } else {
+            $this->step = 'details';
         }
     }
 
@@ -72,6 +81,62 @@ new class extends Component
             || $this->design !== ($this->template->design ?? []);
     }
 
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // STEP 1 — DETAILS
+
+    /**
+     * A brand new template is created here rather than waiting for the builder
+     * step's own save — the same reason EmailCampaign's saveDetails() creates the
+     * row early: everything past this point needs a real id to redirect back to
+     * (and, for a campaign, to attach blocks to), and "Continue to Builder" is the
+     * one moment that id doesn't exist yet.
+     */
+    public function saveDetails(): void
+    {
+        $this->checkGate($this->template ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
+
+        $this->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $activity = app(ActivityLogService::class);
+        $isNew = ! $this->template;
+        $this->template ??= new EmailTemplate;
+
+        $this->template->fill([
+            'name' => $this->name,
+            'description' => $this->description,
+            // content/design are NOT NULL columns with no default — a brand-new
+            // row needs something in them even before there is a single block or
+            // a design choice to save.
+            ...($isNew ? ['content' => $this->blockContent(), 'design' => $this->design] : []),
+        ]);
+
+        $affected = $activity->affectedColumns($this->template);
+        $this->template->save();
+
+        $activity->logActivity(
+            $isNew ? ActivityActionEnum::EMAIL_TEMPLATE_CREATE : ActivityActionEnum::EMAIL_TEMPLATE_UPDATE,
+            " template: {$this->template->name}",
+            $affected,
+            model: $this->template,
+        );
+
+        $this->dispatch('builder-saved');
+
+        if ($isNew) {
+            $this->redirectRoute('admin.marketing.templates.edit', [$this->template, 'step' => 'builder'], navigate: true);
+
+            return;
+        }
+
+        $this->step = 'builder';
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // STEP 2 — BUILDER
+
     public function save(): void
     {
         $this->checkGate($this->template ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
@@ -103,7 +168,7 @@ new class extends Component
 
         $this->respondSuccess('The template has been saved.');
 
-        $this->redirectRoute('admin.marketing.templates.edit', $this->template, navigate: true);
+        $this->redirectRoute('admin.marketing.templates.edit', [$this->template, 'step' => 'builder'], navigate: true);
     }
 };
 ?>
@@ -112,7 +177,9 @@ new class extends Component
     A builder fills the window, exactly as the campaign builder does: a 640px canvas
     with a palette either side has nothing left over for the dashboard chrome, and
     closing is the way out. It asks first, because everything here lives in
-    component state until a save.
+    component state until a save. Two steps, the same shape as the campaign
+    builder's own — details first (name doesn't exist without an id to save
+    anything else against), the canvas second.
 --}}
 <div
     x-data="{ dirty: @js($this->hasUnsavedChanges()) }"
@@ -121,7 +188,7 @@ new class extends Component
     x-on:beforeunload.window="if (dirty) { $event.preventDefault(); $event.returnValue = '' }"
     class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950"
 >
-    <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 dark:border-slate-800 dark:bg-slate-950">
+    <div class="flex shrink-0 flex-col gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800 dark:bg-slate-950">
         <div class="flex min-w-0 items-center gap-3">
             {{-- A plain button rather than a link: leaving with unsaved work has to
                  be a question, and a link cannot ask one. --}}
@@ -144,30 +211,40 @@ new class extends Component
             </span>
         </div>
 
-        <x-dashboard.gate.button :gate="$pageGate" :level="$template ? $gateModify : $gateCreate" wire:click="save" icon="check">
-            Save Template
-        </x-dashboard.gate.button>
+        <nav aria-label="Template steps" class="flex items-center gap-1 self-start rounded-full border border-slate-200 bg-white p-1 lg:self-auto dark:border-slate-800 dark:bg-slate-950">
+            @php($reachable = $template !== null)
+            <button type="button" wire:click="$set('step', 'details')" @class([
+                'press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
+                'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => $step === 'details',
+                'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900' => $step !== 'details',
+            ])>
+                @if ($step === 'builder')
+                    <flux:icon name="check-circle" class="size-3.5" />
+                @endif
+                Details
+            </button>
+            <button type="button" @if ($reachable) wire:click="$set('step', 'builder')" @else disabled @endif @class([
+                'press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
+                'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => $step === 'builder',
+                'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900' => $step !== 'builder' && $reachable,
+                'text-slate-300 dark:text-slate-700' => ! $reachable,
+            ])>
+                Builder
+            </button>
+        </nav>
     </div>
 
-    <div class="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
-        <flux:card class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <flux:input wire:model="name" label="Template name" placeholder="e.g. Newsletter Template" />
-            <div class="flex items-end gap-2">
-                <flux:select wire:model="footer_section_id" label="Footer" class="flex-1">
-                    <flux:select.option value="">No footer</flux:select.option>
-                    @foreach ($this->footers as $footer)
-                        <flux:select.option value="{{ $footer->id }}">{{ $footer->name }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-                @include('pages.admin.marketing.partials._design-settings')
-            </div>
-            <flux:input wire:model="description" label="Description" class="sm:col-span-2" />
-        </flux:card>
-
-        @include('pages.admin.marketing.partials._builder', [
-            'allowSectionBlocks' => true,
-            'canvasHeight' => 'h-[calc(100vh-19rem)] min-h-96',
+    <div
+        @class([
+            'flex-1 overflow-y-auto px-4 sm:px-6',
+            'py-6' => $step === 'details',
         ])
+    >
+        @if ($step === 'details')
+            @include('pages.admin.marketing.partials._template-details')
+        @else
+            @include('pages.admin.marketing.partials._template-builder-step')
+        @endif
     </div>
 
     <livewire:livewire.library.image-picker />

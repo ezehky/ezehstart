@@ -124,6 +124,24 @@ enum EmailBlockTypeEnum: string
     }
 
     /**
+     * The cases a Columns block's own appender offers per column — Basic and Site
+     * Config, everything a column can hold as a child. Columns and Section are
+     * deliberately excluded: a column holding another Columns block has no email
+     * client that renders nested tables sanely, and a Section already carries
+     * whatever blocks it needs without wrapping it in one more container. Dynamic
+     * Content and Related Content stay top-level too — a card grid inside a
+     * narrow column reads as a crushed accident, not a deliberate layout.
+     *
+     * @return array<int, self>
+     */
+    public static function nestable(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $case) => ! in_array($case, [
+            self::COLUMNS, self::SECTION, self::DYNAMIC_CONTENT, self::RELATED_CONTENT,
+        ], true)));
+    }
+
+    /**
      * The block palette's grouping — see resources/views/components/marketing/blocks.
      */
     public function group(): string
@@ -165,28 +183,29 @@ enum EmailBlockTypeEnum: string
     public function defaultData(): array
     {
         return match ($this) {
-            self::HEADING => ['text' => 'New heading', 'level' => 'h1', 'align' => 'center', 'color' => '#0F172A'],
-            self::PARAGRAPH => ['text' => 'New paragraph text.', 'align' => 'left', 'color' => '#475569'],
-            self::BUTTON => ['text' => 'Click here', 'url' => '', 'align' => 'center', 'background' => '#A3E635', 'color' => '#0F172A', 'new_tab' => false],
-            self::DIVIDER => ['color' => '#E2E8F0'],
+            self::HEADING => ['text' => 'New heading', 'level' => 'h1', 'align' => 'center', 'color' => '#0F172A', 'spacing' => 10],
+            self::PARAGRAPH => ['text' => 'New paragraph text.', 'align' => 'left', 'color' => '#475569', 'spacing' => 10],
+            self::BUTTON => ['text' => 'Click here', 'url' => '', 'align' => 'center', 'background' => '#A3E635', 'color' => '#0F172A', 'new_tab' => false, 'full_width' => false, 'spacing' => 30],
+            self::DIVIDER => ['color' => '#E2E8F0', 'spacing' => 10],
             self::SPACER => ['height' => 24],
-            self::IMAGE => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => '100%', 'align' => 'center', 'radius' => 8],
-            self::HTML => ['html' => ''],
-            self::DYNAMIC_CONTENT => ['content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null, 'tag_id' => null, 'limit' => 1, 'layout' => 'featured', 'show_image' => true, 'show_excerpt' => true, 'show_date' => false, 'button_text' => 'Read More'],
-            self::RELATED_CONTENT => ['content_type' => 'post', 'source' => 'same_category', 'source_content_id' => null, 'limit' => 3, 'heading' => 'You May Also Like', 'button_text' => 'Read More'],
-            self::COLUMNS => ['background' => null, 'background_image_id' => null, 'columns' => [
-                ['type' => 'text', 'text' => 'First column', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
-                ['type' => 'text', 'text' => 'Second column', 'image_id' => null, 'alt' => '', 'background' => null, 'background_image_id' => null],
+            self::IMAGE => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => '100%', 'align' => 'center', 'radius' => 8, 'spacing' => 10],
+            self::HTML => ['html' => '', 'spacing' => 10],
+            self::DYNAMIC_CONTENT => ['content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null, 'tag_id' => null, 'limit' => 1, 'layout' => 'featured', 'show_image' => true, 'show_excerpt' => true, 'show_date' => false, 'button_text' => 'Read More', 'spacing' => 30],
+            self::RELATED_CONTENT => ['content_type' => 'post', 'source' => 'same_category', 'source_content_id' => null, 'limit' => 3, 'heading' => 'You May Also Like', 'button_text' => 'Read More', 'spacing' => 34],
+            self::COLUMNS => ['background' => null, 'background_image_id' => null, 'spacing' => 10, 'columns' => [
+                ['background' => null, 'background_image_id' => null, 'blocks' => []],
+                ['background' => null, 'background_image_id' => null, 'blocks' => []],
             ]],
             self::SECTION => ['email_section_id' => null],
-            self::LOGO, self::LOGO_DARK => ['width' => '160px', 'align' => 'center', 'link_url' => '{{site.url}}'],
-            self::FAVICON => ['width' => '32px', 'align' => 'center'],
+            self::LOGO, self::LOGO_DARK => ['width' => '160px', 'align' => 'center', 'link_url' => '{{site.url}}', 'spacing' => 10],
+            self::FAVICON => ['width' => '32px', 'align' => 'center', 'spacing' => 10],
             self::SOCIALS => [
                 'source' => 'config',
                 'style' => 'image',
                 'variant' => 'default',
                 'align' => 'center',
                 'custom_links' => [],
+                'spacing' => 10,
             ],
         };
     }
