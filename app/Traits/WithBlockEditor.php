@@ -115,8 +115,12 @@ trait WithBlockEditor
      * and the index it was dropped at, rather than the whole new order — an id is
      * the only thing that survives a canvas re-render mid-drag.
      */
-    public function reorderBlocks(string $blockId, int $position): void
+    public function reorderBlocks(?string $blockId, int $position): void
     {
+        if ($blockId === null) {
+            return;
+        }
+
         $from = null;
 
         foreach ($this->blocks as $index => $block) {
