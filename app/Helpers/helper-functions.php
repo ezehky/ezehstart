@@ -451,3 +451,18 @@ if (! function_exists('kAccountRestoreUrl')) {
         );
     }
 }
+
+// ARRAY
+if (! function_exists('kArrayIntersectKey')) {
+    /**
+     * Check if an array has any of the specified keys.
+     *
+     * @param  array  $array  The array to check.
+     * @param  array  $keys  The keys to look for.
+     * @return bool True if any key is present, false otherwise.
+     */
+    function kArrayIntersectKey(array $array, array $keys): bool
+    {
+        return ! empty(array_intersect_key($array, array_flip($keys)));
+    }
+}

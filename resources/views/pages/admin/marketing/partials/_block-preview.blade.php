@@ -22,35 +22,33 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::BUTTON)
-        <div class="{{ ! empty($data['full_width']) ? '' : $align }}">
-            <span
-                @class(['rounded-lg px-5 py-2.5 text-center text-[13px] font-bold', 'block' => ! empty($data['full_width']), 'inline-block' => empty($data['full_width'])])
-                style="background: {{ $data['background'] ?? '#A3E635' }}; color: {{ $data['color'] ?? '#0F172A' }}"
-            >
-                {{ data_get($data, 'text', 'Click here') }}
-            </span>
-        </div>
+        <span style="{{ $css['style'] }}">
+            {{ data_get($data, 'text', 'Click here') }}
+        </span>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::DIVIDER)
-        <hr class="border-t" style="border-color: {{ $data['color'] ?? '#E2E8F0' }}">
+        <hr style="{{ $css['style'] }}">
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SPACER)
-        <div style="{{ \App\Enums\EmailBlockTypeElementEnum::HEIGHT->cssDesign($data['height']) }}"></div>
+        <div style="{{ $css['style'] }}"></div>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
         @php($image = ! empty($data['image_id']) ? \App\Models\Image::find($data['image_id']) : null)
-        <div class="{{ $align }}">
-            @if ($image)
-                <img src="{{ $image->url() }}" alt="{{ $data['alt'] ?? '' }}" class="inline-block max-w-full" style="width: {{ $data['width'] ?? '100%' }}; border-radius: {{ (int) ($data['radius'] ?? 0) }}px">
-            @else
-                <div class="mx-auto flex h-32 w-full items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800">
-                    <flux:icon name="photo" class="size-6" />
-                </div>
-            @endif
-        </div>
+        @if ($image)
+            <img
+                src="{{ $image->url() }}"
+                alt="{{ data_get($data, 'alt', 'Email Image') }}"
+                class="max-w-full"
+                style="{{ $css['style'] }}"
+            >
+        @else
+            <div class="mx-auto flex h-32 w-full items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800">
+                <flux:icon name="photo" class="size-6" />
+            </div>
+        @endif
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::HTML)

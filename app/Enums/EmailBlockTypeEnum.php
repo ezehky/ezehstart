@@ -216,19 +216,23 @@ enum EmailBlockTypeEnum: string
             self::BUTTON => EmailBlockTypeElementEnum::make([
                 EmailBlockTypeElementEnum::TEXT->value => 'Click here',
                 EmailBlockTypeElementEnum::URL,
-                EmailBlockTypeElementEnum::ALIGN,
-                EmailBlockTypeElementEnum::BACKGROUND->value => '#A3E635',
                 EmailBlockTypeElementEnum::COLOR->value => '#0F172A',
-                EmailBlockTypeElementEnum::NEW_TAB,
-                EmailBlockTypeElementEnum::FULL_WIDTH,
                 EmailBlockTypeElementEnum::CHAR_CASE,
+                EmailBlockTypeElementEnum::BUTTON,
+                EmailBlockTypeElementEnum::FONT_WEIGHT,
 
                 // Layout
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::BACKGROUND->value => '#A3E635',
                 EmailBlockTypeElementEnum::SPACING,
             ]),
             self::DIVIDER => EmailBlockTypeElementEnum::make([
                 EmailBlockTypeElementEnum::COLOR->value => '#E2E8F0',
-                EmailBlockTypeElementEnum::SPACING,
+                EmailBlockTypeElementEnum::WIDTH,
+                EmailBlockTypeElementEnum::ITEM_MOVE,
+
+                // Layout
+                EmailBlockTypeElementEnum::SPACING->value => 5,
             ]),
             self::SPACER => EmailBlockTypeElementEnum::make([
                 EmailBlockTypeElementEnum::HEIGHT,
@@ -238,8 +242,10 @@ enum EmailBlockTypeEnum: string
                 EmailBlockTypeElementEnum::ALT,
                 EmailBlockTypeElementEnum::LINK_URL,
                 EmailBlockTypeElementEnum::WIDTH,
-                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::ITEM_MOVE,
                 EmailBlockTypeElementEnum::RADIUS,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING,
             ]),
             self::HTML => EmailBlockTypeElementEnum::make([

@@ -54,17 +54,35 @@ class EmailRenderService
             ->implode('');
     }
 
-    public function getCss(EmailBlockTypeEnum $type, array $data, bool $canvas = false): array
+    public function getCss(EmailBlockTypeEnum $type, array $data): array
     {
         $classes = $style = $container = [];
         // General must-have styles for all blocks, even if the admin has not set them in the
         $container = [
-            EmailBlockTypeElementEnum::BACKGROUND->cssDesign($data),
-            EmailBlockTypeElementEnum::BORDER->cssDesign($data),
-            EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
             EmailBlockTypeElementEnum::SPACING->cssDesign($data),
-            EmailBlockTypeElementEnum::BORDER_SPACING->cssDesign($data),
         ];
+
+        // Skip Default container
+        if (! $type->isButton() && ! $type->isDivider() && ! $type->isImage()) {
+            $container = [
+                ...$container,
+                EmailBlockTypeElementEnum::BORDER_SPACING->cssDesign($data),
+                EmailBlockTypeElementEnum::BACKGROUND->cssDesign($data),
+                EmailBlockTypeElementEnum::BORDER->cssDesign($data),
+                EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+            ];
+        }
+
+        // Button
+        if ($type->isButton()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::BUTTON->cssDesign($data),
+                EmailBlockTypeElementEnum::FONT_WEIGHT->cssDesign($data),
+            ];
+            $container[] = EmailBlockTypeElementEnum::ALIGN->cssDesign($data);
+
+        }
 
         // Button, Heading, Paragraph
         if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
@@ -72,8 +90,15 @@ class EmailRenderService
                 ...$style,
                 EmailBlockTypeElementEnum::COLOR->cssDesign($data),
                 EmailBlockTypeElementEnum::FONT->cssDesign($data),
-                EmailBlockTypeElementEnum::ALIGN->cssDesign($data),
                 EmailBlockTypeElementEnum::CHAR_CASE->cssDesign($data),
+            ];
+        }
+
+        // Heading, Paragraph
+        if ($type->isHeading() || $type->isParagraph()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::ALIGN->cssDesign($data),
             ];
         }
 
@@ -82,24 +107,39 @@ class EmailRenderService
             $style[] = EmailBlockTypeElementEnum::FONT_SIZE->cssDesign($data);
         }
 
-        // Button
-        if ($type->isButton()) {
-            $style[] = EmailBlockTypeElementEnum::BTN_BACKGROUND->cssDesign($data);
-        }
-
-        // Button, Heading
-        if ($type->isButton() || $type->isHeading()) {
-
-        }
-
         // Heading
         if ($type->isHeading()) {
             $classes[] = EmailBlockTypeElementEnum::LEVEL->cssDesign($data, 'class');
         }
 
-        // For containers
-        if ($canvas) {
-            $style = [...$style, ...$container];
+        // Divider
+        if ($type->isDivider()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::COLOR->cssDesign($data, type: $type),
+                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
+                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+                'height:2px;border-width:0;',
+            ];
+        }
+
+        // Spacer
+        if ($type->isSpacer()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::HEIGHT->cssDesign($data),
+            ];
+            $container = [];
+        }
+
+        // Image
+        if ($type->isImage()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
+                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+                EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+            ];
         }
 
         //

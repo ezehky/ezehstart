@@ -59,19 +59,31 @@
                     <flux:label>URL</flux:label>
                     @include('pages.admin.marketing.partials._personalize-menu', ['block' => $block, 'field' => 'url'])
                 </div>
-                <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.url" placeholder="https:// or &#123;&#123;unsubscribe_url&#125;&#125;" />
+                <flux:input
+                    wire:model.live.debounce.1000ms="{{ $prefix }}.url"
+                    placeholder="https:// or &#123;&#123;unsubscribe_url&#125;&#125;"
+                />
             </div>
-            <flux:checkbox wire:model.live="{{ $prefix }}.new_tab" label="Open in new tab" />
-            <flux:switch
-                wire:model.live="{{ $prefix }}.full_width"
-                label="Full width"
-                description="Stretches to the letter's full content width."
-            />
-            <x-marketing.align wire:model.live="{{ $prefix }}.align" />
-            <div class="grid grid-cols-2 gap-3">
-                <x-form.color-field wire:model.live="{{ $prefix }}.background" label="Background" />
-                <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
-            </div>
+
+            {{-- <flux:checkbox wire:model.live="{{ $prefix }}.button.new_tab" label="Open in new tab" /> --}}
+            <flux:switch wire:model.live="{{ $prefix }}.button.full_width" label="Full width" />
+            <flux:field>
+                <flux:label>
+                    Spacing
+                    <x-marketing.small-text>px: x, y</x-marketing.small-text>
+                </flux:label>
+                <flux:input.group>
+                    @foreach (['x' => 'X', 'y' => 'Y'] as $direction => $placeholder)
+                        <x-form.number-field
+                            wire:model.live.debounce.1000ms="{{ $prefix }}.button.spacing.{{ $direction }}"
+                            placeholder="{{ $placeholder }}"
+                            size="sm"
+                            min="0"
+                            max="120"
+                        />
+                    @endforeach
+                </flux:input.group>
+            </flux:field>
         </div>
         @break
 
@@ -80,14 +92,14 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SPACER)
-        <flux:input type="number" min="4" max="200" wire:model.live="{{ $prefix }}.height" label="Height (px)" />
+        <x-form.number-field wire:model.live.debounce.1000ms="{{ $prefix }}.height" label="Height (px)" min="4" max="200" />
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
         @php($image = ! empty($data['image_id']) ? \App\Models\Image::find($data['image_id']) : null)
         <div class="space-y-4">
             <div>
-                <flux:label>Image</flux:label>
+                {{-- <flux:label>Image</flux:label> --}}
 
                 {{-- The chosen file's own address, shown because the picker closes
                      without saying which row it handed back and the canvas preview
@@ -97,34 +109,35 @@
                         <img src="{{ $image->url() }}" alt="" class="size-12 shrink-0 rounded object-cover">
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-xs font-medium text-slate-700 dark:text-slate-200">{{ $image->title }}</p>
-                            <p class="break-all text-[11px] text-slate-400" title="{{ $image->url() }}">{{ $image->url() }}</p>
+                            <p class="break-all text-[11px] text-slate-400" title="{{ $image->url() }}">
+                                {{ $image->url() }}
+                            </p>
                         </div>
                     </div>
                 @endif
 
                 <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <flux:button size="sm" icon="photo" wire:click="chooseImage('img:{{ $block['id'] }}')">
-                        {{ $image ? 'Change image' : 'Select from Media Library' }}
-                    </flux:button>
+                    <flux:tooltip content="{{ $image ? 'Change image' : 'Select from Media Library' }}">
+                        <flux:button
+                            icon="{{ $image ? 'images' : 'image-play' }}"
+                            wire:click="chooseImage('img:{{ $block['id'] }}')"
+                            aria-label="Select from Media Library"
+                        />
+                    </flux:tooltip>
+
                     @if ($image)
                         <flux:tooltip content="Remove image">
-                            <flux:button size="sm" variant="ghost" icon="x-mark" square wire:click="removeBlockImage('img:{{ $block['id'] }}')" aria-label="Remove image" />
+                            <flux:button
+                                variant="ghost"
+                                icon="image-off"
+                                square
+                                wire:click="removeBlockImage('img:{{ $block['id'] }}')"
+                                aria-label="Remove image" />
                         </flux:tooltip>
                     @endif
                 </div>
             </div>
-            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.alt" label="Alt text" />
-            <flux:input
-                wire:model.live.debounce.1000ms="{{ $prefix }}.link_url"
-                label="Link URL"
-                description="Where clicking the image takes the reader. Leave empty for a plain picture."
-                placeholder="https://"
-            />
-            <div class="grid grid-cols-2 gap-3">
-                <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.width" label="Width" placeholder="100%" />
-                <flux:input type="number" min="0" max="40" wire:model.live.debounce.1000ms="{{ $prefix }}.radius" label="Border radius" />
-            </div>
-            <x-marketing.align wire:model.live="{{ $prefix }}.align" />
+            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.alt" label="Alt text" placeholder="e.g Two people" />
         </div>
         @break
 
@@ -380,9 +393,23 @@
 @endswitch
 
 {{-- Duplicates check values against data keys--}}
-@if (array_intersect_key($data, array_flip(['font_size', 'font', 'char_case', 'align', 'color'])))
+@if (kArrayIntersectKey($data, [
+        'font_size', 'font', 'font_weight', 'char_case', 'align',
+        'color', 'button', 'item_move', 'link_url'
+]))
     <div class="space-y-4 mt-4">
-        @if (array_intersect_key($data, array_flip(['font_size', 'font'])))
+        {{-- Link Url --}}
+        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('link_url', $data))
+            <flux:input
+                wire:model.live.debounce.1000ms="{{ $prefix }}.link_url"
+                label="Link URL"
+                description="Where clicking the image takes the reader. Leave empty for a plain picture."
+                placeholder="https://"
+            />
+        @endif
+
+        {{-- FONT & STYLE --}}
+        @if (kArrayIntersectKey($data, ['font_size', 'font']))
             <flux:field>
                 <flux:label>Font</flux:label>
                 <flux:input.group>
@@ -400,6 +427,12 @@
             </flux:field>
         @endif
 
+        {{-- FONT WEIGHT --}}
+        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('font_weight', $data))
+            <x-marketing.font-weight :$prefix />
+        @endif
+
+        {{-- CASE --}}
         @if (\App\Enums\EmailBlockTypeElementEnum::checkField('char_case', $data))
             <flux:radio.group wire:model.live="{{ $prefix }}.char_case" label="Case" variant="segmented" size="sm">
                 @foreach (\App\Enums\EmailBlockTypeElementEnum::charCases() as $key => $value)
@@ -407,22 +440,84 @@
                 @endforeach
             </flux:radio.group>
         @endif
+
+        {{-- ALIGNMENT --}}
         @if (\App\Enums\EmailBlockTypeElementEnum::checkField('align', $data))
             <x-marketing.align wire:model.live="{{ $prefix }}.align" />
         @endif
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('color', $data))
-            <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
+
+        {{-- COLOR --}}
+        @if (kArrayIntersectKey($data, ['button', 'color']) && ! $case->isDivider())
+            <div class="flex items-center justify-between gap-3">
+                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('color', $data))
+                    <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
+                @endif
+                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('button', $data))
+                    <x-form.color-field wire:model.live="{{ $prefix }}.button.background" label="Background" />
+                @endif
+            </div>
+        @endif
+
+        {{-- BUTTON BORDER --}}
+        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('button', $data))
+            <flux:field>
+                <flux:label>
+                    Border
+                    <x-marketing.small-text>px: top, right, bottom, left</x-marketing.small-text>
+                </flux:label>
+                <flux:input.group>
+                    @foreach (['top' => 't', 'right' => 'r', 'bottom' => 'b', 'left' => 'l'] as $direction => $placeholder)
+                        <flux:select wire:model.live="{{ $prefix }}.button.border_width.{{ $direction }}" size="sm">
+                            @for ($i = 0; $i <= 5; $i++)
+                                <flux:select.option value="{{ $i }}">{{ $i }}px</flux:select.option>
+                            @endfor
+                        </flux:select>
+                    @endforeach
+                </flux:input.group>
+            </flux:field>
+            <x-form.color-field wire:model.live="{{ $prefix }}.button.border_color" label="Color" />
+            <x-marketing.radius wire:model.live="{{ $prefix }}.button.border_radius" />
+        @endif
+
+        {{-- Width & Height --}}
+        @if (kArrayIntersectKey($data, ['width', 'height']))
+            <div class="flex items-center justify-between gap-3">
+                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('width', $data))
+                    <div class="w-full">
+                        <flux:select wire:model.live="{{ $prefix }}.width" label="Width" size="sm">
+                            @foreach (\App\Enums\EmailBlockTypeElementEnum::WIDTH->validItems() as $widthKey => $widthLabel)
+                                <flux:select.option value="{{ $widthKey }}">
+                                    {{ strtoupper($widthKey) }}
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+                @endif
+                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('height', $data))
+                    <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.height" size="sm" label="Height" placeholder="auto" />
+                @endif
+            </div>
+        @endif
+
+
+        {{-- Item Move --}}
+        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('item_move', $data))
+            <flux:radio.group wire:model.live="{{ $prefix }}.item_move" label="Move" variant="segmented" size="sm">
+                @foreach (\App\Enums\EmailBlockTypeElementEnum::ITEM_MOVE->validItems() as $key => $item)
+                    <flux:radio value="{{ $key }}" icon="{{ $item['icon'] }}" />
+                @endforeach
+            </flux:radio.group>
         @endif
     </div>
 @endif
-
 
 @unless (in_array($case, [\App\Enums\EmailBlockTypeEnum::SPACER, \App\Enums\EmailBlockTypeEnum::SECTION], true))
     {{-- Every block but Spacer (which is nothing but its own height) and Section
          (a reference — the blocks it points at carry their own) gets the same one
          editable clearance: the space below it, before the next block starts. --}}
-    <div class="space-y-4 mt-4">
-        <flux:separator variant="subtle" text="layout" />
+    <div class="space-y-4 mt-8">
+        <flux:separator variant="subtle" text="LAYOUT" />
+
         @if (\App\Enums\EmailBlockTypeElementEnum::checkField('background', $data))
             <x-form.color-field wire:model.live="{{ $prefix }}.background" label="Background color" />
         @endif

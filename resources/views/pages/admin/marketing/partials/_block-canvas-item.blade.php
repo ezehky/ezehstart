@@ -41,12 +41,12 @@
     <div @class([
         'pointer-events-none absolute group-hover:-top-3 start-2.5 z-10',
         'rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
-        'opacity-100 -top-3' => $selectedBlockId === $block['id'],
+        // 'opacity-100 -top-3' => $selectedBlockId === $block['id'],
     ])>{{ $case->label() }}</div>
 
     <div @class([
         'absolute group-hover:-top-3 end-2.5 z-10 flex gap-0.5 rounded bg-slate-900 p-0.5 opacity-0 group-hover:opacity-100',
-        'opacity-100 -top-3' => $selectedBlockId === $block['id'],
+        // 'opacity-100 -top-3' => $selectedBlockId === $block['id'],
     ])>
         @if (! empty($sortItem))
             <button type="button" wire:sort:handle class="cursor-grab rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white active:cursor-grabbing" aria-label="Drag to reorder">

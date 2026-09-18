@@ -17,21 +17,24 @@ enum EmailBlockTypeElementEnum: string
     case CHAR_CASE = 'char_case';
     case FONT = 'font';
     case FONT_SIZE = 'font_size';
+    case FONT_WEIGHT = 'font_weight';
     case BORDER = 'border';
     case RADIUS = 'radius';
 
+    /* BUTTON Specifics */
     case URL = 'url';
+    case BUTTON = 'button';
+    /* BUTTON Specifics */
+
     case BACKGROUND = 'background';
-    case BTN_BACKGROUND = 'btn_background';
-    case NEW_TAB = 'new_tab';
-    case FULL_WIDTH = 'full_width';
 
     case HEIGHT = 'height';
+    case WIDTH = 'width';
+    case ITEM_MOVE = 'item_move';
 
     case IMAGE_ID = 'image_id';
     case ALT = 'alt';
     case LINK_URL = 'link_url';
-    case WIDTH = 'width';
 
     case HTML = 'html';
 
@@ -79,6 +82,11 @@ enum EmailBlockTypeElementEnum: string
         return $this === self::BORDER;
     }
 
+    public function isButton(): bool
+    {
+        return $this === self::BUTTON;
+    }
+
     // ===========================================================================
     // Checkers
     // ===========================================================================
@@ -98,19 +106,32 @@ enum EmailBlockTypeElementEnum: string
             self::CHAR_CASE => 'normal',
             self::FONT => 'arial',
             self::FONT_SIZE => 'sm',
+            self::FONT_WEIGHT => 'normal',
             self::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
             self::RADIUS => 'none',
             self::SPACING => ['top' => 10, 'right' => 10, 'bottom' => 10, 'left' => 10],
             self::BORDER_SPACING => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
+
+            // BUTTON Specifics
             self::URL => '',
-            self::BTN_BACKGROUND => '#A3E635',
+            self::BUTTON => [
+                'background' => '#A3E635',
+                'new_tab' => false,
+                'full_width' => false,
+                'border_width' => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 5],
+                'border_color' => '#0F172A',
+                'border_radius' => 'rounded',
+                'spacing' => ['y' => 15, 'x' => 32],
+            ],
+            // BUTTON Specifics
+
             self::BACKGROUND => '#FFFFFF',
-            self::NEW_TAB => false,
-            self::FULL_WIDTH => false,
             self::IMAGE_ID => null,
             self::ALT => '',
             self::LINK_URL => '',
-            self::WIDTH => 'full',
+            self::WIDTH => 'auto',
+            self::HEIGHT => 35,
+            self::ITEM_MOVE => 'center',
             self::HTML => '',
             self::CONTENT_TYPE => 'post',
             self::MODE => 'latest',
@@ -198,6 +219,12 @@ enum EmailBlockTypeElementEnum: string
                 '4xl' => 'font-size: 2.25rem;line-height: 2.5rem;',
             ],
             self::FONT => self::fonts(),
+            self::FONT_WEIGHT => [
+                'normal' => ['style' => 'font-weight: 400;', 'label' => 'Normal', 'icon_style' => 'stroke-width: 1px;'],
+                'bold' => ['style' => 'font-weight: 500;', 'label' => 'Bold', 'icon_style' => 'stroke-width: 2px;'],
+                'bolder' => ['style' => 'font-weight: 700;', 'label' => 'Bolder', 'icon_style' => 'stroke-width: 3px;'],
+                'thicker' => ['style' => 'font-weight: 800;', 'label' => 'Bolder', 'icon_style' => 'stroke-width: 4px;'],
+            ],
             self::WIDTH => [
                 'auto' => 'width: auto;',
                 '1/2' => 'width: 50%;',
@@ -206,6 +233,11 @@ enum EmailBlockTypeElementEnum: string
                 '1/4' => 'width: 25%;',
                 '3/4' => 'width: 75%;',
                 'full' => 'display: block; width: 100%;',
+            ],
+            self::ITEM_MOVE => [
+                'start' => ['style' => 'margin-left: 0; margin-right: auto;', 'label' => 'Start', 'icon' => 'arrow-left'],
+                'center' => ['style' => 'margin: 0 auto;', 'label' => 'Center', 'icon' => 'arrows-pointing-in'],
+                'end' => ['style' => 'margin-left: auto; margin-right: 0;', 'label' => 'End', 'icon' => 'arrow-right'],
             ],
             self::RADIUS => self::validRadius(),
 
@@ -283,7 +315,6 @@ enum EmailBlockTypeElementEnum: string
             $current,
             [
                 self::COLOR, self::BACKGROUND, self::HEIGHT, self::BORDER,
-                self::WIDTH,
             ],
             true
         );
@@ -294,7 +325,7 @@ enum EmailBlockTypeElementEnum: string
         return \in_array(
             $current,
             [
-                self::BACKGROUND, self::RADIUS, self::HEIGHT, self::WIDTH,
+                self::BACKGROUND, self::RADIUS, self::HEIGHT,
                 self::BORDER,
             ],
             true
@@ -307,10 +338,15 @@ enum EmailBlockTypeElementEnum: string
      * @param  array  $data  The data array containing the valid item.
      * @param  string  $key  The key to use when retrieving the CSS class from the valid items array (default: 'class').
      * @param  mixed  $default  The default value to return if the valid item is not found (default: '').
+     * @param  EmailBlockTypeEnum|null  $type  The email block type enum case (optional).
      * @return string|null The corresponding CSS class for the enum case and valid item.
      */
-    public function cssDesign(array $data, string $key = 'style', mixed $default = null): ?string
-    {
+    public function cssDesign(
+        array $data,
+        string $key = 'style',
+        mixed $default = null,
+        ?EmailBlockTypeEnum $type = null
+    ): ?string {
         // Data array
         $item = data_get($data, $this->value);
 
@@ -320,6 +356,11 @@ enum EmailBlockTypeElementEnum: string
                 return '';
             }
             $item = $this->default($default);
+        }
+
+        // Button
+        if ($this->isButton()) {
+            return $this->resolveButton($item, true);
         }
 
         // Spacing || Border Spacing
@@ -334,8 +375,7 @@ enum EmailBlockTypeElementEnum: string
         // No Validation needed
         if (self::noValidity($this)) {
             return match ($this) {
-                self::COLOR => "color: {$item};",
-                self::BTN_BACKGROUND => "background-color: {$item};",
+                self::COLOR => $type?->isDivider() ? "background-color: {$item};" : "color: {$item};",
 
                 // Must not be null
                 self::BACKGROUND => "background-color: {$item};",
@@ -354,8 +394,10 @@ enum EmailBlockTypeElementEnum: string
             self::CHAR_CASE => data_get($validItems, "{$item}.{$key}"),
             self::FONT => data_get($validItems, "{$item}.{$key}"),
             self::FONT_SIZE => data_get($validItems, $item),
+            self::FONT_WEIGHT => data_get($validItems, "{$item}.{$key}"),
             self::WIDTH => data_get($validItems, $item),
             self::RADIUS => data_get($validItems, "{$item}.{$key}"),
+            self::ITEM_MOVE => 'display: block; '.data_get($validItems, "{$item}.{$key}"),
             default => '',
         };
     }
@@ -497,7 +539,7 @@ enum EmailBlockTypeElementEnum: string
     public function resolveSpacing(int|array|null $spacing = 0, bool $style = false, bool $border = false): string|array
     {
         if (! $this->isSpacing() && ! $this->isBorderSpacing()) {
-            throw new \LogicException('resolveSpacing() can only be called on the SPACING or BORDER_SPACING enum case.');
+            throw new \LogicException('resolveSpacing() can only be called on the SPACING or BORDER_SPACING or BUTTON enum case.');
         }
 
         $cssProperty = $border ? 'margin' : 'padding';
@@ -579,6 +621,58 @@ enum EmailBlockTypeElementEnum: string
         }
 
         return $border;
+    }
+
+    public function resolveButton(?array $button = null, bool $style = false): string|array
+    {
+        if (! $this->isButton()) {
+            throw new \LogicException('resolveButton() can only be called on the BUTTON enum case.');
+        }
+
+        // Get default button values
+        $default = $this->default();
+        if ($button === null) {
+            $button = $default;
+        }
+
+        // Merge button values with default values
+        $button = [...$default, ...$button];
+
+        // Return CSS Button
+        if ($style) {
+            // Spacing
+            $spacing = sprintf(
+                'padding:%spx %spx;',
+                data_get($button, 'spacing.y', 15),
+                data_get($button, 'spacing.x', 32),
+            );
+
+            // Border
+            $borderWidth = 'border-style:solid;border-width:';
+            foreach (data_get($button, 'border_width', []) as $side => $width) {
+                $borderWidth .= "{$width}px ";
+            }
+            $borderWidth = trim($borderWidth).';'.
+                'border-color:'.data_get($button, 'border_color', '#DC143C').';';
+
+            // Radius
+            $radius = self::validRadius()[data_get($button, 'border_radius', 'none')]['style'];
+
+            // Width
+            $width = data_get($button, 'full_width', false) ? 'display:block;width:100%;' : 'display:inline-block;';
+
+            // Return CSS Button
+            return sprintf(
+                'text-decoration: none; text-align: center; background-color:%1$s; %2$s %3$s %4$s %5$s',
+                data_get($button, 'background', '#A3E635'),
+                $spacing,
+                $borderWidth,
+                $radius,
+                $width
+            );
+        }
+
+        return $button;
     }
 
     /**
