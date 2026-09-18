@@ -27,9 +27,9 @@
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-            <flux:input type="color" wire:model.live="design.brand" label="Brand" description="Buttons, links, the accent bar." />
-            <flux:input type="color" wire:model.live="design.background" label="Page bg" description="Behind the letter." />
-            <flux:input type="color" wire:model.live="design.container_background" label="Letter bg" description="The card blocks sit on." />
+            <x-form.color-field wire:model.live="design.brand" label="Brand" description="Buttons, links, the accent bar." />
+            <x-form.color-field wire:model.live="design.background" label="Page bg" description="Behind the letter." />
+            <x-form.color-field wire:model.live="design.container_background" label="Letter bg" description="The card blocks sit on." />
         </div>
 
         <flux:select wire:model.live="design.font_family" label="Typeface">

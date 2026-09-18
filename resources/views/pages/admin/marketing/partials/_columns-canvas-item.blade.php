@@ -56,9 +56,12 @@
         </button>
     </div>
 
+    {{-- padding-bottom tracks the row's own "Spacing (px)" field, the same value
+         EmailRenderService::padding() renders the real row's bottom clearance
+         with, so the canvas shows what changing it does. --}}
     <div
         class="grid gap-3 p-6"
-        style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); {{ ! empty($block['data']['background']) ? 'background-color:'.$block['data']['background'].';' : '' }} {{ $rowBgImage ? 'background-image:url('.$rowBgImage->url().');background-size:cover;background-position:center;' : '' }}"
+        style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); padding-bottom: {{ (int) ($block['data']['spacing'] ?? 10) }}px; {{ ! empty($block['data']['background']) ? 'background-color:'.$block['data']['background'].';' : '' }} {{ $rowBgImage ? 'background-image:url('.$rowBgImage->url().');background-size:cover;background-position:center;' : '' }}"
     >
         @foreach ($columns as $columnIndex => $column)
             @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)

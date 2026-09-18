@@ -20,7 +20,7 @@ class EmailTemplateService
     public function libraryQuery(?string $search = null): Builder
     {
         return EmailTemplate::query()
-            ->when($search, fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
+            ->when($search, fn (Builder $query) => $query->searchMacro('name', $search))
             ->orderByDesc('updated_at');
     }
 

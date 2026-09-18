@@ -4,12 +4,10 @@
     exists only so the admin can see roughly what they are building.
 --}}
 
-@php($align = ['left' => 'text-left', 'center' => 'text-center', 'right' => 'text-right'][$data['align'] ?? 'left'] ?? 'text-left')
-
 @switch($case)
     @case(\App\Enums\EmailBlockTypeEnum::HEADING)
-        <p class="{{ $align }} font-heading font-bold" style="color: {{ $data['color'] ?? '#0F172A' }}; font-size: {{ ['h1' => '26px', 'h2' => '20px', 'h3' => '16px'][$data['level'] ?? 'h1'] }}">
-            {{ $data['text'] ?? '' }}
+        <p class="{{ $css['classes'] }} font-heading" style="{{ $css['style'] }}">
+            {{ data_get($data, 'text') }}
         </p>
         @break
 
@@ -18,7 +16,9 @@
              session, the same trust level the rich-text editor itself renders at.
              The escaped/sanitized version is what actually ships — see
              EmailRenderService::renderBlock(). --}}
-        <div class="{{ $align }} text-[14px] leading-relaxed" style="color: {{ $data['color'] ?? '#475569' }}">{!! $data['text'] ?? '' !!}</div>
+        <div class="{{ $css['classes'] }} leading-relaxed" style="{{ $css['style'] }}">
+            {!! data_get($data, 'text') !!}
+        </div>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::BUTTON)
@@ -27,7 +27,7 @@
                 @class(['rounded-lg px-5 py-2.5 text-center text-[13px] font-bold', 'block' => ! empty($data['full_width']), 'inline-block' => empty($data['full_width'])])
                 style="background: {{ $data['background'] ?? '#A3E635' }}; color: {{ $data['color'] ?? '#0F172A' }}"
             >
-                {{ $data['text'] ?? 'Click here' }}
+                {{ data_get($data, 'text', 'Click here') }}
             </span>
         </div>
         @break
@@ -37,7 +37,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SPACER)
-        <div style="height: {{ (int) ($data['height'] ?? 24) }}px"></div>
+        <div style="{{ \App\Enums\EmailBlockTypeElementEnum::HEIGHT->cssDesign($data['height']) }}"></div>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)

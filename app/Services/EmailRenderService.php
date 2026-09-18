@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EmailBlockTypeElementEnum;
 use App\Enums\EmailBlockTypeEnum;
 use App\Enums\SocialHandleEnum;
 use App\Models\EmailCampaign;
@@ -53,6 +54,62 @@ class EmailRenderService
             ->implode('');
     }
 
+    public function getCss(EmailBlockTypeEnum $type, array $data, bool $canvas = false): array
+    {
+        $classes = $style = $container = [];
+        // General must-have styles for all blocks, even if the admin has not set them in the
+        $container = [
+            EmailBlockTypeElementEnum::BACKGROUND->cssDesign($data),
+            EmailBlockTypeElementEnum::BORDER->cssDesign($data),
+            EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+            EmailBlockTypeElementEnum::SPACING->cssDesign($data),
+            EmailBlockTypeElementEnum::BORDER_SPACING->cssDesign($data),
+        ];
+
+        // Button, Heading, Paragraph
+        if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::COLOR->cssDesign($data),
+                EmailBlockTypeElementEnum::FONT->cssDesign($data),
+                EmailBlockTypeElementEnum::ALIGN->cssDesign($data),
+                EmailBlockTypeElementEnum::CHAR_CASE->cssDesign($data),
+            ];
+        }
+
+        // Button, Paragraph
+        if ($type->isButton() || $type->isParagraph()) {
+            $style[] = EmailBlockTypeElementEnum::FONT_SIZE->cssDesign($data);
+        }
+
+        // Button
+        if ($type->isButton()) {
+            $style[] = EmailBlockTypeElementEnum::BTN_BACKGROUND->cssDesign($data);
+        }
+
+        // Button, Heading
+        if ($type->isButton() || $type->isHeading()) {
+
+        }
+
+        // Heading
+        if ($type->isHeading()) {
+            $classes[] = EmailBlockTypeElementEnum::LEVEL->cssDesign($data, 'class');
+        }
+
+        // For containers
+        if ($canvas) {
+            $style = [...$style, ...$container];
+        }
+
+        //
+        return [
+            'classes' => implode(' ', $classes),
+            'style' => implode('', $style),
+            'container' => implode('', $container),
+        ];
+    }
+
     private function renderFooter(?EmailSection $footer, ?User $recipient): string
     {
         if (! $footer) {
@@ -80,16 +137,7 @@ class EmailRenderService
         $text = fn (?string $value) => e($variables->resolve($value, recipient: $recipient));
 
         return match ($type) {
-            EmailBlockTypeEnum::HEADING => $this->row(sprintf(
-                '<%1$s style="margin:0;font-family:Arial,sans-serif;text-align:%2$s;color:%3$s;">%4$s</%1$s>',
-                // Read once, then checked: `$data['level'] ?? 'h1'` passing the
-                // check says nothing about the key existing.
-                in_array($level = $data['level'] ?? 'h1', ['h1', 'h2', 'h3'], true) ? $level : 'h1',
-                $data['align'] ?? 'center',
-                $data['color'] ?? '#0F172A',
-                $text($data['text'] ?? ''),
-            ), $this->padding(EmailBlockTypeEnum::HEADING, $data, 10)),
-
+            EmailBlockTypeEnum::HEADING => $this->renderHeading($data, $text),
             EmailBlockTypeEnum::PARAGRAPH => $this->row(sprintf(
                 '<div style="margin:0;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;text-align:%s;color:%s;">%s</div>',
                 $data['align'] ?? 'left',
@@ -146,6 +194,37 @@ class EmailRenderService
         };
 
         return "{$top}px 40px ".((int) ($data['spacing'] ?? $default)).'px';
+    }
+
+    private function spacing(array $data): string
+    {
+        return EmailBlockTypeElementEnum::SPACING->resolveSpacing(data_get($data, 'spacing'), style: true);
+    }
+
+    /**
+     * The heading block's `<h1>`/`<h2>`/`<h3>`/`<h4>`/`<h5>`/`<h6>` tag, with
+     * the text and all the inline styles the admin can set in the block's own
+     * settings panel.
+     */
+    private function renderHeading(array $data, \Closure $text): string
+    {
+        $level = EmailBlockTypeElementEnum::LEVEL->default(data_get($data, 'level'));
+        $font = EmailBlockTypeElementEnum::FONT->cssDesign($data, 'font');
+        $levelStyles = EmailBlockTypeElementEnum::LEVEL->cssDesign($data);
+
+        return $this->row(sprintf(
+            '<%1$s style="margin:0;text-align:%2$s;color:%3$s;text-transform:%4$s;%5$s;%6$s">%7$s</%1$s>',
+            // Read once, then checked: `$data['level'] ?? 'h1'` passing the
+            // check says nothing about the key existing.
+            $level,
+            EmailBlockTypeElementEnum::ALIGN->default(data_get($data, 'align')),
+            $data['color'] ?? '#0F172A',
+            EmailBlockTypeElementEnum::CHAR_CASE->default(data_get($data, 'char_case')),
+            $levelStyles,
+            $font,
+            $text(data_get($data, 'text', '')),
+            // ), $this->padding(EmailBlockTypeEnum::HEADING, $data, 10));
+        ), $this->spacing($data));
     }
 
     /**
@@ -557,6 +636,8 @@ class EmailRenderService
         $style = "padding:{$padding};"
             .($height !== '' ? "height:{$height};line-height:{$height};font-size:1px;" : '')
             .($background !== null ? "background:{$background};" : '');
+
+        // remember if there is margin add div as container
 
         return sprintf('<tr><td style="%s">%s</td></tr>', $style, $inner);
     }

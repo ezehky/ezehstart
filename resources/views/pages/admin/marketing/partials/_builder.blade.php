@@ -71,7 +71,10 @@
     {{-- The page background behind the letter is the one design value shown even
          where the canvas can't fit a full page — a flat colour swatch, not the
          actual body tag, so it stays readable in both themes when left unset. --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto p-6 custom-scrollbar" style="background: {{ $design['background'] ?? '#F1F5F9' }};">
+    <div
+        class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto p-6 custom-scrollbar"
+        style="background: {{ $design['background'] ?? '#F1F5F9' }};"
+    >
         {{-- The canvas is a single column of blocks, with the selected block's
              settings in the right-hand pane. The canvas itself is not a form —
              the settings are, and they are keyed to the selected block so that
@@ -100,7 +103,7 @@
         <div
             wire:sort="reorderBlocks"
             wire:sort:config="{ handle: '[wire\\:sort\\:handle]' }"
-            class="mx-auto w-full overflow-hidden shadow-sm"
+            class="mx-auto w-full shadow-sm"
             style="max-width: {{ (int) ($design['container_width'] ?? 640) }}px; background: {{ $design['container_background'] ?? '#FFFFFF' }}; border-radius: {{ (int) ($design['container_radius'] ?? 6) }}px; font-family: {{ $letterFont }};"
         >
             @if (! empty($design['accent_bar']))
@@ -149,7 +152,7 @@
                 <p class="mt-3 text-sm text-slate-500">Select a block to edit its settings.</p>
             </div>
         @else
-            @php($blockCase = \App\Enums\EmailBlockTypeEnum::from($selected['type']))
+            @php($blockCase = \App\Enums\EmailBlockTypeEnum::tryFrom($selected['type']))
 
             {{-- Keyed to the block, not to the panel. Two blocks of different types
                  both carry a "text" field, and without a key Livewire's morph keeps
@@ -157,8 +160,12 @@
                  to blocks.0.data.text while the paragraph is selected. --}}
             <div wire:key="block-settings-{{ $selected['id'] }}">
             <div class="mb-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-lime-600 dark:text-lime-400">{{ $blockCase->group() }}</p>
-                <p class="font-medium text-slate-950 dark:text-white">{{ $blockCase->label() }} settings</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-lime-600 dark:text-lime-400">
+                    {{ $blockCase->group() }}
+                </p>
+                <p class="font-medium text-slate-950 dark:text-white">
+                    {{ $blockCase->label() }} settings
+                </p>
             </div>
 
             @include('pages.admin.marketing.partials._block-settings', [

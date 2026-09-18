@@ -20,7 +20,7 @@ class EmailSectionService
     {
         return EmailSection::query()
             ->when($type, fn (Builder $query) => $query->ofType($type))
-            ->when($search, fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
+            ->when($search, fn (Builder $query) => $query->searchMacro('name', $search))
             ->orderByDesc('is_default')
             ->orderBy('name');
     }

@@ -22,6 +22,11 @@
                                     wire:sort inside wire:sort has no clean drop
                                     target once a column is also a drag surface.
 --}}
+@php
+    if ($case instanceof \App\Enums\EmailBlockTypeEnum) {
+        $css = app(\App\Services\EmailRenderService::class)->getCss($case, $block['data']);
+    }
+@endphp
 
 <div
     wire:key="block-{{ $block['id'] }}"
@@ -32,14 +37,16 @@
         'outline outline-2 outline-offset-[-2px] outline-lime-500' => $selectedBlockId === $block['id'],
     ])
 >
+    {{-- -top-3 --}}
     <div @class([
-        'pointer-events-none absolute -top-3 start-2.5 z-10 rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
-        'opacity-100' => $selectedBlockId === $block['id'],
+        'pointer-events-none absolute group-hover:-top-3 start-2.5 z-10',
+        'rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
+        'opacity-100 -top-3' => $selectedBlockId === $block['id'],
     ])>{{ $case->label() }}</div>
 
     <div @class([
-        'absolute -top-3 end-2.5 z-10 flex gap-0.5 rounded bg-slate-900 p-0.5 opacity-0 group-hover:opacity-100',
-        'opacity-100' => $selectedBlockId === $block['id'],
+        'absolute group-hover:-top-3 end-2.5 z-10 flex gap-0.5 rounded bg-slate-900 p-0.5 opacity-0 group-hover:opacity-100',
+        'opacity-100 -top-3' => $selectedBlockId === $block['id'],
     ])>
         @if (! empty($sortItem))
             <button type="button" wire:sort:handle class="cursor-grab rounded p-1 text-slate-300 hover:bg-white/15 hover:text-white active:cursor-grabbing" aria-label="Drag to reorder">
@@ -60,7 +67,11 @@
         </button>
     </div>
 
-    <div class="pointer-events-none {{ $sortItem ? 'p-6' : 'p-3' }}">
-        @include('pages.admin.marketing.partials._block-preview', ['case' => $case, 'data' => $block['data']])
+    {{-- The base padding is fixed room for the hover controls above; the bottom
+         edge alone tracks the block's own "Spacing (px)" field — the same value
+         EmailRenderService::padding() renders the real email's row with — so the
+         canvas actually shows what changing it does instead of staying flat. --}}
+    <div class="pointer-events-none" style="{{ $css['container'] }}">
+        @include('pages.admin.marketing.partials._block-preview', ['case' => $case, 'data' => $block['data'], 'css' => $css])
     </div>
 </div>

@@ -183,30 +183,131 @@ enum EmailBlockTypeEnum: string
     public function defaultData(): array
     {
         return match ($this) {
-            self::HEADING => ['text' => 'New heading', 'level' => 'h1', 'align' => 'center', 'color' => '#0F172A', 'spacing' => 10],
-            self::PARAGRAPH => ['text' => 'New paragraph text.', 'align' => 'left', 'color' => '#475569', 'spacing' => 10],
-            self::BUTTON => ['text' => 'Click here', 'url' => '', 'align' => 'center', 'background' => '#A3E635', 'color' => '#0F172A', 'new_tab' => false, 'full_width' => false, 'spacing' => 30],
-            self::DIVIDER => ['color' => '#E2E8F0', 'spacing' => 10],
-            self::SPACER => ['height' => 24],
-            self::IMAGE => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => '100%', 'align' => 'center', 'radius' => 8, 'spacing' => 10],
-            self::HTML => ['html' => '', 'spacing' => 10],
-            self::DYNAMIC_CONTENT => ['content_type' => 'post', 'mode' => 'latest', 'content_id' => null, 'category_id' => null, 'tag_id' => null, 'limit' => 1, 'layout' => 'featured', 'show_image' => true, 'show_excerpt' => true, 'show_date' => false, 'button_text' => 'Read More', 'spacing' => 30],
-            self::RELATED_CONTENT => ['content_type' => 'post', 'source' => 'same_category', 'source_content_id' => null, 'limit' => 3, 'heading' => 'You May Also Like', 'button_text' => 'Read More', 'spacing' => 34],
-            self::COLUMNS => ['background' => null, 'background_image_id' => null, 'spacing' => 10, 'columns' => [
-                ['background' => null, 'background_image_id' => null, 'blocks' => []],
-                ['background' => null, 'background_image_id' => null, 'blocks' => []],
-            ]],
-            self::SECTION => ['email_section_id' => null],
-            self::LOGO, self::LOGO_DARK => ['width' => '160px', 'align' => 'center', 'link_url' => '{{site.url}}', 'spacing' => 10],
-            self::FAVICON => ['width' => '32px', 'align' => 'center', 'spacing' => 10],
-            self::SOCIALS => [
-                'source' => 'config',
-                'style' => 'image',
-                'variant' => 'default',
-                'align' => 'center',
-                'custom_links' => [],
-                'spacing' => 10,
-            ],
+            self::HEADING => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::TEXT->value => 'New heading',
+                EmailBlockTypeElementEnum::LEVEL,
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::COLOR,
+                EmailBlockTypeElementEnum::CHAR_CASE,
+                EmailBlockTypeElementEnum::FONT,
+
+                // Layout
+                EmailBlockTypeElementEnum::BORDER,
+                EmailBlockTypeElementEnum::RADIUS,
+                EmailBlockTypeElementEnum::BACKGROUND,
+                EmailBlockTypeElementEnum::SPACING,
+                EmailBlockTypeElementEnum::BORDER_SPACING,
+            ]),
+            self::PARAGRAPH => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::TEXT->value => 'New paragraph text.',
+                EmailBlockTypeElementEnum::ALIGN->value => 'left',
+                EmailBlockTypeElementEnum::COLOR->value => '#475569',
+                EmailBlockTypeElementEnum::CHAR_CASE,
+                EmailBlockTypeElementEnum::FONT,
+                EmailBlockTypeElementEnum::FONT_SIZE,
+
+                // Layout
+                EmailBlockTypeElementEnum::BORDER,
+                EmailBlockTypeElementEnum::RADIUS,
+                EmailBlockTypeElementEnum::BACKGROUND,
+                EmailBlockTypeElementEnum::SPACING,
+                EmailBlockTypeElementEnum::BORDER_SPACING,
+            ]),
+            self::BUTTON => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::TEXT->value => 'Click here',
+                EmailBlockTypeElementEnum::URL,
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::BACKGROUND->value => '#A3E635',
+                EmailBlockTypeElementEnum::COLOR->value => '#0F172A',
+                EmailBlockTypeElementEnum::NEW_TAB,
+                EmailBlockTypeElementEnum::FULL_WIDTH,
+                EmailBlockTypeElementEnum::CHAR_CASE,
+
+                // Layout
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::DIVIDER => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::COLOR->value => '#E2E8F0',
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::SPACER => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::HEIGHT,
+            ]),
+            self::IMAGE => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::IMAGE_ID,
+                EmailBlockTypeElementEnum::ALT,
+                EmailBlockTypeElementEnum::LINK_URL,
+                EmailBlockTypeElementEnum::WIDTH,
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::RADIUS,
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::HTML => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::HTML,
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::DYNAMIC_CONTENT => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::CONTENT_TYPE,
+                EmailBlockTypeElementEnum::MODE,
+                EmailBlockTypeElementEnum::CONTENT_ID,
+                EmailBlockTypeElementEnum::CATEGORY_ID,
+                EmailBlockTypeElementEnum::TAG_ID,
+                EmailBlockTypeElementEnum::LIMIT,
+                EmailBlockTypeElementEnum::LAYOUT,
+                EmailBlockTypeElementEnum::SHOW_IMAGE,
+                EmailBlockTypeElementEnum::SHOW_EXCERPT,
+                EmailBlockTypeElementEnum::SHOW_DATE,
+                EmailBlockTypeElementEnum::BUTTON_TEXT,
+                EmailBlockTypeElementEnum::SPACING->value => 30,
+            ]),
+            self::RELATED_CONTENT => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::CONTENT_TYPE,
+                EmailBlockTypeElementEnum::SOURCE->value => 'same_category',
+                EmailBlockTypeElementEnum::SOURCE_CONTENT_ID,
+                EmailBlockTypeElementEnum::LIMIT->value => 3,
+                EmailBlockTypeElementEnum::HEADING,
+                EmailBlockTypeElementEnum::BUTTON_TEXT,
+                EmailBlockTypeElementEnum::SPACING->value => 34,
+            ]),
+            self::COLUMNS => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::BACKGROUND,
+                EmailBlockTypeElementEnum::BACKGROUND_IMAGE_ID,
+                EmailBlockTypeElementEnum::SPACING,
+                EmailBlockTypeElementEnum::COLUMNS->value => [
+                    EmailBlockTypeElementEnum::make([
+                        EmailBlockTypeElementEnum::BACKGROUND,
+                        EmailBlockTypeElementEnum::BACKGROUND_IMAGE_ID,
+                        EmailBlockTypeElementEnum::BLOCKS,
+                    ]),
+                    EmailBlockTypeElementEnum::make([
+                        EmailBlockTypeElementEnum::BACKGROUND,
+                        EmailBlockTypeElementEnum::BACKGROUND_IMAGE_ID,
+                        EmailBlockTypeElementEnum::BLOCKS,
+                    ]),
+                ],
+            ]),
+            self::SECTION => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::EMAIL_SECTION_ID,
+            ]),
+            self::LOGO, self::LOGO_DARK => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::WIDTH->value => '160px',
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::LINK_URL->value => '{{site.url}}',
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::FAVICON => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::WIDTH->value => '32px',
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
+            self::SOCIALS => EmailBlockTypeElementEnum::make([
+                EmailBlockTypeElementEnum::SOURCE,
+                EmailBlockTypeElementEnum::STYLE,
+                EmailBlockTypeElementEnum::VARIANT,
+                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::CUSTOM_LINKS,
+                EmailBlockTypeElementEnum::SPACING,
+            ]),
         };
     }
 }
