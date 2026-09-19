@@ -264,6 +264,8 @@ enum EmailBlockTypeEnum: string
                 EmailBlockTypeElementEnum::SHOW_EXCERPT,
                 EmailBlockTypeElementEnum::SHOW_DATE,
                 EmailBlockTypeElementEnum::BUTTON_TEXT,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING->value => 30,
             ]),
             self::RELATED_CONTENT => EmailBlockTypeElementEnum::make([
@@ -273,6 +275,8 @@ enum EmailBlockTypeEnum: string
                 EmailBlockTypeElementEnum::LIMIT->value => 3,
                 EmailBlockTypeElementEnum::HEADING,
                 EmailBlockTypeElementEnum::BUTTON_TEXT,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING->value => 34,
             ]),
             self::COLUMNS => EmailBlockTypeElementEnum::make([
@@ -296,24 +300,52 @@ enum EmailBlockTypeEnum: string
                 EmailBlockTypeElementEnum::EMAIL_SECTION_ID,
             ]),
             self::LOGO, self::LOGO_DARK => EmailBlockTypeElementEnum::make([
-                EmailBlockTypeElementEnum::WIDTH->value => '160px',
-                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::WIDTH->value => 'sm',
                 EmailBlockTypeElementEnum::LINK_URL->value => '{{site.url}}',
+                EmailBlockTypeElementEnum::ITEM_MOVE,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING,
             ]),
             self::FAVICON => EmailBlockTypeElementEnum::make([
-                EmailBlockTypeElementEnum::WIDTH->value => '32px',
-                EmailBlockTypeElementEnum::ALIGN,
+                EmailBlockTypeElementEnum::WIDTH->value => 'xs',
+                EmailBlockTypeElementEnum::ITEM_MOVE,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING,
             ]),
             self::SOCIALS => EmailBlockTypeElementEnum::make([
                 EmailBlockTypeElementEnum::SOURCE,
                 EmailBlockTypeElementEnum::STYLE,
                 EmailBlockTypeElementEnum::VARIANT,
-                EmailBlockTypeElementEnum::ALIGN,
                 EmailBlockTypeElementEnum::CUSTOM_LINKS,
+                EmailBlockTypeElementEnum::ITEM_MOVE,
+
+                // Layout
                 EmailBlockTypeElementEnum::SPACING,
             ]),
         };
+    }
+
+    /**
+     * Whether this block type rejects the default container CSS applied to most
+     * blocks in EmailRenderService::renderBlocks(). Buttons, dividers and images
+     * are already self-contained, so they don't need the extra padding and border.
+     */
+    public function rejectMostContainerCss()
+    {
+        return \in_array($this, [
+            self::DYNAMIC_CONTENT,
+            self::RELATED_CONTENT,
+            self::COLUMNS,
+            self::SECTION,
+            self::BUTTON,
+            self::LOGO,
+            self::LOGO_DARK,
+            self::FAVICON,
+            self::SOCIALS,
+            self::DIVIDER,
+            self::IMAGE,
+        ], true);
     }
 }

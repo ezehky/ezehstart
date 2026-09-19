@@ -58,20 +58,23 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::DYNAMIC_CONTENT)
-        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider($data['content_type'] ?? 'post'))
+        @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider(data_get($data, 'content_type', 'post')))
         <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
             <div class="flex items-center gap-2 text-xs font-semibold text-lime-700 dark:text-lime-400">
                 <flux:icon name="newspaper" class="size-4" />
-                {{ $provider?->label() ?? 'Content' }} · {{ ucfirst($data['mode'] ?? 'latest') }} · {{ $data['limit'] ?? 1 }} item(s) · {{ ucfirst(str_replace('_', ' ', $data['layout'] ?? 'featured')) }}
+                {{ $provider?->label() ?? 'Content' }} ·
+                {{ ucfirst(data_get($data, 'mode', 'latest')) }} ·
+                {{ data_get($data, 'limit', 1) }} item(s) ·
+                {{ ucfirst(str_replace('_', ' ', data_get($data, 'layout', 'featured'))) }}
             </div>
         </div>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::RELATED_CONTENT)
         <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-            <p class="mb-1 text-center text-xs font-semibold">{{ $data['heading'] ?? 'You May Also Like' }}</p>
+            <p class="mb-1 text-center text-xs font-semibold">{{ data_get($data, 'heading', 'You May Also Like') }}</p>
             <div class="flex items-center justify-center gap-2 text-[11px] text-slate-400">
-                <flux:icon name="squares-2x2" class="size-3.5" /> {{ $data['limit'] ?? 3 }} related item(s)
+                <flux:icon name="squares-2x2" class="size-3.5" /> {{ data_get($data, 'limit', 3) }} related item(s)
             </div>
         </div>
         @break
@@ -82,37 +85,16 @@
 
     @case(\App\Enums\EmailBlockTypeEnum::LOGO)
     @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)
-        @php($src = kSiteConfig($case->isLogoDark() ? 'logo-dark' : 'logo'))
-        <div class="{{ $align }}">
-            @if ($src)
-                <img src="{{ $src }}" alt="" style="width: {{ $data['width'] ?? '160px' }}" class="inline-block">
-            @else
-                <div class="inline-flex items-center gap-1 rounded border border-dashed border-slate-200 px-2 py-1 text-xs text-slate-400 dark:border-slate-700">
-                    <flux:icon name="photo" class="size-3.5" /> No {{ $case->isLogoDark() ? 'dark logo' : 'logo' }} set in Site Config
-                </div>
-            @endif
-        </div>
-        @break
-
     @case(\App\Enums\EmailBlockTypeEnum::FAVICON)
-        @php($src = kSiteConfig('favicon'))
-        <div class="{{ $align }}">
-            @if ($src)
-                <img src="{{ $src }}" alt="" style="width: {{ $data['width'] ?? '32px' }}" class="inline-block">
-            @else
-                <div class="inline-flex items-center gap-1 rounded border border-dashed border-slate-200 px-2 py-1 text-xs text-slate-400 dark:border-slate-700">
-                    <flux:icon name="star" class="size-3.5" /> No favicon set in Site Config
-                </div>
-            @endif
-        </div>
+        <x-marketing.logo-placeholder :$case :$css />
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
-        @php($links = ($data['source'] ?? 'config') === 'custom' ? ($data['custom_links'] ?? []) : (array) kSiteConfig('social-handles', default: []))
-        <div class="flex {{ ($data['align'] ?? 'center') === 'left' ? 'justify-start' : (($data['align'] ?? 'center') === 'right' ? 'justify-end' : 'justify-center') }} gap-2">
+        @php($links = data_get($data, 'source', 'config') === 'custom' ? data_get($data, 'custom_links', []) : (array) kSiteConfig('social-handles', default: []))
+        <div style="{{ $css['style'] }}">
             @forelse ($links as $link)
-                @php($handle = \App\Enums\SocialHandleEnum::tryFrom($link['platform'] ?? ''))
-                @if (($data['style'] ?? 'image') === 'image' && $handle)
+                @php($handle = \App\Enums\SocialHandleEnum::tryFrom(data_get($link, 'platform')))
+                @if (data_get($data, 'style', 'image') === 'image' && $handle)
                     <div class="flex size-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                         <flux:icon :name="$handle->icon()" class="size-3.5 text-slate-500 dark:text-slate-300" />
                     </div>

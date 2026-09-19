@@ -63,7 +63,7 @@ class EmailRenderService
         ];
 
         // Skip Default container
-        if (! $type->isButton() && ! $type->isDivider() && ! $type->isImage()) {
+        if (! $type->rejectMostContainerCss()) {
             $container = [
                 ...$container,
                 EmailBlockTypeElementEnum::BORDER_SPACING->cssDesign($data),
@@ -139,6 +139,28 @@ class EmailRenderService
                 EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
                 EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
                 EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+            ];
+        }
+
+        // Section
+        if ($type->isSection()) {
+            $container = [];
+        }
+
+        // Logo, Logo Dark, Favicon
+        if ($type->isLogo() || $type->isLogoDark() || $type->isFavicon()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
+                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+            ];
+        }
+
+        // Social Handles
+        if ($type->isSocials()) {
+            $style = [
+                ...$style,
+                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
             ];
         }
 

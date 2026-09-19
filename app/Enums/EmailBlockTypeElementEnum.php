@@ -227,6 +227,10 @@ enum EmailBlockTypeElementEnum: string
             ],
             self::WIDTH => [
                 'auto' => 'width: auto;',
+                'xs' => 'width: 8.53%;',
+                'sm' => 'width: 14.28%;',
+                'md' => 'width: 20.83%;',
+                'lg' => 'width: 25%;',
                 '1/2' => 'width: 50%;',
                 '1/3' => 'width: 33.3333%;',
                 '2/3' => 'width: 66.6667%;',

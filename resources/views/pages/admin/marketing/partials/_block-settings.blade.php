@@ -300,26 +300,13 @@
 
     @case(\App\Enums\EmailBlockTypeEnum::LOGO)
     @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)
-        <div class="space-y-4">
-            <p class="text-xs text-slate-500">
-                Pulled straight from {{ $case->isLogoDark() ? 'the dark logo' : 'the logo' }} in Site Config — Configuration → Site Settings, not from this block.
-            </p>
-            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.width" label="Width" placeholder="160px" />
-            <x-marketing.align wire:model.live="{{ $prefix }}.align" />
-            <flux:input
-                wire:model.live.debounce.1000ms="{{ $prefix }}.link_url"
-                label="Link URL"
-                placeholder="&#123;&#123;site.url&#125;&#125;"
-            />
-        </div>
+        <p class="text-xs text-slate-500">
+            Pulled straight from {{ $case->isLogoDark() ? 'the dark logo' : 'the logo' }} in Site Config.
+        </p>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::FAVICON)
-        <div class="space-y-4">
-            <p class="text-xs text-slate-500">Pulled straight from the favicon in Site Config — Configuration → Site Settings.</p>
-            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.width" label="Width" placeholder="32px" />
-            <x-marketing.align wire:model.live="{{ $prefix }}.align" />
-        </div>
+        <p class="text-xs text-slate-500">Pulled straight from the favicon in Site Config.</p>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
@@ -329,7 +316,7 @@
                 <flux:select.option value="custom">Add my own</flux:select.option>
             </flux:select>
 
-            @if (($data['source'] ?? 'config') === 'custom')
+            @if (data_get($data, 'source', 'config') === 'custom')
                 <div class="space-y-3">
                     @forelse ($data['custom_links'] ?? [] as $linkIndex => $link)
                         <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="social-link-{{ $linkIndex }}">
@@ -355,7 +342,15 @@
                             No links yet.
                         </p>
                     @endforelse
-                    <flux:button size="sm" variant="ghost" icon="plus" wire:click="addSocialLink('{{ $block['id'] }}')" class="w-full">Add link</flux:button>
+                    <flux:button
+                        size="sm"
+                        variant="ghost"
+                        icon="plus"
+                        wire:click="addSocialLink('{{ $block['id'] }}')"
+                        class="w-full"
+                    >
+                        Add link
+                    </flux:button>
                 </div>
             @else
                 <p class="text-xs text-slate-500">
@@ -368,15 +363,13 @@
                 <flux:select.option value="text">Name only</flux:select.option>
             </flux:select>
 
-            @if (($data['style'] ?? 'image') === 'image')
+            @if (data_get($data, 'style', 'image') === 'image')
                 <flux:select wire:model.live="{{ $prefix }}.variant" label="Icon color">
                     <flux:select.option value="default">Brand colours</flux:select.option>
                     <flux:select.option value="white">White</flux:select.option>
                     <flux:select.option value="black">Black</flux:select.option>
                 </flux:select>
             @endif
-
-            <x-marketing.align wire:model.live="{{ $prefix }}.align" />
         </div>
         @break
 
