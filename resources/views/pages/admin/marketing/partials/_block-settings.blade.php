@@ -31,7 +31,7 @@
                 <flux:textarea wire:model.live.debounce.1000ms="{{ $prefix }}.text" rows="2" placeholder="Heading..." />
             </div>
             <flux:radio.group wire:model.live="{{ $prefix }}.level" label="Heading level" variant="segmented" size="sm">
-                @foreach (\App\Enums\EmailBlockTypeElementEnum::LEVEL->validItems() as $key => $value)
+                @foreach (\App\Enums\EmailBlockItemEnum::LEVEL->validItems() as $key => $value)
                     <flux:radio value="{{ $key }}" :label="str($key)->upper()" />
                 @endforeach
             </flux:radio.group>
@@ -392,7 +392,7 @@
 ]))
     <div class="space-y-4 mt-4">
         {{-- Link Url --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('link_url', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('link_url', $data))
             <flux:input
                 wire:model.live.debounce.1000ms="{{ $prefix }}.link_url"
                 label="Link URL"
@@ -406,12 +406,12 @@
             <flux:field>
                 <flux:label>Font</flux:label>
                 <flux:input.group>
-                    @if (\App\Enums\EmailBlockTypeElementEnum::checkField('font', $data))
+                    @if (\App\Enums\EmailBlockItemEnum::checkField('font', $data))
                         <x-marketing.fonts class="w-full" wire:model.live="{{ $prefix }}.font" />
                     @endif
-                    @if (\App\Enums\EmailBlockTypeElementEnum::checkField('font_size', $data))
+                    @if (\App\Enums\EmailBlockItemEnum::checkField('font_size', $data))
                         <flux:select class="w-24" wire:model.live="{{ $prefix }}.font_size" size="sm" placeholder="Font size">
-                            @foreach (\App\Enums\EmailBlockTypeElementEnum::FONT_SIZE->validItems() as $key => $item)
+                            @foreach (\App\Enums\EmailBlockItemEnum::FONT_SIZE->validItems() as $key => $item)
                                 <flux:select.option value="{{ $key }}">{{ $key }}</flux:select.option>
                             @endforeach
                         </flux:select>
@@ -421,38 +421,38 @@
         @endif
 
         {{-- FONT WEIGHT --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('font_weight', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('font_weight', $data))
             <x-marketing.font-weight :$prefix />
         @endif
 
         {{-- CASE --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('char_case', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('char_case', $data))
             <flux:radio.group wire:model.live="{{ $prefix }}.char_case" label="Case" variant="segmented" size="sm">
-                @foreach (\App\Enums\EmailBlockTypeElementEnum::charCases() as $key => $value)
+                @foreach (\App\Enums\EmailBlockItemEnum::charCases() as $key => $value)
                     <flux:radio value="{{ $key }}" :icon="$value['icon']" />
                 @endforeach
             </flux:radio.group>
         @endif
 
         {{-- ALIGNMENT --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('align', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('align', $data))
             <x-marketing.align wire:model.live="{{ $prefix }}.align" />
         @endif
 
         {{-- COLOR --}}
         @if (kArrayIntersectKey($data, ['button', 'color']) && ! $case->isDivider())
             <div class="flex items-center justify-between gap-3">
-                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('color', $data))
+                @if (\App\Enums\EmailBlockItemEnum::checkField('color', $data))
                     <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
                 @endif
-                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('button', $data))
+                @if (\App\Enums\EmailBlockItemEnum::checkField('button', $data))
                     <x-form.color-field wire:model.live="{{ $prefix }}.button.background" label="Background" />
                 @endif
             </div>
         @endif
 
         {{-- BUTTON BORDER --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('button', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('button', $data))
             <flux:field>
                 <flux:label>
                     Border
@@ -475,10 +475,10 @@
         {{-- Width & Height --}}
         @if (kArrayIntersectKey($data, ['width', 'height']))
             <div class="flex items-center justify-between gap-3">
-                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('width', $data))
+                @if (\App\Enums\EmailBlockItemEnum::checkField('width', $data))
                     <div class="w-full">
                         <flux:select wire:model.live="{{ $prefix }}.width" label="Width" size="sm">
-                            @foreach (\App\Enums\EmailBlockTypeElementEnum::WIDTH->validItems() as $widthKey => $widthLabel)
+                            @foreach (\App\Enums\EmailBlockItemEnum::WIDTH->validItems() as $widthKey => $widthLabel)
                                 <flux:select.option value="{{ $widthKey }}">
                                     {{ strtoupper($widthKey) }}
                                 </flux:select.option>
@@ -486,7 +486,7 @@
                         </flux:select>
                     </div>
                 @endif
-                @if (\App\Enums\EmailBlockTypeElementEnum::checkField('height', $data))
+                @if (\App\Enums\EmailBlockItemEnum::checkField('height', $data))
                     <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.height" size="sm" label="Height" placeholder="auto" />
                 @endif
             </div>
@@ -494,9 +494,9 @@
 
 
         {{-- Item Move --}}
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('item_move', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('item_move', $data))
             <flux:radio.group wire:model.live="{{ $prefix }}.item_move" label="Move" variant="segmented" size="sm">
-                @foreach (\App\Enums\EmailBlockTypeElementEnum::ITEM_MOVE->validItems() as $key => $item)
+                @foreach (\App\Enums\EmailBlockItemEnum::ITEM_MOVE->validItems() as $key => $item)
                     <flux:radio value="{{ $key }}" icon="{{ $item['icon'] }}" />
                 @endforeach
             </flux:radio.group>
@@ -511,20 +511,20 @@
     <div class="space-y-4 mt-8">
         <flux:separator variant="subtle" text="LAYOUT" />
 
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('background', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('background', $data))
             <x-form.color-field wire:model.live="{{ $prefix }}.background" label="Background color" />
         @endif
 
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('border', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('border', $data))
             <x-marketing.border :$prefix />
         @endif
 
-        @if (\App\Enums\EmailBlockTypeElementEnum::checkField('radius', $data))
+        @if (\App\Enums\EmailBlockItemEnum::checkField('radius', $data))
             <x-marketing.radius wire:model.live="{{ $prefix }}.radius" />
         @endif
 
         @foreach (['spacing' => 'Spacing', 'border_spacing' => 'Border spacing'] as $key => $label)
-            @if (\App\Enums\EmailBlockTypeElementEnum::checkField($key, $data))
+            @if (\App\Enums\EmailBlockItemEnum::checkField($key, $data))
                 <flux:field>
                     <flux:label>
                         {{ $label }}

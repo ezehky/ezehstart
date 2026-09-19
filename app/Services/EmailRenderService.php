@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\EmailBlockTypeElementEnum;
+use App\Enums\EmailBlockItemEnum;
 use App\Enums\EmailBlockTypeEnum;
 use App\Enums\SocialHandleEnum;
 use App\Models\EmailCampaign;
@@ -59,17 +59,17 @@ class EmailRenderService
         $classes = $style = $container = [];
         // General must-have styles for all blocks, even if the admin has not set them in the
         $container = [
-            EmailBlockTypeElementEnum::SPACING->cssDesign($data),
+            EmailBlockItemEnum::SPACING->cssDesign($data),
         ];
 
         // Skip Default container
         if (! $type->rejectMostContainerCss()) {
             $container = [
                 ...$container,
-                EmailBlockTypeElementEnum::BORDER_SPACING->cssDesign($data),
-                EmailBlockTypeElementEnum::BACKGROUND->cssDesign($data),
-                EmailBlockTypeElementEnum::BORDER->cssDesign($data),
-                EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+                EmailBlockItemEnum::BORDER_SPACING->cssDesign($data),
+                EmailBlockItemEnum::BACKGROUND->cssDesign($data),
+                EmailBlockItemEnum::BORDER->cssDesign($data),
+                EmailBlockItemEnum::RADIUS->cssDesign($data),
             ];
         }
 
@@ -77,10 +77,10 @@ class EmailRenderService
         if ($type->isButton()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::BUTTON->cssDesign($data),
-                EmailBlockTypeElementEnum::FONT_WEIGHT->cssDesign($data),
+                EmailBlockItemEnum::BUTTON->cssDesign($data),
+                EmailBlockItemEnum::FONT_WEIGHT->cssDesign($data),
             ];
-            $container[] = EmailBlockTypeElementEnum::ALIGN->cssDesign($data);
+            $container[] = EmailBlockItemEnum::ALIGN->cssDesign($data);
 
         }
 
@@ -88,9 +88,9 @@ class EmailRenderService
         if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::COLOR->cssDesign($data),
-                EmailBlockTypeElementEnum::FONT->cssDesign($data),
-                EmailBlockTypeElementEnum::CHAR_CASE->cssDesign($data),
+                EmailBlockItemEnum::COLOR->cssDesign($data),
+                EmailBlockItemEnum::FONT->cssDesign($data),
+                EmailBlockItemEnum::CHAR_CASE->cssDesign($data),
             ];
         }
 
@@ -98,27 +98,27 @@ class EmailRenderService
         if ($type->isHeading() || $type->isParagraph()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::ALIGN->cssDesign($data),
+                EmailBlockItemEnum::ALIGN->cssDesign($data),
             ];
         }
 
         // Button, Paragraph
         if ($type->isButton() || $type->isParagraph()) {
-            $style[] = EmailBlockTypeElementEnum::FONT_SIZE->cssDesign($data);
+            $style[] = EmailBlockItemEnum::FONT_SIZE->cssDesign($data);
         }
 
         // Heading
         if ($type->isHeading()) {
-            $classes[] = EmailBlockTypeElementEnum::LEVEL->cssDesign($data, 'class');
+            $classes[] = EmailBlockItemEnum::LEVEL->cssDesign($data, 'class');
         }
 
         // Divider
         if ($type->isDivider()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::COLOR->cssDesign($data, type: $type),
-                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
-                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+                EmailBlockItemEnum::COLOR->cssDesign($data, type: $type),
+                EmailBlockItemEnum::WIDTH->cssDesign($data),
+                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
                 'height:2px;border-width:0;',
             ];
         }
@@ -127,7 +127,7 @@ class EmailRenderService
         if ($type->isSpacer()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::HEIGHT->cssDesign($data),
+                EmailBlockItemEnum::HEIGHT->cssDesign($data),
             ];
             $container = [];
         }
@@ -136,9 +136,9 @@ class EmailRenderService
         if ($type->isImage()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
-                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
-                EmailBlockTypeElementEnum::RADIUS->cssDesign($data),
+                EmailBlockItemEnum::WIDTH->cssDesign($data),
+                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
+                EmailBlockItemEnum::RADIUS->cssDesign($data),
             ];
         }
 
@@ -151,8 +151,8 @@ class EmailRenderService
         if ($type->isLogo() || $type->isLogoDark() || $type->isFavicon()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::WIDTH->cssDesign($data),
-                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+                EmailBlockItemEnum::WIDTH->cssDesign($data),
+                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
             ];
         }
 
@@ -160,7 +160,7 @@ class EmailRenderService
         if ($type->isSocials()) {
             $style = [
                 ...$style,
-                EmailBlockTypeElementEnum::ITEM_MOVE->cssDesign($data),
+                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
             ];
         }
 
@@ -260,7 +260,7 @@ class EmailRenderService
 
     private function spacing(array $data): string
     {
-        return EmailBlockTypeElementEnum::SPACING->resolveSpacing(data_get($data, 'spacing'), style: true);
+        return EmailBlockItemEnum::SPACING->resolveSpacing(data_get($data, 'spacing'), style: true);
     }
 
     /**
@@ -270,18 +270,18 @@ class EmailRenderService
      */
     private function renderHeading(array $data, \Closure $text): string
     {
-        $level = EmailBlockTypeElementEnum::LEVEL->default(data_get($data, 'level'));
-        $font = EmailBlockTypeElementEnum::FONT->cssDesign($data, 'font');
-        $levelStyles = EmailBlockTypeElementEnum::LEVEL->cssDesign($data);
+        $level = EmailBlockItemEnum::LEVEL->default(data_get($data, 'level'));
+        $font = EmailBlockItemEnum::FONT->cssDesign($data, 'font');
+        $levelStyles = EmailBlockItemEnum::LEVEL->cssDesign($data);
 
         return $this->row(sprintf(
             '<%1$s style="margin:0;text-align:%2$s;color:%3$s;text-transform:%4$s;%5$s;%6$s">%7$s</%1$s>',
             // Read once, then checked: `$data['level'] ?? 'h1'` passing the
             // check says nothing about the key existing.
             $level,
-            EmailBlockTypeElementEnum::ALIGN->default(data_get($data, 'align')),
+            EmailBlockItemEnum::ALIGN->default(data_get($data, 'align')),
             $data['color'] ?? '#0F172A',
-            EmailBlockTypeElementEnum::CHAR_CASE->default(data_get($data, 'char_case')),
+            EmailBlockItemEnum::CHAR_CASE->default(data_get($data, 'char_case')),
             $levelStyles,
             $font,
             $text(data_get($data, 'text', '')),

@@ -4,7 +4,7 @@ namespace App\Enums;
 
 use App\Traits\WithEnumHelpers;
 
-enum EmailBlockTypeElementEnum: string
+enum EmailBlockItemEnum: string
 {
     use WithEnumHelpers;
 
