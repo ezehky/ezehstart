@@ -321,7 +321,19 @@ enum EmailBlockTypeEnum: string
                 EmailBlockTypeElementEnum::CUSTOM_LINKS,
                 EmailBlockTypeElementEnum::ITEM_MOVE,
 
+                // For Name Only
+                EmailBlockTypeElementEnum::COLOR => '#0F172A',
+                EmailBlockTypeElementEnum::CHAR_CASE,
+                EmailBlockTypeElementEnum::FONT,
+                EmailBlockTypeElementEnum::FONT_SIZE,
+                EmailBlockTypeElementEnum::ITEM_BACKGROUND => '#f1f5f9',
+                EmailBlockTypeElementEnum::ITEM_RADIUS,
+                EmailBlockTypeElementEnum::ITEM_SPACING => ['x' => 10, 'y' => 5],
+
                 // Layout
+                EmailBlockTypeElementEnum::BACKGROUND,
+                EmailBlockTypeElementEnum::BORDER_SPACING,
+                EmailBlockTypeElementEnum::RADIUS,
                 EmailBlockTypeElementEnum::SPACING,
             ]),
         };

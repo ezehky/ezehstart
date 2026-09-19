@@ -448,7 +448,7 @@ class EmailRenderService
      * for the "default" (coloured) variant. Blank for a custom link with no
      * recognised platform — renderSocials() falls back to a text label then.
      */
-    private function socialIcon(string $platform, string $variant): ?string
+    public function socialIcon(string $platform, string $variant): ?string
     {
         $handle = SocialHandleEnum::tryFrom($platform);
 

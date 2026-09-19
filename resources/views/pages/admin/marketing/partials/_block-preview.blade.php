@@ -91,13 +91,24 @@
 
     @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
         @php($links = data_get($data, 'source', 'config') === 'custom' ? data_get($data, 'custom_links', []) : (array) kSiteConfig('social-handles', default: []))
-        <div style="{{ $css['style'] }}">
+        <div
+            @class([
+                'flex gap-2 items-center',
+                'justify-center' => data_get($data, 'item_move', 'center') === 'center',
+                'justify-start' => data_get($data, 'item_move', 'center') === 'start',
+                'justify-end' => data_get($data, 'item_move', 'center') === 'end',
+            ])
+        >
             @forelse ($links as $link)
                 @php($handle = \App\Enums\SocialHandleEnum::tryFrom(data_get($link, 'platform')))
                 @if (data_get($data, 'style', 'image') === 'image' && $handle)
-                    <div class="flex size-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                        <flux:icon :name="$handle->icon()" class="size-3.5 text-slate-500 dark:text-slate-300" />
-                    </div>
+                    <img
+                        src="{{ app(\App\Services\EmailRenderService::class)->socialIcon($handle->value, data_get($data, 'variant', 'default')) }}"
+                        alt="{{ $handle?->label() }}" width="35" height="35" style="display:block;"
+                    >
+                    {{-- <div class="flex size-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                        <flux:icon :name="$handle->icon()" class="size-6 text-slate-500 dark:text-slate-300" />
+                    </div> --}}
                 @else
                     <span class="rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                         {{ $link['label'] ?? $handle?->label() ?? $link['platform'] ?? 'Link' }}
