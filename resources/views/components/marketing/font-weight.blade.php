@@ -1,6 +1,6 @@
-@props(['prefix'])
+@props(['prefix', 'service'])
 <flux:radio.group wire:model.live="{{ $prefix }}.font_weight" label="Font Weight" variant="segmented" size="sm">
-    @foreach (\App\Enums\EmailBlockItemEnum::FONT_WEIGHT->validItems() as $key => $item)
+    @foreach ($service->validItems(\App\Enums\EmailBlockItemEnum::FONT_WEIGHT) as $key => $item)
         <flux:radio value="{{ $key }}">
             <x-slot:icon>
                 <flux:icon name="case-sensitive" style="{{ $item['icon_style'] }}" title="{{ $key }}" />

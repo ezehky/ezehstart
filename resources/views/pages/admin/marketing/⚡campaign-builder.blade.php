@@ -103,10 +103,9 @@ new class extends Component
         return self::LARGE_AUDIENCE;
     }
 
-    public function mount(?EmailCampaign $campaign = null): void
+    public function mount(): void
     {
         $this->timezone = config('app.timezone');
-        $this->campaign = $campaign?->exists ? $campaign : null;
 
         kSetSiteTitle('marketing', 'campaigns', $this->campaign ? 'Edit campaign' : 'New campaign');
         $this->setPageGate('marketing.campaigns');

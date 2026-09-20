@@ -22,10 +22,8 @@ new class extends Component
 
     public string $email_section_type = 'footer';
 
-    public function mount(?EmailSection $section = null): void
+    public function mount(): void
     {
-        $this->section = $section?->exists ? $section : null;
-
         kSetSiteTitle('marketing', 'sections', $this->section ? 'Edit section' : 'New section');
         $this->setPageGate('marketing.sections');
 

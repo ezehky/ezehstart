@@ -2,79 +2,100 @@
 
 namespace App\Services;
 
+use App\Enums\EmailBlockItemEnum;
+use App\Enums\EmailBlockTypeEnum;
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Support\Arr;
 
 #[Singleton]
 class EmailBlockItemService
 {
+    // ==============================================================================================
+    // PUBLIC METHODS
+    // ==============================================================================================
+
     /**
      * Returns the default value for the enum case.
      *
+     * @param  string|EmailBlockItemEnum  $item  The enum case to get the default value for.
      * @param  mixed  $alternative  An alternative value to return instead of the default.
      * @return mixed The default value for the enum case or the alternative value if provided.
      */
-    public function default(mixed $alternative = null): mixed
+    public function default(string|EmailBlockItemEnum $item, mixed $alternative = null): mixed
     {
-        return $alternative !== null ? $alternative : match ($this) {
-            self::TEXT => 'New text',
-            self::LEVEL => 'h1',
-            self::ALIGN => 'center',
-            self::COLOR => '#0F172A',
-            self::CHAR_CASE => 'normal',
-            self::FONT => 'arial',
-            self::FONT_SIZE => 'sm',
-            self::FONT_WEIGHT => 'normal',
-            self::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
-            self::RADIUS => 'none',
-            self::SPACING => ['top' => 10, 'right' => 10, 'bottom' => 10, 'left' => 10],
-            self::BORDER_SPACING => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
+        $item = $this->resolveItem($item);
+
+        return $alternative !== null ? $alternative : match ($item) {
+            // No Styling
+            EmailBlockItemEnum::TEXT => 'New text',
+            EmailBlockItemEnum::LEVEL => 'h1',
+
+            // FONTS
+            EmailBlockItemEnum::ALIGN => 'center',
+            EmailBlockItemEnum::COLOR => '#0F172A',
+            EmailBlockItemEnum::CHAR_CASE => 'normal',
+            EmailBlockItemEnum::FONT => 'arial',
+            EmailBlockItemEnum::FONT_SIZE => 'sm',
+            EmailBlockItemEnum::FONT_WEIGHT => 'normal',
 
             // BUTTON Specifics
-            self::URL => '',
-            self::BUTTON => [
-                'background' => '#A3E635',
-                'new_tab' => false,
-                'full_width' => false,
-                'border_width' => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 5],
-                'border_color' => '#0F172A',
-                'border_radius' => 'rounded',
-                'spacing' => ['y' => 15, 'x' => 32],
-            ],
+            EmailBlockItemEnum::URL => '',
             // BUTTON Specifics
             // ITEMS
-            self::ITEM_BACKGROUND => '#FFFFFF',
-            self::ITEM_SPACING => ['y' => 15, 'x' => 32],
-            self::ITEM_MOVE => 'center',
-            self::ITEM_RADIUS => 'rounded-sm',
+            EmailBlockItemEnum::ITEM_BACKGROUND => '#FFFFFF',
+            EmailBlockItemEnum::ITEM_SPACING => ['y' => 15, 'x' => 32],
+            EmailBlockItemEnum::ITEM_MOVE => 'center',
+            EmailBlockItemEnum::ITEM_RADIUS => 'rounded-sm',
 
-            self::BACKGROUND => '#FFFFFF',
-            self::IMAGE_ID => null,
-            self::ALT => '',
-            self::LINK_URL => '',
-            self::WIDTH => 'auto',
-            self::HEIGHT => 35,
-            self::HTML => '',
-            self::CONTENT_TYPE => 'post',
-            self::MODE => 'latest',
-            self::CONTENT_ID => null,
-            self::CATEGORY_ID => null,
-            self::TAG_ID => null,
-            self::LIMIT => 1,
-            self::LAYOUT => 'featured',
-            self::SHOW_IMAGE => true,
-            self::SHOW_EXCERPT => true,
-            self::SHOW_DATE => false,
-            self::BUTTON_TEXT => 'Read More',
-            self::HEADING => 'You May Also Like',
-            self::SOURCE => 'config',
-            self::SOURCE_CONTENT_ID => null,
-            self::COLUMNS => [],
-            self::BACKGROUND_IMAGE_ID => null,
-            self::BLOCKS => [],
-            self::EMAIL_SECTION_ID => null,
-            self::STYLE => 'image',
-            self::VARIANT => 'default',
-            self::CUSTOM_LINKS => [],
+            EmailBlockItemEnum::BORDER_WIDTH => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
+            EmailBlockItemEnum::BORDER_COLOR => '#0F172A',
+
+            EmailBlockItemEnum::ELEMENT_DISPLAY => 'inline-block',
+
+            // Image
+            EmailBlockItemEnum::IMAGE_ID => null,
+            EmailBlockItemEnum::ALT => '',
+            EmailBlockItemEnum::LINK_URL => '',
+
+            // Parent Specifics
+            EmailBlockItemEnum::PARENT_ALIGN => 'center',
+
+            // Layouts
+            EmailBlockItemEnum::BACKGROUND => '#FFFFFF',
+            EmailBlockItemEnum::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
+            EmailBlockItemEnum::RADIUS => 'none',
+            EmailBlockItemEnum::SPACING => ['top' => 10, 'right' => 10, 'bottom' => 10, 'left' => 10],
+            EmailBlockItemEnum::BORDER_SPACING => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
+
+            EmailBlockItemEnum::WIDTH => 'auto',
+            EmailBlockItemEnum::WIDTH_VALUE => 35,
+            EmailBlockItemEnum::HEIGHT => 35,
+
+            EmailBlockItemEnum::HTML => '',
+            EmailBlockItemEnum::CONTENT_TYPE => 'post',
+            EmailBlockItemEnum::MODE => 'latest',
+            EmailBlockItemEnum::CONTENT_ID => null,
+            EmailBlockItemEnum::CATEGORY_ID => null,
+            EmailBlockItemEnum::TAG_ID => null,
+            EmailBlockItemEnum::LIMIT => 1,
+            EmailBlockItemEnum::LAYOUT => 'featured',
+            EmailBlockItemEnum::SHOW_IMAGE => true,
+            EmailBlockItemEnum::SHOW_EXCERPT => true,
+            EmailBlockItemEnum::SHOW_DATE => false,
+            EmailBlockItemEnum::BUTTON_TEXT => 'Read More',
+            EmailBlockItemEnum::HEADING => 'You May Also Like',
+
+            // Socials
+            EmailBlockItemEnum::SOURCE => 'config',
+            EmailBlockItemEnum::SOURCE_CONTENT_ID => null,
+
+            EmailBlockItemEnum::COLUMNS => [],
+            EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
+            EmailBlockItemEnum::BLOCKS => [],
+            EmailBlockItemEnum::EMAIL_SECTION_ID => null,
+            EmailBlockItemEnum::STYLE => 'image',
+            EmailBlockItemEnum::VARIANT => 'default',
+            EmailBlockItemEnum::CUSTOM_LINKS => [],
             default => null
         };
     }
@@ -82,19 +103,21 @@ class EmailBlockItemService
     /**
      * Returns an array of valid items for the enum case.
      *
+     * @param  string|EmailBlockItemEnum  $item  The enum case to get the valid items for.
      * @return array An array of valid items for the enum case.
      */
-    public function validItems(): array
+    public function validItems(string|EmailBlockItemEnum $item): array
     {
         // Align
-        return match ($this) {
-            self::ALIGN => [
+        return match ($item) {
+            EmailBlockItemEnum::ALIGN,
+            EmailBlockItemEnum::PARENT_ALIGN => [
                 // key => css style
                 'left' => 'text-align: left;',
                 'center' => 'text-align: center;',
                 'right' => 'text-align: right;',
             ],
-            self::LEVEL => [
+            EmailBlockItemEnum::LEVEL => [
                 // key => css class style
                 'h1' => ['class' => 'text-4xl font-bold', 'style' => 'font-size: 2.5rem;line-height: 1.2;'],
                 'h2' => ['class' => 'text-3xl font-semibold', 'style' => 'font-size: 2rem;line-height: 1.25;'],
@@ -103,7 +126,7 @@ class EmailBlockItemService
             ],
             // key => [css class, label, icon] — charCases() reads label/icon straight
             // off this array, so a new case is one entry here, not two.
-            self::CHAR_CASE => [
+            EmailBlockItemEnum::CHAR_CASE => [
                 'normal' => [
                     'class' => 'normal-case',
                     'style' => '',
@@ -129,7 +152,7 @@ class EmailBlockItemService
                     'icon' => 'case-sensitive',
                 ],
             ],
-            self::FONT_SIZE => [
+            EmailBlockItemEnum::FONT_SIZE => [
                 'xs' => 'font-size: 0.75rem;line-height: 1rem;',
                 'sm' => 'font-size: 0.875rem;line-height: 1.25rem;',
                 'base' => 'font-size: 1rem;line-height: 1.5rem;',
@@ -139,14 +162,14 @@ class EmailBlockItemService
                 '3xl' => 'font-size: 1.875rem;line-height: 2.25rem;',
                 '4xl' => 'font-size: 2.25rem;line-height: 2.5rem;',
             ],
-            self::FONT => self::fonts(),
-            self::FONT_WEIGHT => [
+            EmailBlockItemEnum::FONT => $this->fonts(),
+            EmailBlockItemEnum::FONT_WEIGHT => [
                 'normal' => ['style' => 'font-weight: 400;', 'label' => 'Normal', 'icon_style' => 'stroke-width: 1px;'],
                 'bold' => ['style' => 'font-weight: 500;', 'label' => 'Bold', 'icon_style' => 'stroke-width: 2px;'],
                 'bolder' => ['style' => 'font-weight: 700;', 'label' => 'Bolder', 'icon_style' => 'stroke-width: 3px;'],
                 'thicker' => ['style' => 'font-weight: 800;', 'label' => 'Bolder', 'icon_style' => 'stroke-width: 4px;'],
             ],
-            self::WIDTH => [
+            EmailBlockItemEnum::WIDTH => [
                 'auto' => 'width: auto;',
                 'xs' => 'width: 8.53%;',
                 'sm' => 'width: 14.28%;',
@@ -157,27 +180,29 @@ class EmailBlockItemService
                 '2/3' => 'width: 66.6667%;',
                 '1/4' => 'width: 25%;',
                 '3/4' => 'width: 75%;',
-                'full' => 'display: block; width: 100%;',
+                'full' => 'width: 100%;',
+            ],
+
+            EmailBlockItemEnum::ELEMENT_DISPLAY => [
+                'block' => 'display: block;',
+                'inline' => 'display: inline;',
+                'inline-block' => 'display: inline-block;',
             ],
 
             // ITEM Specifics
-            self::ITEM_MOVE => [
+            EmailBlockItemEnum::ITEM_MOVE => [
                 'start' => ['style' => 'margin-left: 0; margin-right: auto;', 'label' => 'Start', 'icon' => 'arrow-left'],
                 'center' => ['style' => 'margin: 0 auto;', 'label' => 'Center', 'icon' => 'arrows-pointing-in'],
                 'end' => ['style' => 'margin-left: auto; margin-right: 0;', 'label' => 'End', 'icon' => 'arrow-right'],
             ],
-            self::ITEM_SPACING => [
-                // 'x' => []
-            ],
-            self::ITEM_RADIUS => self::validRadius(),
+            EmailBlockItemEnum::ITEM_RADIUS,
+            EmailBlockItemEnum::RADIUS => $this->validRadius(),
 
-            self::RADIUS => self::validRadius(),
-
-            self::CONTENT_TYPE => ['post'],// 'product'],
-            self::MODE => ['latest', 'specific'],
-            self::LAYOUT => ['featured', 'grid', 'list'],
-            self::SOURCE => ['config', 'custom'],
-            self::STYLE => ['image', 'text'],
+            EmailBlockItemEnum::CONTENT_TYPE => ['post'],// 'product'],
+            EmailBlockItemEnum::MODE => ['latest', 'specific'],
+            EmailBlockItemEnum::LAYOUT => ['featured', 'grid', 'list'],
+            EmailBlockItemEnum::SOURCE => ['config', 'custom'],
+            EmailBlockItemEnum::STYLE => ['image', 'text'],
             default => [],
         };
     }
@@ -185,17 +210,29 @@ class EmailBlockItemService
     /**
      * Returns an array of enum values and their corresponding data.
      *
-     * @param  self|null|array  $haystack  An instance of the enum, an array of enum values, or null.
-     *                                     If null, returns all enum values with their corresponding data.
-     *                                     array: An associative array where keys are enum values and values are the corresponding data.
+     * @param  string|EmailBlockItemEnum|null|array  $haystack  An instance of the enum, an array of enum values, or null.
+     *                                                          If null, returns all enum values with their corresponding data.
+     *                                                          array: An associative array where keys are enum values and values
+     *                                                          are the corresponding data.
      * @param  mixed  $value  The value associated with the enum case (optional).
      * @return array An associative array of enum values and their corresponding data.
      *
      * @throws \InvalidArgumentException If an invalid enum value is provided.
      */
-    public static function make(self|null|array $haystack = null, mixed $value = null): array
+    public function make(string|EmailBlockItemEnum|null|array $haystack = null, mixed $value = null, bool $allLayout = false): array
     {
         $result = [];
+
+        if ($allLayout && \is_array($haystack)) {
+            $haystack = [
+                ...$haystack,
+                EmailBlockItemEnum::BORDER,
+                EmailBlockItemEnum::RADIUS,
+                EmailBlockItemEnum::BACKGROUND,
+                EmailBlockItemEnum::SPACING,
+                EmailBlockItemEnum::BORDER_SPACING,
+            ];
+        }
 
         //
         if (\is_array($haystack)) {
@@ -203,146 +240,42 @@ class EmailBlockItemService
                 $self = null;
                 $val = '';
                 // Get value
-                if (\is_int($key) && $item instanceof self) {
+                if (\is_int($key) && $item instanceof EmailBlockItemEnum) {
                     $self = $item;
-                    $val = $item->default();
+                    $val = $this->default($item);
                 } else {
-                    $self = self::tryFrom($key);
+                    $self = $this->resolveItem($key);
                     $val = $item;
-                }
-
-                // Check if $self is a valid enum case
-                if (! ($self instanceof self)) {
-                    throw new \InvalidArgumentException("Invalid enum value: {$self}");
                 }
 
                 // Spacing is an array, not a string, so we need to handle it differently
                 if ($self->isSpacing() || $self->isBorderSpacing() && ! \is_array($val)) {
-                    $val = $self->resolveSpacing($val, border: $self->isBorderSpacing());
+                    $val = $this->resolveSpacing($self, $val, border: $self->isBorderSpacing());
                 }
 
                 // Border is an array, not a string, so we need to handle it differently
                 if ($self->isBorder() && ! \is_array($val)) {
-                    $val = $self->resolveBorder($val);
+                    $val = $this->resolveBorder($self, $val);
                 }
 
                 $result[$self->value] = $val;
             }
-        } elseif ($haystack instanceof self) {
-            $result[$haystack->value] = $haystack->default($value);
+        } elseif ($haystack = $this->resolveItem($haystack, true)) {
+            $result[$haystack->value] = $this->default($haystack, $value);
         }
 
         return $result;
     }
 
     /**
-     * Checks if the given enum case requires no validation.
-     *
-     * @param  self  $current  The enum case to check.
-     * @return bool True if the enum case requires no validation, false otherwise.
-     */
-    private static function noValidity(self $current): bool
-    {
-        return \in_array(
-            $current,
-            [
-                self::COLOR, self::BACKGROUND, self::HEIGHT, self::BORDER,
-            ],
-            true
-        );
-    }
-
-    private static function mustNotBeNull(self $current): bool
-    {
-        return \in_array(
-            $current,
-            [
-                self::BACKGROUND, self::RADIUS, self::HEIGHT,
-                self::BORDER,
-            ],
-            true
-        );
-    }
-
-    /**
-     * Returns the CSS class for the enum case based on the provided valid item.
-     *
-     * @param  array  $data  The data array containing the valid item.
-     * @param  string  $key  The key to use when retrieving the CSS class from the valid items array (default: 'class').
-     * @param  mixed  $default  The default value to return if the valid item is not found (default: '').
-     * @param  EmailBlockTypeEnum|null  $type  The email block type enum case (optional).
-     * @return string|null The corresponding CSS class for the enum case and valid item.
-     */
-    public function cssDesign(
-        array $data,
-        string $key = 'style',
-        mixed $default = null,
-        ?EmailBlockTypeEnum $type = null
-    ): ?string {
-        // Data array
-        $item = data_get($data, $this->value);
-
-        // Item is
-        if ($item === null) {
-            if (self::mustNotBeNull($this) && $default === null) {
-                return '';
-            }
-            $item = $this->default($default);
-        }
-
-        // Button
-        if ($this->isButton()) {
-            return $this->resolveButton($item, true);
-        }
-
-        // Spacing || Border Spacing
-        if ($this->isSpacing() || $this->isBorderSpacing()) {
-            return $this->resolveSpacing($item, true, $this->isBorderSpacing());
-        }
-
-        // Border
-        if ($this->isBorder() && $item !== null) {
-            return $this->resolveBorder($item, true);
-        }
-        // No Validation needed
-        if (self::noValidity($this)) {
-            return match ($this) {
-                self::COLOR => $type?->isDivider() ? "background-color: {$item};" : "color: {$item};",
-
-                // Must not be null
-                self::BACKGROUND => "background-color: {$item};",
-                self::HEIGHT => "height: {$item}px;",
-                default => '',
-            };
-        }
-
-        // Get valid items and default value
-        $validItems = $this->validItems();
-
-        // Check if the provided valid item exists in the valid items array
-        return match ($this) {
-            self::ALIGN => data_get($validItems, $item),
-            self::LEVEL => data_get($validItems, "{$item}.{$key}"),
-            self::CHAR_CASE => data_get($validItems, "{$item}.{$key}"),
-            self::FONT => data_get($validItems, "{$item}.{$key}"),
-            self::FONT_SIZE => data_get($validItems, $item),
-            self::FONT_WEIGHT => data_get($validItems, "{$item}.{$key}"),
-            self::WIDTH => data_get($validItems, $item),
-            self::RADIUS => data_get($validItems, "{$item}.{$key}"),
-            self::ITEM_MOVE => 'display: block; '.data_get($validItems, "{$item}.{$key}"),
-            default => '',
-        };
-    }
-
-    /**
      * The char-case picker's label/icon, straight off validItems()'s CHAR_CASE
      * entries — adding or removing a case only ever means editing that one array.
      */
-    public static function charCases(): array
+    public function charCases(): array
     {
         return array_map(
             fn (array $item) => ['label' => $item['label'], 'icon' => $item['icon']],
-            self::CHAR_CASE->validItems(),
+            $this->validItems(EmailBlockItemEnum::CHAR_CASE),
         );
     }
 
@@ -351,7 +284,7 @@ class EmailBlockItemService
      *
      * @return array An associative array of available fonts with their labels, CSS classes, and style.
      */
-    public static function fonts(): array
+    public function fonts(): array
     {
         return [
             'arial' => [
@@ -447,7 +380,7 @@ class EmailBlockItemService
      *
      * @return array An associative array of valid border radius values with their CSS styles and icons.
      */
-    public static function validRadius(): array
+    public function validRadius(): array
     {
         return [
             'none' => ['label' => 'None', 'style' => 'border-radius: 0;', 'icon' => 'square-off'],
@@ -459,8 +392,253 @@ class EmailBlockItemService
     }
 
     /**
+     * Checks if a field exists in the data array.
+     *
+     * @param  string|EmailBlockItemEnum  $key  The field to check
+     * @param  array  $data  The data array to check in
+     * @return bool True if the field exists, false otherwise.
+     */
+    public function checkField(string|EmailBlockItemEnum $key, array $data = []): bool
+    {
+        // Check if key exists in enum
+        if (! $this->resolveItem($key, true)) {
+            return false;
+        }
+
+        $item = $this->resolveItem($key);
+
+        // Check if key exists in data
+        if ($data && ! \array_key_exists($item->value, $data)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function allowedItemFields(array $data)
+    {
+        return kArrayIntersectKey($data, [
+            EmailBlockItemEnum::FONT->value, EmailBlockItemEnum::FONT_WEIGHT->value,
+            EmailBlockItemEnum::FONT_SIZE->value, EmailBlockItemEnum::ALIGN->value, EmailBlockItemEnum::CHAR_CASE->value,
+            EmailBlockItemEnum::COLOR->value, EmailBlockItemEnum::ITEM_MOVE->value, EmailBlockItemEnum::LINK_URL->value,
+            EmailBlockItemEnum::ITEM_BACKGROUND->value, EmailBlockItemEnum::ITEM_SPACING->value,
+            EmailBlockItemEnum::ITEM_RADIUS->value, EmailBlockItemEnum::WIDTH->value, EmailBlockItemEnum::WIDTH_VALUE->value,
+            EmailBlockItemEnum::HEIGHT->value,
+            EmailBlockItemEnum::BORDER_WIDTH->value, EmailBlockItemEnum::BORDER_COLOR->value,
+            EmailBlockItemEnum::PARENT_ALIGN->value,
+
+        ]);
+    }
+
+    /**
+     * Returns the CSS classes and styles for the given email block item and data.
+     *
+     * @param  EmailBlockTypeEnum  $type  The email block item to get the CSS for.
+     * @param  array  $data  The data array containing the valid item.
+     * @return array An associative array containing 'classes', 'style', and 'container' keys with their corresponding values.
+     */
+    public function getCss(EmailBlockTypeEnum $type, array $data): array
+    {
+        $classes = $style = $parent = $container = [];
+
+        // Social
+        if ($type->isSocials()) {
+            // Image: remove all
+            $data = (data_get($data, 'style', 'image') === 'image') ?
+                Arr::except($data, [
+                    EmailBlockItemEnum::COLOR->value,
+                    EmailBlockItemEnum::CHAR_CASE->value,
+                    EmailBlockItemEnum::FONT->value,
+                    EmailBlockItemEnum::FONT_SIZE->value,
+                    EmailBlockItemEnum::FONT_WEIGHT->value,
+                    EmailBlockItemEnum::ITEM_BACKGROUND->value,
+                    EmailBlockItemEnum::ITEM_RADIUS->value,
+                    EmailBlockItemEnum::ITEM_SPACING->value,
+                ]) :
+                // Text
+                Arr::except($data, [
+                    EmailBlockItemEnum::WIDTH_VALUE->value,
+                    EmailBlockItemEnum::HEIGHT->value,
+                ]);
+        }
+
+        // Resolve the type to an EmailBlockTypeEnum
+        foreach ($data as $key => $value) {
+            $item = $this->resolveItem($key);
+
+            if ($item->isLayoutItem()) {
+                $container[] = $this->cssDesign($key, $data);
+            } elseif ($item->isParentItem()) {
+                $parent[] = $this->cssDesign($key, $data);
+            } else {
+                $style[] = $this->cssDesign($key, $data, type: $type);
+            }
+        }
+
+        // Heading
+        if ($type->isHeading()) {
+            $classes[] = $this->cssDesign(EmailBlockItemEnum::LEVEL, $data, 'class');
+        }
+
+        // Button
+        if ($type->isButton()) {
+            $style[] = 'text-decoration: none; text-align: center;';
+        }
+
+        // Divider
+        if ($type->isDivider()) {
+            $style[] = 'border-width:0;';
+        }
+
+        //
+        return [
+            'classes' => implode(' ', $classes),
+            'style' => implode('', $style),
+            'container' => implode('', $container),
+            'parent' => implode('', $parent),
+        ];
+    }
+
+    // ==============================================================================================
+    // PRIVATE METHODS
+    // ==============================================================================================
+
+    /**
+     * Resolves the given item to an instance of EmailBlockItemEnum.
+     *
+     * @param  string|EmailBlockItemEnum  $item  The item to resolve.
+     * @param  bool  $returnBool  Whether to return a boolean indicating if the item is valid (true) or not (false).
+     * @return EmailBlockItemEnum|bool The resolved EmailBlockItemEnum instance or a boolean indicating validity.
+     *
+     * @throws \LogicException If the provided item is not a valid EmailBlockItemEnum value and $returnBool is false.
+     */
+    private function resolveItem(string|EmailBlockItemEnum $item, bool $returnBool = false): EmailBlockItemEnum|bool
+    {
+        // Resolve the item to an EmailBlockItemEnum
+        if ($item instanceof EmailBlockItemEnum) {
+            return $returnBool ? true : $item;
+        }
+
+        // Try to resolve the item from the enum
+        if ($item = EmailBlockItemEnum::tryFrom($item)) {
+            return $returnBool ? true : $item;
+        }
+
+        if ($returnBool) {
+            return false;
+        }
+
+        throw new \LogicException("Invalid EmailBlockItemEnum value: {$item}");
+    }
+
+    /**
+     * Returns the CSS class for the enum case based on the provided valid item.
+     *
+     * @param  string|EmailBlockItemEnum  $item  The enum case to get the CSS class for.
+     * @param  array  $data  The data array containing the valid item.
+     * @param  string  $key  The key to use when retrieving the CSS class from the valid items array (default: 'class').
+     * @param  mixed  $default  The default value to return if the valid item is not found (default: '').
+     * @param  EmailBlockTypeEnum|null  $type  The email block type enum case (optional).
+     * @return string|null The corresponding CSS class for the enum case and valid item.
+     */
+    private function cssDesign(
+        string|EmailBlockItemEnum $item,
+        array $data,
+        string $key = 'style',
+        mixed $default = null,
+        ?EmailBlockTypeEnum $type = null
+    ): ?string {
+        $item = $this->resolveItem($item);
+
+        // Data array
+        $selected = data_get($data, $item->value);
+
+        // Item is
+        if ($selected === null) {
+            $selected = $this->default($item, $default);
+        }
+
+        // Spacing || Border Spacing
+        if ($item->isSpacing() || $item->isBorderSpacing()) {
+            return $this->resolveSpacing($item, $selected, true, $item->isBorderSpacing());
+        }
+
+        // Border && Border Width
+        if ($item->isBorder() || $item->isBorderWidth() && $item !== null) {
+            return $this->resolveBorder($item, $selected, true, $item->isBorderWidth());
+        }
+
+        // Item Spacing
+        if ($item->isItemSpacing() && Arr::has($data[$item->value], ['x', 'y'])) {
+            return \sprintf(
+                'padding:%spx %spx;',
+                data_get($selected, 'y', 15),
+                data_get($selected, 'x', 32),
+            );
+        }
+
+        // No Validation needed
+        if ($this->noValidity($item)) {
+            return match ($item) {
+                EmailBlockItemEnum::COLOR => $type?->isDivider() ? "background-color: {$selected};" : "color: {$selected};",
+                EmailBlockItemEnum::BACKGROUND,
+                EmailBlockItemEnum::ITEM_BACKGROUND => "background-color: {$selected};",
+                EmailBlockItemEnum::HEIGHT => "height: {$selected}px;",
+                EmailBlockItemEnum::WIDTH_VALUE => "width: {$selected}px;",
+                EmailBlockItemEnum::BORDER_COLOR => "border-color: {$selected};",
+                default => '',
+            };
+        }
+
+        // Get valid items and default value
+        $validItems = $this->validItems($item);
+
+        $extraStyle = '';
+
+        // Check if the provided valid item exists in the valid items array
+        return match ($item) {
+            // Without Key
+            EmailBlockItemEnum::ALIGN,
+            EmailBlockItemEnum::FONT_SIZE,
+            EmailBlockItemEnum::WIDTH,
+            EmailBlockItemEnum::ELEMENT_DISPLAY,
+            EmailBlockItemEnum::PARENT_ALIGN => $extraStyle.data_get($validItems, $selected),
+
+            // With Key
+            EmailBlockItemEnum::LEVEL,
+            EmailBlockItemEnum::CHAR_CASE,
+            EmailBlockItemEnum::FONT,
+            EmailBlockItemEnum::FONT_WEIGHT,
+            EmailBlockItemEnum::RADIUS,
+            EmailBlockItemEnum::ITEM_RADIUS,
+            EmailBlockItemEnum::ITEM_MOVE => data_get($validItems, "{$selected}.{$key}"),
+            default => '',
+        };
+    }
+
+    /**
+     * Checks if the given enum case requires no validation.
+     *
+     * @param  EmailBlockItemEnum  $current  The enum case to check for validation requirements.
+     * @return bool True if the enum case requires no validation, false otherwise.
+     */
+    private function noValidity(EmailBlockItemEnum $current): bool
+    {
+        return \in_array(
+            $current,
+            [
+                EmailBlockItemEnum::COLOR, EmailBlockItemEnum::HEIGHT,
+                EmailBlockItemEnum::BACKGROUND, EmailBlockItemEnum::ITEM_BACKGROUND,
+                EmailBlockItemEnum::BORDER_COLOR, EmailBlockItemEnum::WIDTH_VALUE,
+            ],
+            true
+        );
+    }
+
+    /**
      * Resolves the spacing value into a CSS padding or margin string or an array of padding or margin values.
      *
+     * @param  EmailBlockItemEnum  $item  The email block item for which to resolve the spacing.
      * @param  int|array|null  $spacing  The spacing value(s) to resolve. Can be a single integer or
      *                                   an associative array with keys 'top', 'right', 'bottom', and 'left'.
      * @param  bool  $border  Whether to resolve the spacing as border spacing (true) or padding spacing (false).
@@ -469,9 +647,10 @@ class EmailBlockItemService
      *
      * @throws \LogicException If called on a non-SPACING enum case.
      */
-    public function resolveSpacing(int|array|null $spacing = 0, bool $style = false, bool $border = false): string|array
+    private function resolveSpacing(EmailBlockItemEnum $item, int|array|null $spacing = 0, bool $style = false, bool $border = false): string|array
     {
-        if (! $this->isSpacing() && ! $this->isBorderSpacing()) {
+        $item = $this->resolveItem($item);
+        if (! $item->isSpacing() && ! $item->isBorderSpacing()) {
             throw new \LogicException('resolveSpacing() can only be called on the SPACING or BORDER_SPACING or BUTTON enum case.');
         }
 
@@ -479,7 +658,7 @@ class EmailBlockItemService
 
         $spacing ??= 0;
 
-        $output = $this->default();
+        $output = $this->default($item);
 
         // Spacing Array
         if (\is_array($spacing)) {
@@ -513,39 +692,66 @@ class EmailBlockItemService
     /**
      * Resolves the border value into a CSS border string or an array of border values.
      *
-     * @param  int|array|null  $borderWidth  The border or border width value(s) to resolve
-     *                                       an associative array with keys 'width', 'style', and 'color'.
+     * @param  EmailBlockItemEnum  $item  The email block item for which to resolve the border.
+     * @param  int|array|null  $value  The border or border width value(s) to resolve
+     *                                 an associative array with keys 'width', 'style', and 'color'.
      * @param  bool  $style  Whether to return the result as a CSS border string (true) or an array of border values (false).
+     * @param  bool  $isBorderWidth  Whether to include the border width in the output (true) or not (false).
      * @return string|array The resolved CSS border string or an array of border values.
      *
      * @throws \LogicException If called on a non-BORDER enum case.
      */
-    public function resolveBorder(int|array|null $borderWidth = 0, bool $style = false): string|array
-    {
-        if (! $this->isBorder()) {
+    private function resolveBorder(
+        EmailBlockItemEnum $item,
+        int|array|null $value = 0,
+        bool $style = false,
+        bool $isBorderWidth = false
+    ): string|array {
+        $item = $this->resolveItem($item);
+
+        if (! $item->isBorder() && ! $item->isBorderWidth()) {
             throw new \LogicException('resolveBorder() can only be called on the BORDER enum case.');
         }
 
-        $borderWidth ??= 0;
+        $value ??= 0;
 
-        $border = $this->default();
+        $border = $this->default($item);
 
         // Border Array
-        if (\is_array($borderWidth)) {
-            foreach ($border as $key => $value) {
-                if (isset($borderWidth[$key])) {
-                    $border[$key] = $borderWidth[$key];
+        if (\is_array($value)) {
+            foreach ($border as $key => $item) {
+                if (isset($value[$key])) {
+                    $border[$key] = $value[$key];
                 }
             }
         }
         // Single Border
+        elseif (! $isBorderWidth) {
+            $border = ['width' => $value, 'style' => 'solid', 'color' => '#E2E8F0'];
+        }
+
+        // Border Width Array
         else {
-            $border = ['width' => $borderWidth, 'style' => 'solid', 'color' => '#E2E8F0'];
+            // Give every key the value inside $value
+            foreach ($border as $key => $item) {
+                $border[$key] = $value;
+            }
         }
 
         // Return CSS Border
         if ($style) {
-            return sprintf(
+            if ($isBorderWidth) {
+                // is there another way to present below code
+                $borderWidth = 'border-style:solid;border-width:';
+                foreach ($border as $side => $width) {
+                    $borderWidth .= "{$width}px ";
+                }
+
+                return "{$borderWidth};";
+            }
+
+            // Layout Border
+            return \sprintf(
                 'border:%1$spx %2$s %3$s;',
                 data_get($border, 'width', 0),
                 data_get($border, 'style', 'solid'),
@@ -554,79 +760,5 @@ class EmailBlockItemService
         }
 
         return $border;
-    }
-
-    public function resolveButton(?array $button = null, bool $style = false): string|array
-    {
-        if (! $this->isButton()) {
-            throw new \LogicException('resolveButton() can only be called on the BUTTON enum case.');
-        }
-
-        // Get default button values
-        $default = $this->default();
-        if ($button === null) {
-            $button = $default;
-        }
-
-        // Merge button values with default values
-        $button = [...$default, ...$button];
-
-        // Return CSS Button
-        if ($style) {
-            // Spacing
-            $spacing = sprintf(
-                'padding:%spx %spx;',
-                data_get($button, 'spacing.y', 15),
-                data_get($button, 'spacing.x', 32),
-            );
-
-            // Border
-            $borderWidth = 'border-style:solid;border-width:';
-            foreach (data_get($button, 'border_width', []) as $side => $width) {
-                $borderWidth .= "{$width}px ";
-            }
-            $borderWidth = trim($borderWidth).';'.
-                'border-color:'.data_get($button, 'border_color', '#DC143C').';';
-
-            // Radius
-            $radius = self::validRadius()[data_get($button, 'border_radius', 'none')]['style'];
-
-            // Width
-            $width = data_get($button, 'full_width', false) ? 'display:block;width:100%;' : 'display:inline-block;';
-
-            // Return CSS Button
-            return sprintf(
-                'text-decoration: none; text-align: center; background-color:%1$s; %2$s %3$s %4$s %5$s',
-                data_get($button, 'background', '#A3E635'),
-                $spacing,
-                $borderWidth,
-                $radius,
-                $width
-            );
-        }
-
-        return $button;
-    }
-
-    /**
-     * Checks if a field exists in the data array.
-     *
-     * @param  string  $key  The field to check
-     * @param  array  $data  The data array to check in
-     * @return bool True if the field exists, false otherwise.
-     */
-    public static function checkField(string $key, array $data = []): bool
-    {
-        // Check if key exists in enum
-        if (! self::tryFrom($key)) {
-            return false;
-        }
-
-        // Check if key exists in data
-        if ($data && ! \array_key_exists($key, $data)) {
-            return false;
-        }
-
-        return true;
     }
 }

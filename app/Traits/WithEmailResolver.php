@@ -154,6 +154,10 @@ trait WithEmailResolver
                 throw new \InvalidArgumentException('Custom email sender requires a username to construct the "from" address.');
             }
 
+            // remove all characters from the username that are not allowed in email addresses
+            $username = preg_replace('/[^a-zA-Z0-9._%+-]/', '', $username);
+
+            // Strip protocols and construct the "from" address for custom sender
             $from = kStripDomainProtocols($from, $username);
         }
 

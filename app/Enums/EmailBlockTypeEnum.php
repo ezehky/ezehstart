@@ -2,6 +2,7 @@
 
 namespace App\Enums;
 
+use App\Services\EmailBlockItemService;
 use App\Traits\WithEnumHelpers;
 
 /**
@@ -182,77 +183,73 @@ enum EmailBlockTypeEnum: string
      */
     public function defaultData(): array
     {
+        $itemService = app(EmailBlockItemService::class);
+
         return match ($this) {
-            self::HEADING => EmailBlockItemEnum::make([
+            self::HEADING => $itemService->make([
                 EmailBlockItemEnum::TEXT->value => 'New heading',
                 EmailBlockItemEnum::LEVEL,
                 EmailBlockItemEnum::ALIGN,
                 EmailBlockItemEnum::COLOR,
                 EmailBlockItemEnum::CHAR_CASE,
                 EmailBlockItemEnum::FONT,
-
-                // Layout
-                EmailBlockItemEnum::BORDER,
-                EmailBlockItemEnum::RADIUS,
-                EmailBlockItemEnum::BACKGROUND,
-                EmailBlockItemEnum::SPACING,
-                EmailBlockItemEnum::BORDER_SPACING,
-            ]),
-            self::PARAGRAPH => EmailBlockItemEnum::make([
+            ], allLayout: true),
+            self::PARAGRAPH => $itemService->make([
                 EmailBlockItemEnum::TEXT->value => 'New paragraph text.',
                 EmailBlockItemEnum::ALIGN->value => 'left',
                 EmailBlockItemEnum::COLOR->value => '#475569',
                 EmailBlockItemEnum::CHAR_CASE,
                 EmailBlockItemEnum::FONT,
                 EmailBlockItemEnum::FONT_SIZE,
-
-                // Layout
-                EmailBlockItemEnum::BORDER,
-                EmailBlockItemEnum::RADIUS,
-                EmailBlockItemEnum::BACKGROUND,
-                EmailBlockItemEnum::SPACING,
-                EmailBlockItemEnum::BORDER_SPACING,
-            ]),
-            self::BUTTON => EmailBlockItemEnum::make([
+            ], allLayout: true),
+            self::BUTTON => $itemService->make([
                 EmailBlockItemEnum::TEXT->value => 'Click here',
                 EmailBlockItemEnum::URL,
                 EmailBlockItemEnum::COLOR->value => '#0F172A',
+                EmailBlockItemEnum::WIDTH,
+                EmailBlockItemEnum::ITEM_BACKGROUND->value => '#A3E635',
                 EmailBlockItemEnum::CHAR_CASE,
-                EmailBlockItemEnum::BUTTON,
                 EmailBlockItemEnum::FONT_WEIGHT,
+                EmailBlockItemEnum::ITEM_RADIUS,
+                EmailBlockItemEnum::ITEM_SPACING,
+                EmailBlockItemEnum::BORDER_WIDTH->value => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 5],
+                EmailBlockItemEnum::BORDER_COLOR,
+                EmailBlockItemEnum::ELEMENT_DISPLAY,
+
+                // Parent
+                EmailBlockItemEnum::PARENT_ALIGN,
 
                 // Layout
-                EmailBlockItemEnum::ALIGN,
-                EmailBlockItemEnum::BACKGROUND->value => '#A3E635',
                 EmailBlockItemEnum::SPACING,
             ]),
-            self::DIVIDER => EmailBlockItemEnum::make([
+            self::DIVIDER => $itemService->make([
                 EmailBlockItemEnum::COLOR->value => '#E2E8F0',
                 EmailBlockItemEnum::WIDTH,
                 EmailBlockItemEnum::ITEM_MOVE,
+                EmailBlockItemEnum::HEIGHT->value => 2,
 
                 // Layout
-                EmailBlockItemEnum::SPACING->value => 5,
+                EmailBlockItemEnum::SPACING->value => ['top' => 5, 'left' => 20, 'bottom' => 5, 'right' => 20],
             ]),
-            self::SPACER => EmailBlockItemEnum::make([
+            self::SPACER => $itemService->make([
                 EmailBlockItemEnum::HEIGHT,
             ]),
-            self::IMAGE => EmailBlockItemEnum::make([
+            self::IMAGE => $itemService->make([
                 EmailBlockItemEnum::IMAGE_ID,
                 EmailBlockItemEnum::ALT,
                 EmailBlockItemEnum::LINK_URL,
                 EmailBlockItemEnum::WIDTH,
                 EmailBlockItemEnum::ITEM_MOVE,
-                EmailBlockItemEnum::RADIUS,
+                EmailBlockItemEnum::ITEM_RADIUS,
 
                 // Layout
                 EmailBlockItemEnum::SPACING,
             ]),
-            self::HTML => EmailBlockItemEnum::make([
+            self::HTML => $itemService->make([
                 EmailBlockItemEnum::HTML,
                 EmailBlockItemEnum::SPACING,
             ]),
-            self::DYNAMIC_CONTENT => EmailBlockItemEnum::make([
+            self::DYNAMIC_CONTENT => $itemService->make([
                 EmailBlockItemEnum::CONTENT_TYPE,
                 EmailBlockItemEnum::MODE,
                 EmailBlockItemEnum::CONTENT_ID,
@@ -268,7 +265,7 @@ enum EmailBlockTypeEnum: string
                 // Layout
                 EmailBlockItemEnum::SPACING->value => 30,
             ]),
-            self::RELATED_CONTENT => EmailBlockItemEnum::make([
+            self::RELATED_CONTENT => $itemService->make([
                 EmailBlockItemEnum::CONTENT_TYPE,
                 EmailBlockItemEnum::SOURCE->value => 'same_category',
                 EmailBlockItemEnum::SOURCE_CONTENT_ID,
@@ -279,27 +276,28 @@ enum EmailBlockTypeEnum: string
                 // Layout
                 EmailBlockItemEnum::SPACING->value => 34,
             ]),
-            self::COLUMNS => EmailBlockItemEnum::make([
+            self::COLUMNS => $itemService->make([
                 EmailBlockItemEnum::BACKGROUND,
                 EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
                 EmailBlockItemEnum::SPACING,
                 EmailBlockItemEnum::COLUMNS->value => [
-                    EmailBlockItemEnum::make([
+                    $itemService->make([
                         EmailBlockItemEnum::BACKGROUND,
                         EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
                         EmailBlockItemEnum::BLOCKS,
                     ]),
-                    EmailBlockItemEnum::make([
+                    $itemService->make([
                         EmailBlockItemEnum::BACKGROUND,
                         EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
                         EmailBlockItemEnum::BLOCKS,
                     ]),
                 ],
             ]),
-            self::SECTION => EmailBlockItemEnum::make([
+            self::SECTION => $itemService->make([
                 EmailBlockItemEnum::EMAIL_SECTION_ID,
             ]),
-            self::LOGO, self::LOGO_DARK => EmailBlockItemEnum::make([
+            self::LOGO,
+            self::LOGO_DARK => $itemService->make([
                 EmailBlockItemEnum::WIDTH->value => 'sm',
                 EmailBlockItemEnum::LINK_URL->value => '{{site.url}}',
                 EmailBlockItemEnum::ITEM_MOVE,
@@ -307,35 +305,37 @@ enum EmailBlockTypeEnum: string
                 // Layout
                 EmailBlockItemEnum::SPACING,
             ]),
-            self::FAVICON => EmailBlockItemEnum::make([
+            self::FAVICON => $itemService->make([
                 EmailBlockItemEnum::WIDTH->value => 'xs',
                 EmailBlockItemEnum::ITEM_MOVE,
 
                 // Layout
                 EmailBlockItemEnum::SPACING,
             ]),
-            self::SOCIALS => EmailBlockItemEnum::make([
+            self::SOCIALS => $itemService->make([
                 EmailBlockItemEnum::SOURCE,
                 EmailBlockItemEnum::STYLE,
                 EmailBlockItemEnum::VARIANT,
                 EmailBlockItemEnum::CUSTOM_LINKS,
-                EmailBlockItemEnum::ITEM_MOVE,
+                EmailBlockItemEnum::ELEMENT_DISPLAY,
+
+                // Image
+                EmailBlockItemEnum::WIDTH_VALUE->value => 40,
+                EmailBlockItemEnum::HEIGHT->value => 40,
 
                 // For Name Only
-                EmailBlockItemEnum::COLOR => '#0F172A',
+                EmailBlockItemEnum::COLOR->value => '#0F172A',
                 EmailBlockItemEnum::CHAR_CASE,
                 EmailBlockItemEnum::FONT,
                 EmailBlockItemEnum::FONT_SIZE,
-                EmailBlockItemEnum::ITEM_BACKGROUND => '#f1f5f9',
+                EmailBlockItemEnum::FONT_WEIGHT,
+                EmailBlockItemEnum::ITEM_BACKGROUND->value => '#f1f5f9',
                 EmailBlockItemEnum::ITEM_RADIUS,
-                EmailBlockItemEnum::ITEM_SPACING => ['x' => 10, 'y' => 5],
+                EmailBlockItemEnum::ITEM_SPACING->value => ['x' => 10, 'y' => 5],
 
-                // Layout
-                EmailBlockItemEnum::BACKGROUND,
-                EmailBlockItemEnum::BORDER_SPACING,
-                EmailBlockItemEnum::RADIUS,
-                EmailBlockItemEnum::SPACING,
-            ]),
+                // Parent
+                EmailBlockItemEnum::PARENT_ALIGN,
+            ], allLayout: true),
         };
     }
 
@@ -358,6 +358,17 @@ enum EmailBlockTypeEnum: string
             self::SOCIALS,
             self::DIVIDER,
             self::IMAGE,
+        ], true);
+    }
+
+    /**
+     * Whether this block type has no layout components.
+     */
+    public function skipLayout()
+    {
+        return \in_array($this, [
+            self::SECTION,
+            self::SPACER,
         ], true);
     }
 }

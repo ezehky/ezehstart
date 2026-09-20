@@ -54,123 +54,123 @@ class EmailRenderService
             ->implode('');
     }
 
-    public function getCss(EmailBlockTypeEnum $type, array $data): array
-    {
-        $classes = $style = $container = [];
-        // General must-have styles for all blocks, even if the admin has not set them in the
-        $container = [
-            EmailBlockItemEnum::SPACING->cssDesign($data),
-        ];
+    // public function getCss(EmailBlockTypeEnum $type, array $data): array
+    // {
+    //     $classes = $style = $container = [];
+    //     // General must-have styles for all blocks, even if the admin has not set them in the
+    //     $container = [
+    //         EmailBlockItemEnum::SPACING->cssDesign($data),
+    //     ];
 
-        // Skip Default container
-        if (! $type->rejectMostContainerCss()) {
-            $container = [
-                ...$container,
-                EmailBlockItemEnum::BORDER_SPACING->cssDesign($data),
-                EmailBlockItemEnum::BACKGROUND->cssDesign($data),
-                EmailBlockItemEnum::BORDER->cssDesign($data),
-                EmailBlockItemEnum::RADIUS->cssDesign($data),
-            ];
-        }
+    //     // Skip Default container
+    //     if (! $type->rejectMostContainerCss()) {
+    //         $container = [
+    //             ...$container,
+    //             EmailBlockItemEnum::BORDER_SPACING->cssDesign($data),
+    //             EmailBlockItemEnum::BACKGROUND->cssDesign($data),
+    //             EmailBlockItemEnum::BORDER->cssDesign($data),
+    //             EmailBlockItemEnum::RADIUS->cssDesign($data),
+    //         ];
+    //     }
 
-        // Button
-        if ($type->isButton()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::BUTTON->cssDesign($data),
-                EmailBlockItemEnum::FONT_WEIGHT->cssDesign($data),
-            ];
-            $container[] = EmailBlockItemEnum::ALIGN->cssDesign($data);
+    //     // Button
+    //     if ($type->isButton()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::BUTTON->cssDesign($data),
+    //             EmailBlockItemEnum::FONT_WEIGHT->cssDesign($data),
+    //         ];
+    //         $container[] = EmailBlockItemEnum::ALIGN->cssDesign($data);
 
-        }
+    //     }
 
-        // Button, Heading, Paragraph
-        if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::COLOR->cssDesign($data),
-                EmailBlockItemEnum::FONT->cssDesign($data),
-                EmailBlockItemEnum::CHAR_CASE->cssDesign($data),
-            ];
-        }
+    //     // Button, Heading, Paragraph
+    //     if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::COLOR->cssDesign($data),
+    //             EmailBlockItemEnum::FONT->cssDesign($data),
+    //             EmailBlockItemEnum::CHAR_CASE->cssDesign($data),
+    //         ];
+    //     }
 
-        // Heading, Paragraph
-        if ($type->isHeading() || $type->isParagraph()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::ALIGN->cssDesign($data),
-            ];
-        }
+    //     // Heading, Paragraph
+    //     if ($type->isHeading() || $type->isParagraph()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::ALIGN->cssDesign($data),
+    //         ];
+    //     }
 
-        // Button, Paragraph
-        if ($type->isButton() || $type->isParagraph()) {
-            $style[] = EmailBlockItemEnum::FONT_SIZE->cssDesign($data);
-        }
+    //     // Button, Paragraph
+    //     if ($type->isButton() || $type->isParagraph()) {
+    //         $style[] = EmailBlockItemEnum::FONT_SIZE->cssDesign($data);
+    //     }
 
-        // Heading
-        if ($type->isHeading()) {
-            $classes[] = EmailBlockItemEnum::LEVEL->cssDesign($data, 'class');
-        }
+    //     // Heading
+    //     if ($type->isHeading()) {
+    //         $classes[] = EmailBlockItemEnum::LEVEL->cssDesign($data, 'class');
+    //     }
 
-        // Divider
-        if ($type->isDivider()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::COLOR->cssDesign($data, type: $type),
-                EmailBlockItemEnum::WIDTH->cssDesign($data),
-                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-                'height:2px;border-width:0;',
-            ];
-        }
+    //     // Divider
+    //     if ($type->isDivider()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::COLOR->cssDesign($data, type: $type),
+    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
+    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
+    //             'height:2px;border-width:0;',
+    //         ];
+    //     }
 
-        // Spacer
-        if ($type->isSpacer()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::HEIGHT->cssDesign($data),
-            ];
-            $container = [];
-        }
+    //     // Spacer
+    //     if ($type->isSpacer()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::HEIGHT->cssDesign($data),
+    //         ];
+    //         $container = [];
+    //     }
 
-        // Image
-        if ($type->isImage()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::WIDTH->cssDesign($data),
-                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-                EmailBlockItemEnum::RADIUS->cssDesign($data),
-            ];
-        }
+    //     // Image
+    //     if ($type->isImage()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
+    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
+    //             EmailBlockItemEnum::RADIUS->cssDesign($data),
+    //         ];
+    //     }
 
-        // Section
-        if ($type->isSection()) {
-            $container = [];
-        }
+    //     // Section
+    //     if ($type->isSection()) {
+    //         $container = [];
+    //     }
 
-        // Logo, Logo Dark, Favicon
-        if ($type->isLogo() || $type->isLogoDark() || $type->isFavicon()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::WIDTH->cssDesign($data),
-                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-            ];
-        }
+    //     // Logo, Logo Dark, Favicon
+    //     if ($type->isLogo() || $type->isLogoDark() || $type->isFavicon()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
+    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
+    //         ];
+    //     }
 
-        // Social Handles
-        if ($type->isSocials()) {
-            $style = [
-                ...$style,
-                EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-            ];
-        }
+    //     // Social Handles
+    //     if ($type->isSocials()) {
+    //         $style = [
+    //             ...$style,
+    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
+    //         ];
+    //     }
 
-        //
-        return [
-            'classes' => implode(' ', $classes),
-            'style' => implode('', $style),
-            'container' => implode('', $container),
-        ];
-    }
+    //     //
+    //     return [
+    //         'classes' => implode(' ', $classes),
+    //         'style' => implode('', $style),
+    //         'container' => implode('', $container),
+    //     ];
+    // }
 
     private function renderFooter(?EmailSection $footer, ?User $recipient): string
     {

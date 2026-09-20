@@ -24,7 +24,7 @@
 --}}
 @php
     if ($case instanceof \App\Enums\EmailBlockTypeEnum) {
-        $css = app(\App\Services\EmailRenderService::class)->getCss($case, $block['data']);
+        $css = app(\App\Services\EmailBlockItemService::class)->getCss($case, $block['data']);
     }
 @endphp
 

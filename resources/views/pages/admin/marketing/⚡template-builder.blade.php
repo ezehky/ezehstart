@@ -31,10 +31,8 @@ new class extends Component
 
     public array $design = [];
 
-    public function mount(?EmailTemplate $template = null): void
+    public function mount(): void
     {
-        $this->template = $template?->exists ? $template : null;
-
         kSetSiteTitle('marketing', 'templates', $this->template ? 'Edit template' : 'New template');
         $this->setPageGate('marketing.templates');
 
