@@ -446,6 +446,11 @@ class EmailBlockItemService
             // Image: remove all
             $data = (data_get($data, 'style', 'image') === 'image') ?
                 Arr::except($data, [
+                    EmailBlockItemEnum::WIDTH_VALUE->value,
+                    EmailBlockItemEnum::HEIGHT->value,
+                ]) :
+                // Text
+                Arr::except($data, [
                     EmailBlockItemEnum::COLOR->value,
                     EmailBlockItemEnum::CHAR_CASE->value,
                     EmailBlockItemEnum::FONT->value,
@@ -454,11 +459,6 @@ class EmailBlockItemService
                     EmailBlockItemEnum::ITEM_BACKGROUND->value,
                     EmailBlockItemEnum::ITEM_RADIUS->value,
                     EmailBlockItemEnum::ITEM_SPACING->value,
-                ]) :
-                // Text
-                Arr::except($data, [
-                    EmailBlockItemEnum::WIDTH_VALUE->value,
-                    EmailBlockItemEnum::HEIGHT->value,
                 ]);
         }
 

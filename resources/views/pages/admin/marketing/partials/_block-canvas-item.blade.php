@@ -23,9 +23,7 @@
                                     target once a column is also a drag surface.
 --}}
 @php
-    if ($case instanceof \App\Enums\EmailBlockTypeEnum) {
-        $css = app(\App\Services\EmailBlockItemService::class)->getCss($case, $block['data']);
-    }
+    $css = $block['css'] ?? [];
 @endphp
 
 <div

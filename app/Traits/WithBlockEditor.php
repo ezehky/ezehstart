@@ -3,6 +3,8 @@
 namespace App\Traits;
 
 use App\Enums\EmailBlockTypeEnum;
+use App\Services\EmailBlockItemService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 
@@ -12,6 +14,16 @@ use Livewire\Attributes\On;
  * each carrying its own copy.
  *
  * A block is `['id' => uuid, 'type' => EmailBlockTypeEnum::value, 'data' => [...]]`.
+ * A 'css' key — the EmailBlockItemService::getCss() result for that block's type and
+ * data — is stamped on afterwards by refreshBlockCss() below, so it is never set by
+ * hand and never round-trips through the database. It has to be called from every
+ * spot $blocks or a block's own 'data' can change — every mutator here calls it, and
+ * mountWithBlockEditor()/updatedWithBlockEditor() catch a host's own mount() loading a
+ * saved campaign/section and a settings-panel field bound straight to
+ * "blocks.{index}.data.field" — because Livewire snapshots the component's public
+ * properties for the view *before* firing its "rendering" hook, so stamping 'css' from
+ * that hook is one render too late; every path has to leave $blocks already carrying
+ * it.
  * Reordering is either drag-and-drop (`wire:sort` calls reorderBlocks() with the
  * dragged block's id and its new position) or the move-up/move-down buttons, which
  * stay for keyboard and touch. Everything else here works off a plain array index.
@@ -53,6 +65,68 @@ trait WithBlockEditor
 
     public string $blockSettingsTab = 'content';
 
+    /**
+     * Catches a host's own mount() — loadFromCampaign(), the section editor's
+     * mount() — assigning $this->blocks straight from a saved record, before this
+     * trait ever sees it. Livewire calls a host's own mount() first and every
+     * trait's mountXxx() after, so refreshBlockCss() here always runs after that
+     * assignment and before the first render.
+     */
+    public function mountWithBlockEditor(): void
+    {
+        $this->refreshBlockCss();
+    }
+
+    /**
+     * Catches a settings-panel field bound straight to "blocks.{index}.data.field"
+     * (or a column child's deeper path) — a wire:model.live write Livewire applies
+     * directly to the property, with no trait method in between to hang this off.
+     * Fires once per changed property, before the calls (action methods) in the
+     * same request run and before the render after them.
+     */
+    public function updatedWithBlockEditor(string $name): void
+    {
+        if (str_starts_with($name, 'blocks.')) {
+            $this->refreshBlockCss();
+        }
+    }
+
+    /**
+     * Stamps every block — top-level and one column deep — with its own 'css' key,
+     * the EmailBlockItemService::getCss() result for that block's type and data,
+     * so the canvas partials read $block['css'] instead of each calling the
+     * service themselves. Every method below that changes $blocks or a block's
+     * own 'data' calls this last: Livewire snapshots the component's public
+     * properties for the view before its "rendering" hook fires, so a single
+     * hook stamping 'css' there is always one render behind — the actual mutation
+     * has to leave $blocks already carrying it.
+     */
+    private function refreshBlockCss(): void
+    {
+        $service = app(EmailBlockItemService::class);
+
+        foreach ($this->blocks as $index => $block) {
+            $this->blocks[$index]['css'] = $this->cssForBlock($service, $block);
+
+            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
+                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+                    $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['css']
+                        = $this->cssForBlock($service, $child);
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function cssForBlock(EmailBlockItemService $service, array $block): array
+    {
+        $case = EmailBlockTypeEnum::tryFrom($block['type']);
+
+        return $case ? $service->getCss($case, $block['data']) : [];
+    }
+
     public function addBlock(string $type, ?int $afterIndex = null): void
     {
         $case = EmailBlockTypeEnum::tryFrom($type);
@@ -71,6 +145,7 @@ trait WithBlockEditor
 
         $this->selectedBlockId = $block['id'];
         $this->blockSettingsTab = 'content';
+        $this->refreshBlockCss();
     }
 
     public function selectBlock(?string $blockId): void
@@ -87,6 +162,7 @@ trait WithBlockEditor
 
         unset($this->blocks[$index]);
         $this->blocks = array_values($this->blocks);
+        $this->refreshBlockCss();
     }
 
     public function duplicateBlock(int $index): void
@@ -101,6 +177,7 @@ trait WithBlockEditor
         array_splice($this->blocks, $index + 1, 0, [$copy]);
 
         $this->selectedBlockId = $copy['id'];
+        $this->refreshBlockCss();
     }
 
     public function moveBlockUp(int $index): void
@@ -110,6 +187,7 @@ trait WithBlockEditor
         }
 
         [$this->blocks[$index - 1], $this->blocks[$index]] = [$this->blocks[$index], $this->blocks[$index - 1]];
+        $this->refreshBlockCss();
     }
 
     public function moveBlockDown(int $index): void
@@ -119,6 +197,7 @@ trait WithBlockEditor
         }
 
         [$this->blocks[$index + 1], $this->blocks[$index]] = [$this->blocks[$index], $this->blocks[$index + 1]];
+        $this->refreshBlockCss();
     }
 
     /**
@@ -151,6 +230,7 @@ trait WithBlockEditor
         $moved = array_splice($this->blocks, $from, 1);
 
         array_splice($this->blocks, max(0, min($position, count($this->blocks))), 0, $moved);
+        $this->refreshBlockCss();
     }
 
     /**
@@ -178,6 +258,7 @@ trait WithBlockEditor
         $this->blocks[$index]['data']['columns'][$column]['blocks'][] = $block;
         $this->selectedBlockId = $block['id'];
         $this->blockSettingsTab = 'content';
+        $this->refreshBlockCss();
     }
 
     public function removeColumnBlock(int $index, int $column, int $child): void
@@ -192,6 +273,7 @@ trait WithBlockEditor
 
         unset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child]);
         $this->blocks[$index]['data']['columns'][$column]['blocks'] = array_values($this->blocks[$index]['data']['columns'][$column]['blocks']);
+        $this->refreshBlockCss();
     }
 
     public function duplicateColumnBlock(int $index, int $column, int $child): void
@@ -206,6 +288,7 @@ trait WithBlockEditor
         array_splice($this->blocks[$index]['data']['columns'][$column]['blocks'], $child + 1, 0, [$copy]);
 
         $this->selectedBlockId = $copy['id'];
+        $this->refreshBlockCss();
     }
 
     public function moveColumnBlockUp(int $index, int $column, int $child): void
@@ -221,6 +304,7 @@ trait WithBlockEditor
             $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
             $this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1],
         ];
+        $this->refreshBlockCss();
     }
 
     public function moveColumnBlockDown(int $index, int $column, int $child): void
@@ -238,6 +322,7 @@ trait WithBlockEditor
             $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
             $this->blocks[$index]['data']['columns'][$column]['blocks'][$child + 1],
         ];
+        $this->refreshBlockCss();
     }
 
     /**
@@ -310,6 +395,8 @@ trait WithBlockEditor
                 }
             }
 
+            $this->refreshBlockCss();
+
             return;
         }
 
@@ -334,6 +421,7 @@ trait WithBlockEditor
             'background_image_id' => null,
             'blocks' => [],
         ];
+        $this->refreshBlockCss();
     }
 
     /**
@@ -348,6 +436,7 @@ trait WithBlockEditor
 
         unset($this->blocks[$index]['data']['columns'][$column]);
         $this->blocks[$index]['data']['columns'] = array_values($this->blocks[$index]['data']['columns']);
+        $this->refreshBlockCss();
     }
 
     /**
@@ -478,6 +567,7 @@ trait WithBlockEditor
         foreach ($this->blocks as $index => $block) {
             if ($block['id'] === $blockId) {
                 $this->blocks[$index]['data'][$field] = $value;
+                $this->refreshBlockCss();
 
                 return;
             }
@@ -486,6 +576,7 @@ trait WithBlockEditor
                 foreach ($column['blocks'] ?? [] as $childIndex => $child) {
                     if ($child['id'] === $blockId) {
                         $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['data'][$field] = $value;
+                        $this->refreshBlockCss();
 
                         return;
                     }
@@ -495,10 +586,29 @@ trait WithBlockEditor
     }
 
     /**
+     * The 'css' key renderingWithBlockEditor() stamps on every block is derived —
+     * recomputed from 'type' and 'data' on every render — so it is stripped back
+     * out here rather than saved: persisting it would save a snapshot that goes
+     * stale the moment EmailBlockItemService::getCss() changes.
+     *
      * @return array{blocks: array<int, array{id: string, type: string, data: array<string, mixed>}>}
      */
     protected function blockContent(): array
     {
-        return ['blocks' => $this->blocks];
+        $strip = fn (array $block) => Arr::except($block, ['css']);
+
+        $blocks = array_map(function (array $block) use ($strip) {
+            $block = $strip($block);
+
+            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
+                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+                    $block['data']['columns'][$columnIndex]['blocks'][$childIndex] = $strip($child);
+                }
+            }
+
+            return $block;
+        }, $this->blocks);
+
+        return ['blocks' => $blocks];
     }
 }
