@@ -22,9 +22,7 @@
                                     wire:sort inside wire:sort has no clean drop
                                     target once a column is also a drag surface.
 --}}
-@php
-    $css = $block['css'] ?? [];
-@endphp
+@php($css = $block['css'] ?? ['container' => '', 'classes' => '', 'style' => '', 'parent' => ''])
 
 <div
     wire:key="block-{{ $block['id'] }}"

@@ -278,20 +278,13 @@ enum EmailBlockTypeEnum: string
             ]),
             self::COLUMNS => $itemService->make([
                 EmailBlockItemEnum::COLUMNS->value => [
-                    $itemService->make([
-                        EmailBlockItemEnum::BACKGROUND,
-                        EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
-                        EmailBlockItemEnum::BLOCKS,
-                    ]),
-                    $itemService->make([
-                        EmailBlockItemEnum::BACKGROUND,
-                        EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
-                        EmailBlockItemEnum::BLOCKS,
-                    ]),
+                    $itemService->columnDefault(),
+                    $itemService->columnDefault(),
                 ],
 
                 // Layout
                 EmailBlockItemEnum::BACKGROUND,
+                EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
                 EmailBlockItemEnum::SPACING->value => 0,
             ]),
             self::SECTION => $itemService->make([

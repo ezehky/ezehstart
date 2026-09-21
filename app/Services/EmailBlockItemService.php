@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\EmailBlockItemEnum;
 use App\Enums\EmailBlockTypeEnum;
+use App\Models\Image;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Arr;
 
@@ -62,6 +63,7 @@ class EmailBlockItemService
 
             // Layouts
             EmailBlockItemEnum::BACKGROUND => '#FFFFFF',
+            EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
             EmailBlockItemEnum::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
             EmailBlockItemEnum::RADIUS => 'none',
             EmailBlockItemEnum::SPACING => ['top' => 10, 'right' => 10, 'bottom' => 10, 'left' => 10],
@@ -88,16 +90,42 @@ class EmailBlockItemService
             // Socials
             EmailBlockItemEnum::SOURCE => 'config',
             EmailBlockItemEnum::SOURCE_CONTENT_ID => null,
-
-            EmailBlockItemEnum::COLUMNS => [],
-            EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
-            EmailBlockItemEnum::BLOCKS => [],
-            EmailBlockItemEnum::EMAIL_SECTION_ID => null,
             EmailBlockItemEnum::STYLE => 'image',
             EmailBlockItemEnum::VARIANT => 'default',
             EmailBlockItemEnum::CUSTOM_LINKS => [],
+
+            // Columns
+            EmailBlockItemEnum::COLUMNS => [],
+            EmailBlockItemEnum::BLOCKS => [],
+
+            // Section
+            EmailBlockItemEnum::EMAIL_SECTION_ID => null,
             default => null
         };
+    }
+
+    /**
+     * Returns the default column structure for the email block.
+     *
+     * @param  bool  $make  Whether to return the default column structure as an array or as a processed array.
+     * @return array The default column structure for the email block.
+     */
+    public function columnDefault(bool $make = true): array
+    {
+        $data = [
+            EmailBlockItemEnum::BLOCKS,
+
+            // Layout
+            EmailBlockItemEnum::BACKGROUND,
+            EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
+            EmailBlockItemEnum::SPACING,
+        ];
+
+        if ($make) {
+            return $this->make($data);
+        }
+
+        return $data;
     }
 
     /**
@@ -567,6 +595,11 @@ class EmailBlockItemService
         // Item is
         if ($selected === null) {
             $selected = $this->default($item, $default);
+        }
+
+        // BACKGROUND IMAGE
+        if ($item->isBackgroundImage() && $finder = Image::find($selected)) {
+            return "background-image: url('{$finder->url()}');background-size:cover;background-position:center;";
         }
 
         // Spacing || Border Spacing

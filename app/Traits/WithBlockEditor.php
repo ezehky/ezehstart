@@ -114,8 +114,10 @@ trait WithBlockEditor
 
         foreach ($this->blocks as $index => $block) {
             $this->blocks[$index]['css'] = $this->cssForBlock($service, $block);
+            dd($block);
 
             foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
+                dd($column);
                 foreach ($column['blocks'] ?? [] as $childIndex => $child) {
                     $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['css']
                         = $this->cssForBlock($service, $child);
@@ -252,7 +254,7 @@ trait WithBlockEditor
     {
         $case = EmailBlockTypeEnum::tryFrom($type);
 
-        if (! $case || ! in_array($case, EmailBlockTypeEnum::nestable(), true)) {
+        if (! $case || ! \in_array($case, EmailBlockTypeEnum::nestable(), true)) {
             return;
         }
 
@@ -316,7 +318,7 @@ trait WithBlockEditor
 
     public function moveColumnBlockDown(int $index, int $column, int $child): void
     {
-        $count = count($this->blocks[$index]['data']['columns'][$column]['blocks'] ?? []);
+        $count = \count($this->blocks[$index]['data']['columns'][$column]['blocks'] ?? []);
 
         if ($child >= $count - 1) {
             return;
@@ -419,15 +421,11 @@ trait WithBlockEditor
      */
     public function addColumn(int $index): void
     {
-        if (! isset($this->blocks[$index]['data']['columns']) || count($this->blocks[$index]['data']['columns']) >= 4) {
+        if (! isset($this->blocks[$index]['data']['columns']) || \count($this->blocks[$index]['data']['columns']) >= 4) {
             return;
         }
 
-        $this->blocks[$index]['data']['columns'][] = [
-            'background' => null,
-            'background_image_id' => null,
-            'blocks' => [],
-        ];
+        $this->blocks[$index]['data']['columns'][] = app(EmailBlockItemService::class)->columnDefault();
         $this->refreshBlockCss();
     }
 
@@ -437,7 +435,7 @@ trait WithBlockEditor
      */
     public function removeColumn(int $index, int $column): void
     {
-        if (! isset($this->blocks[$index]['data']['columns']) || count($this->blocks[$index]['data']['columns']) <= 1) {
+        if (! isset($this->blocks[$index]['data']['columns']) || \count($this->blocks[$index]['data']['columns']) <= 1) {
             return;
         }
 

@@ -116,6 +116,11 @@ enum EmailBlockItemEnum: string
         return $this === self::WIDTH;
     }
 
+    public function isBackgroundImage(): bool
+    {
+        return $this === self::BACKGROUND_IMAGE_ID;
+    }
+
     // // ===========================================================================
     // // Checkers
     // // ===========================================================================
@@ -128,6 +133,7 @@ enum EmailBlockItemEnum: string
                 self::BORDER,
                 self::RADIUS,
                 self::BACKGROUND,
+                self::BACKGROUND_IMAGE_ID,
                 self::SPACING,
                 self::BORDER_SPACING,
             ],
