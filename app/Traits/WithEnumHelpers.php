@@ -36,14 +36,14 @@ trait WithEnumHelpers
 
         foreach (self::cases() as $case) {
             // Exclusives
-            if ($isExclusives && in_array($case->value, $values)) {
+            if ($isExclusives && \in_array($case->value, $values)) {
                 $result[$case->value] = $case->label();
 
                 continue;
             }
 
             // Exceptions
-            if (! $isExclusives && ! in_array($case->value, $values, true)) {
+            if (! $isExclusives && ! \in_array($case->value, $values, true)) {
                 $result[$case->value] = $case->label();
             }
         }

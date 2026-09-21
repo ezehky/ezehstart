@@ -95,11 +95,18 @@ trait WithBlockEditor
      * Stamps every block — top-level and one column deep — with its own 'css' key,
      * the EmailBlockItemService::getCss() result for that block's type and data,
      * so the canvas partials read $block['css'] instead of each calling the
-     * service themselves. Every method below that changes $blocks or a block's
-     * own 'data' calls this last: Livewire snapshots the component's public
-     * properties for the view before its "rendering" hook fires, so a single
-     * hook stamping 'css' there is always one render behind — the actual mutation
-     * has to leave $blocks already carrying it.
+     * service themselves. Deliberately never touches the block's own 'data' —
+     * a Socials block keeps both its font/color fields and its width/height
+     * fields in storage no matter which one 'style' currently hides, so flipping
+     * between "Icon image" and "Name only" never loses whichever set isn't
+     * showing (see socialsIrrelevantFields() and where the settings panel uses
+     * it to hide, not delete, the fields that don't apply).
+     *
+     * Every method below that changes $blocks or a block's own 'data' calls this
+     * last: Livewire snapshots the component's public properties for the view
+     * before its "rendering" hook fires, so a single hook doing this there is
+     * always one render behind — the actual mutation has to leave $blocks already
+     * carrying the result.
      */
     private function refreshBlockCss(): void
     {
@@ -137,7 +144,7 @@ trait WithBlockEditor
 
         $block = ['id' => (string) Str::uuid(), 'type' => $case->value, 'data' => $case->defaultData()];
 
-        if ($afterIndex === null || $afterIndex >= count($this->blocks) - 1) {
+        if ($afterIndex === null || $afterIndex >= \count($this->blocks) - 1) {
             $this->blocks[] = $block;
         } else {
             array_splice($this->blocks, $afterIndex + 1, 0, [$block]);
@@ -192,7 +199,7 @@ trait WithBlockEditor
 
     public function moveBlockDown(int $index): void
     {
-        if ($index >= count($this->blocks) - 1) {
+        if ($index >= \count($this->blocks) - 1) {
             return;
         }
 

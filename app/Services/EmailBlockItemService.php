@@ -441,25 +441,8 @@ class EmailBlockItemService
     {
         $classes = $style = $parent = $container = [];
 
-        // Social
         if ($type->isSocials()) {
-            // Image: remove all
-            $data = (data_get($data, 'style', 'image') === 'image') ?
-                Arr::except($data, [
-                    EmailBlockItemEnum::WIDTH_VALUE->value,
-                    EmailBlockItemEnum::HEIGHT->value,
-                ]) :
-                // Text
-                Arr::except($data, [
-                    EmailBlockItemEnum::COLOR->value,
-                    EmailBlockItemEnum::CHAR_CASE->value,
-                    EmailBlockItemEnum::FONT->value,
-                    EmailBlockItemEnum::FONT_SIZE->value,
-                    EmailBlockItemEnum::FONT_WEIGHT->value,
-                    EmailBlockItemEnum::ITEM_BACKGROUND->value,
-                    EmailBlockItemEnum::ITEM_RADIUS->value,
-                    EmailBlockItemEnum::ITEM_SPACING->value,
-                ]);
+            $data = Arr::except($data, $this->socialsIrrelevantFields(data_get($data, 'style', 'image')));
         }
 
         // Resolve the type to an EmailBlockTypeEnum
@@ -496,6 +479,33 @@ class EmailBlockItemService
             'style' => implode('', $style),
             'container' => implode('', $container),
             'parent' => implode('', $parent),
+        ];
+    }
+
+    /**
+     * The Socials block's own data keys that don't apply to the given display
+     * style — an icon image carries no font styling, and a plain text label
+     * carries no icon sizing. getCss() drops these before turning what's left
+     * into CSS; WithBlockEditor::refreshBlockCss() drops them from the block's
+     * own stored data the moment 'style' changes, so a value picked under one
+     * style doesn't linger, unused, once the admin switches to the other.
+     *
+     * @return array<int, string>
+     */
+    public function socialsIrrelevantFields(string $style): array
+    {
+        return $style === 'image' ? [
+            EmailBlockItemEnum::COLOR->value,
+            EmailBlockItemEnum::CHAR_CASE->value,
+            EmailBlockItemEnum::FONT->value,
+            EmailBlockItemEnum::FONT_SIZE->value,
+            EmailBlockItemEnum::FONT_WEIGHT->value,
+            EmailBlockItemEnum::ITEM_BACKGROUND->value,
+            EmailBlockItemEnum::ITEM_RADIUS->value,
+            EmailBlockItemEnum::ITEM_SPACING->value,
+        ] : [
+            EmailBlockItemEnum::WIDTH_VALUE->value,
+            EmailBlockItemEnum::HEIGHT->value,
         ];
     }
 
@@ -647,7 +657,7 @@ class EmailBlockItemService
      *
      * @throws \LogicException If called on a non-SPACING enum case.
      */
-    private function resolveSpacing(EmailBlockItemEnum $item, int|array|null $spacing = 0, bool $style = false, bool $border = false): string|array
+    public function resolveSpacing(EmailBlockItemEnum $item, int|array|null $spacing = 0, bool $style = false, bool $border = false): string|array
     {
         $item = $this->resolveItem($item);
         if (! $item->isSpacing() && ! $item->isBorderSpacing()) {

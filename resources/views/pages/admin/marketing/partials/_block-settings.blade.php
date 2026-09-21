@@ -18,6 +18,18 @@
 @php
     $itemService = app(\App\Services\EmailBlockItemService::class);
     $data = data_get($block, 'data', []);
+
+    // A Socials block keeps both its font/color fields and its width/height
+    // fields in $data no matter which 'style' is active — deleting whichever
+    // set isn't showing would lose it for good the moment the admin flips
+    // back. $showItem hides the ones the current style doesn't use instead,
+    // the same list getCss() itself drops from the rendered style string.
+    $socialsIrrelevant = $case === \App\Enums\EmailBlockTypeEnum::SOCIALS
+        ? $itemService->socialsIrrelevantFields(data_get($data, 'style', 'image'))
+        : [];
+
+    $showItem = fn (string|\App\Enums\EmailBlockItemEnum $key) => $itemService->checkField($key, $data)
+        && ! in_array($key instanceof \App\Enums\EmailBlockItemEnum ? $key->value : $key, $socialsIrrelevant, true);
 @endphp
 {{-- @dump($data) --}}
 
@@ -230,7 +242,14 @@
                         </flux:tooltip>
                         @if ($rowBgImage)
                             <flux:tooltip content="Remove background image">
-                                <flux:button size="sm" variant="ghost" icon="x-mark" square wire:click="removeBlockImage('bg:{{ $block['id'] }}')" aria-label="Remove background image" />
+                                <flux:button
+                                    size="sm"
+                                    variant="ghost"
+                                    icon="x-mark"
+                                    square
+                                    wire:click="removeBlockImage('bg:{{ $block['id'] }}')"
+                                    aria-label="Remove background image"
+                                />
                             </flux:tooltip>
                         @endif
                     </div>
@@ -275,17 +294,6 @@
                 <flux:button size="sm" variant="ghost" icon="plus" wire:click="addColumn({{ $index }})">Add column</flux:button>
             @endif
         </div>
-        @break
-
-    @case(\App\Enums\EmailBlockTypeEnum::LOGO)
-    @case(\App\Enums\EmailBlockTypeEnum::LOGO_DARK)
-        <p class="text-xs text-slate-500">
-            Pulled straight from {{ $case->isLogoDark() ? 'the dark logo' : 'the logo' }} in Site Config.
-        </p>
-        @break
-
-    @case(\App\Enums\EmailBlockTypeEnum::FAVICON)
-        <p class="text-xs text-slate-500">Pulled straight from the favicon in Site Config.</p>
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::SOCIALS)
@@ -382,10 +390,10 @@
             <flux:field>
                 <flux:label>Font</flux:label>
                 <flux:input.group>
-                    @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::FONT, $data))
+                    @if ($showItem(\App\Enums\EmailBlockItemEnum::FONT))
                         <x-marketing.fonts class="w-full" wire:model.live="{{ $prefix }}.font" :service="$itemService" />
                     @endif
-                    @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::FONT_SIZE, $data))
+                    @if ($showItem(\App\Enums\EmailBlockItemEnum::FONT_SIZE))
                         <flux:select class="w-24" wire:model.live="{{ $prefix }}.font_size" size="sm" placeholder="Font size">
                             @foreach ($itemService->validItems(\App\Enums\EmailBlockItemEnum::FONT_SIZE) as $key => $item)
                                 <flux:select.option value="{{ $key }}">{{ $key }}</flux:select.option>
@@ -397,12 +405,12 @@
         @endif
 
         {{-- FONT WEIGHT --}}
-        @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::FONT_WEIGHT, $data))
+        @if ($showItem(\App\Enums\EmailBlockItemEnum::FONT_WEIGHT))
             <x-marketing.font-weight :$prefix :service="$itemService" />
         @endif
 
         {{-- CASE --}}
-        @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::CHAR_CASE, $data))
+        @if ($showItem(\App\Enums\EmailBlockItemEnum::CHAR_CASE))
             <flux:radio.group wire:model.live="{{ $prefix }}.char_case" label="Case" variant="segmented" size="sm">
                 @foreach ($itemService->charCases() as $key => $value)
                     <flux:radio value="{{ $key }}" :icon="$value['icon']" />
@@ -421,10 +429,10 @@
         {{-- COLOR --}}
         @if (kArrayIntersectKey($data, ['item_background', 'color']) && ! $case->isDivider())
             <div class="flex items-center justify-between gap-3">
-                @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::COLOR, $data))
+                @if ($showItem(\App\Enums\EmailBlockItemEnum::COLOR))
                     <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
                 @endif
-                @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::ITEM_BACKGROUND, $data))
+                @if ($showItem(\App\Enums\EmailBlockItemEnum::ITEM_BACKGROUND))
                     <x-form.color-field wire:model.live="{{ $prefix }}.item_background" label="Background" />
                 @endif
             </div>
@@ -465,7 +473,7 @@
                         </flux:select>
                     </div>
                 @endif
-                @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::WIDTH_VALUE, $data))
+                @if ($showItem(\App\Enums\EmailBlockItemEnum::WIDTH_VALUE))
                     <div class="w-full">
                         <x-form.number-field
                             wire:model.live.debounce.1000ms="{{ $prefix }}.width_value"
@@ -475,7 +483,7 @@
                         />
                     </div>
                 @endif
-                @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::HEIGHT, $data))
+                @if ($showItem(\App\Enums\EmailBlockItemEnum::HEIGHT))
                     <div class="w-full">
                         <x-form.number-field
                             wire:model.live.debounce.1000ms="{{ $prefix }}.height"
@@ -489,7 +497,7 @@
         @endif
 
         {{-- Item Spacing --}}
-        @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::ITEM_SPACING, $data))
+        @if ($showItem(\App\Enums\EmailBlockItemEnum::ITEM_SPACING))
             <flux:field>
                 <flux:label>
                     Spacing

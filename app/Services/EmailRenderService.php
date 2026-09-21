@@ -54,124 +54,6 @@ class EmailRenderService
             ->implode('');
     }
 
-    // public function getCss(EmailBlockTypeEnum $type, array $data): array
-    // {
-    //     $classes = $style = $container = [];
-    //     // General must-have styles for all blocks, even if the admin has not set them in the
-    //     $container = [
-    //         EmailBlockItemEnum::SPACING->cssDesign($data),
-    //     ];
-
-    //     // Skip Default container
-    //     if (! $type->rejectMostContainerCss()) {
-    //         $container = [
-    //             ...$container,
-    //             EmailBlockItemEnum::BORDER_SPACING->cssDesign($data),
-    //             EmailBlockItemEnum::BACKGROUND->cssDesign($data),
-    //             EmailBlockItemEnum::BORDER->cssDesign($data),
-    //             EmailBlockItemEnum::RADIUS->cssDesign($data),
-    //         ];
-    //     }
-
-    //     // Button
-    //     if ($type->isButton()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::BUTTON->cssDesign($data),
-    //             EmailBlockItemEnum::FONT_WEIGHT->cssDesign($data),
-    //         ];
-    //         $container[] = EmailBlockItemEnum::ALIGN->cssDesign($data);
-
-    //     }
-
-    //     // Button, Heading, Paragraph
-    //     if ($type->isButton() || $type->isHeading() || $type->isParagraph()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::COLOR->cssDesign($data),
-    //             EmailBlockItemEnum::FONT->cssDesign($data),
-    //             EmailBlockItemEnum::CHAR_CASE->cssDesign($data),
-    //         ];
-    //     }
-
-    //     // Heading, Paragraph
-    //     if ($type->isHeading() || $type->isParagraph()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::ALIGN->cssDesign($data),
-    //         ];
-    //     }
-
-    //     // Button, Paragraph
-    //     if ($type->isButton() || $type->isParagraph()) {
-    //         $style[] = EmailBlockItemEnum::FONT_SIZE->cssDesign($data);
-    //     }
-
-    //     // Heading
-    //     if ($type->isHeading()) {
-    //         $classes[] = EmailBlockItemEnum::LEVEL->cssDesign($data, 'class');
-    //     }
-
-    //     // Divider
-    //     if ($type->isDivider()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::COLOR->cssDesign($data, type: $type),
-    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
-    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-    //             'height:2px;border-width:0;',
-    //         ];
-    //     }
-
-    //     // Spacer
-    //     if ($type->isSpacer()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::HEIGHT->cssDesign($data),
-    //         ];
-    //         $container = [];
-    //     }
-
-    //     // Image
-    //     if ($type->isImage()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
-    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-    //             EmailBlockItemEnum::RADIUS->cssDesign($data),
-    //         ];
-    //     }
-
-    //     // Section
-    //     if ($type->isSection()) {
-    //         $container = [];
-    //     }
-
-    //     // Logo, Logo Dark, Favicon
-    //     if ($type->isLogo() || $type->isLogoDark() || $type->isFavicon()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::WIDTH->cssDesign($data),
-    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-    //         ];
-    //     }
-
-    //     // Social Handles
-    //     if ($type->isSocials()) {
-    //         $style = [
-    //             ...$style,
-    //             EmailBlockItemEnum::ITEM_MOVE->cssDesign($data),
-    //         ];
-    //     }
-
-    //     //
-    //     return [
-    //         'classes' => implode(' ', $classes),
-    //         'style' => implode('', $style),
-    //         'container' => implode('', $container),
-    //     ];
-    // }
-
     private function renderFooter(?EmailSection $footer, ?User $recipient): string
     {
         if (! $footer) {
@@ -258,9 +140,18 @@ class EmailRenderService
         return "{$top}px 40px ".((int) ($data['spacing'] ?? $default)).'px';
     }
 
+    /**
+     * The heading block's own padding, as the raw "10px 10px 10px 10px" value
+     * row() wraps into "padding:...;" itself — resolveSpacing(style: true)
+     * returns that whole declaration already, which would double the property
+     * name if handed straight to row(), so this always asks for the plain
+     * array and formats it here instead.
+     */
     private function spacing(array $data): string
     {
-        return EmailBlockItemEnum::SPACING->resolveSpacing(data_get($data, 'spacing'), style: true);
+        $spacing = app(EmailBlockItemService::class)->resolveSpacing(EmailBlockItemEnum::SPACING, data_get($data, 'spacing'));
+
+        return "{$spacing['top']}px {$spacing['right']}px {$spacing['bottom']}px {$spacing['left']}px";
     }
 
     /**
@@ -270,18 +161,21 @@ class EmailRenderService
      */
     private function renderHeading(array $data, \Closure $text): string
     {
-        $level = EmailBlockItemEnum::LEVEL->default(data_get($data, 'level'));
-        $font = EmailBlockItemEnum::FONT->cssDesign($data, 'font');
-        $levelStyles = EmailBlockItemEnum::LEVEL->cssDesign($data);
+        return '';
+        $itemService = app(EmailBlockItemService::class);
+
+        $level = $itemService->default(EmailBlockItemEnum::LEVEL, data_get($data, 'level'));
+        $font = $itemService->cssDesign(EmailBlockItemEnum::FONT, $data);
+        $levelStyles = $itemService->cssDesign(EmailBlockItemEnum::LEVEL, $data);
 
         return $this->row(sprintf(
             '<%1$s style="margin:0;text-align:%2$s;color:%3$s;text-transform:%4$s;%5$s;%6$s">%7$s</%1$s>',
             // Read once, then checked: `$data['level'] ?? 'h1'` passing the
             // check says nothing about the key existing.
             $level,
-            EmailBlockItemEnum::ALIGN->default(data_get($data, 'align')),
+            $itemService->default(EmailBlockItemEnum::ALIGN, data_get($data, 'align')),
             $data['color'] ?? '#0F172A',
-            EmailBlockItemEnum::CHAR_CASE->default(data_get($data, 'char_case')),
+            $itemService->default(EmailBlockItemEnum::CHAR_CASE, data_get($data, 'char_case')),
             $levelStyles,
             $font,
             $text(data_get($data, 'text', '')),

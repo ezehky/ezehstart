@@ -102,14 +102,8 @@
                         src="{{ app(\App\Services\EmailRenderService::class)->socialIcon($handle->value, data_get($data, 'variant', 'default')) }}"
                         alt="{{ $handle?->label() }}"
                         style="{{ $css['style'] }}"
-                    >
-                    {{-- <div class="flex size-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                        <flux:icon :name="$handle->icon()" class="size-6 text-slate-500 dark:text-slate-300" />
-                    </div> --}}
+                    />
                 @else
-                    {{-- <span class="rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {{ $link['label'] ?? $handle?->label() ?? $link['platform'] ?? 'Link' }}
-                    </span> --}}
                     <span style="{{ $css['style'] }}">
                         {{ $link['label'] ?? $handle?->label() ?? $link['platform'] ?? 'Link' }}
                     </span>
