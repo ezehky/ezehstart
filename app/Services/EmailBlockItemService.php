@@ -43,7 +43,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::URL => '',
             // BUTTON Specifics
             // ITEMS
-            EmailBlockItemEnum::ITEM_BACKGROUND => '#FFFFFF',
+            EmailBlockItemEnum::ITEM_BACKGROUND => null,
             EmailBlockItemEnum::ITEM_SPACING => ['y' => 15, 'x' => 32],
             EmailBlockItemEnum::ITEM_MOVE => 'center',
             EmailBlockItemEnum::ITEM_RADIUS => 'rounded-sm',
@@ -62,7 +62,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::PARENT_ALIGN => 'center',
 
             // Layouts
-            EmailBlockItemEnum::BACKGROUND => '#FFFFFF',
+            EmailBlockItemEnum::BACKGROUND => null,
             EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
             EmailBlockItemEnum::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
             EmailBlockItemEnum::RADIUS => 'none',
@@ -110,7 +110,7 @@ class EmailBlockItemService
      * @param  bool  $make  Whether to return the default column structure as an array or as a processed array.
      * @return array The default column structure for the email block.
      */
-    public function columnDefault(bool $make = true): array
+    public function columnDefault(bool $make = true, int $count = 1): array
     {
         $data = [
             EmailBlockItemEnum::BLOCKS,
@@ -121,8 +121,13 @@ class EmailBlockItemService
             EmailBlockItemEnum::SPACING,
         ];
 
+        $output = [
+            'label' => "Column {$count}",
+            'data' => $this->make($data),
+        ];
+
         if ($make) {
-            return $this->make($data);
+            return $output;
         }
 
         return $data;
@@ -466,11 +471,11 @@ class EmailBlockItemService
      * @param  array  $data  The data array containing the valid item.
      * @return array An associative array containing 'classes', 'style', and 'container' keys with their corresponding values.
      */
-    public function getCss(EmailBlockTypeEnum $type, array $data): array
+    public function getCss(array $data, ?EmailBlockTypeEnum $type = null): array
     {
         $classes = $style = $parent = $container = [];
 
-        if ($type->isSocials()) {
+        if ($type?->isSocials()) {
             $data = Arr::except($data, $this->socialsIrrelevantFields(data_get($data, 'style', 'image')));
         }
 
@@ -488,17 +493,17 @@ class EmailBlockItemService
         }
 
         // Heading
-        if ($type->isHeading()) {
+        if ($type?->isHeading()) {
             $classes[] = $this->cssDesign(EmailBlockItemEnum::LEVEL, $data, 'class');
         }
 
         // Button
-        if ($type->isButton()) {
+        if ($type?->isButton()) {
             $style[] = 'text-decoration: none; text-align: center;';
         }
 
         // Divider
-        if ($type->isDivider()) {
+        if ($type?->isDivider()) {
             $style[] = 'border-width:0;';
         }
 
@@ -619,6 +624,11 @@ class EmailBlockItemService
                 data_get($selected, 'y', 15),
                 data_get($selected, 'x', 32),
             );
+        }
+
+        // Background Color
+        if ($item->backgroundColors() && $selected === null) {
+            return '';
         }
 
         // No Validation needed

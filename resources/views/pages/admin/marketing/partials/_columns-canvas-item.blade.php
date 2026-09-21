@@ -17,8 +17,8 @@
 
 @php
     $rowSelected = $selectedBlockId === $block['id'];
-    $rowBgImage = \App\Models\Image::find($block['data']['background_image_id']);
-    $columns = $block['data']['columns'] ?? [];
+    $rowBgImage = \App\Models\Image::find(data_get($block, 'data.background_image_id'));
+    $columns = data_get($block, 'data.columns', []);
 @endphp
 
 <div
@@ -61,18 +61,15 @@
          with, so the canvas shows what changing it does. --}}
     <div
         class="grid gap-3 p-6"
-        style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); {{ $block['css']['container'] ?? '' }}"
+        style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); {{ data_get($block, 'css.container', '') }}"
     >
         @foreach ($columns as $columnIndex => $column)
-@dump($column)
-            @php($colBgImage = \App\Models\Image::find($column['background_image_id']))
             <div
                 wire:key="col-{{ $block['id'] }}-{{ $columnIndex }}"
                 class="min-h-[70px] space-y-1.5 rounded-lg border border-dashed border-slate-300 p-1.5 dark:border-slate-600"
-                style="{{ ! empty($column['background']) ? 'background-color:'.$column['background'].';' : '' }} {{ $colBgImage ? 'background-image:url('.$colBgImage->url().');background-size:cover;background-position:center;' : '' }}"
-                {{-- style="" --}}
+                style="{{ data_get($column, 'css.container', '') }}"
             >
-                @forelse ($column['blocks'] ?? [] as $childIndex => $child)
+                @forelse (data_get($column, 'data.blocks', []) as $childIndex => $child)
                     @php($childCase = \App\Enums\EmailBlockTypeEnum::tryFrom($child['type']))
                     @continue(! $childCase)
 

@@ -229,15 +229,16 @@
                  straight on the canvas (see _columns-canvas-item.blade.php), the
                  same way top-level blocks are. This panel only ever covers what a
                  column can't show on its own: the column's own background. --}}
-            @foreach ($data['columns'] ?? [] as $columnIndex => $column)
-                @php($colBgImage = \App\Models\Image::find($column['background_image_id']))
+            @foreach (data_get($data, 'columns', []) as $columnIndex => $column)
+                @php($colBgImage = \App\Models\Image::find($column['data']['background_image_id']))
+                @php($dataKey = "{$prefix}.columns.{$columnIndex}.data")
                 <div
                     class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
                     wire:key="column-{{ $columnIndex }}"
                 >
                     <div class="flex items-center justify-between">
                         <flux:label>Column {{ $columnIndex + 1 }}</flux:label>
-                        @if (count($data['columns']) > 1)
+                        @if (count(data_get($data, 'columns', [])) > 1)
                             <flux:tooltip content="Remove column">
                                 <flux:button
                                     size="xs"
@@ -257,7 +258,7 @@
                         <flux:heading>Background</flux:heading>
                         <div class="flex items-center justify-between gap-2">
                             <x-form.color-field
-                                wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background"
+                                wire:model.live="{{ $dataKey }}.background"
                                 size="sm"
                                 clearable
                             />
@@ -300,6 +301,23 @@
                             @endif
                         </div>
                     </div> --}}
+                    <flux:field>
+                    <flux:label>
+                        Spacing
+                        <x-marketing.small-text>px: top, right, bottom, left</x-marketing.small-text>
+                    </flux:label>
+                    <flux:input.group>
+                        @foreach (['top' => 't', 'right' => 'r', 'bottom' => 'b', 'left' => 'l'] as $direction => $placeholder)
+                            <x-form.number-field
+                                wire:model.live.debounce.1000ms="{{ $dataKey }}.spacing.{{ $direction }}"
+                                placeholder="{{ $placeholder }}"
+                                size="sm"
+                                min="0"
+                                max="120"
+                            />
+                        @endforeach
+                    </flux:input.group>
+                </flux:field>
                 </div>
             @endforeach
 

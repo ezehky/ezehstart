@@ -151,4 +151,16 @@ enum EmailBlockItemEnum: string
             true
         );
     }
+
+    public function backgroundColors(): bool
+    {
+        return \in_array(
+            $this,
+            [
+                self::BACKGROUND,
+                self::ITEM_BACKGROUND,
+            ],
+            true
+        );
+    }
 }

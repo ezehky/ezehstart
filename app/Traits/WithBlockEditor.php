@@ -65,6 +65,8 @@ trait WithBlockEditor
 
     public string $blockSettingsTab = 'content';
 
+    public int $maxColumnSize = 4;
+
     /**
      * Catches a host's own mount() — loadFromCampaign(), the section editor's
      * mount() — assigning $this->blocks straight from a saved record, before this
@@ -114,10 +116,15 @@ trait WithBlockEditor
 
         foreach ($this->blocks as $index => $block) {
             $this->blocks[$index]['css'] = $this->cssForBlock($service, $block);
-            dd($block);
 
-            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
-                dd($column);
+            // Columns blocks are the only ones that nest, so only they have children to refresh
+            $columns = data_get($block, 'data.columns', []);
+            foreach ($columns as $columnIndex => $column) {
+                // Stamp the column itself with its own 'css' key, the EmailBlockItemService::getCss() result for that column's data
+                $this->blocks[$index]['data']['columns'][$columnIndex]['css'] = $this->cssForBlock($service, $column);
+
+                // Stamp each child block inside the column with its own 'css' key,
+                // the EmailBlockItemService::getCss() result for that child block's type and data
                 foreach ($column['blocks'] ?? [] as $childIndex => $child) {
                     $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['css']
                         = $this->cssForBlock($service, $child);
@@ -131,9 +138,9 @@ trait WithBlockEditor
      */
     private function cssForBlock(EmailBlockItemService $service, array $block): array
     {
-        $case = EmailBlockTypeEnum::tryFrom($block['type']);
+        $case = EmailBlockTypeEnum::tryFrom(data_get($block, 'type'));
 
-        return $case ? $service->getCss($case, $block['data']) : [];
+        return $service->getCss($block['data'], $case);
     }
 
     public function addBlock(string $type, ?int $afterIndex = null): void
@@ -144,11 +151,15 @@ trait WithBlockEditor
             return;
         }
 
+        // A new block always starts with its default data
         $block = ['id' => (string) Str::uuid(), 'type' => $case->value, 'data' => $case->defaultData()];
 
+        // If $afterIndex is null or out of bounds, append to the end; otherwise, insert after the specified index
         if ($afterIndex === null || $afterIndex >= \count($this->blocks) - 1) {
             $this->blocks[] = $block;
-        } else {
+        }
+        // If $afterIndex is null or out of bounds, append to the end; otherwise, insert after the specified index
+        else {
             array_splice($this->blocks, $afterIndex + 1, 0, [$block]);
         }
 
@@ -264,7 +275,7 @@ trait WithBlockEditor
 
         $block = ['id' => (string) Str::uuid(), 'type' => $case->value, 'data' => $case->defaultData()];
 
-        $this->blocks[$index]['data']['columns'][$column]['blocks'][] = $block;
+        $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][] = $block;
         $this->selectedBlockId = $block['id'];
         $this->blockSettingsTab = 'content';
         $this->refreshBlockCss();
@@ -272,29 +283,30 @@ trait WithBlockEditor
 
     public function removeColumnBlock(int $index, int $column, int $child): void
     {
-        if (! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child])) {
+        if (! isset($this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child])) {
             return;
         }
 
-        if ($this->blocks[$index]['data']['columns'][$column]['blocks'][$child]['id'] === $this->selectedBlockId) {
+        if ($this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child]['id'] === $this->selectedBlockId) {
             $this->selectedBlockId = null;
         }
 
-        unset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child]);
-        $this->blocks[$index]['data']['columns'][$column]['blocks'] = array_values($this->blocks[$index]['data']['columns'][$column]['blocks']);
+        unset($this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child]);
+        $this->blocks[$index]['data']['columns'][$column]['data']['blocks'] =
+            array_values($this->blocks[$index]['data']['columns'][$column]['data']['blocks']);
         $this->refreshBlockCss();
     }
 
     public function duplicateColumnBlock(int $index, int $column, int $child): void
     {
-        if (! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child])) {
+        if (! isset($this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child])) {
             return;
         }
 
-        $copy = $this->blocks[$index]['data']['columns'][$column]['blocks'][$child];
+        $copy = $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child];
         $copy['id'] = (string) Str::uuid();
 
-        array_splice($this->blocks[$index]['data']['columns'][$column]['blocks'], $child + 1, 0, [$copy]);
+        array_splice($this->blocks[$index]['data']['columns'][$column]['data']['blocks'], $child + 1, 0, [$copy]);
 
         $this->selectedBlockId = $copy['id'];
         $this->refreshBlockCss();
@@ -302,34 +314,34 @@ trait WithBlockEditor
 
     public function moveColumnBlockUp(int $index, int $column, int $child): void
     {
-        if ($child <= 0 || ! isset($this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1])) {
+        if ($child <= 0 || ! isset($this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child - 1])) {
             return;
         }
 
         [
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1],
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child - 1],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child],
         ] = [
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child - 1],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child - 1],
         ];
         $this->refreshBlockCss();
     }
 
     public function moveColumnBlockDown(int $index, int $column, int $child): void
     {
-        $count = \count($this->blocks[$index]['data']['columns'][$column]['blocks'] ?? []);
+        $count = \count($this->blocks[$index]['data']['columns'][$column]['data']['blocks'] ?? []);
 
         if ($child >= $count - 1) {
             return;
         }
 
         [
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child + 1],
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child + 1],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child],
         ] = [
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child],
-            $this->blocks[$index]['data']['columns'][$column]['blocks'][$child + 1],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child],
+            $this->blocks[$index]['data']['columns'][$column]['data']['blocks'][$child + 1],
         ];
         $this->refreshBlockCss();
     }
@@ -400,7 +412,7 @@ trait WithBlockEditor
         if (preg_match('/^colbg:(?<id>.+):(?<column>\d+)$/', $slot, $m)) {
             foreach ($this->blocks as $index => $block) {
                 if ($block['id'] === $m['id'] && isset($this->blocks[$index]['data']['columns'][(int) $m['column']])) {
-                    $this->blocks[$index]['data']['columns'][(int) $m['column']]['background_image_id'] = $imageId;
+                    $this->blocks[$index]['data']['columns'][(int) $m['column']]['data']['background_image_id'] = $imageId;
                 }
             }
 
@@ -421,11 +433,16 @@ trait WithBlockEditor
      */
     public function addColumn(int $index): void
     {
-        if (! isset($this->blocks[$index]['data']['columns']) || \count($this->blocks[$index]['data']['columns']) >= 4) {
+        $columns = data_get($this->blocks, "{$index}.data.columns", []);
+        $count = \count($columns);
+
+        if ($count >= $this->maxColumnSize) {
             return;
         }
 
-        $this->blocks[$index]['data']['columns'][] = app(EmailBlockItemService::class)->columnDefault();
+        data_set($this->blocks, "{$index}.data.columns", app(EmailBlockItemService::class)->columnDefault(count: $count + 1));
+        dd($this->blocks);
+        // $this->blocks[$index]['data']['columns'][] = ;
         $this->refreshBlockCss();
     }
 
@@ -435,7 +452,8 @@ trait WithBlockEditor
      */
     public function removeColumn(int $index, int $column): void
     {
-        if (! isset($this->blocks[$index]['data']['columns']) || \count($this->blocks[$index]['data']['columns']) <= 1) {
+        $columns = data_get($this->blocks, "{$index}.data.columns", []);
+        if (\count($columns) <= 1) {
             return;
         }
 
@@ -522,8 +540,8 @@ trait WithBlockEditor
                 return $block;
             }
 
-            foreach ($block['data']['columns'] ?? [] as $column) {
-                foreach ($column['blocks'] ?? [] as $child) {
+            foreach (data_get($block, 'data.columns', []) as $column) {
+                foreach (data_get($column, 'data.blocks', []) as $child) {
                     if ($child['id'] === $blockId) {
                         return $child;
                     }
@@ -549,10 +567,10 @@ trait WithBlockEditor
                 return "blocks.{$index}";
             }
 
-            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
-                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+            foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
+                foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
                     if ($child['id'] === $blockId) {
-                        return "blocks.{$index}.data.columns.{$columnIndex}.blocks.{$childIndex}";
+                        return "blocks.{$index}.data.columns.{$columnIndex}.data.blocks.{$childIndex}";
                     }
                 }
             }
@@ -577,10 +595,10 @@ trait WithBlockEditor
                 return;
             }
 
-            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
-                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
+            foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
+                foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
                     if ($child['id'] === $blockId) {
-                        $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['data'][$field] = $value;
+                        $this->blocks[$index]['data']['columns'][$columnIndex]['data']['blocks'][$childIndex]['data'][$field] = $value;
                         $this->refreshBlockCss();
 
                         return;
@@ -605,9 +623,9 @@ trait WithBlockEditor
         $blocks = array_map(function (array $block) use ($strip) {
             $block = $strip($block);
 
-            foreach ($block['data']['columns'] ?? [] as $columnIndex => $column) {
-                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
-                    $block['data']['columns'][$columnIndex]['blocks'][$childIndex] = $strip($child);
+            foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
+                foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
+                    $block['data']['columns'][$columnIndex]['data']['blocks'][$childIndex] = $strip($child);
                 }
             }
 

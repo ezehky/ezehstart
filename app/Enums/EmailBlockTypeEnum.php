@@ -279,7 +279,7 @@ enum EmailBlockTypeEnum: string
             self::COLUMNS => $itemService->make([
                 EmailBlockItemEnum::COLUMNS->value => [
                     $itemService->columnDefault(),
-                    $itemService->columnDefault(),
+                    $itemService->columnDefault(count: 2),
                 ],
 
                 // Layout
