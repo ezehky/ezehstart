@@ -17,9 +17,10 @@
 
 @php
     $rowSelected = $selectedBlockId === $block['id'];
-    $rowBgImage = ! empty($block['data']['background_image_id']) ? \App\Models\Image::find($block['data']['background_image_id']) : null;
+    $rowBgImage = \App\Models\Image::find($block['data']['background_image_id']);
     $columns = $block['data']['columns'] ?? [];
 @endphp
+@dump($block)
 
 <div
     wire:key="block-{{ $block['id'] }}"
@@ -64,7 +65,7 @@
         style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); padding-bottom: {{ (int) ($block['data']['spacing'] ?? 10) }}px; {{ ! empty($block['data']['background']) ? 'background-color:'.$block['data']['background'].';' : '' }} {{ $rowBgImage ? 'background-image:url('.$rowBgImage->url().');background-size:cover;background-position:center;' : '' }}"
     >
         @foreach ($columns as $columnIndex => $column)
-            @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
+            @php($colBgImage = \App\Models\Image::find($column['background_image_id']))
             <div
                 wire:key="col-{{ $block['id'] }}-{{ $columnIndex }}"
                 class="min-h-[70px] space-y-1.5 rounded-lg border border-dashed border-slate-300 p-1.5 dark:border-slate-600"
@@ -93,14 +94,17 @@
 
                 <div class="flex flex-wrap justify-center gap-1 pt-1" wire:click.stop>
                     @foreach (\App\Enums\EmailBlockTypeEnum::nestable() as $nestCase)
-                        <button
-                            type="button"
-                            wire:click.stop="addColumnBlock('{{ $nestCase->value }}', {{ $index }}, {{ $columnIndex }})"
-                            title="Add {{ $nestCase->label() }}"
-                            class="press rounded border border-slate-200 p-1.5 text-slate-400 hover:border-lime-400 hover:text-lime-600 dark:border-slate-700 dark:hover:border-lime-400"
-                        >
-                            <flux:icon :name="$nestCase->icon()" class="size-3.5" />
-                        </button>
+                        <flux:tooltip content="Add {{ $nestCase->label() }}">
+                            <flux:button
+                                type="button"
+                                wire:click.stop="addColumnBlock('{{ $nestCase->value }}', {{ $index }}, {{ $columnIndex }})"
+                                :icon="$nestCase->icon()"
+                                icon-variant="mini"
+                                variant="outline"
+                                size="sm"
+                                class="press text-slate-400"
+                            />
+                        </flux:tooltip>
                     @endforeach
                 </div>
             </div>

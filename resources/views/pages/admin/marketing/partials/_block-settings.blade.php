@@ -87,7 +87,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
-        @php($image = ! empty($data['image_id']) ? \App\Models\Image::find($data['image_id']) : null)
+        @php($image = \App\Models\Image::find($data['image_id']))
         <div class="space-y-4">
             <div>
                 {{-- <flux:label>Image</flux:label> --}}
@@ -119,7 +119,6 @@
                     @if ($image)
                         <flux:tooltip content="Remove image">
                             <flux:button
-                                variant="ghost"
                                 icon="image-off"
                                 square
                                 wire:click="removeBlockImage('img:{{ $block['id'] }}')"
@@ -225,54 +224,68 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::COLUMNS)
-        @php($rowBgImage = ! empty($data['background_image_id']) ? \App\Models\Image::find($data['background_image_id']) : null)
         <div class="space-y-5">
-            {{-- The row itself is a container too, not just its columns — a promo
-                 banner is one wide background image behind two columns of content
-                 as often as it is two separately-coloured columns. --}}
-            <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                <flux:label>Row background</flux:label>
-                <div class="grid grid-cols-2 gap-2">
-                    <x-form.color-field wire:model.live="{{ $prefix }}.background" clearable />
-                    <div class="flex items-center gap-1">
-                        <flux:tooltip content="{{ $rowBgImage ? 'Change background image' : 'Set a background image' }}">
-                            <flux:button size="sm" icon="photo" wire:click="chooseImage('bg:{{ $block['id'] }}')">
-                                {{ $rowBgImage ? 'Change' : 'Background image' }}
-                            </flux:button>
-                        </flux:tooltip>
-                        @if ($rowBgImage)
-                            <flux:tooltip content="Remove background image">
-                                <flux:button
-                                    size="sm"
-                                    variant="ghost"
-                                    icon="x-mark"
-                                    square
-                                    wire:click="removeBlockImage('bg:{{ $block['id'] }}')"
-                                    aria-label="Remove background image"
-                                />
-                            </flux:tooltip>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
             {{-- Each column's actual content — its blocks — is added and edited
                  straight on the canvas (see _columns-canvas-item.blade.php), the
                  same way top-level blocks are. This panel only ever covers what a
                  column can't show on its own: the column's own background. --}}
             @foreach ($data['columns'] ?? [] as $columnIndex => $column)
-                @php($colBgImage = ! empty($column['background_image_id']) ? \App\Models\Image::find($column['background_image_id']) : null)
-                <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="column-{{ $columnIndex }}">
+                @php($colBgImage = \App\Models\Image::find($column['background_image_id']))
+                <div
+                    class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                    wire:key="column-{{ $columnIndex }}"
+                >
                     <div class="flex items-center justify-between">
                         <flux:label>Column {{ $columnIndex + 1 }}</flux:label>
                         @if (count($data['columns']) > 1)
-                            <flux:button size="xs" variant="ghost" icon="trash" wire:click="removeColumn({{ $index }}, {{ $columnIndex }})" aria-label="Remove column" />
+                            <flux:tooltip content="Remove column">
+                                <flux:button
+                                    size="xs"
+                                    variant="ghost"
+                                    icon="trash"
+                                    wire:click="removeColumn({{ $index }}, {{ $columnIndex }})"
+                                    aria-label="Remove column"
+                                />
+                            </flux:tooltip>
                         @endif
                     </div>
 
-                    <p class="text-xs text-slate-500">{{ count($column['blocks'] ?? []) }} block(s) — add and edit them on the canvas.</p>
+                    {{-- <p class="text-xs text-slate-500">
+                        {{ count($column['blocks'] ?? []) }} block(s), add and edit them on the canvas.
+                    </p> --}}
+                    <div class="space-y-2">
+                        <flux:heading>Background</flux:heading>
+                        <div class="flex items-center justify-between gap-2">
+                            <x-form.color-field
+                                wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background"
+                                size="sm"
+                                clearable
+                            />
+                            <div class="flex items-center justify-between gap-1">
+                                <flux:tooltip content="{{ $colBgImage ? 'Change column image' : 'Set column image' }}">
+                                    <flux:button
+                                        icon="{{ $colBgImage ? 'images' : 'image-play' }}"
+                                        wire:click="chooseImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
+                                        aria-label="Select from Media Library"
+                                        size="sm"
+                                    />
+                                </flux:tooltip>
 
-                    <div class="grid grid-cols-2 gap-2">
+                                @if ($colBgImage)
+                                    <flux:tooltip content="Remove background image">
+                                        <flux:button
+                                            icon="image-off"
+                                            wire:click="removeBlockImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
+                                            aria-label="Remove background image"
+                                            size="sm"
+                                        />
+                                    </flux:tooltip>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- <div class="grid grid-cols-2 gap-2">
                         <x-form.color-field wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background" label="Background" clearable size="sm" />
                         <div class="flex items-end gap-1">
                             <flux:tooltip content="{{ $colBgImage ? 'Change column background image' : 'Set a column background image' }}">
@@ -286,7 +299,7 @@
                                 </flux:tooltip>
                             @endif
                         </div>
-                    </div>
+                    </div> --}}
                 </div>
             @endforeach
 
@@ -535,8 +548,41 @@
     <div class="space-y-4 mt-8">
         <flux:separator variant="subtle" text="LAYOUT" />
 
-        @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND, $data))
-            <x-form.color-field wire:model.live="{{ $prefix }}.background" label="Background color" />
+        @if (kArrayIntersectKey($data, ['background', 'background_image_id']))
+            <div class="space-y-2">
+                <flux:heading>Background</flux:heading>
+                <div class="flex items-center justify-between gap-2">
+                    @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND, $data))
+                        <div class="w-full">
+                            <x-form.color-field wire:model.live="{{ $prefix }}.background" size="sm" clearable />
+                        </div>
+                    @endif
+                    @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND_IMAGE_ID, $data))
+                        @php($finder = \App\Models\Image::find($data['background_image_id']))
+                        <div class="flex items-center justify-between gap-1">
+                            <flux:tooltip content="{{ $finder ? 'Change background image' : 'Set background image' }}">
+                                <flux:button
+                                    icon="{{ $finder ? 'images' : 'image-play' }}"
+                                    wire:click="chooseImage('bg:{{ $block['id'] }}')"
+                                    aria-label="Select from Media Library"
+                                    size="sm"
+                                />
+                            </flux:tooltip>
+
+                            @if ($finder)
+                                <flux:tooltip content="Remove background image">
+                                    <flux:button
+                                        icon="image-off"
+                                        wire:click="removeBlockImage('bg:{{ $block['id'] }}')"
+                                        aria-label="Remove background image"
+                                        size="sm"
+                                    />
+                                </flux:tooltip>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            </div>
         @endif
 
         @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BORDER, $data))

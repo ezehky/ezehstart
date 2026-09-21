@@ -137,7 +137,7 @@ enum EmailBlockTypeEnum: string
      */
     public static function nestable(): array
     {
-        return array_values(array_filter(self::cases(), fn (self $case) => ! in_array($case, [
+        return array_values(array_filter(self::cases(), fn (self $case) => ! \in_array($case, [
             self::COLUMNS, self::SECTION, self::DYNAMIC_CONTENT, self::RELATED_CONTENT,
         ], true)));
     }
@@ -277,9 +277,6 @@ enum EmailBlockTypeEnum: string
                 EmailBlockItemEnum::SPACING->value => 34,
             ]),
             self::COLUMNS => $itemService->make([
-                EmailBlockItemEnum::BACKGROUND,
-                EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
-                EmailBlockItemEnum::SPACING,
                 EmailBlockItemEnum::COLUMNS->value => [
                     $itemService->make([
                         EmailBlockItemEnum::BACKGROUND,
@@ -292,21 +289,18 @@ enum EmailBlockTypeEnum: string
                         EmailBlockItemEnum::BLOCKS,
                     ]),
                 ],
+
+                // Layout
+                EmailBlockItemEnum::BACKGROUND,
+                EmailBlockItemEnum::SPACING->value => 0,
             ]),
             self::SECTION => $itemService->make([
                 EmailBlockItemEnum::EMAIL_SECTION_ID,
             ]),
             self::LOGO,
-            self::LOGO_DARK => $itemService->make([
-                EmailBlockItemEnum::WIDTH->value => 'sm',
-                EmailBlockItemEnum::LINK_URL->value => '{{site.url}}',
-                EmailBlockItemEnum::ITEM_MOVE,
-
-                // Layout
-                EmailBlockItemEnum::SPACING,
-            ]),
+            self::LOGO_DARK,
             self::FAVICON => $itemService->make([
-                EmailBlockItemEnum::WIDTH->value => 'xs',
+                EmailBlockItemEnum::WIDTH->value => 'sm',
                 EmailBlockItemEnum::ITEM_MOVE,
 
                 // Layout

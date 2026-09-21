@@ -227,10 +227,11 @@ class EmailBlockItemService
             $haystack = [
                 ...$haystack,
                 EmailBlockItemEnum::BORDER,
+                EmailBlockItemEnum::BORDER_SPACING,
                 EmailBlockItemEnum::RADIUS,
                 EmailBlockItemEnum::BACKGROUND,
+                EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
                 EmailBlockItemEnum::SPACING,
-                EmailBlockItemEnum::BORDER_SPACING,
             ];
         }
 
