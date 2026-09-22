@@ -440,9 +440,7 @@ trait WithBlockEditor
             return;
         }
 
-        data_set($this->blocks, "{$index}.data.columns", app(EmailBlockItemService::class)->columnDefault(count: $count + 1));
-        dd($this->blocks);
-        // $this->blocks[$index]['data']['columns'][] = ;
+        $this->blocks[$index]['data']['columns'][] = app(EmailBlockItemService::class)->columnDefault(count: $count + 1);
         $this->refreshBlockCss();
     }
 

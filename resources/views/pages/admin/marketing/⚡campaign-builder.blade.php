@@ -604,7 +604,7 @@ new class extends Component
     <livewire:livewire.library.image-picker />
 
     @if ($campaign)
-        <flux:modal name="previewModal" class="modal-lg">
+        <flux:modal name="previewModal" class="modal-lg" style="width: 100vw !important; height: 100vh !important;">
             <div class="space-y-4">
                 <flux:heading size="lg">Preview</flux:heading>
                 {{-- The iframe does its own scrolling. A scrollable wrapper around

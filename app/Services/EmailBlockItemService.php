@@ -66,7 +66,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
             EmailBlockItemEnum::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
             EmailBlockItemEnum::RADIUS => 'none',
-            EmailBlockItemEnum::SPACING => ['top' => 10, 'right' => 10, 'bottom' => 10, 'left' => 10],
+            EmailBlockItemEnum::SPACING => ['top' => 15, 'right' => 45, 'bottom' => 15, 'left' => 45],
             EmailBlockItemEnum::BORDER_SPACING => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
 
             EmailBlockItemEnum::WIDTH => 'auto',
@@ -329,12 +329,12 @@ class EmailBlockItemService
             'times' => [
                 'label' => 'Times New Roman',
                 'class' => 'font-serif',
-                'style' => 'font-family: "Times New Roman", Times, serif;',
+                'style' => "font-family: 'Times New Roman', Times, serif;",
             ],
             'courier' => [
                 'label' => 'Courier New',
                 'class' => 'font-mono',
-                'style' => 'font-family: "Courier New", Courier, monospace;',
+                'style' => "font-family: 'Courier New', Courier, monospace;",
             ],
             'tahoma' => [
                 'label' => 'Tahoma',
@@ -349,7 +349,7 @@ class EmailBlockItemService
             'trebuchet' => [
                 'label' => 'Trebuchet MS',
                 'class' => 'font-sans',
-                'style' => 'font-family: "Trebuchet MS", Helvetica, sans-serif;',
+                'style' => "font-family: 'Trebuchet MS', Helvetica, sans-serif;",
             ],
             'georgia' => [
                 'label' => 'Georgia',
@@ -364,7 +364,7 @@ class EmailBlockItemService
             'palatino' => [
                 'label' => 'Palatino Linotype',
                 'class' => 'font-serif',
-                'style' => 'font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;',
+                'style' => "font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;",
             ],
             'impact' => [
                 'label' => 'Impact',
@@ -374,37 +374,37 @@ class EmailBlockItemService
             'comic' => [
                 'label' => 'Comic Sans MS',
                 'class' => 'font-sans',
-                'style' => 'font-family: "Comic Sans MS", cursive, sans-serif;',
+                'style' => "font-family: 'Comic Sans MS', cursive, sans-serif;",
             ],
             'bradley' => [
                 'label' => 'Bradley Hand',
                 'class' => 'font-sans',
-                'style' => 'font-family: "Bradley Hand", cursive;',
+                'style' => "font-family: 'Bradley Hand', cursive;",
             ],
             'brush script' => [
                 'label' => 'Brush Script MT',
                 'class' => 'font-sans',
-                'style' => 'font-family: "Brush Script MT", cursive;',
+                'style' => "font-family: 'Brush Script MT', cursive;",
             ],
             'lucida' => [
                 'label' => 'Lucida Sans',
                 'class' => 'font-sans',
-                'style' => 'font-family: "Lucida Sans", "Lucida Grande", sans-serif;',
+                'style' => "font-family: 'Lucida Sans', 'Lucida Grande', sans-serif;",
             ],
             'candara' => [
                 'label' => 'Candara',
                 'class' => 'font-sans',
-                'style' => 'font-family: Candara, Calibri, Segoe, "Segoe UI", Optima, Arial, sans-serif;',
+                'style' => "font-family: 'Candara', 'Calibri', 'Segoe', 'Segoe UI', 'Optima', 'Arial', sans-serif;",
             ],
             'optima' => [
                 'label' => 'Optima',
                 'class' => 'font-sans',
-                'style' => 'font-family: Optima, Segoe, "Segoe UI", Candara, Calibri, Arial, sans-serif;',
+                'style' => "font-family: 'Optima', 'Segoe', 'Segoe UI', 'Candara', 'Calibri', 'Arial', sans-serif;",
             ],
             'futura' => [
                 'label' => 'Futura',
                 'class' => 'font-sans',
-                'style' => 'font-family: Futura, "Trebuchet MS", Arial, sans-serif;',
+                'style' => "font-family: 'Futura', 'Trebuchet MS', 'Arial', sans-serif;",
             ],
         ];
     }

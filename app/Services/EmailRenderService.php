@@ -77,153 +77,113 @@ class EmailRenderService
         }
 
         $data = $block['data'] ?? [];
+
+        // Spacer and Section don't carry the type's usual CSS shape — a spacer
+        // is nothing but its own height, and a section is a reference whose
+        // *own* blocks already carry whatever CSS they need — so both skip the
+        // getCss()/wrap() path below entirely.
+        if ($type->isSpacer()) {
+            return $this->row('&nbsp;', '', ((int) ($data['height'] ?? 24)).'px');
+        }
+
+        if ($type->isSection()) {
+            return $this->renderSectionReference($data, $recipient);
+        }
+
+        $itemService = app(EmailBlockItemService::class);
         $variables = app(EmailVariableService::class);
+        $css = $itemService->getCss($data, $type);
         $text = fn (?string $value) => e($variables->resolve($value, recipient: $recipient));
 
-        return match ($type) {
-            EmailBlockTypeEnum::HEADING => $this->renderHeading($data, $text),
-            EmailBlockTypeEnum::PARAGRAPH => $this->row(sprintf(
-                '<div style="margin:0;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;text-align:%s;color:%s;">%s</div>',
-                $data['align'] ?? 'left',
-                $data['color'] ?? '#475569',
-                $this->sanitize($variables->resolve($data['text'] ?? '', recipient: $recipient, html: true)),
-            ), $this->padding(EmailBlockTypeEnum::PARAGRAPH, $data, 10)),
-
-            EmailBlockTypeEnum::BUTTON => $this->renderButton($data, $text),
-
-            EmailBlockTypeEnum::DIVIDER => $this->row(sprintf(
-                '<hr style="border:none;border-top:1px solid %s;margin:0;">',
-                $data['color'] ?? '#E2E8F0',
-            ), $this->padding(EmailBlockTypeEnum::DIVIDER, $data, 10)),
-
-            EmailBlockTypeEnum::SPACER => $this->row('&nbsp;', '0', (int) ($data['height'] ?? 24).'px'),
-
-            EmailBlockTypeEnum::IMAGE => $this->renderImage($data, $text),
-
-            EmailBlockTypeEnum::HTML => $this->row(
-                $this->sanitize($variables->resolve($data['html'] ?? '', recipient: $recipient, html: true)),
-                $this->padding(EmailBlockTypeEnum::HTML, $data, 10),
-            ),
-
+        $inner = match ($type) {
+            EmailBlockTypeEnum::HEADING => $this->renderHeading($data, $css, $text),
+            EmailBlockTypeEnum::PARAGRAPH => $this->renderParagraph($data, $css, $variables, $recipient),
+            EmailBlockTypeEnum::BUTTON => $this->renderButton($data, $css, $text),
+            EmailBlockTypeEnum::DIVIDER => sprintf('<hr style="%s">', $css['style']),
+            EmailBlockTypeEnum::IMAGE => $this->renderImage($data, $css, $text),
+            EmailBlockTypeEnum::HTML => $this->sanitize($variables->resolve($data['html'] ?? '', recipient: $recipient, html: true)),
             EmailBlockTypeEnum::DYNAMIC_CONTENT => $this->renderDynamicContent($data),
-
             EmailBlockTypeEnum::RELATED_CONTENT => $this->renderRelatedContent($data),
-
-            EmailBlockTypeEnum::COLUMNS => $this->renderColumns($data, $recipient),
-
-            EmailBlockTypeEnum::SECTION => $this->renderSectionReference($data, $recipient),
-
-            EmailBlockTypeEnum::LOGO => $this->renderSiteImage(EmailBlockTypeEnum::LOGO, 'logo', $data, $text),
-
-            EmailBlockTypeEnum::LOGO_DARK => $this->renderSiteImage(EmailBlockTypeEnum::LOGO_DARK, 'logo-dark', $data, $text),
-
-            EmailBlockTypeEnum::FAVICON => $this->renderSiteImage(EmailBlockTypeEnum::FAVICON, 'favicon', $data, $text),
-
-            EmailBlockTypeEnum::SOCIALS => $this->renderSocials($data),
-        };
-    }
-
-    /**
-     * The vertical clearance around a block's wrapping row: a fixed top clearance
-     * per type (how far a fresh block sits below the one above it) and an editable
-     * bottom clearance from the block's own `spacing` field — the single "Spacing
-     * (px)" number the settings panel exposes per block.
-     */
-    private function padding(EmailBlockTypeEnum $type, array $data, int $default): string
-    {
-        $top = match ($type) {
-            EmailBlockTypeEnum::HEADING => 34,
-            EmailBlockTypeEnum::RELATED_CONTENT => 0,
-            default => 10,
+            EmailBlockTypeEnum::COLUMNS => $this->renderColumns($data, $css, $recipient),
+            EmailBlockTypeEnum::LOGO => $this->renderSiteImage('logo', $data, $css, $text),
+            EmailBlockTypeEnum::LOGO_DARK => $this->renderSiteImage('logo-dark', $data, $css, $text),
+            EmailBlockTypeEnum::FAVICON => $this->renderSiteImage('favicon', $data, $css, $text),
+            EmailBlockTypeEnum::SOCIALS => $this->renderSocials($data, $css),
+            EmailBlockTypeEnum::SPACER, EmailBlockTypeEnum::SECTION => '', // handled above, unreachable
         };
 
-        return "{$top}px 40px ".((int) ($data['spacing'] ?? $default)).'px';
+        if ($inner === '') {
+            return '';
+        }
+
+        // A block that rejects most container CSS (see
+        // EmailBlockTypeEnum::rejectMostContainerCss()) already builds its own
+        // background/border/radius into its inner markup — via getCss()'s
+        // 'style'/'container' split applied one level down (a column's own
+        // <td>, a button's own <a>) — so the row wrapping it only ever needs
+        // the plain top/bottom clearance from its 'spacing' field, never the
+        // full container CSS a second time.
+        if ($type->rejectMostContainerCss()) {
+            $padding = $itemService->resolveSpacing(EmailBlockItemEnum::SPACING, data_get($data, 'spacing'), style: true);
+
+            return $this->row($inner, $padding);
+        }
+
+        return $this->row($inner, $css['container']);
     }
 
     /**
-     * The heading block's own padding, as the raw "10px 10px 10px 10px" value
-     * row() wraps into "padding:...;" itself — resolveSpacing(style: true)
-     * returns that whole declaration already, which would double the property
-     * name if handed straight to row(), so this always asks for the plain
-     * array and formats it here instead.
+     * The heading block's `<h1>`–`<h6>` tag. Everything about how it looks —
+     * color, alignment, case, font, and the level's own font-size/line-height —
+     * is already folded into $css['style'] by EmailBlockItemService::getCss(),
+     * the same string the admin's canvas preview renders with.
      */
-    private function spacing(array $data): string
+    private function renderHeading(array $data, array $css, \Closure $text): string
     {
-        $spacing = app(EmailBlockItemService::class)->resolveSpacing(EmailBlockItemEnum::SPACING, data_get($data, 'spacing'));
+        $level = app(EmailBlockItemService::class)->default(EmailBlockItemEnum::LEVEL, data_get($data, 'level'));
 
-        return "{$spacing['top']}px {$spacing['right']}px {$spacing['bottom']}px {$spacing['left']}px";
-    }
-
-    /**
-     * The heading block's `<h1>`/`<h2>`/`<h3>`/`<h4>`/`<h5>`/`<h6>` tag, with
-     * the text and all the inline styles the admin can set in the block's own
-     * settings panel.
-     */
-    private function renderHeading(array $data, \Closure $text): string
-    {
-        return '';
-        $itemService = app(EmailBlockItemService::class);
-
-        $level = $itemService->default(EmailBlockItemEnum::LEVEL, data_get($data, 'level'));
-        $font = $itemService->cssDesign(EmailBlockItemEnum::FONT, $data);
-        $levelStyles = $itemService->cssDesign(EmailBlockItemEnum::LEVEL, $data);
-
-        return $this->row(sprintf(
-            '<%1$s style="margin:0;text-align:%2$s;color:%3$s;text-transform:%4$s;%5$s;%6$s">%7$s</%1$s>',
-            // Read once, then checked: `$data['level'] ?? 'h1'` passing the
-            // check says nothing about the key existing.
+        return sprintf(
+            '<%1$s style="margin:0;%2$s">%3$s</%1$s>',
             $level,
-            $itemService->default(EmailBlockItemEnum::ALIGN, data_get($data, 'align')),
-            $data['color'] ?? '#0F172A',
-            $itemService->default(EmailBlockItemEnum::CHAR_CASE, data_get($data, 'char_case')),
-            $levelStyles,
-            $font,
+            $css['style'],
             $text(data_get($data, 'text', '')),
-            // ), $this->padding(EmailBlockTypeEnum::HEADING, $data, 10));
-        ), $this->spacing($data));
+        );
     }
 
     /**
-     * Split from the plain-align render path because a full-width button has to
-     * stretch its own <table> and <td> to 100%, not just center a fixed-width one —
-     * two structurally different markups the align-based `match` above had no room
-     * for inline.
+     * Trusted rich text, sanitized and resolved for variables the same way the
+     * HTML block is — $css['style'] carries alignment, color, font and case.
      */
-    private function renderButton(array $data, \Closure $text): string
+    private function renderParagraph(array $data, array $css, EmailVariableService $variables, ?User $recipient): string
     {
-        $background = $data['background'] ?? '#A3E635';
+        return sprintf(
+            '<div style="margin:0;%s">%s</div>',
+            $css['style'],
+            $this->sanitize($variables->resolve($data['text'] ?? '', recipient: $recipient, html: true)),
+        );
+    }
+
+    /**
+     * $css['parent'] (from PARENT_ALIGN) places the button within its row;
+     * $css['style'] is everything the settings panel offers on the button
+     * itself — background, border, radius, width, padding, font, case — baked
+     * in by getCss() rather than assembled by hand here.
+     */
+    private function renderButton(array $data, array $css, \Closure $text): string
+    {
         $url = $text($data['url'] ?? '#') ?: '#';
-        $target = ! empty($data['new_tab']) ? ' target="_blank" rel="noopener"' : '';
-        $color = $data['color'] ?? '#0F172A';
         $label = $text($data['text'] ?? 'Click here');
 
-        $html = ! empty($data['full_width'])
-            ? sprintf(
-                '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0"><tr><td style="background:%s;border-radius:8px;text-align:center;"><a href="%s"%s style="display:block;padding:12px 26px;font-family:Arial,sans-serif;font-weight:bold;font-size:14px;color:%s;text-decoration:none;">%s</a></td></tr></table>',
-                $background,
-                $url,
-                $target,
-                $color,
-                $label,
-            )
-            : sprintf(
-                '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:%s;"><tr><td style="background:%s;border-radius:8px;"><a href="%s"%s style="display:inline-block;padding:12px 26px;font-family:Arial,sans-serif;font-weight:bold;font-size:14px;color:%s;text-decoration:none;">%s</a></td></tr></table>',
-                match ($data['align'] ?? 'center') {
-                    'left' => '0 auto 0 0',
-                    'right' => '0 0 0 auto',
-                    default => '0 auto',
-                },
-                $background,
-                $url,
-                $target,
-                $color,
-                $label,
-            );
-
-        return $this->row($html, $this->padding(EmailBlockTypeEnum::BUTTON, $data, 30));
+        return sprintf(
+            '<div style="%s"><a href="%s" style="%s">%s</a></div>',
+            $css['parent'],
+            $url,
+            $css['style'],
+            $label,
+        );
     }
 
-    private function renderImage(array $data, \Closure $text): string
+    private function renderImage(array $data, array $css, \Closure $text): string
     {
         $image = ! empty($data['image_id']) ? Image::query()->find($data['image_id']) : null;
 
@@ -232,20 +192,17 @@ class EmailRenderService
         }
 
         $img = sprintf(
-            '<img src="%s" alt="%s" width="%s" style="display:block;width:%s;max-width:100%%;border-radius:%spx;margin:0 %s;" />',
+            '<img src="%s" alt="%s" style="display:block;max-width:100%%;%s" />',
             $image->url(),
             e($data['alt'] ?? ''),
-            (int) str_replace('%', '', (string) ($data['width'] ?? '100%')) ?: 600,
-            $data['width'] ?? '100%',
-            (int) ($data['radius'] ?? 0),
-            ($data['align'] ?? 'center') === 'center' ? 'auto' : '0',
+            $css['style'],
         );
 
         if ($url = $text($data['link_url'] ?? '')) {
             $img = sprintf('<a href="%s" style="text-decoration:none;">%s</a>', $url, $img);
         }
 
-        return $this->row(sprintf('<div style="text-align:%s;">%s</div>', $data['align'] ?? 'center', $img), $this->padding(EmailBlockTypeEnum::IMAGE, $data, 10));
+        return $img;
     }
 
     /**
@@ -253,9 +210,11 @@ class EmailRenderService
      * SiteConfigurationService's own image keys, read fresh at render time
      * rather than copied into the block — kSiteConfig() already resolves these
      * three to a ready-to-use URL (see setSiteConfigForCache()), so there is no
-     * upload/pick step here the way there is on the plain Image block.
+     * upload/pick step here the way there is on the plain Image block. Sizing
+     * and placement come from $css['style'] (WIDTH, ITEM_MOVE) exactly like
+     * the plain Image block.
      */
-    private function renderSiteImage(EmailBlockTypeEnum $type, string $configKey, array $data, \Closure $text): string
+    private function renderSiteImage(string $configKey, array $data, array $css, \Closure $text): string
     {
         $src = (string) kSiteConfig($configKey);
 
@@ -264,18 +223,17 @@ class EmailRenderService
         }
 
         $img = sprintf(
-            '<img src="%s" alt="%s" style="display:block;width:%s;max-width:100%%;margin:0 %s;" />',
+            '<img src="%s" alt="%s" style="display:block;max-width:100%%;%s" />',
             $src,
             e((string) kSiteConfig('name')),
-            $data['width'] ?? '160px',
-            ($data['align'] ?? 'center') === 'center' ? 'auto' : '0',
+            $css['style'],
         );
 
         if ($url = $text($data['link_url'] ?? '')) {
             $img = sprintf('<a href="%s" style="text-decoration:none;">%s</a>', $url, $img);
         }
 
-        return $this->row(sprintf('<div style="text-align:%s;">%s</div>', $data['align'] ?? 'center', $img), $this->padding($type, $data, 10));
+        return $img;
     }
 
     /**
@@ -284,33 +242,14 @@ class EmailRenderService
      * of the three PNGs public/images/socials ships per platform (plain,
      * "-white", "-black"); "text" style is a plain label link, for a source
      * (custom links) that may name a platform with no icon asset at all.
+     * `socialsIrrelevantFields()` already stripped whichever set of $css['style']
+     * doesn't apply to the active style before this runs (see
+     * EmailBlockItemService::getCss()), so the same style string is correct for
+     * every link regardless of icon vs. text.
      */
-    private function renderSocials(array $data): string
+    private function renderSocials(array $data, array $css): string
     {
-        $html = $this->socialsHtml($data);
-
-        if ($html === '') {
-            return '';
-        }
-
-        return $this->row($html, $this->padding(EmailBlockTypeEnum::SOCIALS, $data, 10));
-    }
-
-    /**
-     * The bare `<table>` of icon/label links, with no wrapping row of its own — so
-     * a Columns block can drop it straight into one <td> alongside whatever sits in
-     * the column next to it (an icon row on one side, a plain text link on the
-     * other, both inside the same row rather than each getting its own).
-     */
-    private function socialsHtml(array $data): string
-    {
-        $links = ($data['source'] ?? 'config') === 'custom'
-            ? collect($data['custom_links'] ?? [])->filter(fn (array $link) => ! empty($link['url']))
-            : collect((array) kSiteConfig('social-handles', default: []))->map(fn (array $handle) => [
-                'platform' => $handle['platform'],
-                'label' => SocialHandleEnum::tryFrom($handle['platform'])?->label() ?? $handle['platform'],
-                'url' => $handle['url'],
-            ]);
+        $links = $this->socialLinks($data);
 
         if ($links->isEmpty()) {
             return '';
@@ -319,22 +258,32 @@ class EmailRenderService
         $style = $data['style'] ?? 'image';
         $variant = $data['variant'] ?? 'default';
 
-        $cells = $links->map(function (array $link) use ($style, $variant) {
+        $items = $links->map(function (array $link) use ($style, $variant, $css) {
             $label = e($link['label'] ?: ($link['platform'] ?? 'Link'));
             $icon = $style === 'image' ? $this->socialIcon($link['platform'] ?? '', $variant) : null;
 
             $inner = $icon
-                ? sprintf('<img src="%s" alt="%s" width="24" height="24" style="display:block;">', $icon, $label)
-                : sprintf('<span style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:#0F172A;">%s</span>', $label);
+                ? sprintf('<img src="%s" alt="%s" style="display:inline-block;vertical-align:middle;%s" />', $icon, $label, $css['style'])
+                : sprintf('<span style="display:inline-block;%s">%s</span>', $css['style'], $label);
 
-            return sprintf('<td style="padding:0 8px;"><a href="%s" style="text-decoration:none;">%s</a></td>', e($link['url']), $inner);
+            return sprintf('<a href="%s" style="text-decoration:none;display:inline-block;margin:0 4px;">%s</a>', e($link['url']), $inner);
         })->implode('');
 
-        return sprintf(
-            '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 %s;"><tr>%s</tr></table>',
-            ($data['align'] ?? 'center') === 'center' ? 'auto' : '0',
-            $cells,
-        );
+        return sprintf('<div style="%s">%s</div>', $css['parent'], $items);
+    }
+
+    /**
+     * @return Collection<int, array{platform: ?string, label: string, url: string}>
+     */
+    private function socialLinks(array $data): Collection
+    {
+        return ($data['source'] ?? 'config') === 'custom'
+            ? collect($data['custom_links'] ?? [])->filter(fn (array $link) => ! empty($link['url']))
+            : collect((array) kSiteConfig('social-handles', default: []))->map(fn (array $handle) => [
+                'platform' => $handle['platform'],
+                'label' => SocialHandleEnum::tryFrom($handle['platform'])?->label() ?? $handle['platform'],
+                'url' => $handle['url'],
+            ]);
     }
 
     /**
@@ -375,7 +324,7 @@ class EmailRenderService
 
         $cards = $items->take($limit)->map(fn ($item) => $provider->toCard($item));
 
-        return $this->row($this->cardsGrid($cards, $data), $this->padding(EmailBlockTypeEnum::DYNAMIC_CONTENT, $data, 30));
+        return $this->cardsGrid($cards, $data);
     }
 
     private function renderRelatedContent(array $data): string
@@ -400,7 +349,7 @@ class EmailRenderService
             e($data['heading'] ?? 'You May Also Like'),
         );
 
-        return $this->row($heading.$this->cardsGrid($cards, $data), $this->padding(EmailBlockTypeEnum::RELATED_CONTENT, $data, 34));
+        return $heading.$this->cardsGrid($cards, $data);
     }
 
     /**
@@ -520,57 +469,38 @@ class EmailRenderService
 
     /**
      * A row of columns, each one its own <td> holding its own nested <table> of
-     * whatever blocks the admin put in that column — a column is a container now,
-     * not a fixed text/image/socials field, so its content is renderBlocks() over
-     * `column.blocks` the same way the letter's own body is renderBlocks() over
-     * the top-level list. A background color and/or background image can sit on
-     * the row as a whole (the promo-banner case) as well as on each column.
+     * whatever blocks the admin put in that column. A column carries no 'type' of
+     * its own, so its CSS is computed the same way WithBlockEditor::cssForBlock()
+     * stamps it for the canvas — getCss() against the column's own data with a
+     * null type — and lands straight on that column's <td>; the row's own
+     * background/border/radius (from the Columns block's own data) lands on the
+     * inner grid <table> instead of the outer <tr>, per rejectMostContainerCss().
      */
-    private function renderColumns(array $data, ?User $recipient): string
+    private function renderColumns(array $data, array $css, ?User $recipient): string
     {
-        $columns = collect($data['columns'] ?? [])->map(function (array $column) use ($recipient) {
-            $style = 'padding:0 12px;font-family:Arial,sans-serif;font-size:14px;color:#475569;';
+        $itemService = app(EmailBlockItemService::class);
 
-            if (! empty($column['background'])) {
-                $style .= 'background-color:'.$column['background'].';';
-            }
-
-            if ($bg = $this->columnBackgroundImage($column['background_image_id'] ?? null)) {
-                $style .= "background-image:url({$bg});background-size:cover;background-position:center;";
-            }
+        $columns = collect($data['columns'] ?? [])->map(function (array $column) use ($recipient, $itemService) {
+            $columnData = $column['data'] ?? $column;
+            $columnCss = $itemService->getCss($columnData, null);
 
             $inner = sprintf(
                 '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0">%s</table>',
-                $this->renderBlocks($column['blocks'] ?? [], $recipient),
+                $this->renderBlocks($columnData['blocks'] ?? [], $recipient),
             );
 
-            return sprintf('<td valign="top" style="%s">%s</td>', $style, $inner);
+            return sprintf(
+                '<td valign="top" style="font-family:Arial,sans-serif;font-size:14px;color:#475569;%s">%s</td>',
+                $columnCss['container'],
+                $inner,
+            );
         })->implode('');
 
-        $rowStyle = '';
-
-        if (! empty($data['background'])) {
-            $rowStyle .= 'background-color:'.$data['background'].';';
-        }
-
-        if ($bg = $this->columnBackgroundImage($data['background_image_id'] ?? null)) {
-            $rowStyle .= "background-image:url({$bg});background-size:cover;background-position:center;";
-        }
-
-        return $this->row(sprintf(
+        return sprintf(
             '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="%s"><tr>%s</tr></table>',
-            $rowStyle,
+            $css['container'],
             $columns,
-        ), $this->padding(EmailBlockTypeEnum::COLUMNS, $data, 10));
-    }
-
-    private function columnBackgroundImage(?int $imageId): ?string
-    {
-        if (! $imageId) {
-            return null;
-        }
-
-        return Image::query()->find($imageId)?->url();
+        );
     }
 
     private function renderSectionReference(array $data, ?User $recipient): string
@@ -585,15 +515,16 @@ class EmailRenderService
     }
 
     /**
-     * One block, wrapped in the table row every email-safe block needs.
+     * One block, wrapped in the table row every email-safe block needs. $style is
+     * a complete inline-style string — the block's own $css['container'] or
+     * resolved spacing — never assembled from separate padding/background parts
+     * here, so it stays a plain pass-through onto the wrapping <td>.
      */
-    private function row(string $inner, string $padding, string $height = '', ?string $background = null): string
+    private function row(string $inner, string $style = '', string $height = ''): string
     {
-        $style = "padding:{$padding};"
-            .($height !== '' ? "height:{$height};line-height:{$height};font-size:1px;" : '')
-            .($background !== null ? "background:{$background};" : '');
-
-        // remember if there is margin add div as container
+        if ($height !== '') {
+            $style .= "height:{$height};line-height:{$height};font-size:1px;";
+        }
 
         return sprintf('<tr><td style="%s">%s</td></tr>', $style, $inner);
     }
@@ -661,6 +592,6 @@ class EmailRenderService
             return '';
         }
 
-        return $this->row('&nbsp;', '0', '6px', $design['brand'] ?? '#65A30D');
+        return $this->row('&nbsp;', 'background:'.($design['brand'] ?? '#65A30D').';', '6px');
     }
 }

@@ -571,17 +571,23 @@ test('a columns block honours a per-column and a row background, and renders eac
             'background_image_id' => null,
             'columns' => [
                 [
-                    'background' => '#ABCDEF',
-                    'background_image_id' => null,
-                    'blocks' => [
-                        ['id' => 'c1', 'type' => 'paragraph', 'data' => ['text' => 'Left column text', 'align' => 'left', 'color' => '#475569']],
+                    'label' => 'Column 1',
+                    'data' => [
+                        'background' => '#ABCDEF',
+                        'background_image_id' => null,
+                        'blocks' => [
+                            ['id' => 'c1', 'type' => 'paragraph', 'data' => ['text' => 'Left column text', 'align' => 'left', 'color' => '#475569']],
+                        ],
                     ],
                 ],
                 [
-                    'background' => null,
-                    'background_image_id' => null,
-                    'blocks' => [
-                        ['id' => 'c2', 'type' => 'button', 'data' => ['text' => 'Right button', 'url' => 'https://example.test', 'align' => 'center', 'background' => '#A3E635', 'color' => '#0F172A', 'new_tab' => false]],
+                    'label' => 'Column 2',
+                    'data' => [
+                        'background' => null,
+                        'background_image_id' => null,
+                        'blocks' => [
+                            ['id' => 'c2', 'type' => 'button', 'data' => ['text' => 'Right button', 'url' => 'https://example.test', 'item_background' => '#A3E635', 'color' => '#0F172A']],
+                        ],
                     ],
                 ],
             ],
@@ -590,8 +596,8 @@ test('a columns block honours a per-column and a row background, and renders eac
 
     $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
 
-    expect($html)->toContain('background-color:#EEEEEE')
-        ->and($html)->toContain('background-color:#ABCDEF')
+    expect($html)->toContain('background-color: #EEEEEE')
+        ->and($html)->toContain('background-color: #ABCDEF')
         ->and($html)->toContain('Left column text')
         ->and($html)->toContain('Right button');
 });
@@ -701,34 +707,34 @@ test('a column acts as a container: blocks can be added, reordered, duplicated a
         ->call('addColumnBlock', 'heading', 0, 0)
         ->call('addColumnBlock', 'paragraph', 0, 0);
 
-    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2)
-        ->and($component->get('blocks.0.data.columns.0.blocks.0.type'))->toBe('heading')
-        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('paragraph')
+    expect($component->get('blocks.0.data.columns.0.data.blocks'))->toHaveCount(2)
+        ->and($component->get('blocks.0.data.columns.0.data.blocks.0.type'))->toBe('heading')
+        ->and($component->get('blocks.0.data.columns.0.data.blocks.1.type'))->toBe('paragraph')
         // Selecting the block it just added, the same way addBlock() does for a
         // top-level block, is what lets its settings show up in the right pane
         // immediately.
-        ->and($component->get('selectedBlockId'))->toBe($component->get('blocks.0.data.columns.0.blocks.1.id'));
+        ->and($component->get('selectedBlockId'))->toBe($component->get('blocks.0.data.columns.0.data.blocks.1.id'));
 
     // A Columns or Section type reaching addColumnBlock directly (bypassing the
     // palette, which never renders them as nestable) is silently ignored.
     $component->call('addColumnBlock', 'columns', 0, 0)
         ->call('addColumnBlock', 'section', 0, 0);
-    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2);
+    expect($component->get('blocks.0.data.columns.0.data.blocks'))->toHaveCount(2);
 
     $component->call('moveColumnBlockUp', 0, 0, 1);
-    expect($component->get('blocks.0.data.columns.0.blocks.0.type'))->toBe('paragraph')
-        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('heading');
+    expect($component->get('blocks.0.data.columns.0.data.blocks.0.type'))->toBe('paragraph')
+        ->and($component->get('blocks.0.data.columns.0.data.blocks.1.type'))->toBe('heading');
 
     $component->call('duplicateColumnBlock', 0, 0, 0);
-    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(3)
-        ->and($component->get('blocks.0.data.columns.0.blocks.1.type'))->toBe('paragraph');
+    expect($component->get('blocks.0.data.columns.0.data.blocks'))->toHaveCount(3)
+        ->and($component->get('blocks.0.data.columns.0.data.blocks.1.type'))->toBe('paragraph');
 
     $component->call('removeColumnBlock', 0, 0, 2);
-    expect($component->get('blocks.0.data.columns.0.blocks'))->toHaveCount(2);
+    expect($component->get('blocks.0.data.columns.0.data.blocks'))->toHaveCount(2);
 
     // Removing the currently-selected nested block clears the selection rather
     // than leaving it pointing at an id that no longer exists.
-    $remainingId = $component->get('blocks.0.data.columns.0.blocks.0.id');
+    $remainingId = $component->get('blocks.0.data.columns.0.data.blocks.0.id');
     $component->call('selectBlock', $remainingId)->call('removeColumnBlock', 0, 0, 0);
     expect($component->get('selectedBlockId'))->toBeNull();
 });
@@ -739,10 +745,10 @@ test('a column\'s own image and background-image slots resolve through the share
             'background' => null,
             'background_image_id' => null,
             'columns' => [
-                ['background' => null, 'background_image_id' => null, 'blocks' => [
-                    ['id' => 'img1', 'type' => 'image', 'data' => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => '100%', 'align' => 'center', 'radius' => 8]],
-                ]],
-                ['background' => null, 'background_image_id' => null, 'blocks' => []],
+                ['label' => 'Column 1', 'data' => ['background' => null, 'background_image_id' => null, 'blocks' => [
+                    ['id' => 'img1', 'type' => 'image', 'data' => ['image_id' => null, 'alt' => '', 'link_url' => '', 'width' => 'full', 'item_move' => 'center', 'item_radius' => 'rounded-sm']],
+                ]]],
+                ['label' => 'Column 2', 'data' => ['background' => null, 'background_image_id' => null, 'blocks' => []]],
             ],
         ]],
     ]]]);
@@ -753,8 +759,8 @@ test('a column\'s own image and background-image slots resolve through the share
         ->call('whenBlockImageSelected', [11], [], 'img:img1')
         ->call('whenBlockImageSelected', [22], [], 'colbg:b1:1');
 
-    expect($component->get('blocks.0.data.columns.0.blocks.0.data.image_id'))->toBe(11)
-        ->and($component->get('blocks.0.data.columns.1.background_image_id'))->toBe(22);
+    expect($component->get('blocks.0.data.columns.0.data.blocks.0.data.image_id'))->toBe(11)
+        ->and($component->get('blocks.0.data.columns.1.data.background_image_id'))->toBe(22);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
