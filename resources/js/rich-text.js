@@ -6,6 +6,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import { TableKit } from "@tiptap/extension-table";
+import { TextStyle, Color, BackgroundColor } from "@tiptap/extension-text-style";
 import VideoEmbed from "./video-embed";
 
 /**
@@ -20,8 +21,12 @@ import VideoEmbed from "./video-embed";
  * is what keeps the cursor still — round-tripping a document through the server
  * mid-word is what makes rich-text editors feel broken — while still guaranteeing
  * the property is current when a click goes straight from the editor to Save.
+ *
+ * A live binding (`wire:model.live.debounce.500ms`) passes its debounce in as
+ * `debounce`: typing then pushes once it pauses for that long rather than on
+ * every keystroke, and blur still pushes straight away.
  */
-export default (placeholder = "") => {
+export default (placeholder = "", debounce = 0) => {
     /**
      * The editor is held here, in the factory's closure, and deliberately NOT as a
      * property on the returned object.
@@ -37,6 +42,9 @@ export default (placeholder = "") => {
      * every keystroke.
      */
     let editor = null;
+
+    /** The pending debounced push, if typing has not paused yet. */
+    let pushTimer = null;
 
     return {
         /** Mirrors the editor's state so the toolbar can show what is active. */
@@ -89,6 +97,12 @@ export default (placeholder = "") => {
                     // equal widths it is created with, and the drag is the only
                     // width control the toolbar does not have to carry.
                     TableKit.configure({ table: { resizable: true } }),
+                    // Both write onto one <span style="…"> through the textStyle
+                    // mark, so a run that has a text colour and a background
+                    // colour is still a single span.
+                    TextStyle,
+                    Color,
+                    BackgroundColor,
                     Placeholder.configure({ placeholder }),
                 ],
                 // `content` is the entangled Livewire property, so it already holds
@@ -100,7 +114,7 @@ export default (placeholder = "") => {
                     },
                 },
                 onTransaction: () => this.refreshActive(),
-                onUpdate: () => this.push(),
+                onUpdate: () => this.schedulePush(),
                 onBlur: () => this.push(),
             });
 
@@ -113,12 +127,23 @@ export default (placeholder = "") => {
          * calls destroy() on a data component when its element goes away.
          */
         destroy() {
+            clearTimeout(pushTimer);
             editor?.destroy();
             editor = null;
         },
 
+        /** Push now, or once typing pauses when the binding is debounced. */
+        schedulePush() {
+            if (!debounce) return this.push();
+
+            clearTimeout(pushTimer);
+            pushTimer = setTimeout(() => this.push(), debounce);
+        },
+
         /** Write the editor's HTML back to the Livewire property. */
         push() {
+            clearTimeout(pushTimer);
+
             if (!editor) return;
 
             const html = editor.isEmpty ? "" : editor.getHTML();
@@ -157,7 +182,28 @@ export default (placeholder = "") => {
                 // inside a table — nine row and column controls have no meaning
                 // anywhere else and would only crowd the toolbar.
                 table: editor.isActive("table"),
+
+                // The colours at the caret, for the swatch strip under each
+                // colour button. Empty when the run has none.
+                color: editor.getAttributes("textStyle").color || "",
+                backgroundColor:
+                    editor.getAttributes("textStyle").backgroundColor || "",
             };
+        },
+
+        /**
+         * Apply a colour from the toolbar popover, or clear it when the value is
+         * empty. `kind` is "color" or "backgroundColor", which is also the
+         * attribute name, so the two popovers share this one method.
+         */
+        setColor(kind, value) {
+            const suffix = kind === "color" ? "Color" : "BackgroundColor";
+
+            value
+                ? this.run(`set${suffix}`, value)
+                : this.run(`unset${suffix}`);
+
+            this.push();
         },
 
         run(command, ...args) {

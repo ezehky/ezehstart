@@ -153,6 +153,26 @@ test('a link that stays in the same tab is not given noopener', function () {
     expect(app(BlogService::class)->sanitize($html))->toBe($html);
 });
 
+test('text and background colour survive exactly as the editor wrote them', function () {
+    $html = '<p><span style="color: #ef4444; background-color: #0f172a">Red on navy</span></p>';
+
+    expect(app(BlogService::class)->sanitize($html))->toBe($html);
+});
+
+test('a span keeps only its colours', function () {
+    $clean = app(BlogService::class)->sanitize(
+        '<span style="color: rgb(239, 68, 68); background-image: url(https://evil.test/x); position: fixed" class="x">Hi</span>'
+    );
+
+    expect($clean)->toBe('<span style="color: rgb(239, 68, 68)">Hi</span>');
+});
+
+test('a colour that is not a plain colour is dropped', function () {
+    $clean = app(BlogService::class)->sanitize('<span style="background-color: url(https://evil.test/x)">Hi</span>');
+
+    expect($clean)->toBe('<span>Hi</span>');
+});
+
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // TAXONOMY
 

@@ -1,4 +1,4 @@
-@props(['prefix', 'element' => 'border'])
+@props(['prefix', 'element' => 'border', 'brand' => null])
 <flux:field>
     <flux:label>Border</flux:label>
     <flux:input.group>
@@ -7,6 +7,6 @@
                 <flux:select.option value="{{ $i }}">{{ $i }}px</flux:select.option>
             @endfor
         </flux:select>
-        <x-form.color-field class="w-full" wire:model.live="{{ $prefix }}.{{ $element }}.color" size="sm" />
+        <x-form.color-field class="w-full" :brand="$brand" wire:model.live="{{ $prefix }}.{{ $element }}.color" size="sm" />
     </flux:input.group>
 </flux:field>

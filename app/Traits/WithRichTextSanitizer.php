@@ -28,7 +28,7 @@ trait WithRichTextSanitizer
      */
     protected function allowedTags(): string
     {
-        return '<p><br><strong><b><em><i><u><s><sub><sup><a><ul><ol><li><h2><h3><h4>'
+        return '<p><br><strong><b><em><i><u><s><sub><sup><a><span><ul><ol><li><h2><h3><h4>'
             .'<blockquote><code><pre><img><hr><figure><figcaption>'
             .'<table><colgroup><col><thead><tbody><tr><th><td><iframe>';
     }
@@ -75,6 +75,8 @@ trait WithRichTextSanitizer
         $clean = $this->normalizeLinks($clean);
 
         $clean = $this->normalizeImages($clean);
+
+        $clean = $this->normalizeSpans($clean);
 
         // Last, so nothing above can rewrite what it produces.
         $clean = $this->rebuildEmbeds($clean);
@@ -164,6 +166,46 @@ trait WithRichTextSanitizer
                 $clamped = max($min, min((int) $value, $max));
 
                 return $tag.' width="'.$clamped.'">';
+            },
+            $html
+        ) ?? '';
+    }
+
+    /**
+     * Reduce every span to the text and background colour the editor writes.
+     *
+     * A span exists in this content only to carry those two, but strip_tags hands
+     * its whole `style` through — and a style can load a `url()`, cover the page
+     * with `position: fixed`, or hide text. So the tag is written again from the
+     * two declarations alone, and only when each holds a plain colour: a hex, an
+     * rgb()/rgba(), or a bare name. Anything else is dropped, and a span left with
+     * nothing is written bare rather than removed, so the closing tag still pairs.
+     */
+    protected function normalizeSpans(string $html): string
+    {
+        return preg_replace_callback(
+            '/<span\b[^>]*>/i',
+            function (array $match): string {
+                preg_match('/\sstyle\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $match[0], $style);
+
+                $declarations = [];
+
+                foreach (explode(';', html_entity_decode($style[2] ?? $style[3] ?? '', ENT_QUOTES)) as $declaration) {
+                    [$property, $value] = array_map('trim', explode(':', $declaration, 2) + [1 => '']);
+                    $property = strtolower($property);
+
+                    if (! in_array($property, ['color', 'background-color'], true)) {
+                        continue;
+                    }
+
+                    if (preg_match('/^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.%\s,\/]+\)|[a-z]+)$/i', $value)) {
+                        $declarations[$property] = $property.': '.strtolower($value);
+                    }
+                }
+
+                return $declarations === []
+                    ? '<span>'
+                    : '<span style="'.e(implode('; ', $declarations)).'">';
             },
             $html
         ) ?? '';

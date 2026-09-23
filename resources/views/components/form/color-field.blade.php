@@ -14,6 +14,20 @@
     The swatch button doubles as the field's leading icon and the popover's
     trigger; the text beside it stays a real, typable input, so pasting a hex
     code works exactly as it did before this component existed.
+
+    The popover is placed with x-anchor rather than a fixed `absolute mt-2`: it
+    flips above the field when there is no room below and shifts sideways to stay
+    inside the nearest scrolling pane, the way <flux:dropdown> does — a fixed
+    left-aligned panel near the pane's edge spilled past it and gave the pane a
+    horizontal scrollbar.
+
+    Pass `brand` (the letter's current brand hex) to offer a "Brand" choice. It
+    stores the "brand-color" token, not the hex, so the field keeps following the
+    brand when it changes — see EmailBlockItemService::resolveColor(). The swatch
+    paints the token from the `--email-brand` variable the builder sets, falling
+    back to the hex passed here.
+
+        <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Line color" :brand="$brand" />
 --}}
 
 @props([
@@ -22,6 +36,7 @@
     'presets' => null,
     'clearable' => false,
     'size' => null,
+    'brand' => null,
 ])
 
 @php
@@ -41,6 +56,8 @@
         '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6',
         '#d946ef', '#ec4899', '#0f172a', '#ffffff',
     ];
+
+    $brandToken = \App\Enums\EmailBlockItemEnum::BRAND_COLOR->value;
 @endphp
 
 <flux:field {{ $attributes->except(array_keys($wireModel->getAttributes()))->class('w-full') }}>
@@ -60,6 +77,11 @@
             {{-- popover repaint the moment the text input changes — no round trip --}}
             {{-- needed to see your own edit reflected in the preview. --}}
             get current() { return $wire.get(@js($model)) || '' },
+            get swatch() {
+                return this.current === @js($brandToken)
+                    ? `var(--email-brand, ${@js($brand)})`
+                    : this.current
+            },
         }"
         x-on:keydown.escape.window="open = false"
         x-on:click.outside="open = false"
@@ -75,8 +97,9 @@
                 <button
                     type="button"
                     class="size-4 shrink-0 rounded ring-1 ring-inset ring-black/10 transition hover:scale-110 dark:ring-white/20"
-                    x-bind:style="current ? `background-color: ${current}` : ''"
+                    x-bind:style="current ? `background-color: ${swatch}` : ''"
                     x-bind:class="! current && 'bg-[linear-gradient(45deg,#0000_25%,#00000022_25%,#00000022_50%,#0000_50%,#0000_75%,#00000022_75%,#00000022)] bg-size-[6px_6px]'"
+                    x-ref="swatch"
                     x-on:click="open = ! open"
                     aria-label="Choose a color"
                 ></button>
@@ -86,9 +109,25 @@
         <div
             x-cloak
             x-show="open"
-            x-transition.origin.top
-            class="absolute z-40 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-white/10 dark:bg-slate-900"
+            x-transition.opacity
+            x-anchor.bottom-start.offset.8="$refs.swatch"
+            class="z-40 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-white/10 dark:bg-slate-900"
         >
+            @if ($brand)
+                <button
+                    type="button"
+                    class="mb-3 flex w-full items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+                    x-bind:class="current === @js($brandToken) && 'ring-2 ring-lime-500'"
+                    x-on:click="$wire.set(@js($model), @js($brandToken)); open = false"
+                >
+                    <span
+                        class="size-4 shrink-0 rounded ring-1 ring-inset ring-black/10 dark:ring-white/20"
+                        style="background-color: var(--email-brand, {{ $brand }})"
+                    ></span>
+                    Brand colour
+                    <span class="ms-auto text-[10px] font-normal text-slate-400">follows the design</span>
+                </button>
+            @endif
             <div class="grid grid-cols-8 gap-1.5">
                 @foreach ($presets as $preset)
                     <button
@@ -110,7 +149,7 @@
                     <input
                         type="color"
                         class="sr-only"
-                        x-bind:value="current || '#000000'"
+                        x-bind:value="current && current !== @js($brandToken) ? current : '#000000'"
                         x-on:input="$wire.set(@js($model), $event.target.value)"
                     />
                 </label>

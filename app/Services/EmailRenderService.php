@@ -35,8 +35,12 @@ class EmailRenderService
     {
         $variables = app(EmailVariableService::class);
 
-        $body = $this->renderBlocks($campaign->content['blocks'] ?? [], $recipient);
-        $body .= $this->renderFooter($campaign->footerSection, $recipient);
+        // Resolved once here and handed down, so every button and divider still on
+        // the "brand-color" token paints in this campaign's own brand
+        $brand = app(EmailBlockItemService::class)->brand($campaign->design ?? []);
+
+        $body = $this->renderBlocks($campaign->content['blocks'] ?? [], $recipient, $brand);
+        $body .= $this->renderFooter($campaign->footerSection, $recipient, $brand);
 
         return [
             'subject' => $variables->resolve($campaign->subject, recipient: $recipient),
@@ -47,14 +51,14 @@ class EmailRenderService
     /**
      * @param  array<int, array<string, mixed>>  $blocks
      */
-    public function renderBlocks(array $blocks, ?User $recipient = null): string
+    public function renderBlocks(array $blocks, ?User $recipient = null, ?string $brand = null): string
     {
         return collect($blocks)
-            ->map(fn (array $block) => $this->renderBlock($block, $recipient))
+            ->map(fn (array $block) => $this->renderBlock($block, $recipient, $brand))
             ->implode('');
     }
 
-    private function renderFooter(?EmailSection $footer, ?User $recipient): string
+    private function renderFooter(?EmailSection $footer, ?User $recipient, ?string $brand): string
     {
         if (! $footer) {
             return '';
@@ -62,13 +66,13 @@ class EmailRenderService
 
         // A section stores {"blocks": [...]}, the same shape a campaign does — the
         // blocks live one key in, never at the top of the column.
-        return $this->renderBlocks($footer->content['blocks'] ?? [], $recipient);
+        return $this->renderBlocks($footer->content['blocks'] ?? [], $recipient, $brand);
     }
 
     /**
      * @param  array<string, mixed>  $block
      */
-    private function renderBlock(array $block, ?User $recipient): string
+    private function renderBlock(array $block, ?User $recipient, ?string $brand): string
     {
         $type = EmailBlockTypeEnum::tryFrom($block['type'] ?? '');
 
@@ -87,12 +91,12 @@ class EmailRenderService
         }
 
         if ($type->isSection()) {
-            return $this->renderSectionReference($data, $recipient);
+            return $this->renderSectionReference($data, $recipient, $brand);
         }
 
         $itemService = app(EmailBlockItemService::class);
         $variables = app(EmailVariableService::class);
-        $css = $itemService->getCss($data, $type);
+        $css = $itemService->getCss($data, $type, brand: $brand);
         $text = fn (?string $value) => e($variables->resolve($value, recipient: $recipient));
 
         $inner = match ($type) {
@@ -104,7 +108,7 @@ class EmailRenderService
             EmailBlockTypeEnum::HTML => $this->sanitize($variables->resolve($data['html'] ?? '', recipient: $recipient, html: true)),
             EmailBlockTypeEnum::DYNAMIC_CONTENT => $this->renderDynamicContent($data),
             EmailBlockTypeEnum::RELATED_CONTENT => $this->renderRelatedContent($data),
-            EmailBlockTypeEnum::COLUMNS => $this->renderColumns($data, $css, $recipient),
+            EmailBlockTypeEnum::COLUMNS => $this->renderColumns($data, $css, $recipient, $brand),
             EmailBlockTypeEnum::LOGO => $this->renderSiteImage('logo', $data, $css, $text),
             EmailBlockTypeEnum::LOGO_DARK => $this->renderSiteImage('logo-dark', $data, $css, $text),
             EmailBlockTypeEnum::FAVICON => $this->renderSiteImage('favicon', $data, $css, $text),
@@ -476,17 +480,17 @@ class EmailRenderService
      * background/border/radius (from the Columns block's own data) lands on the
      * inner grid <table> instead of the outer <tr>, per rejectMostContainerCss().
      */
-    private function renderColumns(array $data, array $css, ?User $recipient): string
+    private function renderColumns(array $data, array $css, ?User $recipient, ?string $brand): string
     {
         $itemService = app(EmailBlockItemService::class);
 
-        $columns = collect($data['columns'] ?? [])->map(function (array $column) use ($recipient, $itemService) {
+        $columns = collect($data['columns'] ?? [])->map(function (array $column) use ($recipient, $itemService, $brand) {
             $columnData = $column['data'] ?? $column;
-            $columnCss = $itemService->getCss($columnData, null);
+            $columnCss = $itemService->getCss($columnData, null, brand: $brand);
 
             $inner = sprintf(
                 '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0">%s</table>',
-                $this->renderBlocks($columnData['blocks'] ?? [], $recipient),
+                $this->renderBlocks($columnData['blocks'] ?? [], $recipient, $brand),
             );
 
             return sprintf(
@@ -503,7 +507,7 @@ class EmailRenderService
         );
     }
 
-    private function renderSectionReference(array $data, ?User $recipient): string
+    private function renderSectionReference(array $data, ?User $recipient, ?string $brand): string
     {
         if (empty($data['email_section_id'])) {
             return '';
@@ -511,7 +515,7 @@ class EmailRenderService
 
         $section = EmailSection::query()->find($data['email_section_id']);
 
-        return $section ? $this->renderBlocks($section->content['blocks'] ?? [], $recipient) : '';
+        return $section ? $this->renderBlocks($section->content['blocks'] ?? [], $recipient, $brand) : '';
     }
 
     /**
@@ -593,6 +597,6 @@ class EmailRenderService
             return '';
         }
 
-        return $this->row('&nbsp;', 'background:'.($design['brand'] ?? '#65A30D').';', '6px');
+        return $this->row('&nbsp;', 'background:'.app(EmailBlockItemService::class)->brand($design).';', '6px');
     }
 }

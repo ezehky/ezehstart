@@ -19,6 +19,11 @@
     $itemService = app(\App\Services\EmailBlockItemService::class);
     $data = data_get($block, 'data', []);
 
+    // Offered as a "Brand colour" choice on every colour field below — the token it
+    // stores follows the design's brand. $design is absent on the section editor,
+    // which falls back to the BRAND_COLOR default.
+    $brand = $itemService->brand($design ?? []);
+
     // A Socials block keeps both its font/color fields and its width/height
     // fields in $data no matter which 'style' is active — deleting whichever
     // set isn't showing would lose it for good the moment the admin flips
@@ -61,7 +66,7 @@
                     ['block' => $block, 'field' => 'text', 'richtext' => true]
                 )
             </div>
-            <x-form.rich-text wire:model="{{ $prefix }}.text" />
+            <x-form.rich-text wire:model.live.debounce.500ms="{{ $prefix }}.text" />
         </div>
         @break
 
@@ -82,7 +87,7 @@
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::DIVIDER)
-        <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Line color" />
+        <x-form.color-field :brand="$brand" wire:model.live="{{ $prefix }}.color" label="Line color" />
         @break
 
     @case(\App\Enums\EmailBlockTypeEnum::IMAGE)
@@ -257,6 +262,7 @@
                             <flux:heading>Background</flux:heading>
                             <div class="flex items-center justify-between gap-2">
                                 <x-form.color-field
+                                    :brand="$brand"
                                     wire:model.live="{{ $dataKey }}.background"
                                     size="sm"
                                     clearable
@@ -282,7 +288,7 @@
                                 </div>
                             </div>
                         </div>
-                        <x-marketing.border :prefix="$dataKey" />
+                        <x-marketing.border :brand="$brand" :prefix="$dataKey" />
                         <x-marketing.radius wire:model.live="{{ $dataKey }}.radius" :service="$itemService" />
 
                         <flux:field>
@@ -462,10 +468,10 @@
         @if (kArrayIntersectKey($data, ['item_background', 'color']) && ! $case->isDivider())
             <div class="flex items-center justify-between gap-3">
                 @if ($showItem(\App\Enums\EmailBlockItemEnum::COLOR))
-                    <x-form.color-field wire:model.live="{{ $prefix }}.color" label="Text color" />
+                    <x-form.color-field :brand="$brand" wire:model.live="{{ $prefix }}.color" label="Text color" />
                 @endif
                 @if ($showItem(\App\Enums\EmailBlockItemEnum::ITEM_BACKGROUND))
-                    <x-form.color-field wire:model.live="{{ $prefix }}.item_background" label="Background" />
+                    <x-form.color-field :brand="$brand" wire:model.live="{{ $prefix }}.item_background" label="Background" />
                 @endif
             </div>
         @endif
@@ -487,7 +493,7 @@
                     @endforeach
                 </flux:input.group>
             </flux:field>
-            <x-form.color-field wire:model.live="{{ $prefix }}.border_color" label="Color" />
+            <x-form.color-field :brand="$brand" wire:model.live="{{ $prefix }}.border_color" label="Color" />
         @endif
 
         @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::ITEM_RADIUS, $data))
@@ -585,7 +591,7 @@
                     <div class="flex items-center justify-between gap-2">
                         @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND, $data))
                             <div class="w-full">
-                                <x-form.color-field wire:model.live="{{ $prefix }}.background" size="sm" clearable />
+                                <x-form.color-field :brand="$brand" wire:model.live="{{ $prefix }}.background" size="sm" clearable />
                             </div>
                         @endif
                         @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND_IMAGE_ID, $data))
@@ -615,7 +621,7 @@
             @endif
 
             @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BORDER, $data))
-                <x-marketing.border :$prefix />
+                <x-marketing.border :brand="$brand" :$prefix />
             @endif
 
             @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::RADIUS, $data))

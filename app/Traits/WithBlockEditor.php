@@ -130,12 +130,15 @@ trait WithBlockEditor
      * Catches a settings-panel field bound straight to "blocks.{index}.data.field"
      * (or a column child's deeper path) — a wire:model.live write Livewire applies
      * directly to the property, with no trait method in between to hang this off.
+     * The design modal's "design.*" fields land the same way, and need the same
+     * refresh: $designCss is derived from $design, and every block still on the
+     * "brand-color" token repaints when design.brand changes.
      * Fires once per changed property, before the calls (action methods) in the
      * same request run and before the render after them.
      */
     public function updatedWithBlockEditor(string $name): void
     {
-        if (str_starts_with($name, 'blocks.')) {
+        if (str_starts_with($name, 'blocks.') || $name === 'design' || str_starts_with($name, 'design.')) {
             $this->refreshBlockCss();
         }
     }
@@ -160,36 +163,37 @@ trait WithBlockEditor
     private function refreshBlockCss(): void
     {
         $service = app(EmailBlockItemService::class);
+        $brand = $service->brand($this->design);
 
         foreach ($this->blocks as $index => $block) {
-            $this->blocks[$index]['css'] = $this->cssForBlock($service, $block);
+            $this->blocks[$index]['css'] = $this->cssForBlock($service, $block, $brand);
 
             // Columns blocks are the only ones that nest, so only they have children to refresh
             foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
                 // Stamp the column itself with its own 'css' key, the EmailBlockItemService::getCss() result for that column's data
-                $this->blocks[$index]['data']['columns'][$columnIndex]['css'] = $this->cssForBlock($service, $column);
+                $this->blocks[$index]['data']['columns'][$columnIndex]['css'] = $this->cssForBlock($service, $column, $brand);
 
                 // Stamp each child block inside the column with its own 'css' key,
                 // the EmailBlockItemService::getCss() result for that child block's type and data
                 foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
                     $this->blocks[$index]['data']['columns'][$columnIndex]['data']['blocks'][$childIndex]['css']
-                        = $this->cssForBlock($service, $child);
+                        = $this->cssForBlock($service, $child, $brand);
                 }
             }
         }
 
         // Fix design
-        $this->designCss = $service->getCss($this->design, isDesign: true);
+        $this->designCss = $service->getCss($this->design, isDesign: true, brand: $brand);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function cssForBlock(EmailBlockItemService $service, array $block): array
+    private function cssForBlock(EmailBlockItemService $service, array $block, string $brand): array
     {
         $case = EmailBlockTypeEnum::tryFrom(data_get($block, 'type'));
 
-        return $service->getCss($block['data'], $case);
+        return $service->getCss($block['data'], $case, brand: $brand);
     }
 
     public function addBlock(string $type, ?int $afterIndex = null): void

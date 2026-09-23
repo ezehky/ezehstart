@@ -48,9 +48,16 @@
         default => 'Arial, Helvetica, sans-serif',
     };
     $canvasHeight ??= 'max-h-[75vh]';
+
+    // Exposed as --email-brand so every colour field's "Brand colour" swatch paints
+    // the current brand without its own round trip (see x-form.color-field).
+    $brand = app(\App\Services\EmailBlockItemService::class)->brand($design);
 @endphp
 
-<div class="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-[240px_1fr_300px] dark:border-slate-800">
+<div
+    class="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-[240px_1fr_300px] dark:border-slate-800"
+    style="--email-brand: {{ $brand }};"
+>
     {{-- PALETTE --}}
     <div class="{{ $canvasHeight }} overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-e dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
         @foreach ($palette as $group => $cases)
@@ -109,7 +116,7 @@
             style="{{ $designCss['style'] }}"
         >
             @if (! empty($design['accent_bar']))
-                <div style="height: 6px; background: {{ $design['brand'] ?? '#65A30D' }};"></div>
+                <div style="height: 6px; background: {{ $brand }};"></div>
             @endif
 
             @forelse ($blocks as $index => $block)
@@ -147,7 +154,20 @@
     </div>
 
     {{-- SETTINGS --}}
-    <div class="{{ $canvasHeight }} overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
+    {{-- The overlay sits on a non-scrolling wrapper so it covers the pane at any
+         scroll position. Selecting a block re-renders this whole panel, and the
+         first one after page load is the slowest (every settings component is
+         compiled and booted then) — without it the click looked like it did
+         nothing, so it was clicked again. --}}
+    <div class="relative border-t border-slate-200 bg-white lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950">
+    <div
+        wire:loading.flex
+        wire:target="selectBlock, addBlock, addColumnBlock, duplicateBlock, duplicateColumnBlock"
+        class="absolute inset-0 z-20 items-center justify-center bg-white/70 backdrop-blur-[1px] dark:bg-slate-950/70"
+    >
+        <flux:icon.loading class="size-5 text-lime-600 dark:text-lime-400" />
+    </div>
+    <div class="{{ $canvasHeight }} overflow-y-auto p-4 custom-scrollbar">
         @if (! $selected)
             <div class="py-10 text-center">
                 <flux:icon name="cursor-arrow-rays" class="mx-auto size-6 text-slate-300" />
@@ -177,5 +197,6 @@
             ])
             </div>
         @endif
+    </div>
     </div>
 </div>

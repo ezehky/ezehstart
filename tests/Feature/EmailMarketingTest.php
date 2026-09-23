@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EmailBlockItemEnum;
 use App\Enums\EmailBlockTypeEnum;
 use App\Enums\EmailRecipientTypeEnum;
 use App\Enums\EmailRecurrenceEnum;
@@ -562,6 +563,37 @@ test('the design dropdown\'s brand colour, radius and accent bar reach the rende
 
     expect($html)->toContain('border-radius:16px')
         ->and($html)->toContain('background:#FF0000;');
+});
+
+test('a button and divider left on the brand token follow the design brand, and a picked hex does not', function () {
+    $campaign = marketingCampaign([
+        'design' => ['brand' => '#FF0000'],
+        'content' => ['blocks' => [
+            ['id' => 'b1', 'type' => 'button', 'data' => EmailBlockTypeEnum::BUTTON->defaultData()],
+            ['id' => 'b2', 'type' => 'divider', 'data' => EmailBlockTypeEnum::DIVIDER->defaultData()],
+            ['id' => 'b3', 'type' => 'divider', 'data' => [...EmailBlockTypeEnum::DIVIDER->defaultData(), 'color' => '#00FF00']],
+        ]],
+    ]);
+
+    $html = app(EmailRenderService::class)->renderCampaign($campaign)['html'];
+
+    expect($html)->toContain('background-color: #FF0000;')
+        ->and($html)->toContain('background-color: #00FF00;')
+        ->and($html)->not->toContain(EmailBlockItemEnum::BRAND_COLOR->value);
+});
+
+test('changing the design brand repaints the canvas css straight away', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+    $campaign = marketingCampaign();
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
+        ->call('addBlock', 'button')
+        ->set('design.brand', '#123456')
+        ->set('design.background', '#654321');
+
+    expect($component->get('blocks.1.css.style'))->toContain('background-color: #123456;')
+        ->and($component->get('designCss.container'))->toContain('#654321');
 });
 
 test('a columns block honours a per-column and a row background, and renders each column\'s nested blocks', function () {

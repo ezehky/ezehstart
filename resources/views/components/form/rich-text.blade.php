@@ -13,11 +13,27 @@
         <x-form.rich-text wire:model="content" label="Body" name="content" />
 
     The `content` Alpine property is the wire:model entanglement, so the editor
-    writes back on blur and whenever the form asks it to flush. It is deliberately
-    not live on every keystroke: a response landing mid-word moves the cursor.
+    writes back on blur and whenever the form asks it to flush. A plain wire:model
+    is deferred — nothing leaves until the next request.
+
+    A preview that has to follow the typing (the email builder's canvas) binds
+    `wire:model.live.debounce.500ms` instead: the modifier reaches the entanglement,
+    and the debounce holds each push back until typing pauses. The wrapper stays
+    wire:ignore'd either way, so a response never reaches back into the document
+    and the cursor stays put.
+
+        <x-form.rich-text wire:model.live.debounce.500ms="{{ $prefix }}.text" />
 --}}
 
-@php($wireModel = $attributes->wire('model')->value())
+@php
+    $wireModel = $attributes->wire('model');
+
+    // "debounce" followed by "500ms" — the same modifier pair wire:model reads
+    $modifiers = $wireModel->modifiers();
+    $debounce = $modifiers->contains('debounce')
+        ? (int) ($modifiers->first(fn ($modifier) => str_ends_with($modifier, 'ms')) ?? 150)
+        : 0;
+@endphp
 
 <flux:field>
     @if ($label)
@@ -30,7 +46,7 @@
 
     <div
         wire:ignore
-        x-data="{ content: @entangle($wireModel), ...richText(@js($placeholder)) }"
+        x-data="{ content: @entangle($wireModel), ...richText(@js($placeholder), @js($debounce)) }"
         x-on:image-picked.window="insertImage($event.detail.url, $event.detail.alt)"
         x-on:video-picked.window="insertVideo($event.detail.url)"
         x-on:personalize-token.window="insertToken($event.detail.token)"
@@ -84,6 +100,91 @@
                 x-on:click="run('toggleSuperscript')"
                 tooltip="Superscript"
             />
+
+            <flux:separator vertical class="mx-1 h-5" />
+
+            {{-- Text and background colour. Each opens a preset grid plus the native
+                 picker, the same choice <x-form.color-field> offers; that component
+                 cannot be reused here because it binds to a Livewire property, and a
+                 colour here belongs to the selection, not to the form. The strip
+                 under the icon shows the colour at the caret. --}}
+            @foreach ([
+                'color' => ['icon' => 'baseline', 'label' => 'Text colour'],
+                'backgroundColor' => ['icon' => 'highlighter', 'label' => 'Background colour'],
+            ] as $kind => $control)
+                <div
+                    class="relative"
+                    x-data="{ open: false }"
+                    x-on:keydown.escape.stop="open = false"
+                    x-on:click.outside="open = false"
+                >
+                    <div class="relative" x-ref="trigger">
+                        <flux:button
+                            size="xs"
+                            type="button"
+                            icon="{{ $control['icon'] }}"
+                            x-bind:variant="open ? 'primary' : 'ghost'"
+                            x-on:click="open = ! open"
+                            tooltip="{{ $control['label'] }}"
+                        />
+
+                        <span
+                            class="pointer-events-none absolute inset-x-1.5 bottom-0.5 h-0.5 rounded-full"
+                            x-bind:style="active.{{ $kind }} ? `background-color: ${active.{{ $kind }}}` : ''"
+                        ></span>
+                    </div>
+
+                    <div
+                        x-cloak
+                        x-show="open"
+                        x-transition.opacity
+                        x-anchor.bottom-start.offset.8="$refs.trigger"
+                        class="z-40 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-white/10 dark:bg-slate-900"
+                    >
+                        <div class="grid grid-cols-8 gap-1.5">
+                            @foreach ([
+                                '#ef4444', '#f97316', '#f59e0b', '#eab308',
+                                '#84cc16', '#22c55e', '#10b981', '#14b8a6',
+                                '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6',
+                                '#d946ef', '#ec4899', '#0f172a', '#ffffff',
+                            ] as $preset)
+                                <button
+                                    type="button"
+                                    class="size-5 rounded ring-1 ring-inset ring-black/10 transition hover:scale-110 dark:ring-white/20"
+                                    x-bind:class="active.{{ $kind }} === @js($preset) && 'ring-2 ring-lime-500'"
+                                    style="background-color: {{ $preset }}"
+                                    x-on:click="setColor(@js($kind), @js($preset)); open = false"
+                                    aria-label="{{ $preset }}"
+                                ></button>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
+                            <label class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+                                <flux:icon name="eye-dropper" class="size-3.5" />
+                                Custom
+                                {{-- `change`, not `input`: input fires on every drag
+                                     step, and each apply refocuses the editor, which
+                                     would close the native picker mid-drag. --}}
+                                <input
+                                    type="color"
+                                    class="sr-only"
+                                    x-bind:value="active.{{ $kind }} && active.{{ $kind }}.startsWith('#') ? active.{{ $kind }} : '#000000'"
+                                    x-on:change="setColor(@js($kind), $event.target.value); open = false"
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                class="text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                                x-on:click="setColor(@js($kind), ''); open = false"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
 
             <flux:separator vertical class="mx-1 h-5" />
 

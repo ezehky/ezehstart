@@ -52,7 +52,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::ITEM_RADIUS => 'rounded-sm',
 
             EmailBlockItemEnum::BORDER_WIDTH => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
-            EmailBlockItemEnum::BORDER_COLOR => $this->default(EmailBlockItemEnum::BRAND_COLOR),
+            EmailBlockItemEnum::BORDER_COLOR => EmailBlockItemEnum::BRAND_COLOR->value,
 
             EmailBlockItemEnum::ELEMENT_DISPLAY => 'inline-block',
 
@@ -70,7 +70,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::BORDER => [
                 'width' => 0,
                 'style' => 'solid',
-                'color' => $this->default(EmailBlockItemEnum::BRAND_COLOR),
+                'color' => EmailBlockItemEnum::BRAND_COLOR->value,
             ],
             EmailBlockItemEnum::RADIUS => 'none',
             EmailBlockItemEnum::SPACING => ['top' => 15, 'right' => 45, 'bottom' => 15, 'left' => 45],
@@ -109,6 +109,30 @@ class EmailBlockItemService
             EmailBlockItemEnum::EMAIL_SECTION_ID => null,
             default => null
         };
+    }
+
+    /**
+     * The letter's brand colour — the design's own "brand" when it has one, the
+     * BRAND_COLOR default otherwise (the section editor has no design at all).
+     *
+     * @param  array<string, mixed>  $design
+     */
+    public function brand(array $design = []): string
+    {
+        return data_get($design, 'brand') ?: $this->default(EmailBlockItemEnum::BRAND_COLOR);
+    }
+
+    /**
+     * A colour field holding the BRAND_COLOR token ("brand-color") rather than a hex
+     * follows the letter's brand: it is stored as the token and only turned into a
+     * hex here, at CSS time, so changing the brand in the design modal repaints every
+     * button and divider still on it — while one the admin picked a hex for keeps it.
+     */
+    public function resolveColor(mixed $value, ?string $brand = null): mixed
+    {
+        return $value === EmailBlockItemEnum::BRAND_COLOR->value
+            ? ($brand ?: $this->default(EmailBlockItemEnum::BRAND_COLOR))
+            : $value;
     }
 
     /**
@@ -478,9 +502,10 @@ class EmailBlockItemService
      * @param  EmailBlockTypeEnum  $type  The email block item to get the CSS for.
      * @param  array  $data  The data array containing the valid item.
      * @param  bool  $isDesign  Whether to include design-specific CSS or not.
+     * @param  string|null  $brand  The letter's brand hex, which any "brand-color" token resolves to (see resolveColor()).
      * @return array An associative array containing 'classes', 'style', and 'container' keys with their corresponding values.
      */
-    public function getCss(array $data, ?EmailBlockTypeEnum $type = null, bool $isDesign = false): array
+    public function getCss(array $data, ?EmailBlockTypeEnum $type = null, bool $isDesign = false, ?string $brand = null): array
     {
         $classes = $style = $parent = $container = [];
 
@@ -507,11 +532,11 @@ class EmailBlockItemService
             $item = $this->resolveItem($key);
 
             if ($item->isLayoutItem()) {
-                $container[] = $this->cssDesign($key, $data);
+                $container[] = $this->cssDesign($key, $data, brand: $brand);
             } elseif ($item->isParentItem()) {
-                $parent[] = $this->cssDesign($key, $data);
+                $parent[] = $this->cssDesign($key, $data, brand: $brand);
             } else {
-                $style[] = $this->cssDesign($key, $data, type: $type);
+                $style[] = $this->cssDesign($key, $data, type: $type, brand: $brand);
             }
         }
 
@@ -626,6 +651,7 @@ class EmailBlockItemService
      * @param  string  $key  The key to use when retrieving the CSS class from the valid items array (default: 'class').
      * @param  mixed  $default  The default value to return if the valid item is not found (default: '').
      * @param  EmailBlockTypeEnum|null  $type  The email block type enum case (optional).
+     * @param  string|null  $brand  The letter's brand hex, for any "brand-color" token.
      * @return string|null The corresponding CSS class for the enum case and valid item.
      */
     private function cssDesign(
@@ -633,7 +659,8 @@ class EmailBlockItemService
         array $data,
         string $key = 'style',
         mixed $default = null,
-        ?EmailBlockTypeEnum $type = null
+        ?EmailBlockTypeEnum $type = null,
+        ?string $brand = null,
     ): ?string {
         $item = $this->resolveItem($item);
 
@@ -644,6 +671,9 @@ class EmailBlockItemService
         if ($selected === null) {
             $selected = $this->default($item, $default);
         }
+
+        // A colour still on the brand token follows the letter's brand
+        $selected = $this->resolveColor($selected, $brand);
 
         // BACKGROUND IMAGE
         if ($item->isBackgroundImage() && $finder = Image::find($selected)) {
@@ -657,6 +687,13 @@ class EmailBlockItemService
 
         // Border && Border Width
         if ($item->isBorder() || $item->isBorderWidth() && $item !== null) {
+            if ($item->isBorder() && \is_array($selected)) {
+                $selected['color'] = $this->resolveColor(
+                    data_get($selected, 'color', EmailBlockItemEnum::BRAND_COLOR->value),
+                    $brand,
+                );
+            }
+
             return $this->resolveBorder($item, $selected, true, $item->isBorderWidth());
         }
 

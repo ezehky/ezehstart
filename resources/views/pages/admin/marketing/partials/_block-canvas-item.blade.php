@@ -29,7 +29,9 @@
     @if (! empty($sortItem)) wire:sort:item="{{ $sortItem }}" @endif
     wire:click.stop="{{ $controls['select'] }}"
     @class([
-        'group relative cursor-pointer',
+        // data-loading is Livewire's own mark on the element whose click is in
+        // flight, so the block answers the click before the server does
+        'group relative cursor-pointer data-loading:outline-2 data-loading:outline-dashed data-loading:outline-offset-[-2px] data-loading:outline-lime-400',
         'outline outline-2 outline-offset-[-2px] outline-lime-500' => $selectedBlockId === $block['id'],
     ])
 >
