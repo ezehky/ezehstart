@@ -509,7 +509,7 @@ new class extends Component
             </flux:text>
 
             <flux:input type="number" wire:model="adjust_user_id" label="Account id" />
-            <flux:input type="number" step="0.01" wire:model="adjust_amount" label="Amount" />
+            <x-form.money-field wire:model="adjust_amount" label="Amount" />
             <flux:input wire:model="adjust_reason" label="Reason" placeholder="Refund for duplicate charge" />
             <flux:switch wire:model="adjust_credit" label="Credit the account" description="Turn off to debit instead." />
 
