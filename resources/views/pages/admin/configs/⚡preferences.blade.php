@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\LocaleEnum;
 use App\Services\NewsletterService;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 /**
@@ -43,6 +45,14 @@ new class extends Component
             // Telling a member when somebody else touched their files.
             'config.uploads.modification.email' => ['required', 'boolean'],
             'config.uploads.modification.in-app' => ['required', 'boolean'],
+
+            // Only a language with strings may be the default — a default with no
+            // lang file would show every visitor English under another flag.
+            'config.localization.default' => [
+                'required',
+                Rule::in(array_map(fn (LocaleEnum $locale) => $locale->value, LocaleEnum::available())),
+            ],
+            'config.localization.switcher' => ['required', 'boolean'],
         ];
 
         // Where the sign-up appears. Neither placement means anything while the
@@ -120,6 +130,28 @@ new class extends Component
         </div>
 
         <div class="space-y-6">
+            <flux:card class="space-y-3">
+                <div class="mb-4">
+                    <flux:heading level="2" size="lg">Language</flux:heading>
+                    <flux:text class="mt-1">
+                        Only languages with a translation file are listed. Add one with
+                        <code class="text-xs">php artisan lang:translate fr</code>.
+                    </flux:text>
+                </div>
+
+                <flux:select wire:model="config.localization.default" label="Default language">
+                    @foreach (LocaleEnum::available() as $locale)
+                        <flux:select.option :value="$locale->value">{{ $locale->flag() }} {{ $locale->label() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <flux:switch
+                    wire:model="config.localization.switcher"
+                    label="Let visitors pick a language"
+                    description="Shows the language menu on the public pages, the sign-in screens and the dashboards. Off keeps everybody on the default."
+                />
+            </flux:card>
+
             <flux:card class="space-y-2">
                 <div class="mb-4">
                     <flux:heading level="2" size="lg">Cookie notice</flux:heading>

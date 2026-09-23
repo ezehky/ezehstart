@@ -3,11 +3,13 @@
 use App\Enums\ActivityActionEnum;
 use App\Enums\EmailSectionTypeEnum;
 use App\Enums\GateAccessEnum;
+use App\Enums\SystemEmailEnum;
 use App\Models\EmailTemplate;
 use App\Services\ActivityLogService;
 use App\Services\EmailSectionService;
 use App\Traits\WithBlockEditor;
 use App\Traits\WithGateProps;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -26,6 +28,14 @@ new class extends Component
 
     public ?string $description = null;
 
+    /**
+     * The system email this template stands in for, as the enum value, or empty
+     * for an ordinary template. See SystemEmailEnum.
+     */
+    public string $system_email = '';
+
+    public ?string $subject = null;
+
     // Step 2 — builder
     public ?int $footer_section_id = null;
 
@@ -37,6 +47,8 @@ new class extends Component
         if ($this->template) {
             $this->name = $this->template->name;
             $this->description = $this->template->description;
+            $this->system_email = (string) $this->template->system_email?->value;
+            $this->subject = $this->template->subject;
             $this->footer_section_id = $this->template->footer_section_id;
             $this->design = $this->template->design ?? [];
             $this->blocks = $this->template->content['blocks'] ?? [];
@@ -57,7 +69,37 @@ new class extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
+            ...$this->systemEmailRules(),
         ];
+    }
+
+    /**
+     * A slot holds one design at most, so a second template naming the same slot
+     * is refused rather than quietly taking it over.
+     */
+    protected function systemEmailRules(): array
+    {
+        return [
+            'system_email' => [
+                'nullable',
+                Rule::enum(SystemEmailEnum::class),
+                Rule::unique(EmailTemplate::class, 'system_email')->ignore($this->template?->id),
+            ],
+            'subject' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'system_email.unique' => 'Another template is already used for that email. Unassign it there first.',
+        ];
+    }
+
+    #[Computed]
+    public function systemEmailCase(): ?SystemEmailEnum
+    {
+        return SystemEmailEnum::tryFrom($this->system_email);
     }
 
     /**
@@ -72,6 +114,8 @@ new class extends Component
 
         return $this->name !== $this->template->name
             || (string) $this->description !== (string) $this->template->description
+            || $this->system_email !== (string) $this->template->system_email?->value
+            || (string) $this->subject !== (string) $this->template->subject
             || $this->footer_section_id !== $this->template->footer_section_id
             || $this->blocks !== ($this->template->content['blocks'] ?? [])
             || $this->design !== ($this->template->design ?? []);
@@ -94,6 +138,7 @@ new class extends Component
         $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
+            ...$this->systemEmailRules(),
         ]);
 
         $activity = app(ActivityLogService::class);
@@ -103,6 +148,8 @@ new class extends Component
         $this->template->fill([
             'name' => $this->name,
             'description' => $this->description,
+            'system_email' => $this->system_email ?: null,
+            'subject' => $this->subject ?: null,
             // content/design are NOT NULL columns with no default — a brand-new
             // row needs something in them even before there is a single block or
             // a design choice to save.
@@ -145,6 +192,8 @@ new class extends Component
         $this->template->fill([
             'name' => $this->name,
             'description' => $this->description,
+            'system_email' => $this->system_email ?: null,
+            'subject' => $this->subject ?: null,
             'footer_section_id' => $this->footer_section_id,
             'content' => $this->blockContent(),
             'design' => $this->design,

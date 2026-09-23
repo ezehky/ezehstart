@@ -72,6 +72,7 @@ new class extends Component
             'config.security.two-factor' => ['required', 'boolean'],
             'config.security.socialite' => ['required', 'boolean'],
             'config.security.passwordless-login' => ['required', 'boolean'],
+            'config.security.passkeys' => ['required', 'boolean'],
             'config.security.captcha' => ['required', 'boolean'],
             // Bounded here as well as in the service: the service clamps whatever
             // it reads, and this stops a silly number being saved in the first place.
@@ -277,7 +278,7 @@ new class extends Component
                 <flux:switch
                     wire:model.live="config.security.socialite"
                     label="Offer social sign-in"
-                    description="Only providers with credentials in the environment are shown."
+                    description="Members only — administrators always sign in with a password, an email code or a passkey. Only providers with credentials in the environment are shown."
                 />
 
                 {{-- Credentials and permission are two different questions. A
@@ -315,6 +316,13 @@ new class extends Component
                     wire:model="config.security.passwordless-login"
                     label="Offer passwordless sign-in"
                     description="Signing in with a six-digit code sent by email."
+                />
+
+                <flux:separator variant="subtle" />
+                <flux:switch
+                    wire:model="config.security.passkeys"
+                    label="Offer passkeys"
+                    description="Sign in with a fingerprint, face or device PIN instead of a password. Browsers only offer them over HTTPS. Turning this off closes sign-in and hides the keys already saved; it does not delete them."
                 />
 
                 <flux:separator variant="subtle" />

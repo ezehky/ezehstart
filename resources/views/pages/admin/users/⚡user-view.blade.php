@@ -5,6 +5,7 @@ use App\Enums\GateAccessEnum;
 use App\Enums\StatusUser;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Rules\PhoneRule;
 use App\Services\ActivityLogService;
 use App\Services\GateService;
 use App\Services\PasswordSecurityService;
@@ -30,6 +31,10 @@ new class extends Component
     public string $email = '';
 
     public ?string $phone_number = null;
+
+    public ?string $phone_dial_code = null;
+
+    public ?string $phone_iso2 = null;
 
     public bool $status = true;
 
@@ -171,6 +176,8 @@ new class extends Component
         $this->name = $this->user->name;
         $this->email = $this->user->email;
         $this->phone_number = $this->user->phone_number;
+        $this->phone_dial_code = $this->user->phone_dial_code;
+        $this->phone_iso2 = $this->user->phone_iso2;
         $this->status = $this->user->status->boolValue();
         $this->password = null;
 
@@ -182,7 +189,9 @@ new class extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:50', Rule::unique(User::class, 'email')->ignore($this->user->id)],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['nullable', 'string', 'max:20', new PhoneRule($this->phone_dial_code)],
+            'phone_dial_code' => ['nullable', 'required_with:phone_number', 'string', 'max:8', 'regex:/^\+\d{1,4}$/'],
+            'phone_iso2' => ['nullable', 'required_with:phone_number', 'string', 'size:2', Rule::exists('countries', 'iso2')],
             'status' => ['boolean'],
             'password' => ['nullable', 'string', 'min:5'],
         ];
@@ -200,6 +209,10 @@ new class extends Component
         $this->user->name = $this->name;
         $this->user->email = strtolower($this->email);
         $this->user->phone_number = $this->phone_number;
+        // Cleared together with the number: a dialling code with nothing to dial
+        // is a country the account never actually gave us.
+        $this->user->phone_dial_code = $this->phone_number ? $this->phone_dial_code : null;
+        $this->user->phone_iso2 = $this->phone_number ? strtoupper((string) $this->phone_iso2) : null;
         // A deletion in flight is not something this switch can express, so it
         // does not get to overwrite it. Without this, an administrator fixing a
         // typo in a name would silently cancel a scheduled deletion — and leave
@@ -426,7 +439,7 @@ new class extends Component
                     <flux:heading level="1" size="xl">{{ $user->name }}</flux:heading>
                     <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                         <div>{{ $user->email }}</div>
-                        <div>{{ $user->phone_number ?: 'No phone number' }}</div>
+                        <div>{{ $user->phoneInternational() ?: 'No phone number' }}</div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 pt-1">
                         <x-util.e-badge :enum="$user->status" />
@@ -705,7 +718,7 @@ new class extends Component
             <div class="grid gap-4 sm:grid-cols-2">
                 <flux:input label="Name" wire:model="name" autofocus badge="required" />
                 <flux:input type="email" label="Email" wire:model="email" badge="required" />
-                <flux:input label="Phone number" wire:model="phone_number" placeholder="e.g. +234 800 000 0000" />
+                <x-form.phone-field label="Phone number" wire:model="phone_number" dial-code="phone_dial_code" iso2="phone_iso2" />
                 <flux:input
                     type="password"
                     label="Password"

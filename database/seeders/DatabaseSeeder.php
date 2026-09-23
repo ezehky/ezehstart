@@ -42,6 +42,9 @@ class DatabaseSeeder extends Seeder
             // none and look like the feature was broken.
             NotificationTypeSeeder::class,
             CountrySeeder::class,
+            // Before UserSeeder, which has nothing to point at otherwise — and so
+            // the money on every screen reads in a currency that exists as a row.
+            CurrencySeeder::class,
             UserSeeder::class,
             EmailSectionSeeder::class,
         ];

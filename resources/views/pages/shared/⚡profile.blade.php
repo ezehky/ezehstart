@@ -244,7 +244,7 @@ new class extends Component
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <flux:input value="{{ $user->name }}" label="Full name" readonly disabled />
             <flux:input value="{{ $user->email }}" label="Email address" readonly disabled />
-            <flux:input value="{{ $user->phone_number ?: '—' }}" label="Phone number" readonly disabled />
+            <flux:input value="{{ $user->phoneInternational() ?: '—' }}" label="Phone number" readonly disabled />
             <flux:input value="{{ $user->createdAtHuman() }}" label="Created" readonly disabled />
         </div>
     </flux:card>
@@ -345,4 +345,12 @@ new class extends Component
             </form>
         @endif
     </flux:card>
+
+    {{-- The admin workspace has no security tab, so its second factor and its
+         passkeys live here. Members manage theirs on the security tab instead,
+         which is the only reason this is asked by type. --}}
+    @unless ($user->isUser())
+        <livewire:livewire.account.two-factor />
+        <livewire:livewire.account.passkeys />
+    @endunless
 </div>

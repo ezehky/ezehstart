@@ -41,7 +41,7 @@ test('the settings page hides the section when the feature is off', function () 
     app(SiteConfigurationService::class)->update(['security' => ['two-factor' => false]]);
 
     Livewire::actingAs($this->member)
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->assertDontSee('Two-factor authentication');
 });
 
@@ -94,7 +94,7 @@ test('cancelling an unconfirmed enrolment removes the row', function () {
     app(TwoFactorService::class)->beginEnrolment($this->member);
 
     Livewire::actingAs($this->member->fresh())
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->call('cancelTwoFactor');
 
     expect($this->member->fresh()->twoFactor)->toBeNull();
@@ -102,7 +102,7 @@ test('cancelling an unconfirmed enrolment removes the row', function () {
 
 test('the whole enrolment works through the settings page', function () {
     $component = Livewire::actingAs($this->member)
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->call('startTwoFactor');
 
     $secret = $this->member->fresh()->twoFactor->secret;
@@ -312,7 +312,7 @@ test('a member can download the codes they have just been shown', function () {
     // Enrolled through the screen rather than the service, because the download
     // is only offered while the generated set is still on the page.
     $component = Livewire::actingAs($this->member->fresh())
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->set('two_factor_code', currentOtp($twoFactor->secret))
         ->call('confirmTwoFactor')
         ->assertHasNoErrors()
@@ -329,7 +329,7 @@ test('a member can download the codes they have just been shown', function () {
 
 test('the download is refused while two factor is off', function () {
     Livewire::actingAs($this->member)
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->call('downloadRecoveryCodes')
         ->assertNotFound();
 });
@@ -342,7 +342,7 @@ test('the download is refused once the codes have left the screen', function () 
     // A fresh visit, which is what a reload is. The codes are stored and could be
     // handed back, but "shown once" is the promise the screen makes.
     Livewire::actingAs($this->member->fresh())
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->call('downloadRecoveryCodes')
         ->assertHasErrors();
 });
@@ -353,7 +353,7 @@ test('the settings screen does not offer a download after a reload', function ()
     $service->confirm($this->member->fresh(), currentOtp($twoFactor->secret));
 
     Livewire::actingAs($this->member->fresh())
-        ->test('pages::user.account.security-settings')
+        ->test('livewire.account.two-factor')
         ->assertDontSee('Download as .txt')
         ->assertDontSee('Copy codes');
 });

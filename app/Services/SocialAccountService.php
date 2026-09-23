@@ -56,6 +56,27 @@ class SocialAccountService
             && $provider->isEnabled();
     }
 
+    /**
+     * Whether this account may sign in through a provider at all.
+     *
+     * Administrators may not. A social login hands the account to whoever holds
+     * the Google or Facebook identity, on that provider's recovery rules rather
+     * than ours — acceptable for a member, not for an account that can change
+     * other people's. Administrators have a password, an email code and passkeys.
+     */
+    public function acceptsAccount(User $user): bool
+    {
+        return ! $user->isAdmin();
+    }
+
+    /**
+     * What an administrator is told when a provider brings them here.
+     */
+    public function adminRefusal(): string
+    {
+        return 'Administrator accounts cannot use social sign-in. Please sign in with your password, an email code or a passkey.';
+    }
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // SIGN IN
 
@@ -82,6 +103,12 @@ class SocialAccountService
             ->first();
 
         if ($existing) {
+            // A link made before the account was promoted still exists, and must
+            // stop working the moment the account became an administrator.
+            if ($existing->user && ! $this->acceptsAccount($existing->user)) {
+                return ['user' => null, 'error' => $this->adminRefusal(), 'created' => false];
+            }
+
             $this->refreshTokens($existing, $socialiteUser);
 
             return ['user' => $existing->user, 'error' => null, 'created' => false];
@@ -101,6 +128,12 @@ class SocialAccountService
         $user = User::query()->where('email', $email)->first();
 
         if ($user) {
+            // Checked before the link is written, not after: matching on email is
+            // exactly how a provider identity would attach itself to an admin.
+            if (! $this->acceptsAccount($user)) {
+                return ['user' => null, 'error' => $this->adminRefusal(), 'created' => false];
+            }
+
             // An address that was only on the newsletter list becomes a real
             // account here: the provider has just proved the visitor owns it, which
             // is the same proof registration asks for. The row is claimed rather

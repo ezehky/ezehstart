@@ -5,7 +5,7 @@ on the sign-in screen — one list, asked for the same way. --}}
 @if ($providers?->isNotEmpty())
 <div class="flex items-center gap-3 my-3">
    <flux:separator class="grow" />
-   <flux:text size="sm" class="shrink-0">or continue with</flux:text>
+   <flux:text size="sm" class="shrink-0">{{ __('or continue with') }}</flux:text>
    <flux:separator class="grow" />
 </div>
 

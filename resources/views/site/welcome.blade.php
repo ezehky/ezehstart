@@ -13,22 +13,21 @@
 
         <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-6 py-16">
             <div class="max-w-2xl">
-                <flux:text color="lime" class="font-semibold">Starter kit</flux:text>
+                <flux:text color="lime" class="font-semibold">{{ __('Starter kit') }}</flux:text>
                 <h1 class="mt-3 font-heading text-4xl font-bold tracking-tight sm:text-5xl dark:text-white">
                     {{ $_configs['name'] }}
                 </h1>
                 <flux:text class="mt-5 text-lg dark:text-slate-400">
-                    Authentication, roles, two workspaces and account management — already wired,
-                    already tested. Replace this page and start building the part that is yours.
+                    {{ __('Authentication, roles, two workspaces and account management — already wired, already tested. Replace this page and start building the part that is yours.') }}
                 </flux:text>
 
                 <div class="mt-8 flex flex-wrap gap-3">
                     @guest
                         <flux:button :href="route('register')" variant="primary" icon="arrow-right" wire:navigate>
-                            Create an account
+                            {{ __('Create an account') }}
                         </flux:button>
                         <flux:button :href="route('passwordless')" icon="envelope" wire:navigate>
-                            Sign in with an email code
+                            {{ __('Sign in with an email code') }}
                         </flux:button>
                     @endguest
                 </div>
@@ -43,8 +42,8 @@
                 ] as $feature)
                     <flux:card class="space-y-3">
                         <x-dashboard.icon-box size="sm" :icon="$feature['icon']" tone="emerald" />
-                        <flux:heading size="lg">{{ $feature['title'] }}</flux:heading>
-                        <flux:text class="text-sm">{{ $feature['body'] }}</flux:text>
+                        <flux:heading size="lg">{{ __($feature['title']) }}</flux:heading>
+                        <flux:text class="text-sm">{{ __($feature['body']) }}</flux:text>
                     </flux:card>
                 @endforeach
             </div>

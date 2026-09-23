@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\SystemEmailEnum;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,7 +23,16 @@ class EmailTemplate extends Model
         return [
             'content' => 'array',
             'design' => 'array',
+            'system_email' => SystemEmailEnum::class,
         ];
+    }
+
+    // Scopes
+
+    #[Scope]
+    protected function forSystemEmail(Builder $query, SystemEmailEnum $email): void
+    {
+        $query->where('system_email', $email);
     }
 
     // Relationships

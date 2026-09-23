@@ -249,7 +249,7 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="email">{{ $item->email }}</x-table.cell>
-                        <x-table.cell column="phone_number">{{ $item->phone_number ?: '—' }}</x-table.cell>
+                        <x-table.cell column="phone_number">{{ $item->phoneInternational() ?: '—' }}</x-table.cell>
 
                         <x-table.cell column="user_type">
                             <flux:badge size="sm" color="zinc">{{ $item->user_type->label() }}</flux:badge>

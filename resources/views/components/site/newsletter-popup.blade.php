@@ -1,72 +1,115 @@
-{{-- The newsletter as an interruption, after `preferences.newsletter.popup-delay`
+{{-- The popup on the public pages, after `preferences.newsletter.popup-delay`
      seconds of reading.
 
-     A card anchored to the corner rather than a modal over a backdrop. A modal has
-     to trap focus and hand it back to stay usable from a keyboard, and one that
-     appears on a timer takes focus away from somebody mid-sentence to do it. A
-     corner card asks the same question and costs the reader nothing if they ignore
-     it.
+     The latest live announcement if there is one — a promotion, a notice, or the
+     newsletter with a picture — and the plain newsletter sign-up if there is not.
+     See AnnouncementService for which, and for when the form comes with it.
 
-     Dismissal is per-browser and lives in localStorage: it is a courtesy to the
-     reader, not something the site needs to know, and there is no account to hang
-     it on for a visitor who has not signed in. --}}
-@php($newsletter = app(App\Services\NewsletterService::class))
+     A Flux modal rather than a hand-built overlay, because a card that appears on a
+     timer over the page has to trap focus, answer Escape and hand focus back, and
+     the modal already does all three.
 
-@if ($newsletter->showsPopup())
+     Closing it hides it for the rest of the visit (sessionStorage). Ticking "don't
+     show this again" hides it for good (localStorage). Both are keyed on the
+     announcement *and* its last edit, so a new or reworded announcement is shown
+     again to somebody who dismissed the last one. --}}
+@php
+    $announcements = app(App\Services\AnnouncementService::class);
+    $announcement = $announcements->current();
+    $withForm = $announcements->showsNewsletter($announcement);
+    $newsletter = app(App\Services\NewsletterService::class);
+
+    $key = $announcement?->dismissKey() ?? 'newsletter-popup';
+    $imageOnly = $announcement?->isImageOnly() ?? false;
+    $split = $announcement?->layout?->isSplit() && $announcement?->image && ! $imageOnly;
+    $image = $announcement?->image;
+@endphp
+
+@if ($announcements->showsPopup($announcement))
     <div
-        x-cloak
         x-data="{
-            open: false,
+            key: @js($key),
+            forever: false,
 
             init() {
-                // A browser with storage blocked or cleared reports nothing rather
-                // than throwing the page away, so a private window still works — it
-                // just does not remember the dismissal.
+                // Storage can be blocked or cleared; a browser that reports nothing
+                // gets the popup, which is the right way round to fail.
                 try {
-                    if (localStorage.getItem('newsletter-popup')) return
+                    if (localStorage.getItem(this.key) || sessionStorage.getItem(this.key)) return
                 } catch (e) {}
 
-                setTimeout(() => { this.open = true }, {{ $newsletter->popupDelay() * 1000 }})
+                setTimeout(() => this.$flux.modal('site-announcement').show(), {{ $newsletter->popupDelay() * 1000 }})
             },
 
-            dismiss() {
-                this.open = false
-
+            dismissed() {
                 try {
-                    localStorage.setItem('newsletter-popup', '1')
+                    (this.forever ? localStorage : sessionStorage).setItem(this.key, '1')
                 } catch (e) {}
             },
         }"
-        x-on:newsletter-subscribed.window="dismiss()"
-        x-on:keydown.escape.window="dismiss()"
-        x-show="open"
-        x-transition.duration.200ms
-        class="fixed inset-x-4 bottom-4 z-40 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-96"
-        role="complementary"
-        aria-label="Newsletter sign-up"
+        x-on:newsletter-subscribed.window="forever = true; $flux.modal('site-announcement').close()"
     >
-        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-start justify-between gap-3">
-                <flux:heading size="lg">Before you go</flux:heading>
+        <flux:modal
+            name="site-announcement"
+            x-on:close="dismissed()"
+            @class([
+                'overflow-hidden',
+                'p-0!' => $imageOnly,
+                'md:max-w-3xl' => $split,
+                'max-w-md' => ! $split,
+            ])
+        >
+            @if ($imageOnly)
+                {{-- The picture is the message. Linked when there is somewhere to go. --}}
+                <x-site.announcement-image :announcement="$announcement" class="max-h-[80vh] w-full object-cover" />
+            @else
+                <div @class(['grid gap-6', 'md:grid-cols-2 md:items-center' => $split])>
+                    @if ($image && ! $split)
+                        <x-site.announcement-image :announcement="$announcement" class="aspect-video w-full rounded-xl object-cover" />
+                    @endif
 
-                <button
-                    type="button"
-                    class="press -mr-1 -mt-1 rounded-md p-1 text-slate-400 transition-colors duration-150 ease-out hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                    aria-label="Dismiss the newsletter sign-up"
-                    x-on:click="dismiss()"
-                >
-                    <flux:icon name="x-mark" class="size-4" />
-                </button>
+                    <div class="space-y-4">
+                        <div>
+                            <flux:heading size="xl" class="font-heading font-bold">
+                                {{ $announcement?->title ?: __('Get the newsletter') }}
+                            </flux:heading>
+
+                            @if (! $announcement || $announcement->body)
+                                <flux:text class="mt-2">
+                                    {{ $announcement
+                                        ? $announcement->body
+                                        : __('Occasional updates from :name — no more than one email a month.', ['name' => $_configs['name']]) }}
+                                </flux:text>
+                            @endif
+                        </div>
+
+                        @if ($announcement?->link_url && $announcement?->link_label)
+                            <flux:button
+                                :href="$announcement->link_url"
+                                variant="primary"
+                                icon:trailing="arrow-right"
+                                class="w-full"
+                            >
+                                {{ $announcement->link_label }}
+                            </flux:button>
+                        @endif
+
+                        @if ($withForm)
+                            {{-- Its own key: the footer renders a second copy of the
+                                 same component on the same page. --}}
+                            <livewire:livewire.newsletter-form key="newsletter-popup" />
+                        @endif
+                    </div>
+
+                    @if ($split)
+                        <x-site.announcement-image :announcement="$announcement" class="h-full max-h-96 w-full rounded-xl object-cover md:max-h-none" />
+                    @endif
+                </div>
+            @endif
+
+            <div @class(['mt-5', 'px-4 pb-4' => $imageOnly])>
+                <flux:checkbox x-model="forever" :label="__('Do not show this again')" />
             </div>
-
-            <flux:text class="mt-1 text-sm">
-                Occasional updates from {{ $_configs['name'] }} — no more than one email a month.
-            </flux:text>
-
-            <div class="mt-4">
-                {{-- The second copy of the footer's form, so it needs its own key. --}}
-                <livewire:livewire.newsletter-form key="newsletter-popup" />
-            </div>
-        </div>
+        </flux:modal>
     </div>
 @endif

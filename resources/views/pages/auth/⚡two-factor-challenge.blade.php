@@ -76,8 +76,8 @@ new #[Layout('layouts::auth')] class extends Component
 
             $this->respondError(
                 $this->useRecovery
-                    ? 'That recovery code is not valid, or has already been used.'
-                    : 'That code is not valid. Check your authenticator app and try again.',
+                    ? __('That recovery code is not valid, or has already been used.')
+                    : __('That code is not valid. Check your authenticator app and try again.'),
                 true,
                 fn () => $this->reset('code', 'recovery_code'),
                 $this->useRecovery ? 'recovery_code' : 'code'
@@ -116,17 +116,17 @@ new #[Layout('layouts::auth')] class extends Component
 };
 ?>
 
-<x-slot:tag>One more step</x-slot:tag>
-<x-slot:title>Two-factor authentication</x-slot:title>
+<x-slot:tag>{{ __('One more step') }}</x-slot:tag>
+<x-slot:title>{{ __('Two-factor authentication') }}</x-slot:title>
 <x-slot:description>
     {{ $useRecovery
-        ? 'Enter one of the recovery codes you saved when you turned this on.'
-        : 'Enter the six-digit code from your authenticator app.' }}
+        ? __('Enter one of the recovery codes you saved when you turned this on.')
+        : __('Enter the six-digit code from your authenticator app.') }}
 </x-slot:description>
 <x-slot:extra>
     <flux:text class="mt-8 text-center dark:text-slate-400">
         <flux:link href="{{ route('logout') }}" variant="ghost">
-            Sign in as someone else
+            {{ __('Sign in as someone else') }}
         </flux:link>
     </flux:text>
 </x-slot:extra>
@@ -135,7 +135,7 @@ new #[Layout('layouts::auth')] class extends Component
     <form wire:submit="verify" class="mt-8 space-y-5">
         @if ($useRecovery)
             <flux:input
-                label="Recovery code"
+                :label="__('Recovery code')"
                 wire:model="recovery_code"
                 autofocus
                 placeholder="XXXXX-XXXXX"
@@ -143,16 +143,16 @@ new #[Layout('layouts::auth')] class extends Component
             />
         @else
             <flux:field>
-                <flux:label>Authentication code</flux:label>
+                <flux:label>{{ __('Authentication code') }}</flux:label>
                 <flux:otp wire:model="code" length="6" autofocus />
                 <flux:error name="code" />
             </flux:field>
         @endif
 
-        <flux:button type="submit" variant="primary" class="w-full">Verify</flux:button>
+        <flux:button type="submit" variant="primary" class="w-full">{{ __('Verify') }}</flux:button>
 
         <flux:button type="button" variant="ghost" class="w-full" wire:click="toggleRecovery">
-            {{ $useRecovery ? 'Use my authenticator app instead' : 'I lost my device — use a recovery code' }}
+            {{ $useRecovery ? __('Use my authenticator app instead') : __('I lost my device — use a recovery code') }}
         </flux:button>
     </form>
 </div>

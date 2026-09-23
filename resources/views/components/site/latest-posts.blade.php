@@ -14,14 +14,14 @@
     <section class="mx-auto w-full max-w-6xl px-6 py-16">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <flux:text color="lime" class="font-semibold">From the blog</flux:text>
+                <flux:text color="lime" class="font-semibold">{{ __('From the blog') }}</flux:text>
                 <h2 class="mt-2 font-heading text-3xl font-bold tracking-tight dark:text-white">
-                    Latest posts
+                    {{ __('Latest posts') }}
                 </h2>
             </div>
 
             <flux:button href="{{ route('blog.index') }}" variant="ghost" icon:trailing="arrow-right">
-                Read everything
+                {{ __('Read everything') }}
             </flux:button>
         </div>
 

@@ -78,6 +78,12 @@ class SiteConfigurationService
                 'two-factor' => false,
                 'passwordless-login' => true,
 
+                // Passkeys. On because nothing about them needs a key in .env, and
+                // off closes enrolment and sign-in together. A browser only offers
+                // them over HTTPS or on localhost, so an install served over plain
+                // http on a real hostname should switch this off until it is not.
+                'passkeys' => true,
+
                 // Social sign-in. The master switch, then one switch per provider
                 // so a provider that has credentials can still be taken off the
                 // sign-in page without anybody editing .env. Keyed by the enum case
@@ -123,6 +129,14 @@ class SiteConfigurationService
                     'email' => true,
                     'in-app' => true,
                 ],
+            ],
+
+            // The interface language. The default is what a visitor sees before
+            // they pick, and what everybody sees with the switcher off. Only a
+            // language with a lang/{code}.json can be either — see LocaleEnum.
+            'localization' => [
+                'default' => config('app.locale'),
+                'switcher' => true,
             ],
 
             'preferences' => [

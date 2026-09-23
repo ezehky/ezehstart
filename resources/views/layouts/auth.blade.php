@@ -2,6 +2,12 @@
     <main class="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
         <section class="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-16">
             <div class="w-full max-w-md">
+                {{-- Above the brand rather than beside it, so a long site name never
+                     pushes the menu off a phone screen. --}}
+                <div class="mb-6 flex justify-end">
+                    <livewire:livewire.language-switcher />
+                </div>
+
                 <flux:brand
                     href="{{ route('home') }}"
                     :logo="$_configs['logo'] ?? ''"
@@ -39,11 +45,11 @@
             ></div>
             <div class="relative max-w-md">
                 <p class="text-sm font-bold uppercase tracking-[0.18em]">{{ $_configs['name'] }}</p>
-                <h1 class="mt-6 font-heading text-5xl font-bold leading-tight">Everything you need, on the first commit.</h1>
+                <h1 class="mt-6 font-heading text-5xl font-bold leading-tight">{{ __('Everything you need, on the first commit.') }}</h1>
             </div>
             <div class="relative flex items-center gap-3 border-t border-slate-950/20 pt-6 text-sm font-medium">
                 <flux:icon.check-badge class="size-6" />
-                Replace this panel with your own pitch.
+                {{ __('Replace this panel with your own pitch.') }}
                 <flux:switch x-data x-model="$flux.dark"  />
             </div>
         </aside>

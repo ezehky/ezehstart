@@ -56,6 +56,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Notification types',
                         'link' => route('admin.config.notification-types'),
                     ],
+                    'currencies' => [
+                        'label' => 'Currencies',
+                        'link' => route('admin.config.currencies'),
+                    ],
                     'logs' => [
                         'label' => 'Log files',
                         'link' => route('admin.config.logs'),
@@ -83,6 +87,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                     'blogs' => [
                         'label' => 'Posts',
                         'link' => route('admin.blog.blogs'),
+                    ],
+                    'announcements' => [
+                        'label' => 'Announcements',
+                        'link' => route('admin.announcements'),
                     ],
                     'categories' => [
                         'label' => 'Categories',

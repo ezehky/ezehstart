@@ -83,10 +83,10 @@ new #[Layout('layouts::site')] class extends Component
 <div class="mx-auto max-w-6xl space-y-8 px-4 py-12">
     <div class="text-center">
         <flux:heading level="1" size="xl">
-            {{ $this->activeCategory?->name ?? 'Blog' }}
+            {{ $this->activeCategory?->name ?? __('Blog') }}
         </flux:heading>
         <flux:text class="mx-auto mt-2 max-w-2xl">
-            {{ $this->activeCategory?->description ?? 'News, notes and the occasional long read.' }}
+            {{ $this->activeCategory?->description ?? __('News, notes and the occasional long read.') }}
         </flux:text>
     </div>
 
@@ -120,17 +120,17 @@ new #[Layout('layouts::site')] class extends Component
 
     @if ($this->activeTag)
         <div class="flex items-center justify-center gap-2">
-            <flux:text size="sm">Tagged</flux:text>
+            <flux:text size="sm">{{ __('Tagged') }}</flux:text>
             <flux:badge size="sm">{{ $this->activeTag->name }}</flux:badge>
-            <flux:button size="xs" variant="ghost" wire:click="clearFilters">Clear</flux:button>
+            <flux:button size="xs" variant="ghost" wire:click="clearFilters">{{ __('Clear') }}</flux:button>
         </div>
     @endif
 
     @if ($this->posts->isEmpty())
         <x-dashboard.workspace-no-record
             icon="newspaper"
-            label="Nothing to read yet"
-            text="There are no posts matching this just now. Try another category."
+            :label="__('Nothing to read yet')"
+            :text="__('There are no posts matching this just now. Try another category.')"
         />
     @else
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

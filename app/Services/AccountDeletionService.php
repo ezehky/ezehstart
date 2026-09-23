@@ -200,6 +200,8 @@ class AccountDeletionService
                 'name' => 'Anonymous User',
                 'email' => "deleted-user-{$user->id}@anonymized.local",
                 'phone_number' => null,
+                'phone_dial_code' => null,
+                'phone_iso2' => null,
                 'avatar' => null,
                 'password' => null,
                 'status' => StatusUser::DELETED,

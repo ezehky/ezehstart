@@ -41,7 +41,9 @@ new #[Layout('layouts::auth')] class extends Component
 
     protected function dispatchNext(string $tag, string $title, string $description)
     {
-        $this->dispatch('attr', tag: $tag, title: $title, description: $description);
+        // Passed through __() here as well: restart() puts the English property
+        // defaults back, and those are keys rather than copy.
+        $this->dispatch('attr', tag: __($tag), title: __($title), description: __($description));
     }
 
     public function step1(): void
@@ -64,7 +66,7 @@ new #[Layout('layouts::auth')] class extends Component
         // password on a row that cannot sign in — and hand a reset code to an
         // address that never asked for one.
         $this->respondError(
-            'That address is on our newsletter list but does not have an account yet. Please register to create one.',
+            __('That address is on our newsletter list but does not have an account yet. Please register to create one.'),
             $this->user->status->isNewsletterSubscriber(),
             field: 'email'
         );
@@ -73,10 +75,11 @@ new #[Layout('layouts::auth')] class extends Component
         $this->sendOtp();
 
         $this->step = 2; // Move to the next step (OTP verification)
-        $this->tag = 'Check your inbox';
-        $this->title = 'Verification code sent';
-        $this->description = 'Enter the six-digit code sent to '.Str::mask($this->user->email, '*', 2, 6).'. '.
-        'Please check your inbox and enter the code to proceed with resetting your password.';
+        $this->tag = __('Check your inbox');
+        $this->title = __('Verification code sent');
+        $this->description = __('Enter the six-digit code sent to :email. Please check your inbox and enter the code to proceed with resetting your password.', [
+            'email' => Str::mask($this->user->email, '*', 2, 6),
+        ]);
         $this->dispatchNext($this->tag, $this->title, $this->description);
         $this->resetValidation(); // Clear any previous validation errors
     }
@@ -88,16 +91,16 @@ new #[Layout('layouts::auth')] class extends Component
         // The service counts the miss and destroys the code once the allowance is
         // spent, so a wrong code here is not something that can be retried forever.
         $this->respondError(
-            'That reset code is invalid or has expired.',
+            __('That reset code is invalid or has expired.'),
             ! app(PasswordResetOtpService::class)->verify($this->email, $this->otp),
             fn () => $this->reset('otp'),
             'otp'
         );
 
         $this->step = 3; // Move to the next step (password reset)
-        $this->tag = 'Reset your password';
-        $this->title = 'Set a new password';
-        $this->description = 'Enter your new password below to complete the password reset process.';
+        $this->tag = __('Reset your password');
+        $this->title = __('Set a new password');
+        $this->description = __('Enter your new password below to complete the password reset process.');
         $this->dispatchNext($this->tag, $this->title, $this->description);
         $this->resetValidation(); // Clear any previous validation errors
     }
@@ -125,7 +128,7 @@ new #[Layout('layouts::auth')] class extends Component
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSWORD_CHANGE, $this->email);
 
         // Redirect the user to their respective dashboard based on their role
-        return to_route('login')->with('status', 'Your password has been reset.');
+        return to_route('login')->with('status', __('Your password has been reset.'));
 
     }
 
@@ -165,7 +168,7 @@ new #[Layout('layouts::auth')] class extends Component
         $secondsRemaining = $service->secondsUntilResendFor($this->email);
 
         $this->respondError(
-            "Please wait {$secondsRemaining} seconds before requesting another code.",
+            __('Please wait :seconds seconds before requesting another code.', ['seconds' => $secondsRemaining]),
             $secondsRemaining > 0,
             field: $this->step === 1 ? 'email' : 'otp'
         );
@@ -177,18 +180,18 @@ new #[Layout('layouts::auth')] class extends Component
 
 {{-- Start --}}
 <x-slot:tag>
-    <span x-data="{ tag: @js($tag) }" x-on:attr.window="tag = $event.detail.tag" x-html="tag"></span>
+    <span x-data="{ tag: @js(__($tag)) }" x-on:attr.window="tag = $event.detail.tag" x-html="tag"></span>
 </x-slot:tag>
 <x-slot:title>
-    <span x-data="{ title: @js($title) }" x-on:attr.window="title = $event.detail.title" x-html="title"></span>
+    <span x-data="{ title: @js(__($title)) }" x-on:attr.window="title = $event.detail.title" x-html="title"></span>
 </x-slot:title>
 <x-slot:description>
-    <span x-data="{ description: @js($description) }" x-on:attr.window="description = $event.detail.description" x-html="description"></span>
+    <span x-data="{ description: @js(__($description)) }" x-on:attr.window="description = $event.detail.description" x-html="description"></span>
 </x-slot:description>
 <x-slot:extra>
     <flux:text class="mt-8 text-center dark:text-slate-400">
         <flux:link href="{{ route('login') }}" variant="ghost">
-            Back to sign in
+            {{ __('Back to sign in') }}
         </flux:link>
     </flux:text>
 </x-slot:extra>
@@ -204,19 +207,19 @@ new #[Layout('layouts::auth')] class extends Component
             <flux:otp wire:model="otp" length="6" />
             <flux:error name="otp" />
 
-            <flux:button type="submit" variant="primary">Verify Code</flux:button>
+            <flux:button type="submit" variant="primary">{{ __('Verify code') }}</flux:button>
             <div class="flex justify-center gap-3">
-                <flux:button type="button" wire:click="resendOtp" class="w-full">Resend code</flux:button>
-                <flux:button type="button" wire:click="restart" variant="ghost" class="w-full">Start over</flux:button>
+                <flux:button type="button" wire:click="resendOtp" class="w-full">{{ __('Resend code') }}</flux:button>
+                <flux:button type="button" wire:click="restart" variant="ghost" class="w-full">{{ __('Start over') }}</flux:button>
             </div>
         </form>
     @elseif ($step === 3)
         <form wire:submit.throttle.500ms="step3" class="mt-8 space-y-5">
-            <x-form.password label="New password" wire:model="password" :note="$passwordNote" />
-            <x-form.password label="Confirm new password" wire:model="password_confirmation" />
+            <x-form.password :label="__('New password')" wire:model="password" :note="$passwordNote" />
+            <x-form.password :label="__('Confirm new password')" wire:model="password_confirmation" />
 
-            <flux:button type="submit" variant="primary" class="w-full">Reset password</flux:button>
-            <flux:button type="button" wire:click="restart" variant="ghost" class="w-full">Start over</flux:button>
+            <flux:button type="submit" variant="primary" class="w-full">{{ __('Reset password') }}</flux:button>
+            <flux:button type="button" wire:click="restart" variant="ghost" class="w-full">{{ __('Start over') }}</flux:button>
         </form>
     @else
         <form wire:submit.throttle.500ms="step1" class="mt-8 space-y-5">
@@ -233,7 +236,7 @@ new #[Layout('layouts::auth')] class extends Component
                 <x-form.captcha action="password-reset" />
             @endif
 
-            <flux:button type="submit" variant="primary" class="w-full">Send reset code</flux:button>
+            <flux:button type="submit" variant="primary" class="w-full">{{ __('Send reset code') }}</flux:button>
         </form>
     @endif
 </div>

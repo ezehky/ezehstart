@@ -9,12 +9,14 @@ use App\Services\PolicyContentService;
 use App\Services\RoleService;
 use App\Traits\WithDynamicModelFormatting;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -22,13 +24,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Spatie\LaravelPasskeys\Models\Concerns\HasPasskeys;
+use Spatie\LaravelPasskeys\Models\Concerns\InteractsWithPasskeys;
 
 #[Unguarded]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements HasLocalePreference, HasPasskeys
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes, WithDynamicModelFormatting;
+    use HasFactory, InteractsWithPasskeys, Notifiable, SoftDeletes, WithDynamicModelFormatting;
 
     /**
      * The type a brand-new account starts as, matching the column default.
@@ -154,6 +158,32 @@ class User extends Authenticatable
             ->join('');
     }
 
+    /**
+     * The number as somebody would dial it from abroad — dialling code, then the
+     * national number with its trunk zero dropped. Null when there is no number.
+     *
+     * The three phone columns are stored apart so the picker can be refilled with
+     * the right country, and put back together here for anything that dials.
+     */
+    public function phoneInternational(): ?string
+    {
+        if (! $this->phone_number) {
+            return null;
+        }
+
+        return kPhoneInternational($this->phone_number, $this->phone_dial_code);
+    }
+
+    /**
+     * The language mail and notifications are sent in. Laravel asks this on its
+     * own for anything addressed to the account, so a queued email is written in
+     * the recipient's language rather than in whoever triggered it.
+     */
+    public function preferredLocale(): ?string
+    {
+        return $this->locale;
+    }
+
     public function profileCompletion(): int
     {
         $profile = $this->userProfile;
@@ -209,6 +239,16 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class)
             ->select('roles.id', 'roles.name', 'roles.slug', 'roles.gates', 'roles.status', 'roles.is_protected')
             ->orderBy('roles.name');
+    }
+
+    /**
+     * The currency this account reads amounts in. Null means the site default —
+     * see CurrencyService::forUser(), which is what everything asks rather than
+     * this relation.
+     */
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(Currency::class);
     }
 
     public function notificationPreferences(): HasMany

@@ -34,6 +34,8 @@ class DemoUserSeeder extends Seeder
                     'name' => fake()->name(),
                     'password' => Hash::make('password'),
                     'phone_number' => fake()->numerify('080########'),
+                    'phone_dial_code' => '+234',
+                    'phone_iso2' => 'NG',
                     'email_verified_at' => $index % 6 === 0 ? null : now()->subDays(rand(1, 300)),
                     'ip_address' => fake()->ipv4(),
                     'user_type' => UserTypeEnum::USER,

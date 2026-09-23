@@ -544,3 +544,36 @@
         );
     }
 }
+
+/* intl-tel-input, behind <x-form.phone-field>. Its own stylesheet is imported by
+   resources/js/phone-input.js; this only brings the dropdown into the slate
+   palette and dark mode, through the custom properties it exposes for that. */
+:root {
+    --iti-border-color: var(--color-slate-200);
+    --iti-hover-color: var(--color-slate-100);
+    --iti-country-selector-bg: white;
+    --iti-icon-color: var(--color-slate-500);
+}
+
+.dark {
+    --iti-border-color: var(--color-slate-700);
+    --iti-hover-color: var(--color-slate-800);
+    --iti-country-selector-bg: var(--color-slate-900);
+    --iti-icon-color: var(--color-slate-400);
+}
+
+.iti__dropdown-content {
+    @apply rounded-lg shadow-lg dark:bg-slate-900 dark:text-slate-100;
+}
+
+.iti__search-input {
+    @apply bg-transparent text-sm outline-none dark:text-slate-100;
+}
+
+.iti__dial-code {
+    @apply text-slate-500 dark:text-slate-400;
+}
+
+.iti__selected-dial-code {
+    @apply text-sm text-slate-700 dark:text-slate-300;
+}

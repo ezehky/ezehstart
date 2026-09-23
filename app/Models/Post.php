@@ -55,7 +55,7 @@ class Post extends Model
 
     public function readTime(): string
     {
-        return max(1, (int) $this->read_minutes).' min read';
+        return __(':minutes min read', ['minutes' => max(1, (int) $this->read_minutes)]);
     }
 
     /**

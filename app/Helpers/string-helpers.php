@@ -284,3 +284,34 @@ if (! function_exists('kMarkdownFormat')) {
         ];
     }
 }
+
+if (! function_exists('kPhoneInternational')) {
+    /**
+     * Put a national number and its dialling code back together as one E.164
+     * string: "+2348012345678" from "08012345678" and "+234".
+     *
+     * The trunk zero is dropped, because that is the digit a caller dials from
+     * inside the country and never from outside it. A number that already starts
+     * with a plus is taken to be complete and only has its spacing stripped.
+     *
+     * @param  string|null  $number  The number as it was typed or stored.
+     * @param  string|null  $dialCode  The dialling code, with or without its plus.
+     * @return string|null The joined number, or null when there is no number.
+     */
+    function kPhoneInternational(?string $number, ?string $dialCode = null): ?string
+    {
+        $digits = preg_replace('/[^\d+]/', '', (string) $number) ?? '';
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if (str_starts_with($digits, '+') || ! $dialCode) {
+            return $digits;
+        }
+
+        $code = ltrim(preg_replace('/\D/', '', $dialCode) ?? '', '0');
+
+        return '+'.$code.ltrim($digits, '0');
+    }
+}

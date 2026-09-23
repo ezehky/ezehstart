@@ -10,6 +10,7 @@ use App\Models\Policy;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\EmailVerificationOtpService;
+use App\Services\PasskeyService;
 use App\Services\PolicyContentService;
 use App\Services\SocialAccountService;
 use App\Services\TwoFactorService;
@@ -42,6 +43,16 @@ trait WithAuthWorker
     public function passwordlessEnabled(): bool
     {
         return (bool) kSiteFlag('security', 'passwordless-login', true);
+    }
+
+    /**
+     * Whether passkey sign-in is on offer. Asked through the service so the
+     * button and the Livewire methods behind it read the same switch.
+     */
+    #[Computed]
+    public function passkeysEnabled(): bool
+    {
+        return app(PasskeyService::class)->isAvailable();
     }
 
     /**

@@ -83,7 +83,7 @@ new #[Layout('layouts::site')] class extends Component
 
         @if ($post->tags->isNotEmpty())
             <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-6 dark:border-slate-800">
-                <flux:text size="sm">Tagged</flux:text>
+                <flux:text size="sm">{{ __('Tagged') }}</flux:text>
                 @foreach ($post->tags as $tag)
                     <a href="{{ route('blog.index', ['tag' => $tag->slug]) }}" wire:navigate>
                         <flux:badge size="sm" inset="top bottom">{{ $tag->name }}</flux:badge>
@@ -97,7 +97,7 @@ new #[Layout('layouts::site')] class extends Component
 
     @if ($this->related->isNotEmpty())
         <section class="mt-12 space-y-4">
-            <flux:heading level="2" size="lg">Read next</flux:heading>
+            <flux:heading level="2" size="lg">{{ __('Read next') }}</flux:heading>
 
             <div class="grid gap-4 sm:grid-cols-3">
                 @foreach ($this->related as $item)

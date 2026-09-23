@@ -14,6 +14,7 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');
     Route::livewire('/notification-types', 'pages::admin.configs.notification-types')->name('notification-types');
+    Route::livewire('/currencies', 'pages::admin.configs.currencies')->name('currencies');
     Route::livewire('/logs', 'pages::admin.configs.logs')->name('logs');
 });
 
@@ -46,6 +47,9 @@ Route::livewire('/transactions', 'pages::admin.transactions')->name('transaction
 // and a rich-text editor inside a dialog fights the page for scroll.
 Route::livewire('/categories/{category_group}', 'pages::admin.content.categories')->name('categories');
 Route::livewire('/tags', 'pages::admin.content.tags')->name('tags');
+
+// The popup on the public pages. Only the latest live one is shown.
+Route::livewire('/announcements', 'pages::admin.content.announcements')->name('announcements');
 Route::prefix('blog')->name('blog.')->group(function () {
     Route::livewire('/posts', 'pages::admin.content.posts')->name('blogs');
     Route::livewire('/posts/new', 'pages::admin.content.post-edit')->name('create');

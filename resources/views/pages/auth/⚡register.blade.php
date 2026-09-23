@@ -56,7 +56,7 @@ new #[Layout('layouts::auth')] class extends Component
     protected function messages(): array
     {
         return [
-            'agreed_to_terms.accepted' => 'Please accept our policies to create an account.',
+            'agreed_to_terms.accepted' => __('Please accept our policies to create an account.'),
         ];
     }
 
@@ -76,7 +76,7 @@ new #[Layout('layouts::auth')] class extends Component
 
         // If user creation failed, respond with an error message
         $this->respondError(
-            message: 'Failed to create user. Please try again.',
+            message: __('Failed to create user. Please try again.'),
             if: ! $user
         );
 
@@ -84,7 +84,7 @@ new #[Layout('layouts::auth')] class extends Component
         if (kSiteConfig('email-settings.verification-strict', default: false)) {
             return to_route('email.verification', ['user' => $user->email])
                 ->with([
-                    'message' => 'Please verify your email address to access this page.',
+                    'message' => __('Please verify your email address to access this page.'),
                 ]);
         }
 
@@ -94,23 +94,23 @@ new #[Layout('layouts::auth')] class extends Component
 };
 ?>
 
-<x-slot:tag>Get started</x-slot:tag>
-<x-slot:title>Create your account</x-slot:title>
-<x-slot:description>It takes less than a minute.</x-slot:description>
+<x-slot:tag>{{ __('Get started') }}</x-slot:tag>
+<x-slot:title>{{ __('Create your account') }}</x-slot:title>
+<x-slot:description>{{ __('It takes less than a minute.') }}</x-slot:description>
 <x-slot:extra>
-    <x-auth.passwordless :enabled="$this->passwordlessEnabled" label="Sign up without password." />
+    <x-auth.passwordless :enabled="$this->passwordlessEnabled" :label="__('Sign up without password.')" />
     <x-auth.social-providers :providers="$this->socialProviders" />
     <flux:text class="mt-8 text-center dark:text-slate-400">
-        Already have an account?
+        {{ __('Already have an account?') }}
         <flux:link href="{{ route('login') }}" variant="ghost">
-            Sign in
+            {{ __('Sign in') }}
         </flux:link>
     </flux:text>
 </x-slot:extra>
 
 <form wire:submit.throttle.500ms="register" class="mt-8 space-y-5">
     <div>
-        <flux:input wire:model="name" autocomplete="name" autofocus placeholder="Enter your full name" />
+        <flux:input wire:model="name" autocomplete="name" autofocus :placeholder="__('Enter your full name')" />
         <flux:error name="name" />
     </div>
     <div>
@@ -126,10 +126,10 @@ new #[Layout('layouts::auth')] class extends Component
     <div>
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
             <flux:field>
-                <flux:label>Password</flux:label>
+                <flux:label>{{ __('Password') }}</flux:label>
                 <x-form.password wire:model="password" :label="null" :note="$passwordNote" />
             </flux:field>
-            <x-form.password label="Confirm password" wire:model="password_confirmation" />
+            <x-form.password :label="__('Confirm password')" wire:model="password_confirmation" />
         </div>
         <flux:error name="password" />
     </div>
@@ -141,7 +141,7 @@ new #[Layout('layouts::auth')] class extends Component
     @endif
 
     <flux:button type="submit" variant="primary" class="w-full">
-        Create account
+        {{ __('Create account') }}
     </flux:button>
 
     @script

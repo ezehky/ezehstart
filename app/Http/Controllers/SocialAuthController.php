@@ -57,6 +57,13 @@ class SocialAuthController extends Controller
         // Already signed in: this is somebody connecting a provider from their
         // security settings, not signing in with one.
         if (auth()->check()) {
+            // No screen offers an administrator a Connect button, which stops
+            // nobody who types the redirect URL — so the callback refuses as well.
+            if (! $service->acceptsAccount(auth()->user())) {
+                return redirect()->to(auth()->user()->user_type->dashboardRoute())
+                    ->with('error', $service->adminRefusal());
+            }
+
             $service->link(auth()->user(), $case, $socialiteUser);
 
             return redirect()->route('user.security-settings')

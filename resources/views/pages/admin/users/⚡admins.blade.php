@@ -6,6 +6,7 @@ use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
 use App\Models\Role;
 use App\Models\User;
+use App\Rules\PhoneRule;
 use App\Services\ActivityLogService;
 use App\Services\PasswordSecurityService;
 use App\Services\RoleService;
@@ -32,6 +33,10 @@ new class extends Component
     public string $email = '';
 
     public ?string $phone_number = null;
+
+    public ?string $phone_dial_code = null;
+
+    public ?string $phone_iso2 = null;
 
     public bool $status = true;
 
@@ -213,6 +218,8 @@ new class extends Component
         $this->name = $admin->name;
         $this->email = $admin->email;
         $this->phone_number = $admin->phone_number;
+        $this->phone_dial_code = $admin->phone_dial_code;
+        $this->phone_iso2 = $admin->phone_iso2;
         $this->status = $admin->status->boolValue();
         $this->password = null;
         $this->roleIds = $admin->roles->pluck('id')->map(fn ($id) => (string) $id)->all();
@@ -230,7 +237,9 @@ new class extends Component
                 'max:50',
                 Rule::unique(User::class, 'email')->ignore($this->admin?->id),
             ],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['nullable', 'string', 'max:20', new PhoneRule($this->phone_dial_code)],
+            'phone_dial_code' => ['nullable', 'required_with:phone_number', 'string', 'max:8', 'regex:/^\+\d{1,4}$/'],
+            'phone_iso2' => ['nullable', 'required_with:phone_number', 'string', 'size:2', Rule::exists('countries', 'iso2')],
             'status' => ['boolean'],
             'password' => [$this->admin ? 'nullable' : 'required', 'string', 'min:5'],
             'roleIds' => ['array'],
@@ -263,6 +272,10 @@ new class extends Component
         $this->admin->name = $this->name;
         $this->admin->email = strtolower($this->email);
         $this->admin->phone_number = $this->phone_number;
+        // Cleared together with the number: a dialling code with nothing to dial
+        // is a country the account never actually gave us.
+        $this->admin->phone_dial_code = $this->phone_number ? $this->phone_dial_code : null;
+        $this->admin->phone_iso2 = $this->phone_number ? strtoupper((string) $this->phone_iso2) : null;
         $this->admin->status = StatusUser::tryFrom((int) $this->status);
 
         // Captured before the assignment below, because that is the last moment the
@@ -346,7 +359,7 @@ new class extends Component
     private function resetAdminForm(): void
     {
         $this->resetValidation();
-        $this->reset('admin', 'name', 'email', 'phone_number', 'status', 'password', 'roleIds');
+        $this->reset('admin', 'name', 'email', 'phone_number', 'phone_dial_code', 'phone_iso2', 'status', 'password', 'roleIds');
         $this->status = true;
     }
 };
@@ -450,7 +463,7 @@ new class extends Component
                         </x-table.cell>
 
                         <x-table.cell column="email">{{ $item->email }}</x-table.cell>
-                        <x-table.cell column="phone_number">{{ $item->phone_number ?: '—' }}</x-table.cell>
+                        <x-table.cell column="phone_number">{{ $item->phoneInternational() ?: '—' }}</x-table.cell>
 
                         <x-table.cell column="roles">
                             <x-dashboard.role.badges :user="$item" />
@@ -529,7 +542,7 @@ new class extends Component
 
                 <flux:input type="email" label="Email" wire:model="email" placeholder="jane@example.com" badge="required" />
 
-                <flux:input label="Phone number" wire:model="phone_number" placeholder="e.g. +234 800 000 0000" />
+                <x-form.phone-field label="Phone number" wire:model="phone_number" dial-code="phone_dial_code" iso2="phone_iso2" />
 
                 <flux:input
                     type="password"

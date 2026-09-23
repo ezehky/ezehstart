@@ -25,7 +25,12 @@ project.
 
 | Area | What ships |
 | --- | --- |
-| Auth | Password, passwordless OTP, social sign-in (Socialite), TOTP two-factor with recovery codes, password history, login throttle |
+| Auth | Password, passwordless OTP, passkeys (`spatie/laravel-passkeys`, behind `security.passkeys`), social sign-in (Socialite), TOTP two-factor with recovery codes, password history, login throttle. Admins get everything **except** social sign-in; their 2FA and passkeys live on the admin profile |
+| Money display | `currencies` with rates against one default; `users.currency_id` null means the default. The ledger is stored in the default and `kMoneyFormat()` converts for the viewer — pass `convert: false` for a limit or an input. `<x-form.money-field>` hands Livewire a plain number |
+| Languages | `LocaleEnum` + `lang/{code}.json`; a case is offered only once its file exists. `php artisan lang:extract`, then `lang:translate fr` (stichoza, dev-only, **never at runtime**). Guest screens are wrapped in `__()`; dashboards are wrapped as they are touched |
+| Phone | `<x-form.phone-field>` over intl-tel-input, stored as `phone_number` + `phone_dial_code` + `phone_iso2`; `User::phoneInternational()` joins them |
+| Announcements | The public popup: the latest live `announcements` row (picture, link, optional newsletter form), falling back to the plain newsletter sign-up |
+| System emails | A builder template can stand in for a mailable via `email_templates.system_email` (`SystemEmailEnum`) and the `WithSystemTemplate` trait; unassigned, the Blade view is sent as before |
 | Image library | Folders, multiple upload, per-image visibility, rename-without-changing-the-URL, a delete guard backed by `image_usages` |
 | Video library | The same again for embeds — folders, per-video visibility, a delete guard backed by `video_usages`. A row is a **reference** (provider + id), never a file; the player URL is rebuilt from the pair on every render |
 | Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages. The seeded **Author** role narrows an account to the posts it wrote and gives it a public byline — bio and social handles on `user_profiles` |

@@ -17,16 +17,16 @@
 
     <flux:label class="">
         @if ($policies->isEmpty())
-            I agree to the terms of service and privacy policy.
+            {{ __('I agree to the terms of service and privacy policy.') }}
         @else
             <span>
-                I agree to the
+                {{ __('I agree to the') }}
                 @foreach ($policies as $policy)
                     <flux:link
                         href="{{ $policy->policy_type->url() }}"
                         target="_blank"
                         rel="noopener noreferrer"
-                    >{{ $policy->title }}</flux:link>@if (! $loop->last)@if ($loop->remaining === 1) and @else, @endif @endif
+                    >{{ $policy->title }}</flux:link>@if (! $loop->last)@if ($loop->remaining === 1) {{ __('and') }} @else, @endif @endif
                 @endforeach
             </span>
         @endif

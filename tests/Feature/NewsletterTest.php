@@ -100,7 +100,7 @@ test('neither placement renders while the newsletter is off', function () {
     $this->get(route('home'))
         ->assertSuccessful()
         ->assertDontSee('Get the newsletter')
-        ->assertDontSee('aria-label="Newsletter sign-up"', escape: false);
+        ->assertDontSee('site-announcement');
 });
 
 test('the popup renders with the configured delay', function () {
@@ -108,7 +108,8 @@ test('the popup renders with the configured delay', function () {
 
     $this->get(route('home'))
         ->assertSuccessful()
-        ->assertSee('aria-label="Newsletter sign-up"', escape: false)
+        // With no announcement running the popup is the plain sign-up.
+        ->assertSee('site-announcement')
         // Milliseconds in the markup, seconds in the configuration.
         ->assertSee('12000');
 });
@@ -119,7 +120,7 @@ test('the popup can be turned off without taking the footer block with it', func
     $this->get(route('home'))
         ->assertSuccessful()
         ->assertSee('Get the newsletter')
-        ->assertDontSee('aria-label="Newsletter sign-up"', escape: false);
+        ->assertDontSee('site-announcement');
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||

@@ -28,6 +28,40 @@ class EmailVariableService
     private const RAW_HTML_TOKEN = 'site.social_links';
 
     /**
+     * Values added for the length of one render — a system email's own tokens,
+     * such as {{login.ip}}. Set through withContext() and nowhere else, so it
+     * cannot outlive the render that asked for it.
+     *
+     * @var array<string, mixed>
+     */
+    private array $scoped = [];
+
+    /**
+     * Run a render with extra tokens available to every resolve() inside it.
+     *
+     * Scoped rather than passed down, because the renderer resolves text in a
+     * dozen block types and nested columns, and threading a context argument
+     * through every one of them is how one gets missed.
+     *
+     * @template T
+     *
+     * @param  array<string, mixed>  $context
+     * @param  callable(): T  $render
+     * @return T
+     */
+    public function withContext(array $context, callable $render): mixed
+    {
+        $previous = $this->scoped;
+        $this->scoped = [...$previous, ...$context];
+
+        try {
+            return $render();
+        } finally {
+            $this->scoped = $previous;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $context  Dot-path values, e.g. ['user' => ['first_name' => 'Judith'], 'post' => [...]].
      * @param  bool  $html  When true, a substituted value is HTML-escaped before
      *                      insertion — the text is about to be dropped into HTML
@@ -42,7 +76,7 @@ class EmailVariableService
             return (string) $text;
         }
 
-        $context = [...$this->baseContext($recipient), ...$context];
+        $context = [...$this->baseContext($recipient), ...$this->scoped, ...$context];
 
         return preg_replace_callback(self::PATTERN, function (array $matches) use ($context, $html) {
             $path = $matches[1];
@@ -65,10 +99,12 @@ class EmailVariableService
     {
         $context = [
             'site' => [
-                'name' => (string) kSiteConfig('name'),
+                // Defaulted like phone and address below: an install that has never
+                // saved its configuration gets kSiteConfig()'s array default back.
+                'name' => (string) kSiteConfig('name', default: config('app.name')),
                 'url' => config('app.url'),
-                'email' => (string) kSiteConfig('email'),
-                'contact_email' => (string) kSiteConfig('contact-email'),
+                'email' => (string) kSiteConfig('email', default: ''),
+                'contact_email' => (string) kSiteConfig('contact-email', default: ''),
                 // kSiteConfig()'s own default is an empty array, and phone/address
                 // both start as an empty string — falsy, so an unconfigured
                 // install would otherwise get that array back and (string) it,

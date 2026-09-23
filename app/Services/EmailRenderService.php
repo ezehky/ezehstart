@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\EmailBlockItemEnum;
 use App\Enums\EmailBlockTypeEnum;
 use App\Enums\SocialHandleEnum;
+use App\Enums\SystemEmailEnum;
 use App\Models\EmailCampaign;
 use App\Models\EmailSection;
+use App\Models\EmailTemplate;
 use App\Models\Image;
 use App\Models\User;
 use App\Traits\WithRichTextSanitizer;
@@ -46,6 +48,33 @@ class EmailRenderService
             'subject' => $variables->resolve($campaign->subject, recipient: $recipient),
             'html' => $this->document($body, $campaign->design ?? []),
         ];
+    }
+
+    /**
+     * A builder template standing in for a system email — see SystemEmailEnum.
+     *
+     * The mail's own tokens ({{login.ip}} and the rest) are only in scope for this
+     * one render, and the subject falls back to the slot's default when the
+     * template leaves it blank.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array{subject: string, html: string}
+     */
+    public function renderSystemTemplate(EmailTemplate $template, SystemEmailEnum $email, ?User $recipient, array $context): array
+    {
+        $variables = app(EmailVariableService::class);
+
+        return $variables->withContext($context, function () use ($template, $email, $recipient, $variables) {
+            $brand = app(EmailBlockItemService::class)->brand($template->design ?? []);
+
+            $body = $this->renderBlocks($template->content['blocks'] ?? [], $recipient, $brand);
+            $body .= $this->renderFooter($template->footerSection, $recipient, $brand);
+
+            return [
+                'subject' => $variables->resolve($template->subject ?: $email->defaultSubject(), recipient: $recipient),
+                'html' => $this->document($body, $template->design ?? []),
+            ];
+        });
     }
 
     /**

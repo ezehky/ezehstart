@@ -7,6 +7,9 @@ import chart from "./chart";
 import countdownTimer from "./countdown-timer";
 import datePicker from "./date-picker";
 import turnstileWidget from "./turnstile";
+import passkey from "./passkey";
+import phoneInput from "./phone-input";
+import moneyInput from "./money-input";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
@@ -47,6 +50,27 @@ Alpine.data("datePicker", datePicker);
  * a second challenge onto the same element.
  */
 Alpine.data("turnstileWidget", turnstileWidget);
+
+/**
+ * The WebAuthn prompt behind the passkey panel and the passkey sign-in button.
+ * Registered once here so a Livewire re-render does not start a second ceremony
+ * against a prompt that is already open.
+ */
+Alpine.data("passkey", passkey);
+
+/**
+ * The country picker behind <x-form.phone-field>. Registered once here so a
+ * Livewire re-render keeps the intl-tel-input instance already on the field
+ * rather than wrapping the input in a second dropdown.
+ */
+Alpine.data("phoneInput", phoneInput);
+
+/**
+ * The formatted amount behind <x-form.money-field>. Registered once here so a
+ * Livewire re-render keeps the typed text rather than reformatting it under the
+ * caret.
+ */
+Alpine.data("moneyInput", moneyInput);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance

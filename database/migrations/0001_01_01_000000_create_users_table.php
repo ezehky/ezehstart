@@ -19,9 +19,25 @@ return new class extends Migration
             $table->string('email', 50)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
+            // The phone number in three parts, as <x-form.phone-field> hands it
+            // over: the national number, the dialling code it belongs to, and the
+            // country that code was picked from. The country is kept as well as
+            // the code because +1 alone cannot tell the picker whether to show
+            // the US or Canada when the number is edited again.
             $table->string('phone_number', 20)->nullable();
+            $table->string('phone_dial_code', 8)->nullable();
+            $table->string('phone_iso2', 2)->nullable();
 
             $table->string('avatar')->nullable();
+
+            // The currency amounts are shown in. Null is the site default, which
+            // is what nearly every account wants — so it stays unset until
+            // somebody picks, and a change of default carries them with it.
+            $table->foreignId('currency_id')->nullable()->constrained()->nullOnDelete();
+
+            // The interface language. Null follows the site default, and mail is
+            // written in this language as well — see User::preferredLocale().
+            $table->string('locale', 10)->nullable();
 
             // Which workspace this account signs in to. Fixed in code — see
             // UserTypeEnum, and bootstrap/app.php for what a new one costs.

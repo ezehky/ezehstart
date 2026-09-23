@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="en">
+{{-- The language and its direction, from whatever LocaleMiddleware settled on.
+     An Arabic page marked ltr would lay every row out backwards. Asked inline
+     rather than assigned to a variable up here: a short php directive above the
+     block below makes the compiler pair the wrong directives. --}}
+<html lang="{{ app(\App\Services\LocaleService::class)->current()->value }}" dir="{{ app(\App\Services\LocaleService::class)->current()->direction() }}">
 	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />

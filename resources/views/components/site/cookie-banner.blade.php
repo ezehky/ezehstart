@@ -41,7 +41,7 @@
     >
         <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
             <flux:text class="text-sm">
-                This site uses cookies to keep you signed in and to remember what you were doing.
+                {{ __('This site uses cookies to keep you signed in and to remember what you were doing.') }}
                 <a
                     href="{{ App\Enums\PolicyTypeEnum::COOKIES->url() }}"
                     class="font-medium text-slate-900 underline underline-offset-2 transition-colors hover:text-lime-600 dark:text-white dark:hover:text-lime-400"
@@ -51,7 +51,7 @@
             </flux:text>
 
             <flux:button size="sm" variant="primary" class="shrink-0" x-on:click="accept()">
-                Got it
+                {{ __('Got it') }}
             </flux:button>
         </div>
     </div>

@@ -7,6 +7,7 @@
         "dev": "vite"
     },
     "dependencies": {
+        "@simplewebauthn/browser": "^14.0.0",
         "@tailwindcss/vite": "^4.1.11",
         "@tiptap/core": "^3.31.3",
         "@tiptap/extension-image": "^3.31.3",
@@ -20,6 +21,7 @@
         "@tiptap/extension-underline": "^3.31.3",
         "@tiptap/starter-kit": "^3.31.3",
         "concurrently": "^10.0.3",
+        "intl-tel-input": "^29.5.2",
         "laravel-vite-plugin": "^3.1",
         "tailwindcss": "^4.0.7",
         "vite": "^8.0.0"

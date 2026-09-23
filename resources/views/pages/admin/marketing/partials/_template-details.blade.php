@@ -14,6 +14,38 @@
     <flux:input wire:model="name" label="Template name" placeholder="e.g. Newsletter Template" />
     <flux:input wire:model="description" label="Description" description="Internal only — shown to admins picking a starting point for a campaign." />
 
+    <flux:separator variant="subtle" />
+
+    {{-- A template can stand in for one of the emails the app sends by itself.
+         Unassigned, that email goes out from its built-in view as before. --}}
+    <flux:select wire:model.live="system_email" label="Use as a system email" description="Replaces the built-in design of that email. Leave on None for an ordinary campaign template.">
+        <flux:select.option value="">None</flux:select.option>
+        @foreach (App\Enums\SystemEmailEnum::cases() as $case)
+            <flux:select.option :value="$case->value">{{ $case->label() }}</flux:select.option>
+        @endforeach
+    </flux:select>
+
+    @if ($this->systemEmailCase)
+        <flux:input
+            wire:model="subject"
+            label="Subject"
+            :placeholder="$this->systemEmailCase->defaultSubject()"
+            description="Tokens work here too. Blank uses the placeholder."
+        />
+
+        <flux:callout icon="variable" color="zinc" class="text-sm">
+            <flux:callout.heading>{{ $this->systemEmailCase->description() }}</flux:callout.heading>
+            <flux:callout.text>
+                Tokens this email adds, on top of the site and recipient ones:
+                <ul class="mt-2 space-y-1">
+                    @foreach ($this->systemEmailCase->tokens() as $token => $tokenLabel)
+                        <li><code class="text-xs">{{ $token }}</code> — {{ $tokenLabel }}</li>
+                    @endforeach
+                </ul>
+            </flux:callout.text>
+        </flux:callout>
+    @endif
+
     <div class="flex justify-end gap-2">
         <flux:button href="{{ route('admin.marketing.templates') }}" wire:navigate variant="ghost">Cancel</flux:button>
         <x-dashboard.gate.button

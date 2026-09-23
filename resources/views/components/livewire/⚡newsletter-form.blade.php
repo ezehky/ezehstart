@@ -42,7 +42,7 @@ new class extends Component
         // form in somebody's open tab, and this is what stops it writing a row
         // after the feature was turned off underneath it.
         $this->respondError(
-            'The newsletter is not accepting sign-ups at the moment.',
+            __('The newsletter is not accepting sign-ups at the moment.'),
             ! $service->isEnabled(),
             field: 'email',
         );
@@ -56,7 +56,7 @@ new class extends Component
         // The popup wrapping this copy closes on it, and remembers that it did.
         $this->dispatch('newsletter-subscribed');
 
-        return $this->respondSuccess('You are on the list. Thank you!');
+        return $this->respondSuccess(__('You are on the list. Thank you!'));
     }
 };
 ?>
@@ -66,7 +66,7 @@ new class extends Component
         <div class="flex items-start gap-3 rounded-lg bg-lime-50 px-4 py-3 dark:bg-lime-500/10">
             <flux:icon name="check-circle" class="mt-0.5 size-5 shrink-0 text-lime-600 dark:text-lime-400" />
             <flux:text class="text-sm">
-                You are on the list. Look out for the next one.
+                {{ __('You are on the list. Look out for the next one.') }}
             </flux:text>
         </div>
     @else
@@ -80,12 +80,12 @@ new class extends Component
                     type="email"
                     placeholder="you@example.com"
                     autocomplete="email"
-                    aria-label="Email address"
+                    :aria-label="__('Email address')"
                     class="sm:flex-1"
                 />
 
                 <flux:button type="submit" variant="primary" icon="envelope">
-                    Subscribe
+                    {{ __('Subscribe') }}
                 </flux:button>
             </div>
 

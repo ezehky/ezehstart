@@ -39,7 +39,7 @@ new #[Layout('layouts::auth')] class extends Component
         ]);
 
         $this->respondError(
-            'That verification code is invalid or has expired.',
+            __('That verification code is invalid or has expired.'),
             ! app(EmailVerificationOtpService::class)->verify($this->user, $this->otp),
             field: 'otp'
         );
@@ -48,27 +48,27 @@ new #[Layout('layouts::auth')] class extends Component
         $this->redirectRoute('user.dashboard');
 
         // Mark the user's email as verified
-        return $this->respondSuccess('Your email address has been verified.');
+        return $this->respondSuccess(__('Your email address has been verified.'));
     }
 
     public function resend(): void
     {
         if ($this->user->hasVerifiedEmail()) {
-            session()->flash('status', 'Your email address is already verified.');
+            session()->flash('status', __('Your email address is already verified.'));
 
             return;
         }
 
         $this->sendVerificationOtp($this->user, 'otp');
 
-        session()->flash('status', 'We sent a new verification code to your email address.');
+        session()->flash('status', __('We sent a new verification code to your email address.'));
     }
 };
 ?>
 
-<x-slot:tag>Check your inbox</x-slot:tag>
-<x-slot:title>Verify your email</x-slot:title>
-<x-slot:description>Enter the six-digit code sent to {{ Str::mask($user->email, '*', 2, 6) }}.</x-slot:description>
+<x-slot:tag>{{ __('Check your inbox') }}</x-slot:tag>
+<x-slot:title>{{ __('Verify your email') }}</x-slot:title>
+<x-slot:description>{{ __('Enter the six-digit code sent to :email.', ['email' => Str::mask($user->email, '*', 2, 6)]) }}</x-slot:description>
 
 <div>
     @session('status')
@@ -81,11 +81,11 @@ new #[Layout('layouts::auth')] class extends Component
 
         <div class="flex items-center gap-3">
             <flux:button type="submit" variant="primary" icon="check">
-                Verify email
+                {{ __('Verify email') }}
             </flux:button>
 
             <flux:button type="button" wire:click="resend">
-                Resend code
+                {{ __('Resend code') }}
             </flux:button>
         </div>
     </form>

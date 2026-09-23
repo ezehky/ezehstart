@@ -9,10 +9,9 @@
 @if ($newsletter->showsInFooter())
     <div class="mb-8 grid gap-6 rounded-xl border border-slate-200 p-6 sm:grid-cols-[1.1fr_1fr] sm:items-center dark:border-slate-800">
         <div>
-            <flux:heading size="lg">Get the newsletter</flux:heading>
+            <flux:heading size="lg">{{ __('Get the newsletter') }}</flux:heading>
             <flux:text class="mt-1 text-sm">
-                Occasional updates from {{ $_configs['name'] }}. No more than one email a month, and
-                every one of them has an unsubscribe link.
+                {{ __('Occasional updates from :name. No more than one email a month, and every one of them has an unsubscribe link.', ['name' => $_configs['name']]) }}
             </flux:text>
         </div>
 

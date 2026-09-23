@@ -9,10 +9,10 @@
     <section id="faq" class="mx-auto w-full max-w-6xl scroll-mt-8 border-t border-slate-200 px-6 py-16 dark:border-white/10">
         <div class="mx-auto max-w-3xl">
             <h2 class="font-heading text-3xl font-bold tracking-tight text-slate-950 dark:text-white">
-                Frequently asked questions
+                {{ __('Frequently asked questions') }}
             </h2>
             <flux:text class="mt-3">
-                The things people ask before they sign up. If yours is not here, get in touch.
+                {{ __('The things people ask before they sign up. If yours is not here, get in touch.') }}
             </flux:text>
 
             {{-- One panel open at a time, and the first one open on arrival: a wall

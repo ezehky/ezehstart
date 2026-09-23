@@ -80,9 +80,9 @@ new #[Layout('layouts::auth')] class extends Component
 
             $this->moveTo(
                 'details',
-                'Start your journey',
-                'Create your account',
-                "Tell us who you are and we will email a code to confirm {$this->email}. No password to remember.",
+                __('Start your journey'),
+                __('Create your account'),
+                __('Tell us who you are and we will email a code to confirm :email. No password to remember.', ['email' => $this->email]),
             );
 
             return;
@@ -125,7 +125,7 @@ new #[Layout('layouts::auth')] class extends Component
         $this->validate(['otp' => ['required', 'digits:6']]);
 
         $this->respondError(
-            'That code is invalid or has expired.',
+            __('That code is invalid or has expired.'),
             ! app(PasswordlessOtpService::class)->verify($this->email, $this->otp),
             fn () => $this->reset('otp'),
             'otp'
@@ -140,7 +140,7 @@ new #[Layout('layouts::auth')] class extends Component
     {
         $this->sendCode();
 
-        session()->flash('status', 'A new code has been sent to your email address.');
+        session()->flash('status', __('A new code has been sent to your email address.'));
 
         $this->resetValidation();
     }
@@ -162,7 +162,7 @@ new #[Layout('layouts::auth')] class extends Component
     protected function messages(): array
     {
         return [
-            'agreed_to_terms.accepted' => 'Please accept our policies to create an account.',
+            'agreed_to_terms.accepted' => __('Please accept our policies to create an account.'),
         ];
     }
 
@@ -170,10 +170,10 @@ new #[Layout('layouts::auth')] class extends Component
     {
         $user = User::query()->whereEmail($this->email)->first();
 
-        $this->respondError('We could not find that account.', ! $user, field: 'otp');
+        $this->respondError(__('We could not find that account.'), ! $user, field: 'otp');
 
-        // The account may have been suspended or promoted while the code was in
-        // flight, so the eligibility checks run again before the session is granted.
+        // The account may have been suspended while the code was in flight, so the
+        // eligibility check runs again before the session is granted.
         $this->guardAccountCanUseCodes($user, field: 'otp');
 
         // Receiving the code proves the address, so an account still sitting
@@ -183,6 +183,13 @@ new #[Layout('layouts::auth')] class extends Component
         }
 
         Auth::login($user, true);
+
+        // The code proves the mailbox, which is one factor. An account that turned
+        // on a second still owes it — otherwise an email code would be the way
+        // round two-factor for anybody who could read the inbox.
+        if ($challenge = $this->twoFactorChallengeRedirect($user, true)) {
+            return $challenge;
+        }
 
         $this->loginUser('Signed in with an email code.');
 
@@ -204,7 +211,7 @@ new #[Layout('layouts::auth')] class extends Component
         );
 
         $this->respondError(
-            message: 'Failed to create user. Please try again.',
+            message: __('Failed to create user. Please try again.'),
             if: ! $user
         );
 
@@ -212,20 +219,15 @@ new #[Layout('layouts::auth')] class extends Component
     }
 
     /**
-     * Suspended accounts get nothing, and privileged accounts keep their password:
-     * an admin session should never be obtainable from mailbox access alone.
+     * Suspended accounts get nothing. Administrators may use a code like anybody
+     * else — the second factor is what stands between a mailbox and an admin
+     * session, and signInExistingUser() still asks for it.
      */
     private function guardAccountCanUseCodes(User $user, string $field = 'email'): void
     {
         $this->respondError(
-            'Login Access Denied. '.$user->status->message(),
+            __('Login Access Denied.').' '.$user->status->message(),
             ! $user->status->isActive(),
-            field: $field
-        );
-
-        $this->respondError(
-            'This account signs in with its password. Please use the sign in form.',
-            $user->isAdmin(),
             field: $field
         );
     }
@@ -236,7 +238,7 @@ new #[Layout('layouts::auth')] class extends Component
         $secondsRemaining = $service->secondsUntilResendFor($this->email);
 
         $this->respondError(
-            "Please wait {$secondsRemaining} seconds before requesting another code.",
+            __('Please wait :seconds seconds before requesting another code.', ['seconds' => $secondsRemaining]),
             $secondsRemaining > 0,
             field: $this->step === 'code' ? 'otp' : 'email'
         );
@@ -248,10 +250,12 @@ new #[Layout('layouts::auth')] class extends Component
     {
         $this->moveTo(
             'code',
-            'Check your inbox',
-            $this->isNewAccount ? 'Confirm your email' : 'Enter your code',
-            'Enter the six-digit code sent to '.Str::mask($this->email, '*', 2, 6).
-            '. It expires in '.PasswordlessOtpService::EXPIRATION_MINUTES.' minutes.',
+            __('Check your inbox'),
+            $this->isNewAccount ? __('Confirm your email') : __('Enter your code'),
+            __('Enter the six-digit code sent to :email. It expires in :minutes minutes.', [
+                'email' => Str::mask($this->email, '*', 2, 6),
+                'minutes' => PasswordlessOtpService::EXPIRATION_MINUTES,
+            ]),
         );
     }
 
@@ -272,26 +276,28 @@ new #[Layout('layouts::auth')] class extends Component
      */
     private function dispatchAttributes(): void
     {
-        $this->dispatch('attr', tag: $this->tag, title: $this->title, description: $this->description);
+        // Passed through __() here as well: the opening copy is the property
+        // defaults, which are English keys, and startOver() puts them back.
+        $this->dispatch('attr', tag: __($this->tag), title: __($this->title), description: __($this->description));
     }
 };
 ?>
 
 {{-- Start --}}
 <x-slot:tag>
-    <span x-data="{ tag: @js($tag) }" x-on:attr.window="tag = $event.detail.tag" x-html="tag"></span>
+    <span x-data="{ tag: @js(__($tag)) }" x-on:attr.window="tag = $event.detail.tag" x-html="tag"></span>
 </x-slot:tag>
 <x-slot:title>
-    <span x-data="{ title: @js($title) }" x-on:attr.window="title = $event.detail.title" x-html="title"></span>
+    <span x-data="{ title: @js(__($title)) }" x-on:attr.window="title = $event.detail.title" x-html="title"></span>
 </x-slot:title>
 <x-slot:description>
-    <span x-data="{ description: @js($description) }" x-on:attr.window="description = $event.detail.description" x-html="description"></span>
+    <span x-data="{ description: @js(__($description)) }" x-on:attr.window="description = $event.detail.description" x-html="description"></span>
 </x-slot:description>
 <x-slot:extra>
     <flux:text class="mt-8 text-center dark:text-slate-400">
-        Prefer a password?
+        {{ __('Prefer a password?') }}
         <flux:link href="{{ route('login') }}" variant="ghost">
-            Sign in the usual way
+            {{ __('Sign in the usual way') }}
         </flux:link>
     </flux:text>
 </x-slot:extra>
@@ -308,30 +314,30 @@ new #[Layout('layouts::auth')] class extends Component
             <flux:error name="otp" />
 
             <flux:button type="submit" variant="primary" icon="check" class="w-full">
-                {{ $isNewAccount ? 'Confirm and create account' : 'Sign in' }}
+                {{ $isNewAccount ? __('Confirm and create account') : __('Sign in') }}
             </flux:button>
 
             <div class="flex justify-center gap-3">
-                <flux:button type="button" wire:click="resendCode" class="w-full">Resend code</flux:button>
-                <flux:button type="button" wire:click="startOver" variant="ghost" class="w-full">Start over</flux:button>
+                <flux:button type="button" wire:click="resendCode" class="w-full">{{ __('Resend code') }}</flux:button>
+                <flux:button type="button" wire:click="startOver" variant="ghost" class="w-full">{{ __('Start over') }}</flux:button>
             </div>
         </form>
     @elseif ($step === 'details')
         <form wire:submit.throttle.500ms="submitDetails" class="mt-8 space-y-5">
-            <flux:input wire:model="name" autocomplete="name" autofocus placeholder="Enter your full name" />
+            <flux:input wire:model="name" autocomplete="name" autofocus :placeholder="__('Enter your full name')" />
             <flux:error name="name" />
 
             <x-form.consent-field />
 
             <flux:error name="email" />
 
-            <flux:button type="submit" variant="primary" class="w-full">Email me a code</flux:button>
-            <flux:button type="button" wire:click="startOver" variant="ghost" class="w-full">Use a different email</flux:button>
+            <flux:button type="submit" variant="primary" class="w-full">{{ __('Email me a code') }}</flux:button>
+            <flux:button type="button" wire:click="startOver" variant="ghost" class="w-full">{{ __('Use a different email') }}</flux:button>
         </form>
     @else
         <form wire:submit.throttle.500ms="submitEmail" class="mt-8 space-y-5">
             <flux:input
-                label="Email address"
+                :label="__('Email address')"
                 wire:model="email"
                 type="email"
                 autocomplete="email"
@@ -345,7 +351,7 @@ new #[Layout('layouts::auth')] class extends Component
                 <x-form.captcha action="passwordless" />
             @endif
 
-            <flux:button type="submit" variant="primary" class="w-full">Send me a code</flux:button>
+            <flux:button type="submit" variant="primary" class="w-full">{{ __('Send me a code') }}</flux:button>
         </form>
     @endif
 

@@ -44,14 +44,14 @@ class MoneyRule implements ValidationRule
 
         // Check if the value is less than the minimum allowed
         if ($this->min && $value < $this->min) {
-            $fail("The {$attribute} must be at least ".kMoneyFormat($this->min, $this->currency, true).'.');
+            $fail("The {$attribute} must be at least ".kMoneyFormat($this->min, $this->currency, true, convert: false).'.');
 
             return;
         }
 
         // Check if the value is greater than the maximum allowed
         if ($this->max && $value > $this->max) {
-            $fail("The {$attribute} must not exceed ".kMoneyFormat($this->max, $this->currency, true).'.');
+            $fail("The {$attribute} must not exceed ".kMoneyFormat($this->max, $this->currency, true, convert: false).'.');
 
             return;
         }

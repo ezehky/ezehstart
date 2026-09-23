@@ -99,6 +99,18 @@ enum ActivityActionEnum: string
     case TWO_FACTOR_RECOVERY_REGENERATE = 'two-factor.recovery-regenerate';
     case TWO_FACTOR_RECOVERY_USED = 'two-factor.recovery-used';
 
+    // Passkeys. Adding one is a new way into the account, so it is logged on the
+    // same terms as turning the second factor on — and removing one as off.
+    case PASSKEY_CREATE = 'passkey.create';
+    case PASSKEY_DELETE = 'passkey.delete';
+
+    // Currencies. The default is its own case: changing it changes what every
+    // stored amount is read as, which is not the same kind of edit as a rate.
+    case CURRENCY_CREATE = 'currency.create';
+    case CURRENCY_UPDATE = 'currency.update';
+    case CURRENCY_DELETE = 'currency.delete';
+    case CURRENCY_DEFAULT = 'currency.default';
+
     // Connected accounts
     case SOCIAL_ACCOUNT_LINK = 'social-account.link';
     case SOCIAL_ACCOUNT_UNLINK = 'social-account.unlink';
@@ -125,6 +137,9 @@ enum ActivityActionEnum: string
     case POST_UPDATE = 'post.update';
     case POST_PUBLISH = 'post.publish';
     case POST_DELETE = 'post.delete';
+    case ANNOUNCEMENT_CREATE = 'announcement.create';
+    case ANNOUNCEMENT_UPDATE = 'announcement.update';
+    case ANNOUNCEMENT_DELETE = 'announcement.delete';
     case CATEGORY_CREATE = 'category.create';
     case CATEGORY_UPDATE = 'category.update';
     case CATEGORY_DELETE = 'category.delete';
@@ -179,6 +194,8 @@ enum ActivityActionEnum: string
             self::ROLE_CREATE,
             self::TAG_CREATE,
             self::NOTIFICATION_TYPE_CREATE,
+            self::CURRENCY_CREATE,
+            self::ANNOUNCEMENT_CREATE,
             self::TRANSACTION_CREATE => 'Created new ',
 
             // Update
@@ -195,6 +212,8 @@ enum ActivityActionEnum: string
             self::CATEGORY_UPDATE,
             self::TAG_UPDATE,
             self::NOTIFICATION_TYPE_UPDATE,
+            self::CURRENCY_UPDATE,
+            self::ANNOUNCEMENT_UPDATE,
             self::ROLE_UPDATE,
             self::ROLE_GATES_UPDATE,
             self::ADMIN_GATES_UPDATE => 'Updated ',
@@ -215,6 +234,8 @@ enum ActivityActionEnum: string
             self::POST_DELETE,
             self::CATEGORY_DELETE,
             self::TAG_DELETE,
+            self::CURRENCY_DELETE,
+            self::ANNOUNCEMENT_DELETE,
             self::NOTIFICATION_TYPE_DELETE => 'Deleted ',
 
             // Restore and purge. Both read as sentences somebody will scan for, so
@@ -234,6 +255,9 @@ enum ActivityActionEnum: string
 
             // Connected accounts
             self::SOCIAL_ACCOUNT_LINK => 'Connected ',
+            self::PASSKEY_CREATE => 'Added passkey ',
+            self::PASSKEY_DELETE => 'Removed passkey ',
+            self::CURRENCY_DEFAULT => 'Changed the default currency from ',
             self::SOCIAL_ACCOUNT_UNLINK => 'Disconnected ',
 
             // Reads as "Started acting as Ada Lovelace (ada@example.test)".

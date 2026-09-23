@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\LocaleMiddleware;
 use App\Http\Middleware\UserMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -42,6 +43,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // as a column name, and ->type read back null here, so every guest route a
         // signed-in account touched was a 500 rather than a redirect.
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()->user_type->dashboardRoute());
+
+        // The interface language, on every web request. Livewire's own update
+        // route runs the web group too, so a component re-render is translated the
+        // same way as the page it sits on.
+        $middleware->web(append: [LocaleMiddleware::class]);
 
         // Prevent CSRF for webhooks
         $middleware->preventRequestForgery(except: [

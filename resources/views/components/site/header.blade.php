@@ -11,6 +11,7 @@
     />
 
     <div class="flex items-center gap-2">
+        <livewire:livewire.language-switcher />
         <flux:switch x-data x-model="$flux.dark" />
 
         @auth
@@ -20,11 +21,11 @@
                 size="sm"
                 wire:navigate
             >
-                Dashboard
+                {{ __('Dashboard') }}
             </flux:button>
         @else
-            <flux:button :href="route('login')" variant="ghost" size="sm" wire:navigate>Sign in</flux:button>
-            <flux:button :href="route('register')" variant="primary" size="sm" wire:navigate>Get started</flux:button>
+            <flux:button :href="route('login')" variant="ghost" size="sm" wire:navigate>{{ __('Sign in') }}</flux:button>
+            <flux:button :href="route('register')" variant="primary" size="sm" wire:navigate>{{ __('Get started') }}</flux:button>
         @endauth
     </div>
 </header>
