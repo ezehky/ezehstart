@@ -95,6 +95,12 @@ If two models need it → `WithDynamicModelFormatting` or a shared method. If it
 a string, a date, money, or a file path → it is a `k*()` helper, and one probably
 already exists. See [helpers.md](helpers.md).
 
+**Write it reusable from the start, where the case may be.** Do not wait for the
+second caller to extract something. Logic that is not about this one screen — parsing,
+lookups, formatting, a guard — goes into a service method, an enum method, a trait or a
+`k*()` helper on first writing, taking its inputs as parameters rather than reading
+page state. A page method stays on the page only when it really is about that page.
+
 ### 8. Keep consistency over cleverness
 If the codebase does something in a slightly long-winded way, do it that way. Do not
 "modernise", "optimise", or "clean up" surrounding code you were not asked to change.

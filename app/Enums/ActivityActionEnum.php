@@ -75,6 +75,11 @@ enum ActivityActionEnum: string
     // Site configuration
     case CONFIG_UPDATE = 'config.update';
 
+    // Log files. A log can hold request data and stack traces, so taking a copy
+    // off the server is recorded as well as throwing one away.
+    case LOG_FILE_DOWNLOAD = 'log-file.download';
+    case LOG_FILE_CLEAR = 'log-file.clear';
+
     // Legal pages. Publishing is its own case rather than an update: it is the
     // moment a version becomes the text people are held to, and an audit trail
     // that cannot tell the two apart is not worth reading.
@@ -239,6 +244,8 @@ enum ActivityActionEnum: string
             // one about a single row, so the subject is the count and the filename.
             self::IMPORT => 'Imported ',
             self::EXPORT => 'Exported ',
+            self::LOG_FILE_DOWNLOAD => 'Downloaded log file ',
+            self::LOG_FILE_CLEAR => 'Cleared log file ',
 
             // Money
             self::TRANSACTION_CONFIRM => 'Confirmed ',

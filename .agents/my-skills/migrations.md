@@ -182,11 +182,20 @@ $table->timestamp('email_verified_at')->nullable();
 
 ### Altering a table
 
-Separate migration, descriptive name, real `down()`:
+Separate migration, descriptive name, real `down()`. Adding columns is
+`add_{what}_to_{table}_table`; changing one is `change_{table}_{column}_to_{what}`:
 
 ```
+2026_07_31_090000_add_answer_meta_to_faqs_table.php
 2026_07_31_090000_change_faqs_answer_to_text.php
 ```
+
+```bash
+php artisan make:migration add_answer_meta_to_faqs_table --no-interaction
+```
+
+The `add_…_to_…_table` name is what makes `make:migration` scaffold a
+`Schema::table()` body rather than a `Schema::create()` one.
 
 ### Indexes
 

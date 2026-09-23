@@ -195,6 +195,16 @@
     .modal-confirm {
         @apply w-[calc(100vw-2rem)] md:w-110!;
     }
+    /* Nearly the whole viewport, for content that is read rather than filled in —
+       a full log entry, an email preview. */
+    .modal-full {
+        @apply h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)]! max-w-none!;
+    }
+
+    /* Log or plain-text output that wraps rather than scrolling sideways. */
+    .log-pre {
+        @apply min-h-0 flex-1 overflow-auto rounded-lg bg-slate-50 p-4 font-mono text-xs break-words whitespace-pre-wrap text-slate-700 dark:bg-slate-800/50 dark:text-slate-300;
+    }
 
     /* Rendered admin-authored markdown (policy pages, FAQ answers). The HTML is
        produced by MarkdownService, so it cannot carry utility classes of its own. */

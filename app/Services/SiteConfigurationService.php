@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\EmailSenderEnum;
+use App\Enums\LogChannelEnum;
 use App\Enums\SocialProviderEnum;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Arr;
@@ -238,7 +239,7 @@ class SiteConfigurationService
                 $siteConfig = $this->setSiteConfigForCache($siteConfig);
 
                 // Logging the site configuration for debugging purposes
-                Log::channel('site-config')
+                Log::channel(LogChannelEnum::SITE_CONFIG->value)
                     ->info('site config re-cached.', [
                         'user' => auth()->user()?->name,
                         'user_id' => auth()->id(),

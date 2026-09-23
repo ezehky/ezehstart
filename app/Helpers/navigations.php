@@ -56,6 +56,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Notification types',
                         'link' => route('admin.config.notification-types'),
                     ],
+                    'logs' => [
+                        'label' => 'Log files',
+                        'link' => route('admin.config.logs'),
+                    ],
                 ],
                 'icon' => 'cog-6-tooth',
             ],

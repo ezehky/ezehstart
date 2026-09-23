@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LogChannelEnum;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -131,24 +132,20 @@ return [
             'handler' => NullHandler::class,
         ],
 
-        'site-config' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/site-config.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'ezeh' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/ezeh.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        ...collect(LogChannelEnum::cases())
+            ->filter(fn (LogChannelEnum $enum) => ! $enum->isLaravel())
+            ->mapWithKeys(fn (LogChannelEnum $enum) => [
+                $enum->value => [
+                    'driver' => 'single',
+                    'path' => storage_path("logs/{$enum->value}.log"),
+                    'level' => env('LOG_LEVEL', 'debug'),
+                    'replace_placeholders' => true,
+                ],
+            ])->toArray(),
     ],
 
 ];

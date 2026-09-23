@@ -14,6 +14,7 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');
     Route::livewire('/notification-types', 'pages::admin.configs.notification-types')->name('notification-types');
+    Route::livewire('/logs', 'pages::admin.configs.logs')->name('logs');
 });
 
 // Static Content

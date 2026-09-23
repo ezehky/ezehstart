@@ -25,6 +25,8 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Uses existing `k*()` helpers for slugs, money, dates, files, pluralisation
 - [ ] ✓ Uses existing layouts (`layouts::app` by default, `layouts::auth` for guests)
 - [ ] ✓ No duplicated logic anywhere in the diff
+- [ ] ✓ Logic that is not about this one screen was written reusable — a service or
+      enum method, trait, helper or component taking parameters — not buried in a page
 
 ## Naming
 
