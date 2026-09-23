@@ -107,22 +107,21 @@
                 @endif
 
                 <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <flux:tooltip content="{{ $image ? 'Change image' : 'Select from Media Library' }}">
-                        <flux:button
-                            icon="{{ $image ? 'images' : 'image-play' }}"
-                            wire:click="chooseImage('img:{{ $block['id'] }}')"
-                            aria-label="Select from Media Library"
-                        />
-                    </flux:tooltip>
+                    <flux:button
+                        icon="{{ $image ? 'images' : 'image-play' }}"
+                        wire:click="chooseImage('img:{{ $block['id'] }}')"
+                        aria-label="Select from Media Library"
+                        :tooltip="$image ? 'Change image' : 'Select from Media Library'"
+                    />
 
                     @if ($image)
-                        <flux:tooltip content="Remove image">
-                            <flux:button
-                                icon="image-off"
-                                square
-                                wire:click="removeBlockImage('img:{{ $block['id'] }}')"
-                                aria-label="Remove image" />
-                        </flux:tooltip>
+                        <flux:button
+                            icon="image-off"
+                            square
+                            wire:click="removeBlockImage('img:{{ $block['id'] }}')"
+                            aria-label="Remove image"
+                            tooltip="Remove image"
+                        />
                     @endif
                 </div>
             </div>
@@ -263,24 +262,22 @@
                                     clearable
                                 />
                                 <div class="flex items-center justify-between gap-1">
-                                    <flux:tooltip content="{{ $colBgImage ? 'Change column image' : 'Set column image' }}">
-                                        <flux:button
-                                            icon="{{ $colBgImage ? 'images' : 'image-play' }}"
-                                            wire:click="chooseImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
-                                            aria-label="Select from Media Library"
-                                            size="sm"
-                                        />
-                                    </flux:tooltip>
+                                    <flux:button
+                                        icon="{{ $colBgImage ? 'images' : 'image-play' }}"
+                                        wire:click="chooseImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
+                                        aria-label="Select from Media Library"
+                                        size="sm"
+                                        :tooltip="$colBgImage ? 'Change column image' : 'Set column image'"
+                                    />
 
                                     @if ($colBgImage)
-                                        <flux:tooltip content="Remove background image">
-                                            <flux:button
-                                                icon="image-off"
-                                                wire:click="removeBlockImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
-                                                aria-label="Remove background image"
-                                                size="sm"
-                                            />
-                                        </flux:tooltip>
+                                        <flux:button
+                                            icon="image-off"
+                                            wire:click="removeBlockImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')"
+                                            aria-label="Remove background image"
+                                            size="sm"
+                                            tooltip="Remove background image"
+                                        />
                                     @endif
                                 </div>
                             </div>
@@ -288,21 +285,6 @@
                         <x-marketing.border :prefix="$dataKey" />
                         <x-marketing.radius wire:model.live="{{ $dataKey }}.radius" :service="$itemService" />
 
-                        {{-- <div class="grid grid-cols-2 gap-2">
-                            <x-form.color-field wire:model.live="{{ $prefix }}.columns.{{ $columnIndex }}.background" label="Background" clearable size="sm" />
-                            <div class="flex items-end gap-1">
-                                <flux:tooltip content="{{ $colBgImage ? 'Change column background image' : 'Set a column background image' }}">
-                                    <flux:button size="sm" icon="photo" wire:click="chooseImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')">
-                                        {{ $colBgImage ? 'Change' : 'Bg image' }}
-                                    </flux:button>
-                                </flux:tooltip>
-                                @if ($colBgImage)
-                                    <flux:tooltip content="Remove column background image">
-                                        <flux:button size="sm" variant="ghost" icon="x-mark" square wire:click="removeBlockImage('colbg:{{ $block['id'] }}:{{ $columnIndex }}')" aria-label="Remove column background image" />
-                                    </flux:tooltip>
-                                @endif
-                            </div>
-                        </div> --}}
                         <flux:field>
                             <flux:label>
                                 Spacing
@@ -343,9 +325,15 @@
                         <div class="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="social-link-{{ $linkIndex }}">
                             <div class="flex items-center justify-between">
                                 <flux:label class="text-xs text-slate-500">Link {{ $linkIndex + 1 }}</flux:label>
-                                <flux:tooltip content="Remove this link">
-                                    <flux:button size="sm" variant="ghost" icon="trash" square wire:click="removeSocialLink('{{ $block['id'] }}', {{ $linkIndex }})" aria-label="Remove link {{ $linkIndex + 1 }}" />
-                                </flux:tooltip>
+                                <flux:button
+                                    size="sm"
+                                    variant="ghost"
+                                    icon="trash"
+                                    square
+                                    wire:click="removeSocialLink('{{ $block['id'] }}', {{ $linkIndex }})"
+                                    aria-label="Remove link {{ $linkIndex + 1 }}"
+                                    tooltip="Remove this link"
+                                />
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <flux:select wire:model.live="{{ $prefix }}.custom_links.{{ $linkIndex }}.platform" label="Icon" size="sm">
@@ -354,9 +342,19 @@
                                         <flux:select.option value="{{ $handle->value }}">{{ $handle->label() }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
-                                <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.custom_links.{{ $linkIndex }}.label" label="Label" size="sm" placeholder="e.g. Our blog" />
+                                <flux:input
+                                    wire:model.live.debounce.1000ms="{{ $prefix }}.custom_links.{{ $linkIndex }}.label"
+                                    label="Label"
+                                    size="sm"
+                                    placeholder="e.g. Our blog"
+                                />
                             </div>
-                            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.custom_links.{{ $linkIndex }}.url" label="URL" size="sm" placeholder="https://" />
+                            <flux:input
+                                wire:model.live.debounce.1000ms="{{ $prefix }}.custom_links.{{ $linkIndex }}.url"
+                                label="URL"
+                                size="sm"
+                                placeholder="https://"
+                            />
                         </div>
                     @empty
                         <p class="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-500 dark:border-slate-700">
@@ -593,24 +591,22 @@
                         @if ($itemService->checkField(\App\Enums\EmailBlockItemEnum::BACKGROUND_IMAGE_ID, $data))
                             @php($finder = \App\Models\Image::find($data['background_image_id']))
                             <div class="flex items-center justify-between gap-1">
-                                <flux:tooltip content="{{ $finder ? 'Change background image' : 'Set background image' }}">
-                                    <flux:button
-                                        icon="{{ $finder ? 'images' : 'image-play' }}"
-                                        wire:click="chooseImage('bg:{{ $block['id'] }}')"
-                                        aria-label="Select from Media Library"
-                                        size="sm"
-                                    />
-                                </flux:tooltip>
+                                <flux:button
+                                    icon="{{ $finder ? 'images' : 'image-play' }}"
+                                    wire:click="chooseImage('bg:{{ $block['id'] }}')"
+                                    aria-label="Select from Media Library"
+                                    size="sm"
+                                    :tooltip="$finder ? 'Change background image' : 'Set background image'"
+                                />
 
                                 @if ($finder)
-                                    <flux:tooltip content="Remove background image">
-                                        <flux:button
-                                            icon="image-off"
-                                            wire:click="removeBlockImage('bg:{{ $block['id'] }}')"
-                                            aria-label="Remove background image"
-                                            size="sm"
-                                        />
-                                    </flux:tooltip>
+                                    <flux:button
+                                        icon="image-off"
+                                        wire:click="removeBlockImage('bg:{{ $block['id'] }}')"
+                                        aria-label="Remove background image"
+                                        size="sm"
+                                        tooltip="Remove background image"
+                                    />
                                 @endif
                             </div>
                         @endif

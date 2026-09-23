@@ -5,12 +5,11 @@
      a rule printed permanently under every field is noise on the screens that are
      not enforcing it.
 
-     Hand-rolled rather than <flux:tooltip>, which is built for a pointer passing
-     over something and closes itself again the moment focus moves inside the
-     field — including onto the eye toggle, and on the first keystroke. A rule you
-     are trying to satisfy has to stay on screen for as long as you are typing, so
-     this one is held open by two independent flags and only closes when focus has
-     genuinely left the field and the pointer is elsewhere.
+     Built for a pointer passing over something and closes itself again the moment
+     focus moves inside the field — including onto the eye toggle, and on the first
+     keystroke. A rule you are trying to satisfy has to stay on screen for as long
+     as you are typing, so this one is held open by two independent flags and only
+     closes when focus has genuinely left the field and the pointer is elsewhere.
 
      Pass :note="$passwordNote" on the field that has to satisfy the rule and leave
      it off the confirmation — saying it twice helps nobody.

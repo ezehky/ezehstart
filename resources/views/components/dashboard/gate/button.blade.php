@@ -22,11 +22,7 @@
      </x-dashboard.gate.button> --}}
 
 @if (kGateAction($gate, $level))
-     @if ($tooltip)
-        <flux:tooltip :content="$tooltip">
-     @endif
-    <flux:button {{ $attributes->merge(['variant' => 'primary', 'type' => 'submit']) }}>{{ $slot }}</flux:button>
-    @if ($tooltip)
-        </flux:tooltip>
-    @endif
+    <flux:button :$tooltip {{ $attributes->merge(['variant' => 'primary', 'type' => 'submit']) }}>
+        {{ $slot }}
+    </flux:button>
 @endif

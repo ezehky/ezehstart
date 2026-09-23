@@ -100,17 +100,16 @@
 
                 <div class="hidden group-hover:flex flex-wrap justify-center gap-1 pt-1 mt-8" wire:click.stop>
                     @foreach (\App\Enums\EmailBlockTypeEnum::nestable() as $nestCase)
-                        <flux:tooltip content="Add {{ $nestCase->label() }}">
-                            <flux:button
-                                type="button"
-                                wire:click.stop="addColumnBlock('{{ $nestCase->value }}', {{ $index }}, {{ $columnIndex }})"
-                                :icon="$nestCase->icon()"
-                                icon-variant="mini"
-                                variant="outline"
-                                size="sm"
-                                class="press text-slate-400"
-                            />
-                        </flux:tooltip>
+                        <flux:button
+                            type="button"
+                            wire:click.stop="addColumnBlock('{{ $nestCase->value }}', {{ $index }}, {{ $columnIndex }})"
+                            :icon="$nestCase->icon()"
+                            icon-variant="mini"
+                            variant="outline"
+                            size="sm"
+                            class="press text-slate-400"
+                            tooltip="Add {{ $nestCase->label() }}"
+                        />
                     @endforeach
                 </div>
             </div>
