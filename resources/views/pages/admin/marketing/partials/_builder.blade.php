@@ -35,6 +35,8 @@
     $selectedIndex = $this->selectedBlockIndex();
     $selected = $this->selectedBlockId ? $this->findBlock($this->selectedBlockId) : null;
 
+    $blockCase = $selected ? \App\Enums\EmailBlockTypeEnum::tryFrom($selected['type']) : null;
+
     // $design only exists on hosts that carry a page design (the campaign and
     // template builders) — the saved section editor has no page around its
     // blocks, so this reads as an empty array there and every value below falls
@@ -151,14 +153,13 @@
                 <flux:icon name="cursor-arrow-rays" class="mx-auto size-6 text-slate-300" />
                 <p class="mt-3 text-sm text-slate-500">Select a block to edit its settings.</p>
             </div>
-        @else
-            @php($blockCase = \App\Enums\EmailBlockTypeEnum::tryFrom($selected['type']))
+        @elseif($blockCase)
 
             {{-- Keyed to the block, not to the panel. Two blocks of different types
                  both carry a "text" field, and without a key Livewire's morph keeps
                  the textarea it already had — leaving the heading's box still bound
                  to blocks.0.data.text while the paragraph is selected. --}}
-            <div wire:key="block-settings-{{ $selected['id'] }}">
+            <div wire:key="block-settings-{{ data_get($selected, 'id') }}">
             <div class="mb-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-lime-600 dark:text-lime-400">
                     {{ $blockCase->group() }}
@@ -171,7 +172,7 @@
             @include('pages.admin.marketing.partials._block-settings', [
                 'case' => $blockCase,
                 'block' => $selected,
-                'prefix' => $this->pathFor($selected['id']).'.data',
+                'prefix' => $this->pathFor(data_get($selected, 'id')).'.data',
                 'index' => $selectedIndex,
             ])
             </div>
