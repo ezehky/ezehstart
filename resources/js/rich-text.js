@@ -1,14 +1,3 @@
-import { Editor } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import ResizableImage from "./resizable-image";
-import Placeholder from "@tiptap/extension-placeholder";
-import TextAlign from "@tiptap/extension-text-align";
-import Subscript from "@tiptap/extension-subscript";
-import Superscript from "@tiptap/extension-superscript";
-import { TableKit } from "@tiptap/extension-table";
-import { TextStyle, Color, BackgroundColor } from "@tiptap/extension-text-style";
-import VideoEmbed from "./video-embed";
-
 /**
  * The tiptap editor behind <x-form.rich-text>.
  *
@@ -46,6 +35,9 @@ export default (placeholder = "", debounce = 0) => {
     /** The pending debounced push, if typing has not paused yet. */
     let pushTimer = null;
 
+    /** Set by destroy(), so an init() still awaiting tiptap knows to stop. */
+    let destroyed = false;
+
     return {
         /** Mirrors the editor's state so the toolbar can show what is active. */
         active: {},
@@ -73,38 +65,19 @@ export default (placeholder = "", debounce = 0) => {
          */
         linkBlank: true,
 
-        init() {
-            editor = new Editor({
+        /**
+         * Async because tiptap is loaded on demand — see rich-text-editor.js. A
+         * component torn down while the chunk is still arriving is left alone
+         * rather than handed an editor on a node that is no longer there.
+         */
+        async init() {
+            const { createEditor } = await import("./rich-text-editor");
+
+            if (destroyed) return;
+
+            editor = createEditor({
                 element: this.$refs.editor,
-                extensions: [
-                    StarterKit.configure({
-                        heading: { levels: [2, 3, 4] },
-                        // Link's own defaults would stamp target="_blank" onto
-                        // every anchor, which would make the new-tab checkbox a
-                        // control that can only ever be turned on. Nulling them
-                        // here leaves both attributes to applyLink().
-                        link: { HTMLAttributes: { target: null, rel: null } },
-                    }),
-                    ResizableImage.configure({
-                        inline: false,
-                        allowBase64: false,
-                    }),
-                    VideoEmbed,
-                    TextAlign.configure({ types: ["heading", "paragraph"] }),
-                    Subscript,
-                    Superscript,
-                    // Resizable columns: a table of prose is unreadable at the
-                    // equal widths it is created with, and the drag is the only
-                    // width control the toolbar does not have to carry.
-                    TableKit.configure({ table: { resizable: true } }),
-                    // Both write onto one <span style="…"> through the textStyle
-                    // mark, so a run that has a text colour and a background
-                    // colour is still a single span.
-                    TextStyle,
-                    Color,
-                    BackgroundColor,
-                    Placeholder.configure({ placeholder }),
-                ],
+                placeholder,
                 // `content` is the entangled Livewire property, so it already holds
                 // whatever the server sent — no second copy has to be passed in.
                 content: this.content || "",
@@ -127,6 +100,7 @@ export default (placeholder = "", debounce = 0) => {
          * calls destroy() on a data component when its element goes away.
          */
         destroy() {
+            destroyed = true;
             clearTimeout(pushTimer);
             editor?.destroy();
             editor = null;
@@ -207,6 +181,8 @@ export default (placeholder = "", debounce = 0) => {
         },
 
         run(command, ...args) {
+            if (!editor) return;
+
             editor
                 .chain()
                 .focus()
@@ -223,6 +199,8 @@ export default (placeholder = "", debounce = 0) => {
          * dismissed with Escape.
          */
         openLink() {
+            if (!editor) return;
+
             const attributes = editor.getAttributes("link");
 
             this.linkUrl = attributes.href || "";
@@ -312,7 +290,7 @@ export default (placeholder = "", debounce = 0) => {
          * one takes it.
          */
         insertImage(url, alt = "") {
-            if (!this.awaitingImage || !url) return;
+            if (!editor || !this.awaitingImage || !url) return;
 
             this.awaitingImage = false;
 
@@ -337,7 +315,7 @@ export default (placeholder = "", debounce = 0) => {
          * asked for one takes it.
          */
         insertVideo(url) {
-            if (!this.awaitingVideo || !url) return;
+            if (!editor || !this.awaitingVideo || !url) return;
 
             this.awaitingVideo = false;
 

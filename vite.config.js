@@ -11,6 +11,9 @@ export default defineConfig({
             fonts: [
                 bunny('Instrument Sans', {
                     weights: [400, 500, 600],
+                    // Metric-matched fallbacks need the optional "fontaine"
+                    // package, which is not a dependency here.
+                    optimizedFallbacks: false,
                 }),
             ],
         }),
