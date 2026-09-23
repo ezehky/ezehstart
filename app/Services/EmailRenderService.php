@@ -192,7 +192,7 @@ class EmailRenderService
         }
 
         $img = sprintf(
-            '<img src="%s" alt="%s" style="display:block;max-width:100%%;%s" />',
+            '<img src="%s" alt="%s" style="%s" />',
             $image->url(),
             e($data['alt'] ?? ''),
             $css['style'],
@@ -223,7 +223,7 @@ class EmailRenderService
         }
 
         $img = sprintf(
-            '<img src="%s" alt="%s" style="display:block;max-width:100%%;%s" />',
+            '<img src="%s" alt="%s" style="%s" />',
             $src,
             e((string) kSiteConfig('name')),
             $css['style'],
@@ -299,7 +299,7 @@ class EmailRenderService
             return null;
         }
 
-        $suffix = in_array($variant, ['white', 'black'], true) ? "-{$variant}" : '';
+        $suffix = \in_array($variant, ['white', 'black'], true) ? "-{$variant}" : '';
         $path = "images/socials/{$handle->icon()}{$suffix}.png";
 
         return file_exists(public_path($path)) ? asset($path) : null;
@@ -526,6 +526,11 @@ class EmailRenderService
             $style .= "height:{$height};line-height:{$height};font-size:1px;";
         }
 
+        // Check style has margin
+        if (str_contains(strtolower($style), 'margin')) {
+            return sprintf('<tr><td><div style="%s">%s</div></td></tr>', $style, $inner);
+        }
+
         return sprintf('<tr><td style="%s">%s</td></tr>', $style, $inner);
     }
 
@@ -537,11 +542,7 @@ class EmailRenderService
      */
     private function document(string $body, array $design): string
     {
-        $background = $design['background'] ?? '#F1F5F9';
-        $containerBackground = $design['container_background'] ?? '#FFFFFF';
-        $width = (int) ($design['container_width'] ?? 640);
-        $radius = (int) ($design['container_radius'] ?? 6);
-        $fontFamily = $this->fontStack($design['font_family'] ?? 'sans');
+        $designCss = app(EmailBlockItemService::class)->getCss($design, isDesign: true);
         $accentBar = $this->accentBar($design);
 
         return <<<HTML
@@ -551,10 +552,10 @@ class EmailRenderService
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="margin:0;padding:0;background:{$background};font-family:{$fontFamily};">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{$background};">
+        <body style="{$designCss['container']}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="{$width}" cellpadding="0" cellspacing="0" style="width:{$width}px;max-width:100%;background:{$containerBackground};border-radius:{$radius}px;overflow:hidden;">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="{$designCss['style']}">
         {$accentBar}
         {$body}
         </table>

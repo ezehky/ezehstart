@@ -207,7 +207,7 @@ enum EmailBlockTypeEnum: string
                 EmailBlockItemEnum::URL,
                 EmailBlockItemEnum::COLOR->value => '#0F172A',
                 EmailBlockItemEnum::WIDTH,
-                EmailBlockItemEnum::ITEM_BACKGROUND->value => '#A3E635',
+                EmailBlockItemEnum::ITEM_BACKGROUND->value => $itemService->default(EmailBlockItemEnum::BRAND_COLOR),
                 EmailBlockItemEnum::CHAR_CASE,
                 EmailBlockItemEnum::FONT_WEIGHT,
                 EmailBlockItemEnum::ITEM_RADIUS,
@@ -223,10 +223,11 @@ enum EmailBlockTypeEnum: string
                 EmailBlockItemEnum::SPACING,
             ]),
             self::DIVIDER => $itemService->make([
-                EmailBlockItemEnum::COLOR->value => '#E2E8F0',
+                EmailBlockItemEnum::COLOR->value => $itemService->default(EmailBlockItemEnum::BRAND_COLOR),
                 EmailBlockItemEnum::WIDTH,
                 EmailBlockItemEnum::ITEM_MOVE,
                 EmailBlockItemEnum::HEIGHT->value => 2,
+                EmailBlockItemEnum::ITEM_RADIUS,
 
                 // Layout
                 EmailBlockItemEnum::SPACING->value => ['top' => 5, 'left' => 20, 'bottom' => 5, 'right' => 20],
@@ -279,7 +280,7 @@ enum EmailBlockTypeEnum: string
             self::COLUMNS => $itemService->make([
                 EmailBlockItemEnum::COLUMNS->value => [
                     $itemService->columnDefault(),
-                    $itemService->columnDefault(count: 2),
+                    $itemService->columnDefault(2),
                 ],
 
                 // Layout

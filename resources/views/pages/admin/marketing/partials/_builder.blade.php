@@ -45,11 +45,12 @@
         'mono' => '"Courier New", Courier, monospace',
         default => 'Arial, Helvetica, sans-serif',
     };
+    $canvasHeight ??= 'max-h-[75vh]';
 @endphp
 
 <div class="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 lg:grid-cols-[240px_1fr_300px] dark:border-slate-800">
     {{-- PALETTE --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-e dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
+    <div class="{{ $canvasHeight }} overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-e dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
         @foreach ($palette as $group => $cases)
             <p class="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-400 first:mt-0">{{ $group }}</p>
             <div class="grid grid-cols-2 gap-2">
@@ -72,8 +73,8 @@
          where the canvas can't fit a full page — a flat colour swatch, not the
          actual body tag, so it stays readable in both themes when left unset. --}}
     <div
-        class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto p-6 custom-scrollbar"
-        style="background: {{ $design['background'] ?? '#F1F5F9' }};"
+        class="{{ $canvasHeight }} overflow-y-auto p-6 custom-scrollbar"
+        style="{{ $designCss['container'] }} padding:24px 12px;"
     >
         {{-- The canvas is a single column of blocks, with the selected block's
              settings in the right-hand pane. The canvas itself is not a form —
@@ -103,8 +104,7 @@
         <div
             wire:sort="reorderBlocks"
             wire:sort:config="{ handle: '[wire\\:sort\\:handle]' }"
-            class="mx-auto w-full shadow-sm"
-            style="max-width: {{ (int) ($design['container_width'] ?? 640) }}px; background: {{ $design['container_background'] ?? '#FFFFFF' }}; border-radius: {{ (int) ($design['container_radius'] ?? 6) }}px; font-family: {{ $letterFont }};"
+            style="{{ $designCss['style'] }}"
         >
             @if (! empty($design['accent_bar']))
                 <div style="height: 6px; background: {{ $design['brand'] ?? '#65A30D' }};"></div>
@@ -145,7 +145,7 @@
     </div>
 
     {{-- SETTINGS --}}
-    <div class="{{ $canvasHeight ?? 'max-h-[75vh]' }} overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
+    <div class="{{ $canvasHeight }} overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-s dark:border-slate-800 dark:bg-slate-950 custom-scrollbar">
         @if (! $selected)
             <div class="py-10 text-center">
                 <flux:icon name="cursor-arrow-rays" class="mx-auto size-6 text-slate-300" />

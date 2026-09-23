@@ -15,6 +15,8 @@
     unset.
 --}}
 
+@php($itemService = app(\App\Services\EmailBlockItemService::class))
+
 <flux:modal.trigger name="design-settings">
     <flux:button variant="ghost" icon="swatch">Design</flux:button>
 </flux:modal.trigger>
@@ -27,21 +29,28 @@
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-            <x-form.color-field wire:model.live="design.brand" label="Brand" description="Buttons, links, the accent bar." />
-            <x-form.color-field wire:model.live="design.background" label="Page bg" description="Behind the letter." />
-            <x-form.color-field wire:model.live="design.container_background" label="Letter bg" description="The card blocks sit on." />
+            <x-form.color-field wire:model.live="design.brand" label="Brand" size="sm" description="Buttons, links, the accent bar." />
+            <x-form.color-field wire:model.live="design.background" label="Page bg" size="sm" description="Behind the letter." />
+            <x-form.color-field
+                wire:model.live="design.container_background"
+                label="Letter bg"
+                description:trailing="The card blocks sit on."
+                size="sm"
+            />
+            <x-marketing.fonts class="w-full" wire:model.live="design.font_family" label="Typeface" :service="$itemService" />
         </div>
-
-        <flux:select wire:model.live="design.font_family" label="Typeface">
-            <flux:select.option value="sans">Sans serif</flux:select.option>
-            <flux:select.option value="serif">Serif</flux:select.option>
-            <flux:select.option value="mono">Monospace</flux:select.option>
-        </flux:select>
 
         <div class="grid grid-cols-2 gap-3">
-            <flux:input type="number" min="320" max="800" wire:model.live.debounce.600ms="design.container_width" label="Width (px)" placeholder="640" />
-            <flux:input type="number" min="0" max="32" wire:model.live.debounce.600ms="design.container_radius" label="Corner radius" placeholder="6" />
+            <x-form.number-field
+                wire:model.live.debounce.1000ms="design.container_width"
+                label="Width (px)"
+                description="The letter's maximum width."
+                min="320"
+                max="800"
+                size="sm"
+            />
         </div>
+        <x-marketing.radius wire:model.live="design.container_radius" :service="$itemService" label="Corner radius" />
 
         <flux:separator variant="subtle" />
 

@@ -78,6 +78,8 @@ enum EmailBlockItemEnum: string
     case VARIANT = 'variant';
     case CUSTOM_LINKS = 'custom_links';
 
+    case BRAND_COLOR = 'brand-color';
+
     // ===========================================================================
     // Checkers
     // ===========================================================================

@@ -29,8 +29,6 @@ new class extends Component
     // Step 2 — builder
     public ?int $footer_section_id = null;
 
-    public array $design = [];
-
     public function mount(): void
     {
         kSetSiteTitle('marketing', 'templates', $this->template ? 'Edit template' : 'New template');

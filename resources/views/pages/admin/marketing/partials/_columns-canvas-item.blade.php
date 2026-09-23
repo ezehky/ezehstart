@@ -64,33 +64,41 @@
         style="grid-template-columns: repeat({{ count($columns) ?: 2 }}, 1fr); {{ data_get($block, 'css.container', '') }}"
     >
         @foreach ($columns as $columnIndex => $column)
+            @php($columnBlocks = data_get($column, 'data.blocks', []))
             <div
                 wire:key="col-{{ $block['id'] }}-{{ $columnIndex }}"
-                class="min-h-[70px] space-y-1.5 rounded-lg border border-dashed border-slate-300 p-1.5 dark:border-slate-600"
-                style="{{ data_get($column, 'css.container', '') }}"
+                @class([
+                    'group',
+                    'min-h-[70px]' => ! count($columnBlocks),
+                    'rounded-lg',
+                    'border border-dashed border-slate-300 p-1.5 dark:border-slate-600',
+                    'group-hover:pt-5',
+                ])
             >
-                @forelse (data_get($column, 'data.blocks', []) as $childIndex => $child)
-                    @php($childCase = \App\Enums\EmailBlockTypeEnum::tryFrom($child['type']))
-                    @continue(! $childCase)
+                <div style="{{ data_get($column, 'css.container', '') }}">
+                    @forelse ($columnBlocks as $childIndex => $child)
+                        @php($childCase = \App\Enums\EmailBlockTypeEnum::tryFrom($child['type']))
+                        @continue(! $childCase)
 
-                    @include('pages.admin.marketing.partials._block-canvas-item', [
-                        'block' => $child,
-                        'case' => $childCase,
-                        'selectedBlockId' => $selectedBlockId,
-                        'sortItem' => null,
-                        'controls' => [
-                            'select' => "selectBlock('{$child['id']}')",
-                            'moveUp' => "moveColumnBlockUp({$index}, {$columnIndex}, {$childIndex})",
-                            'moveDown' => "moveColumnBlockDown({$index}, {$columnIndex}, {$childIndex})",
-                            'duplicate' => "duplicateColumnBlock({$index}, {$columnIndex}, {$childIndex})",
-                            'remove' => "removeColumnBlock({$index}, {$columnIndex}, {$childIndex})",
-                        ],
-                    ])
-                @empty
-                    <p class="p-3 text-center text-[11px] text-slate-400">Empty column</p>
-                @endforelse
+                        @include('pages.admin.marketing.partials._block-canvas-item', [
+                            'block' => $child,
+                            'case' => $childCase,
+                            'selectedBlockId' => $selectedBlockId,
+                            'sortItem' => null,
+                            'controls' => [
+                                'select' => "selectBlock('{$child['id']}')",
+                                'moveUp' => "moveColumnBlockUp({$index}, {$columnIndex}, {$childIndex})",
+                                'moveDown' => "moveColumnBlockDown({$index}, {$columnIndex}, {$childIndex})",
+                                'duplicate' => "duplicateColumnBlock({$index}, {$columnIndex}, {$childIndex})",
+                                'remove' => "removeColumnBlock({$index}, {$columnIndex}, {$childIndex})",
+                            ],
+                        ])
+                    @empty
+                        <p class="p-3 text-center text-[11px] text-slate-400">Empty column</p>
+                    @endforelse
+                </div>
 
-                <div class="flex flex-wrap justify-center gap-1 pt-1" wire:click.stop>
+                <div class="hidden group-hover:flex flex-wrap justify-center gap-1 pt-1 mt-8" wire:click.stop>
                     @foreach (\App\Enums\EmailBlockTypeEnum::nestable() as $nestCase)
                         <flux:tooltip content="Add {{ $nestCase->label() }}">
                             <flux:button

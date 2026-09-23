@@ -31,6 +31,9 @@ class EmailBlockItemService
             EmailBlockItemEnum::TEXT => 'New text',
             EmailBlockItemEnum::LEVEL => 'h1',
 
+            // BRAND
+            EmailBlockItemEnum::BRAND_COLOR => '#A3E635',
+
             // FONTS
             EmailBlockItemEnum::ALIGN => 'center',
             EmailBlockItemEnum::COLOR => '#0F172A',
@@ -49,7 +52,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::ITEM_RADIUS => 'rounded-sm',
 
             EmailBlockItemEnum::BORDER_WIDTH => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
-            EmailBlockItemEnum::BORDER_COLOR => '#0F172A',
+            EmailBlockItemEnum::BORDER_COLOR => $this->default(EmailBlockItemEnum::BRAND_COLOR),
 
             EmailBlockItemEnum::ELEMENT_DISPLAY => 'inline-block',
 
@@ -64,7 +67,11 @@ class EmailBlockItemService
             // Layouts
             EmailBlockItemEnum::BACKGROUND => null,
             EmailBlockItemEnum::BACKGROUND_IMAGE_ID => null,
-            EmailBlockItemEnum::BORDER => ['width' => 0, 'style' => 'solid', 'color' => '#A3E635'],
+            EmailBlockItemEnum::BORDER => [
+                'width' => 0,
+                'style' => 'solid',
+                'color' => $this->default(EmailBlockItemEnum::BRAND_COLOR),
+            ],
             EmailBlockItemEnum::RADIUS => 'none',
             EmailBlockItemEnum::SPACING => ['top' => 15, 'right' => 45, 'bottom' => 15, 'left' => 45],
             EmailBlockItemEnum::BORDER_SPACING => ['top' => 0, 'right' => 0, 'bottom' => 0, 'left' => 0],
@@ -107,10 +114,11 @@ class EmailBlockItemService
     /**
      * Returns the default column structure for the email block.
      *
-     * @param  bool  $make  Whether to return the default column structure as an array or as a processed array.
+     * @param  int  $count  The number of the column.
+     * @param  bool  $justData  Whether to return just the data or the full column structure.
      * @return array The default column structure for the email block.
      */
-    public function columnDefault(bool $make = true, int $count = 1): array
+    public function columnDefault(int $count = 1, bool $justData = false): array
     {
         $data = [
             EmailBlockItemEnum::BLOCKS,
@@ -118,19 +126,19 @@ class EmailBlockItemService
             // Layout
             EmailBlockItemEnum::BACKGROUND,
             EmailBlockItemEnum::BACKGROUND_IMAGE_ID,
-            EmailBlockItemEnum::SPACING,
+            EmailBlockItemEnum::SPACING->value => 0,
+            EmailBlockItemEnum::BORDER,
+            EmailBlockItemEnum::RADIUS,
         ];
 
-        $output = [
+        if ($justData) {
+            return $this->make($data);
+        }
+
+        return [
             'label' => "Column {$count}",
             'data' => $this->make($data),
         ];
-
-        if ($make) {
-            return $output;
-        }
-
-        return $data;
     }
 
     /**
@@ -469,12 +477,27 @@ class EmailBlockItemService
      *
      * @param  EmailBlockTypeEnum  $type  The email block item to get the CSS for.
      * @param  array  $data  The data array containing the valid item.
+     * @param  bool  $isDesign  Whether to include design-specific CSS or not.
      * @return array An associative array containing 'classes', 'style', and 'container' keys with their corresponding values.
      */
-    public function getCss(array $data, ?EmailBlockTypeEnum $type = null): array
+    public function getCss(array $data, ?EmailBlockTypeEnum $type = null, bool $isDesign = false): array
     {
         $classes = $style = $parent = $container = [];
 
+        // Design
+        if ($isDesign) {
+            $data = [
+                EmailBlockItemEnum::FONT->value => data_get($data, 'font_family'),
+                EmailBlockItemEnum::ITEM_RADIUS->value => data_get($data, 'container_radius', 'rounded'),
+                EmailBlockItemEnum::WIDTH_VALUE->value => data_get($data, 'container_width', 640),
+                EmailBlockItemEnum::ITEM_BACKGROUND->value => data_get($data, 'container_background', '#FFFFFF'),
+
+                // Layout
+                EmailBlockItemEnum::BACKGROUND->value => data_get($data, 'background', '#F1F5F9'),
+            ];
+        }
+
+        // Socials
         if ($type?->isSocials()) {
             $data = Arr::except($data, $this->socialsIrrelevantFields(data_get($data, 'style', 'image')));
         }
@@ -502,9 +525,29 @@ class EmailBlockItemService
             $style[] = 'text-decoration: none; text-align: center;';
         }
 
+        // Image
+        if ($type?->isImage() || $type?->isLogoDark() || $type?->isLogo() || $type?->isFavicon()) {
+            $style[] = 'display: block;';
+        }
+
         // Divider
         if ($type?->isDivider()) {
             $style[] = 'border-width:0;';
+        }
+
+        // Complete design
+        if ($isDesign) {
+            $style = [
+                ...$style,
+                'overflow: hidden;',
+                "max-width: {$data['width_value']}px;",
+                'margin: 0 auto;',
+
+            ];
+            $container = [
+                ...$container,
+                'margin:0;padding:0;',
+            ];
         }
 
         //
@@ -638,7 +681,7 @@ class EmailBlockItemService
                 EmailBlockItemEnum::BACKGROUND,
                 EmailBlockItemEnum::ITEM_BACKGROUND => "background-color: {$selected};",
                 EmailBlockItemEnum::HEIGHT => "height: {$selected}px;",
-                EmailBlockItemEnum::WIDTH_VALUE => "width: {$selected}px;",
+                EmailBlockItemEnum::WIDTH_VALUE => "max-width: 100%; width: {$selected}px;",
                 EmailBlockItemEnum::BORDER_COLOR => "border-color: {$selected};",
                 default => '',
             };

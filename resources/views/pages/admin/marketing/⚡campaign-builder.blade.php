@@ -45,8 +45,6 @@ new class extends Component
     // Builder
     public ?int $footer_section_id = null;
 
-    public array $design = [];
-
     // Recipients
     public string $email_recipient_type = 'all_users';
 

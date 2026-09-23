@@ -61,6 +61,10 @@ trait WithBlockEditor
      */
     public array $blocks = [];
 
+    public array $design = [];
+
+    public array $designCss = [];
+
     public ?string $selectedBlockId = null;
 
     public string $blockSettingsTab = 'content';
@@ -76,7 +80,50 @@ trait WithBlockEditor
      */
     public function mountWithBlockEditor(): void
     {
+        $this->blocks = $this->resolveNewItemsInDefaultBlock($this->blocks);
+
         $this->refreshBlockCss();
+    }
+
+    private function resolveNewItemsInDefaultBlock(array $blocks): array
+    {
+        $itemService = app(EmailBlockItemService::class);
+
+        // When there is a new item added to the default make
+        if ($blocks) {
+            foreach ($blocks as $index => $block) {
+                // If the block type is not valid, skip it
+                if (! $type = EmailBlockTypeEnum::tryFrom($block['type'])) {
+                    continue;
+                }
+
+                // Get the existing data for the block, if any
+                $data = data_get($block, 'data', []);
+
+                // Merge the default data with the existing data
+                $blocks[$index]['data'] = [...$type->defaultData(), ...$data];
+
+                // Columns
+                if ($type->isColumns()) {
+                    foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
+                        // Get the existing data for the column, if any
+                        $columnData = data_get($column, 'data', []);
+
+                        // Merge the default data with the existing data
+                        $blocks[$index]['data']['columns'][$columnIndex]['data'] = [
+                            ...$itemService->columnDefault(justData: true),
+                            ...$columnData,
+                        ];
+
+                        // Resolve new items in the column's blocks
+                        $blocks[$index]['data']['columns'][$columnIndex]['data']['blocks'] =
+                            $this->resolveNewItemsInDefaultBlock(data_get($column, 'data.blocks', []));
+                    }
+                }
+            }
+        }
+
+        return $blocks;
     }
 
     /**
@@ -118,19 +165,21 @@ trait WithBlockEditor
             $this->blocks[$index]['css'] = $this->cssForBlock($service, $block);
 
             // Columns blocks are the only ones that nest, so only they have children to refresh
-            $columns = data_get($block, 'data.columns', []);
-            foreach ($columns as $columnIndex => $column) {
+            foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
                 // Stamp the column itself with its own 'css' key, the EmailBlockItemService::getCss() result for that column's data
                 $this->blocks[$index]['data']['columns'][$columnIndex]['css'] = $this->cssForBlock($service, $column);
 
                 // Stamp each child block inside the column with its own 'css' key,
                 // the EmailBlockItemService::getCss() result for that child block's type and data
-                foreach ($column['blocks'] ?? [] as $childIndex => $child) {
-                    $this->blocks[$index]['data']['columns'][$columnIndex]['blocks'][$childIndex]['css']
+                foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
+                    $this->blocks[$index]['data']['columns'][$columnIndex]['data']['blocks'][$childIndex]['css']
                         = $this->cssForBlock($service, $child);
                 }
             }
         }
+
+        // Fix design
+        $this->designCss = $service->getCss($this->design, isDesign: true);
     }
 
     /**
@@ -440,7 +489,7 @@ trait WithBlockEditor
             return;
         }
 
-        $this->blocks[$index]['data']['columns'][] = app(EmailBlockItemService::class)->columnDefault(count: $count + 1);
+        $this->blocks[$index]['data']['columns'][] = app(EmailBlockItemService::class)->columnDefault($count + 1);
         $this->refreshBlockCss();
     }
 
