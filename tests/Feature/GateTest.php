@@ -162,10 +162,12 @@ test('an override can deny something the role allows', function () {
 // ENFORCEMENT
 
 test('a page the account has no gate over returns a 404', function () {
-    setAdminRoleGates(['users' => GateAccessEnum::FULL->value]);
+    // The protected role always resolves FULL — see kGate()'s administrator pass —
+    // so seeing a refusal needs an admin on a narrower, non-protected role instead.
+    $admin = adminWithRoles(roleWithGates('Narrow', ['users' => GateAccessEnum::FULL->value]));
 
-    $this->actingAs($this->admin)->get(route('admin.tags'))->assertNotFound();
-    $this->actingAs($this->admin)->get(route('admin.transactions'))->assertNotFound();
+    $this->actingAs($admin)->get(route('admin.tags'))->assertNotFound();
+    $this->actingAs($admin)->get(route('admin.transactions'))->assertNotFound();
 });
 
 test('a page the account does hold a gate over still opens', function () {
@@ -204,9 +206,11 @@ test('the member workspace is not gated by the admin map', function () {
 });
 
 test('the sidebar drops a branch the account cannot reach', function () {
-    setAdminRoleGates(['users' => GateAccessEnum::FULL->value]);
+    // Same as above: the protected role always resolves FULL, so this needs a
+    // narrower, non-protected role to see anything dropped.
+    $admin = adminWithRoles(roleWithGates('Narrow', ['users' => GateAccessEnum::FULL->value]));
 
-    $this->actingAs($this->admin);
+    $this->actingAs($admin);
 
     $links = kPageNavigationLinks('admin');
 
@@ -219,12 +223,12 @@ test('the sidebar drops a branch the account cannot reach', function () {
 });
 
 test('the sidebar drops a single child without dropping its parent', function () {
-    setAdminRoleGates([
+    $admin = adminWithRoles(roleWithGates('Narrow', [
         'users' => GateAccessEnum::FULL->value,
         'users.roles' => GateAccessEnum::NONE->value,
-    ]);
+    ]));
 
-    $this->actingAs($this->admin);
+    $this->actingAs($admin);
 
     $children = data_get(kPageNavigationLinks('admin'), 'users.children');
 
@@ -312,18 +316,20 @@ test('clearing an override puts the account back on its role', function () {
 // THE CONTROLS ON A SCREEN
 
 test('a read-only admin can open a screen and is refused every write on it', function () {
-    setAdminRoleGates([
+    // A narrow, non-protected role: the protected role always resolves FULL over
+    // every gate, so it can never be refused a write.
+    $admin = adminWithRoles(roleWithGates('Narrow', [
         'content' => GateAccessEnum::VIEW->value,
         'users' => GateAccessEnum::FULL->value,
-    ]);
+    ]));
 
     // The page opens: VIEW is enough to look at it.
-    Livewire::actingAs($this->admin)
+    Livewire::actingAs($admin)
         ->test('pages::admin.content.tags')
         ->assertOk();
 
     foreach (['create', 'createMany'] as $method) {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($admin)
             ->test('pages::admin.content.tags')
             ->call($method)
             ->assertHasErrors();
@@ -331,19 +337,19 @@ test('a read-only admin can open a screen and is refused every write on it', fun
 });
 
 test('an admin who can add but not delete is refused the delete', function () {
-    setAdminRoleGates([
+    $admin = adminWithRoles(roleWithGates('Narrow', [
         'content' => GateAccessEnum::CREATE->value,
         'users' => GateAccessEnum::FULL->value,
-    ]);
+    ]));
 
     $tag = Tag::query()->create(['name' => 'Skincare', 'slug' => 'skincare']);
 
-    Livewire::actingAs($this->admin)
+    Livewire::actingAs($admin)
         ->test('pages::admin.content.tags')
         ->call('create')
         ->assertHasNoErrors();
 
-    Livewire::actingAs($this->admin)
+    Livewire::actingAs($admin)
         ->test('pages::admin.content.tags')
         ->call('confirmDelete', $tag->id)
         ->assertHasErrors();
@@ -352,14 +358,14 @@ test('an admin who can add but not delete is refused the delete', function () {
 });
 
 test('the buttons a read-only admin cannot use are not rendered', function () {
-    setAdminRoleGates([
+    $admin = adminWithRoles(roleWithGates('Narrow', [
         'content' => GateAccessEnum::VIEW->value,
         'users' => GateAccessEnum::FULL->value,
-    ]);
+    ]));
 
     // Asserted against the wire:click rather than the label: the modals carry the same
     // words in their headings and are in the DOM whether they are open or not.
-    Livewire::actingAs($this->admin)
+    Livewire::actingAs($admin)
         ->test('pages::admin.content.tags')
         ->assertDontSeeHtml('wire:click="create"')
         ->assertDontSeeHtml('wire:click="createMany"');

@@ -186,7 +186,7 @@ class RoleService
      */
     public function updateBlockedReason(Role $role, bool $active): ?string
     {
-        if ($role->is_protected && ! $active) {
+        if ($role->is_protected->isYes() && ! $active) {
             return 'The protected role cannot be switched off. It is what guarantees somebody can still administer this install.';
         }
 
@@ -204,7 +204,7 @@ class RoleService
      */
     public function deleteBlockedReason(Role $role): ?string
     {
-        if ($role->is_protected) {
+        if ($role->is_protected->isYes()) {
             return 'The protected role cannot be deleted. It is what guarantees somebody can still administer this install.';
         }
 

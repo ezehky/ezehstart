@@ -579,8 +579,8 @@ test('the builder saves page and letter background settings onto the design, and
 
     $html = app(EmailRenderService::class)->renderCampaign($campaign->fresh())['html'];
 
-    expect($html)->toContain('background:#111111')
-        ->and($html)->toContain('background:#222222');
+    expect($html)->toContain('background-color: #111111;')
+        ->and($html)->toContain('background-color: #222222;');
 });
 
 test('the design dropdown\'s brand colour, radius and accent bar reach the render', function () {
@@ -590,13 +590,13 @@ test('the design dropdown\'s brand colour, radius and accent bar reach the rende
     Livewire::actingAs($admin)
         ->test('pages::admin.marketing.campaign-builder', ['campaign' => $campaign])
         ->set('design.brand', '#FF0000')
-        ->set('design.container_radius', 16)
+        ->set('design.container_radius', 'rounded-full')
         ->set('design.accent_bar', true)
         ->call('saveBuilder');
 
     $html = app(EmailRenderService::class)->renderCampaign($campaign->fresh())['html'];
 
-    expect($html)->toContain('border-radius:16px')
+    expect($html)->toContain('border-radius: 999px;')
         ->and($html)->toContain('background:#FF0000;');
 });
 

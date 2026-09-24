@@ -29,13 +29,13 @@ function seedQuestion(array $attributes = []): Faq
 
 test('the screen is closed to a member', function () {
     $this->actingAs(userOfType(UserTypeEnum::USER))
-        ->get(route('admin.config.faqs'))
+        ->get(route('admin.static.faqs'))
         ->assertNotFound();
 });
 
 test('a question is added and appears on the site straight away', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('create', FaqTypeEnum::GENERAL->value)
         ->set('question', 'How do I sign in?')
         ->set('answer', 'With your email address and password.')
@@ -55,7 +55,7 @@ test('a new question is queued behind the ones already there', function () {
     seedQuestion(['flow_order' => 4]);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('create', FaqTypeEnum::GENERAL->value)
         ->assertSet('flow_order', 5);
 });
@@ -64,7 +64,7 @@ test('two questions cannot be worded identically', function () {
     seedQuestion(['question' => 'Can I delete my account?']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('create', FaqTypeEnum::GENERAL->value)
         ->set('question', 'Can I delete my account?')
         ->set('answer', 'Yes.')
@@ -76,7 +76,7 @@ test('editing a question keeps its own wording available to it', function () {
     $faq = seedQuestion(['question' => 'Is this editable?']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('edit', $faq->id)
         ->assertSet('question', 'Is this editable?')
         ->set('answer', 'It is now.')
@@ -94,7 +94,7 @@ test('hiding a question takes it off the site without losing it', function () {
     $faq = seedQuestion(['question' => 'Will this be hidden?']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('toggleStatus', $faq->id)
         ->assertHasNoErrors();
 
@@ -103,7 +103,7 @@ test('hiding a question takes it off the site without losing it', function () {
     $this->get(route('home'))->assertDontSee('Will this be hidden?');
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('toggleStatus', $faq->id);
 
     expect($faq->fresh()->status)->toBe(StatusDefault::ACTIVE);
@@ -113,7 +113,7 @@ test('a question is deleted only after the dialog is confirmed', function () {
     $faq = seedQuestion();
 
     $component = Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('confirmDelete', $faq->id);
 
     // Opening the dialog changes nothing on its own.
@@ -126,7 +126,7 @@ test('a question is deleted only after the dialog is confirmed', function () {
 
 test('an answer is stored as written and compiled on the way out', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('create', FaqTypeEnum::GENERAL->value)
         ->set('question', 'Does markdown work?')
         ->set('answer', 'Yes, **it does**.')
@@ -142,7 +142,7 @@ test('every write is recorded in the activity log', function () {
     $faq = seedQuestion();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->call('toggleStatus', $faq->id)
         ->call('confirmDelete', $faq->id)
         ->call('delete');
@@ -157,7 +157,7 @@ test('every write is recorded in the activity log', function () {
 
 test('a file of questions and answers becomes a FAQ list', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('importFile', csvUpload("question,answer,order\nHow do I sign in?,With your email address.,1\nWhere is my receipt?,On the transaction.,2\n"))
         ->call('import')
         ->assertHasNoErrors();
@@ -169,7 +169,7 @@ test('a file of questions and answers becomes a FAQ list', function () {
 
 test('a question with no answer is named rather than written blank', function () {
     $component = Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('importFile', csvUpload("question,answer\nHow do I sign in?,\nWhere is my receipt?,On the transaction.\n"))
         ->call('import');
 
@@ -180,12 +180,12 @@ test('a question with no answer is named rather than written blank', function ()
 
 test('a question already on the list is left where it is', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('importFile', csvUpload("question,answer\nHow do I sign in?,With your email address.\n"))
         ->call('import');
 
     $component = Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('importFile', csvUpload("question,answer\nHow do I sign in?,Something else entirely.\n"))
         ->call('import');
 
@@ -196,14 +196,14 @@ test('a question already on the list is left where it is', function () {
 
 test('questions are cleared out in bulk', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('importFile', csvUpload("question,answer\nOne?,Yes.\nTwo?,No.\n"))
         ->call('import');
 
     $ids = Faq::query()->pluck('id')->map(fn ($id) => (string) $id)->all();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.faqs')
+        ->test('pages::admin.static.faqs')
         ->set('selected', $ids)
         ->call('bulkDelete')
         ->assertHasNoErrors();

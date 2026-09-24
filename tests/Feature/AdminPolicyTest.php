@@ -17,7 +17,7 @@ test('the screen is closed to a member', function () {
     // The admin workspace answers 404 rather than 403 to an account that has no
     // business there, which is the behaviour the rest of the suite asserts too.
     $this->actingAs(userOfType(UserTypeEnum::USER))
-        ->get(route('admin.config.policies'))
+        ->get(route('admin.static.policies'))
         ->assertNotFound();
 });
 
@@ -25,7 +25,7 @@ test('the screen is closed to a member', function () {
 
 test('a new policy is saved as a draft and stays off the public page', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('title', 'Terms of Service')
         ->set('content', '## 1. Overview')
@@ -48,7 +48,7 @@ test('drafting a new version starts from the one in force', function () {
     publishedPolicy(attributes: ['content' => '## Existing clause', 'intro' => 'The intro in force.']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->assertSet('version', '2.0')
         ->assertSet('content', '## Existing clause')
@@ -59,7 +59,7 @@ test('two versions of the same policy cannot share a number', function () {
     publishedPolicy(attributes: ['version' => '1.0']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('version', '1.0')
         ->set('title', 'Terms of Service')
@@ -76,7 +76,7 @@ test('different policies may share a version number', function () {
     publishedPolicy(PolicyTypeEnum::TERMS, ['version' => '1.0']);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::PRIVACY->value)
         ->set('version', '1.0')
         ->set('title', 'Privacy Policy')
@@ -95,7 +95,7 @@ test('a published version cannot be edited', function () {
     $policy = publishedPolicy();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('edit', $policy->id)
         ->assertHasErrors();
 
@@ -116,7 +116,7 @@ test('publishing puts a draft in force and archives what it replaces', function 
     ]);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('confirmPublish', $draft->id)
         ->call('publish')
         ->assertHasNoErrors();
@@ -134,7 +134,7 @@ test('an already published version cannot be published again', function () {
     $policy = publishedPolicy();
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('confirmPublish', $policy->id)
         ->call('publish')
         ->assertHasErrors();
@@ -150,7 +150,7 @@ test('publishing is recorded in the activity log as its own action', function ()
     ]);
 
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('confirmPublish', $draft->id)
         ->call('publish');
 
@@ -159,7 +159,7 @@ test('publishing is recorded in the activity log as its own action', function ()
 
 test('saving a draft is recorded against the policy', function () {
     Livewire::actingAs($this->admin)
-        ->test('pages::admin.configs.policies')
+        ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('title', 'Terms of Service')
         ->set('content', '## 1. Overview')
