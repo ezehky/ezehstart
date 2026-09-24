@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CurrencySymbolPositionEnum;
 use App\Models\User;
 use App\Services\CurrencyService;
 
@@ -47,6 +48,10 @@ if (! function_exists('kMoneyFormat')) {
         bool $convert = true,
         ?User $user = null,
     ): string {
+        // A symbol passed in has no currency row to say which side it goes on, so
+        // it goes in front, where every symbol went before currencies had a side.
+        $position = CurrencySymbolPositionEnum::BEFORE;
+
         if ($default) {
             $symbol = $default;
         } else {
@@ -54,13 +59,15 @@ if (! function_exists('kMoneyFormat')) {
 
             $amount = $convert ? kCurrencyConvert($amount, $currency) : $amount;
             $symbol = $currency['symbol'];
+            $position = CurrencySymbolPositionEnum::tryFrom($currency['symbol_position'] ?? '') ?? $position;
         }
 
         // FORMAT MONEY
         $money = kMoney($amount, $decimals);
 
-        // HANDLE SYMBOL POSITION AFTER
-        return $decodeHtml ? html_entity_decode("{$symbol}{$money}") : "{$symbol}{$money}";
+        $formatted = $position->place($symbol, $money);
+
+        return $decodeHtml ? html_entity_decode($formatted) : $formatted;
     }
 }
 
@@ -68,7 +75,7 @@ if (! function_exists('kDefaultCurrency')) {
     /**
      * The currency the ledger is written in, as the array CurrencyService caches.
      *
-     * @return array{id: int|null, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @return array{id: int|null, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     function kDefaultCurrency(): array
     {
@@ -89,7 +96,7 @@ if (! function_exists('kActiveCurrency')) {
      * signed in when none is given. The site default for a guest, and for anybody
      * who never picked one.
      *
-     * @return array{id: int|null, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @return array{id: int|null, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     function kActiveCurrency(?User $user = null): array
     {

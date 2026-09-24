@@ -4,10 +4,13 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
 use App\Models\ActivityLog;
+use App\Models\User;
 use App\Services\ImpersonationService;
 use App\Services\PasskeyService;
 use App\Services\SiteConfigurationService;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Spatie\LaravelPasskeys\Models\Passkey;
 
 beforeEach(function () {
     $this->member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
@@ -94,6 +97,85 @@ test('a suspended account cannot sign in with its passkey', function () {
         ->assertHasErrors('passkey');
 
     expect(auth()->check())->toBeFalse();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// SIGN UP
+
+/**
+ * The sign-up form, filled in as far as a passkey sign-up needs — no password.
+ */
+function passkeySignup(): Testable
+{
+    return Livewire::test('pages::auth.register')
+        ->set('name', 'Ada Lovelace')
+        ->set('email', 'ada@example.test')
+        ->set('agreed_to_terms', true);
+}
+
+test('the sign-up page offers a passkey while the switch is on', function () {
+    $this->get(route('register'))->assertOk()->assertSee('Create account with a passkey');
+
+    app(SiteConfigurationService::class)->update(['security' => ['passkeys' => false]]);
+
+    $this->get(route('register'))->assertOk()->assertDontSee('Create account with a passkey');
+});
+
+test('a passkey sign-up asks for the details, but not a password', function () {
+    Livewire::test('pages::auth.register')
+        ->call('passkeyOptions')
+        ->assertHasErrors(['name', 'email', 'agreed_to_terms'])
+        ->assertHasNoErrors('password');
+});
+
+test('the sign-up challenge is for the address typed and demands user verification', function () {
+    $options = json_decode(passkeySignup()->call('passkeyOptions')->assertHasNoErrors()->effects['returns'][0], true);
+
+    expect($options['user']['name'])->toBe('ada@example.test')
+        ->and($options['user']['displayName'])->toBe('Ada Lovelace')
+        ->and($options['authenticatorSelection']['userVerification'])->toBe('required');
+});
+
+test('a key that verifies opens a signed-in account with no password', function () {
+    $this->partialMock(PasskeyService::class, fn ($mock) => $mock->shouldReceive('completeSignup')
+        ->andReturnUsing(fn (User $user) => Passkey::query()->find(passkeyFor($user, 'Added at sign-up'))));
+
+    passkeySignup()
+        ->call('passkeyOptions')
+        ->call('registerWithPasskey', '{"id":"signed"}')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    $user = User::query()->firstWhere('email', 'ada@example.test');
+
+    expect($user)->not->toBeNull()
+        ->and($user->password)->toBeNull()
+        ->and($user->passkeys()->count())->toBe(1)
+        ->and(auth()->id())->toBe($user->id);
+});
+
+test('a key that does not verify leaves no account behind', function () {
+    passkeySignup()
+        ->call('passkeyOptions')
+        ->call('registerWithPasskey', '{"id":"forged"}')
+        ->assertHasErrors('passkey');
+
+    expect(User::query()->where('email', 'ada@example.test')->exists())->toBeFalse()
+        ->and(auth()->check())->toBeFalse();
+});
+
+test('a key answer with no challenge issued for that address creates nothing', function () {
+    passkeySignup()
+        ->call('registerWithPasskey', '{"id":"signed"}')
+        ->assertHasErrors('passkey');
+
+    expect(User::query()->where('email', 'ada@example.test')->exists())->toBeFalse();
+});
+
+test('the switch closes passkey sign-up as well as hiding the button', function () {
+    app(SiteConfigurationService::class)->update(['security' => ['passkeys' => false]]);
+
+    passkeySignup()->call('passkeyOptions')->assertNotFound();
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||

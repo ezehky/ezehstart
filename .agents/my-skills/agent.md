@@ -138,6 +138,8 @@ Never generate any of the following in this project:
 | `new SomeService()` | `app(SomeService::class)` |
 | Raw `number_format($money)` for currency | `kMoneyFormat()` / `->fooMoney()` |
 | `Carbon::parse($x)->format(...)` in Blade | `->fooHuman()` / `kDatetimeConverter()` |
+| A query, `app(SomeService::class)`, or a `kSiteFlag()` decision in a Blade view or component | A `#[Computed]` on the page, backed by a service; the component takes the result as a prop |
+| `Route::view()` for a page that reads anything | `Route::livewire('/path', 'pages::site.name')` with `#[Layout('layouts::site')]` |
 | `Str::slug()` | `kSlug()` |
 | `@livewire('…')` | `<livewire:… />` or the page route |
 | New base folders under `app/` | One of the 13 existing folders |

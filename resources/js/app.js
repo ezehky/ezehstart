@@ -5,6 +5,7 @@ import {
 import richText from "./rich-text";
 import chart from "./chart";
 import countdownTimer from "./countdown-timer";
+import counter from "./counter";
 import datePicker from "./date-picker";
 import turnstileWidget from "./turnstile";
 import passkey from "./passkey";
@@ -36,6 +37,13 @@ Alpine.data("chart", chart);
  * being started on the same element.
  */
 Alpine.data("countdownTimer", countdownTimer);
+
+/**
+ * The count-up behind <x-util.counter>. Registered once here so a Livewire
+ * re-render keeps the number where it is rather than starting a second count on
+ * the same element.
+ */
+Alpine.data("counter", counter);
 
 /**
  * The calendar behind <x-form.date-field>. Registered once here so a Livewire

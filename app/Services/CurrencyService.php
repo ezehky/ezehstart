@@ -28,13 +28,14 @@ class CurrencyService
      * because that is what kMoneyFormat() hard-coded before currencies were rows,
      * so a fresh clone looks the same before and after it is seeded.
      *
-     * @var array{id: int|null, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @var array{id: int|null, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     public const FALLBACK = [
         'id' => null,
         'name' => 'Naira',
         'code' => 'NGN',
         'symbol' => '&#8358;',
+        'symbol_position' => 'before',
         'rate' => 1.0,
         'is_default' => true,
     ];
@@ -72,7 +73,7 @@ class CurrencyService
     /**
      * The currency the ledger is written in.
      *
-     * @return array{id: int|null, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @return array{id: int|null, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     public function default(): array
     {
@@ -88,7 +89,7 @@ class CurrencyService
      * Resolved from the cached list rather than the relation, so formatting a
      * table of fifty amounts does not cost fifty queries.
      *
-     * @return array{id: int|null, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @return array{id: int|null, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     public function forUser(?User $user): array
     {

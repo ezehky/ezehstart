@@ -53,12 +53,12 @@ enum LocaleEnum: string
     public function flag(): string
     {
         return match ($this) {
-            self::EN => '🇬🇧',
-            self::FR => '🇫🇷',
-            self::ES => '🇪🇸',
-            self::PT => '🇵🇹',
-            self::DE => '🇩🇪',
-            self::AR => '🇸🇦',
+            self::EN => 'US',
+            self::FR => 'FR',
+            self::ES => 'ES',
+            self::PT => 'PT',
+            self::DE => 'DE',
+            self::AR => 'SA',
         };
     }
 

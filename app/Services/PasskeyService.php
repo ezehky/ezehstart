@@ -13,7 +13,11 @@ use Spatie\LaravelPasskeys\Actions\StorePasskeyAction;
 use Spatie\LaravelPasskeys\Models\Passkey;
 use Spatie\LaravelPasskeys\Support\Config;
 use Spatie\LaravelPasskeys\Support\Serializer;
+use Webauthn\AuthenticatorSelectionCriteria;
+use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialRequestOptions;
+use Webauthn\PublicKeyCredentialRpEntity;
+use Webauthn\PublicKeyCredentialUserEntity;
 
 /**
  * Passkeys — WebAuthn key pairs held on the account holder's device.
@@ -36,6 +40,8 @@ class PasskeyService
     private const REGISTRATION_KEY = 'passkeys.registration-options';
 
     private const AUTHENTICATION_KEY = 'passkeys.authentication-options';
+
+    private const SIGNUP_KEY = 'passkeys.signup';
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // AVAILABILITY
@@ -77,27 +83,7 @@ class PasskeyService
     {
         $options = session()->pull(self::REGISTRATION_KEY);
 
-        if (! \is_string($options)) {
-            return null;
-        }
-
-        try {
-            $passkey = app(StorePasskeyAction::class)->execute(
-                $user,
-                $credentialJson,
-                $options,
-                request()->getHost(),
-                ['name' => Str::limit(trim($name), 250, '')],
-            );
-        } catch (\Throwable $e) {
-            Log::channel('ezeh')->warning('Passkey enrolment failed: '.$e->getMessage(), ['user' => $user->id]);
-
-            return null;
-        }
-
-        app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSKEY_CREATE, $passkey->name, model: $user);
-
-        return $passkey;
+        return \is_string($options) ? $this->store($user, $credentialJson, $options, $name) : null;
     }
 
     /**
@@ -117,6 +103,106 @@ class PasskeyService
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSKEY_DELETE, $passkey->name, model: $user);
 
         return true;
+    }
+
+    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    // SIGN UP
+
+    /**
+     * The options for a key made before its account exists, as JSON — the
+     * sign-up page's "create account with a passkey".
+     *
+     * Built here rather than by the package's action, which reads the handle off
+     * a saved account's id. There is no account yet, so the handle is random. It
+     * only has to agree with itself: sign-in finds the account through the stored
+     * key, and checks the handle the device answers with against the one stored
+     * beside it, never against users.id.
+     *
+     * User verification is required, for the same reason as at sign-in: this key
+     * is the account's only way in, and it is only as strong as the fingerprint,
+     * face or PIN in front of it.
+     *
+     * The name and address are held with the challenge, so the account that gets
+     * created is the one the device was asked to make a key for.
+     */
+    public function signupOptions(string $name, string $email): string
+    {
+        $rp = new PublicKeyCredentialRpEntity(
+            name: '',
+            id: Config::getRelyingPartyId(),
+            icon: Config::getRelyingPartyIcon(),
+        );
+
+        // Assigned rather than passed, as the package does — webauthn-lib 5.3
+        // deprecates the name in the constructor.
+        $rp->name = Config::getRelyingPartyName();
+
+        $options = Serializer::make()->toJson(new PublicKeyCredentialCreationOptions(
+            rp: $rp,
+            user: new PublicKeyCredentialUserEntity(name: $email, id: Str::random(32), displayName: $name),
+            challenge: Str::random(32),
+            authenticatorSelection: new AuthenticatorSelectionCriteria(
+                null,
+                AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_REQUIRED,
+                AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED,
+            ),
+            attestation: PublicKeyCredentialCreationOptions::ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
+        ));
+
+        session()->put(self::SIGNUP_KEY, ['options' => $options, 'email' => $email]);
+
+        return $options;
+    }
+
+    /**
+     * Whether a sign-up challenge is waiting for this address. Asked before the
+     * account is written, so a key answer arriving for an address the form no
+     * longer holds creates nothing.
+     */
+    public function hasPendingSignup(string $email): bool
+    {
+        return data_get(session()->get(self::SIGNUP_KEY), 'email') === $email;
+    }
+
+    /**
+     * Keep the key the sign-up page's device made, on the account just written for
+     * it. Null when it does not check out — called inside the transaction that
+     * writes the account, so a null there is what rolls the account back.
+     */
+    public function completeSignup(User $user, string $credentialJson): ?Passkey
+    {
+        $pending = session()->pull(self::SIGNUP_KEY);
+
+        if (data_get($pending, 'email') !== $user->email || ! \is_string(data_get($pending, 'options'))) {
+            return null;
+        }
+
+        return $this->store($user, $credentialJson, $pending['options'], __('Added at sign-up'));
+    }
+
+    /**
+     * Verify a device's answer against the challenge it was given and keep the
+     * public key, logged against the account.
+     */
+    private function store(User $user, string $credentialJson, string $options, string $name): ?Passkey
+    {
+        try {
+            $passkey = app(StorePasskeyAction::class)->execute(
+                $user,
+                $credentialJson,
+                $options,
+                request()->getHost(),
+                ['name' => Str::limit(trim($name), 250, '')],
+            );
+        } catch (\Throwable $e) {
+            Log::channel('ezeh')->warning('Passkey enrolment failed: '.$e->getMessage(), ['user' => $user->id]);
+
+            return null;
+        }
+
+        app(ActivityLogService::class)->logActivity(ActivityActionEnum::PASSKEY_CREATE, $passkey->name, model: $user);
+
+        return $passkey;
     }
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

@@ -7,6 +7,26 @@ and are used as `<x-group.kebab-case />`. **There are no PHP component classes**
 `app/View/Components/` does not exist. Every component is a single Blade file opening
 with `@props([...])`.
 
+### Data comes in, never goes looking
+
+A component is presentation. Everything it shows arrives as a prop, already
+fetched, filtered and ordered by the page that renders it. No `Model::query()`, no
+`app(SomeService::class)`, no `kSiteFlag()` switch deciding what appears: the page
+reads those in a `#[Computed]`, the logic behind the read lives in a service, and
+the component is handed the answer.
+
+```blade
+{{-- pages/site/⚡home.blade.php --}}
+<x-site.stats :stats="$this->stats" />      {{-- stats(): SiteStatsService::frontPage() --}}
+<x-site.latest-posts :posts="$this->latestPosts" />
+```
+
+What a component *may* work out for itself is how to draw what it was given — a
+`match` from a size to classes, a tone to a palette, an invalid prop to an
+exception. A section with nothing to show renders nothing when handed an empty
+prop (`@if (filled($stats))`), so the "silent on an empty install" rule is kept
+by the data, not by a query inside the component.
+
 ### The groups
 
 | Group | Purpose | Examples |

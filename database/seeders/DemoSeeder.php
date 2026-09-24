@@ -43,6 +43,9 @@ class DemoSeeder extends Seeder
             DemoUserSeeder::class,
             DemoContentSeeder::class,
             DemoTransactionSeeder::class,
+
+            // After the posts, because it points visitors at them.
+            DemoAnnouncementSeeder::class,
         ]);
     }
 

@@ -63,7 +63,7 @@ new class extends Component
     @if ($this->enabled)
         <flux:dropdown position="bottom" align="end">
             <flux:button variant="ghost" size="sm" :aria-label="__('Change language')" class="gap-1.5">
-                <span class="text-base leading-none">{{ $this->current->flag() }}</span>
+                <flux:flag class="me-2 leading-none" :country="$this->current->flag()" size="xs" />
                 @if ($withLabel)
                     <span>{{ $this->current->label() }}</span>
                 @else
@@ -78,7 +78,7 @@ new class extends Component
                         wire:click="choose('{{ $locale->value }}')"
                         :icon:trailing="$locale === $this->current ? 'check' : null"
                     >
-                        <span class="me-2 text-base leading-none">{{ $locale->flag() }}</span>
+                        <flux:flag class="me-2 leading-none" :country="$locale->flag()" size="xs" />
                         <span lang="{{ $locale->value }}" dir="{{ $locale->direction() }}">{{ $locale->label() }}</span>
                     </flux:menu.item>
                 @endforeach

@@ -360,6 +360,41 @@ test('a new template starts on the details step and moves to the builder once cr
         ->assertSet('step', 'builder');
 });
 
+/**
+ * mount() fills in block defaults and stamps css onto every block, column and
+ * child, none of which is saved — a straight comparison with the row read every
+ * freshly saved template as unsaved.
+ */
+test('a saved template reopens clean, and an edit makes it unsaved again', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN);
+
+    $template = EmailTemplate::create([
+        'name' => 'Columns Template',
+        'content' => ['blocks' => [
+            ['id' => 'b1', 'type' => 'heading', 'data' => ['text' => 'Hello']],
+            ['id' => 'b2', 'type' => 'columns', 'data' => ['columns' => [
+                ['label' => 'Column 1', 'data' => ['blocks' => [
+                    ['id' => 'c1', 'type' => 'paragraph', 'data' => ['text' => 'Left']],
+                ]]],
+            ]]],
+        ]],
+        'design' => [],
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.template-builder', ['template' => $template])
+        ->call('save');
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.marketing.template-builder', ['template' => $template->fresh()]);
+
+    expect($component->instance()->hasUnsavedChanges())->toBeFalse();
+
+    $component->set('blocks.0.data.text', 'Changed');
+
+    expect($component->instance()->hasUnsavedChanges())->toBeTrue();
+});
+
 test('the template builder renders with every block type present', function () {
     $admin = userOfType(UserTypeEnum::ADMIN);
 

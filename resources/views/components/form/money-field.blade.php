@@ -29,6 +29,10 @@
     $model = $attributes->wire('model');
     $currency ??= kDefaultCurrency();
 
+    // The symbol sits on the side the currency writes it, so the field reads the
+    // way the amount will once it is saved.
+    $symbolAfter = ($currency['symbol_position'] ?? null) === \App\Enums\CurrencySymbolPositionEnum::AFTER->value;
+
     // A range in the placeholder says what the field will accept before anybody
     // has to be told by a validation error.
     $placeholder ??= $min !== null && $max !== null && $min < $max
@@ -49,7 +53,9 @@
 
     <div wire:ignore x-data="moneyInput({ value: {{ $entangle }}, decimals: @js((int) $decimals) })">
         <flux:input.group>
-            <flux:input.group.prefix>{!! $currency['symbol'] !!}</flux:input.group.prefix>
+            @unless ($symbolAfter)
+                <flux:input.group.prefix>{!! $currency['symbol'] !!}</flux:input.group.prefix>
+            @endunless
 
             <flux:input
                 x-model="display"
@@ -60,6 +66,9 @@
                 {{ $attributes->whereDoesntStartWith('wire:model') }}
             />
 
+            @if ($symbolAfter)
+                <flux:input.group.suffix>{!! $currency['symbol'] !!}</flux:input.group.suffix>
+            @endif
             <flux:input.group.suffix>{{ $currency['code'] }}</flux:input.group.suffix>
         </flux:input.group>
     </div>

@@ -87,6 +87,10 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Every text/number/email/search input has a `placeholder` that shows an example
       rather than repeating the label
 - [ ] ✓ Derived data is `#[Computed]`, not assigned in `mount()`
+- [ ] ✓ No query, service call or `kSiteFlag()` decision in Blade — not in the page's
+      view half, not in a component. The page's `#[Computed]` reads it (logic in a
+      service) and passes it down as a prop
+- [ ] ✓ A public page is a `pages/site/` SFC on `layouts::site`, never `Route::view()`
 - [ ] ✓ Computed caches are invalidated with `unset($this->name)` after writes
 - [ ] ✓ Validation is `protected function rules(): array`
 - [ ] ✓ Save path: `validate()` → fill → `respondPrimary(if: $model->isClean())` →

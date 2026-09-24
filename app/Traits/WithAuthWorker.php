@@ -42,7 +42,7 @@ trait WithAuthWorker
     #[Computed]
     public function passwordlessEnabled(): bool
     {
-        return (bool) kSiteFlag('security', 'passwordless-login', true);
+        return (bool) kSiteFlag('security', 'passwordless-login', false);
     }
 
     /**
@@ -124,8 +124,15 @@ trait WithAuthWorker
      *
      * Self-registration only ever makes a member. users carry no role — the type
      * column defaults to UserTypeEnum::USER and there is nothing else to assign.
+     *
+     * $within runs inside the same transaction, after the account is written, for
+     * anything the account cannot exist without — the key of a passkey sign-up,
+     * which has no password to fall back on. A falsy answer rolls the whole account
+     * back, so nothing is emailed, logged or signed in.
+     *
+     * @param  (\Closure(User): mixed)|null  $within
      */
-    private function createUser(array $data, array $profileData = [], bool $sendOtp = true): ?User
+    private function createUser(array $data, array $profileData = [], bool $sendOtp = true, ?\Closure $within = null): ?User
     {
         $userService = app(UserService::class);
 
@@ -136,7 +143,7 @@ trait WithAuthWorker
         $consentPolicies = app(PolicyContentService::class)->getCurrentRequiringConsent();
 
         try {
-            $user = DB::transaction(function () use ($data, $profileData, $userService, $consentPolicies) {
+            $user = DB::transaction(function () use ($data, $profileData, $userService, $consentPolicies, $within) {
                 // Create the user, or take over the newsletter row that already
                 // holds this address. Status is set explicitly on the claim: the
                 // column default only applies to an insert, and the row being
@@ -167,6 +174,10 @@ trait WithAuthWorker
                 // account that exists without the record of what it agreed to is
                 // exactly the state this feature is here to prevent.
                 $consentPolicies->each(fn (Policy $policy) => $userService->recordConsent($policy, $user));
+
+                if ($within && ! $within($user)) {
+                    throw new \RuntimeException('The account could not be completed and was not kept.');
+                }
 
                 return $user;
             });

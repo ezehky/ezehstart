@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CurrencySymbolPositionEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusYes;
 use App\Traits\WithDynamicModelFormatting;
@@ -20,6 +21,7 @@ class Currency extends Model
     {
         return [
             'rate' => 'float',
+            'symbol_position' => CurrencySymbolPositionEnum::class,
             'is_default' => StatusYes::class,
             'status' => StatusDefault::class,
         ];
@@ -64,7 +66,7 @@ class Currency extends Model
      * rather than the model so it can sit in the cache and the session without
      * dragging a serialised Eloquent object along with it.
      *
-     * @return array{id: int, name: string, code: string, symbol: string, rate: float, is_default: bool}
+     * @return array{id: int, name: string, code: string, symbol: string, symbol_position: string, rate: float, is_default: bool}
      */
     public function toCurrencyArray(): array
     {
@@ -73,6 +75,9 @@ class Currency extends Model
             'name' => $this->name,
             'code' => $this->code,
             'symbol' => $this->symbol,
+            // The case's value, not the case: this array is cached and put in the
+            // session, and a plain string survives both unchanged.
+            'symbol_position' => ($this->symbol_position ?? CurrencySymbolPositionEnum::BEFORE)->value,
             'rate' => (float) $this->rate,
             'is_default' => $this->isDefault(),
         ];

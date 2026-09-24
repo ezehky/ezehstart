@@ -95,3 +95,23 @@ test('the builder assigns a template to a slot', function () {
     expect($template->system_email)->toBe(SystemEmailEnum::WELCOME)
         ->and($template->subject)->toBe('Welcome aboard, {{user.first_name}}');
 });
+
+test('the builder offers a system template its own tokens in the personalize menu', function () {
+    $template = systemTemplate(SystemEmailEnum::LOGIN);
+
+    Livewire::actingAs(userOfType(UserTypeEnum::ADMIN))
+        ->test('pages::admin.marketing.template-builder', ['template' => $template])
+        ->call('selectBlock', 'b1')
+        ->assertSee(SystemEmailEnum::LOGIN->label())
+        ->assertSee('{{login.device}}', escape: false);
+});
+
+test('an ordinary template offers only the site and recipient tokens', function () {
+    $template = systemTemplate(SystemEmailEnum::LOGIN, ['system_email' => null]);
+
+    Livewire::actingAs(userOfType(UserTypeEnum::ADMIN))
+        ->test('pages::admin.marketing.template-builder', ['template' => $template])
+        ->call('selectBlock', 'b1')
+        ->assertSee('{{site.name}}', escape: false)
+        ->assertDontSee('{{login.device}}', escape: false);
+});

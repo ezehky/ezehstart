@@ -179,7 +179,52 @@ new #[Layout('layouts::auth')] class extends Component
 <x-slot:title>{{ __('Sign in to your account') }}</x-slot:title>
 <x-slot:description>{{ __('Pick up where you left off.') }}</x-slot:description>
 <x-slot:extra>
-    {{-- Only where the browser can make the request at all. The Alpine component
+    <x-auth.passwordless class="my-3" :enabled="$this->passwordlessEnabled" />
+    <x-auth.social-providers :providers="$this->socialProviders" />
+    <flux:text class="mt-8 text-center dark:text-slate-400">
+        {{ __('New here?') }}
+        <flux:link href="{{ route('register') }}" variant="ghost">
+            {{ __('Create an account') }}
+        </flux:link>
+    </flux:text>
+</x-slot:extra>
+
+<div>
+    <form wire:submit.throttle.1000ms="login" class="mt-8 space-y-5">
+        <flux:input
+            :label="__('Email address')"
+            wire:model="email"
+            type="email"
+            autofocus
+            placeholder="you@example.com"
+            icon="user"
+        />
+
+        <flux:field>
+            <div class="flex items-center justify-between gap-4 mb-2">
+                <flux:label>{{ __('Password') }}</flux:label>
+                <flux:link href="{{ route('password.request') }}" variant="ghost" class="text-sm">
+                    {{ __('Forgot password?') }}
+                </flux:link>
+            </div>
+            <x-form.password :label="null" wire:model="password" icon="lock-closed" />
+            <flux:error name="password" />
+        </flux:field>
+        <flux:switch wire:model="remember" :label="__('Keep me signed in')" />
+
+        {{-- Only after this address has been failing sign-ins. Hiding it is the
+                courtesy; rules() is the boundary, and the two ask the same method. --}}
+        @if ($this->captchaRequired())
+            <x-form.captcha action="login" />
+        @endif
+
+        <flux:button type="submit" variant="primary" class="w-full">{{ __('Sign in') }}</flux:button>
+    </form>
+
+    {{-- Inside the component root, not in the layout's extra slot. The slot is
+         printed outside the component, where $wire has nothing to call — the
+         button rendered, and clicking it threw before the device was ever asked.
+         Only where the browser can make the request at all: the Alpine component
          reports support, so a browser without WebAuthn never sees a button that
          can only fail. --}}
     @if ($this->passkeysEnabled)
@@ -191,44 +236,4 @@ new #[Layout('layouts::auth')] class extends Component
             <p x-show="error" x-text="error" class="mt-2 text-sm text-rose-600 dark:text-rose-400"></p>
         </div>
     @endif
-    <x-auth.passwordless :enabled="$this->passwordlessEnabled" />
-    <x-auth.social-providers :providers="$this->socialProviders" />
-    <flux:text class="mt-8 text-center dark:text-slate-400">
-        {{ __('New here?') }}
-        <flux:link href="{{ route('register') }}" variant="ghost">
-            {{ __('Create an account') }}
-        </flux:link>
-    </flux:text>
-</x-slot:extra>
-
-<form wire:submit.throttle.1000ms="login" class="mt-8 space-y-5">
-    <flux:input
-        :label="__('Email address')"
-        wire:model="email"
-        type="email"
-        autofocus
-        placeholder="you@example.com"
-        icon="user"
-    />
-
-    <flux:field>
-        <div class="flex items-center justify-between gap-4 mb-2">
-            <flux:label>{{ __('Password') }}</flux:label>
-            <flux:link href="{{ route('password.request') }}" variant="ghost" class="text-sm">
-                {{ __('Forgot password?') }}
-            </flux:link>
-        </div>
-        <x-form.password :label="null" wire:model="password" icon="lock-closed" />
-        <flux:error name="password" />
-    </flux:field>
-    <flux:switch wire:model="remember" :label="__('Keep me signed in')" />
-
-    {{-- Only after this address has been failing sign-ins. Hiding it is the
-            courtesy; rules() is the boundary, and the two ask the same method. --}}
-    @if ($this->captchaRequired())
-        <x-form.captcha action="login" />
-    @endif
-
-    <flux:button type="submit" variant="primary" class="w-full">{{ __('Sign in') }}</flux:button>
-</form>
-
+</div>

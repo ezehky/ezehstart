@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Enums\EmailBlockTypeEnum;
 use App\Services\EmailBlockItemService;
+use App\Services\EmailVariableService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -405,6 +406,19 @@ trait WithBlockEditor
      * top-level index because the field it is appending to might belong to a
      * block nested inside a column.
      */
+    /**
+     * What the "+ Personalize" menu offers, [heading => [token => label]]. Every
+     * email has the site and recipient tokens; a host with tokens of its own puts
+     * them in a group ahead of these — the template builder does, for the system
+     * email it stands in for, which only that mail can resolve.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public function personalizeTokenGroups(): array
+    {
+        return ['Site & recipient' => app(EmailVariableService::class)->knownTokens()];
+    }
+
     public function insertToken(string $blockId, string $field, string $token): void
     {
         $block = $this->findBlock($blockId);
@@ -669,20 +683,46 @@ trait WithBlockEditor
      */
     protected function blockContent(): array
     {
+        return ['blocks' => $this->withoutBlockCss($this->blocks)];
+    }
+
+    /**
+     * Whether the canvas holds anything the saved blocks do not — the half of a
+     * host's hasUnsavedChanges() that is about blocks.
+     *
+     * Not a straight comparison with the saved row. mount() fills each block's
+     * missing defaults and stamps a 'css' key on every block, column and child,
+     * none of which is saved, so a freshly loaded canvas never equalled its own
+     * record and "Unsaved" came back on every save. Both sides go through the same
+     * defaults and lose the same keys before they are compared.
+     */
+    protected function blocksDifferFrom(array $savedBlocks): bool
+    {
+        return $this->withoutBlockCss($this->blocks)
+            !== $this->withoutBlockCss($this->resolveNewItemsInDefaultBlock($savedBlocks));
+    }
+
+    /**
+     * The blocks without the 'css' refreshBlockCss() stamps on them — derived from
+     * the data on every mount, so never worth storing.
+     */
+    private function withoutBlockCss(array $blocks): array
+    {
         $strip = fn (array $block) => Arr::except($block, ['css']);
 
-        $blocks = array_map(function (array $block) use ($strip) {
+        return array_map(function (array $block) use ($strip) {
             $block = $strip($block);
 
             foreach (data_get($block, 'data.columns', []) as $columnIndex => $column) {
+                // The column carries a 'css' key of its own, as well as its children.
+                $block['data']['columns'][$columnIndex] = $strip($column);
+
                 foreach (data_get($column, 'data.blocks', []) as $childIndex => $child) {
                     $block['data']['columns'][$columnIndex]['data']['blocks'][$childIndex] = $strip($child);
                 }
             }
 
             return $block;
-        }, $this->blocks);
-
-        return ['blocks' => $blocks];
+        }, $blocks);
     }
 }

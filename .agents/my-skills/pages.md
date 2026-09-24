@@ -2,7 +2,7 @@
 
 ## Rule
 
-There are **six** recurring page shapes in this project. Every new screen is one of
+There are **seven** recurring page shapes in this project. Every new screen is one of
 them. Identify the shape first, then copy the template.
 
 | Shape | Canonical file | Signature |
@@ -13,6 +13,7 @@ them. Identify the shape first, then copy the template.
 | **D. Tabbed record** | `pages/admin/training/⚡cohort-*.blade.php` (10 files) | shared trait + `x-dashboard.tab-nav` + one tab's content |
 | **E. Dashboard** | `pages/admin/⚡dashboard.blade.php`, `pages/user/⚡dashboard.blade.php` | greeting + stat cards + chart + feeds |
 | **F. Guest / auth** | `pages/auth/⚡login.blade.php` | `#[Layout('layouts::auth')]` + named slots |
+| **G. Public page** | `pages/site/⚡home.blade.php`, `pages/site/blog/⚡index.blade.php` | `#[Layout('layouts::site')]` + `#[Computed]` reads handed to `x-site.*` components |
 
 All pages start with `kSetSiteTitle(...)` in `mount()` and end with a single root
 `<div class="space-y-6">` (or `<form>` for shape C).
@@ -659,9 +660,41 @@ See [auth.md](auth.md), [layouts.md](layouts.md).
 
 ---
 
+## G. Public page
+
+### Rule
+
+`new #[Layout('layouts::site')] class extends Component`, routed in `web.php` with
+`Route::livewire()` — never `Route::view()`, which leaves the data nowhere to be
+read but the Blade. The layout brings the header and footer; the page reads every
+section's data in a `#[Computed]` and hands it to an `x-site.*` component as a
+prop. The logic behind a read (what counts, what is hidden while the install is
+empty) belongs to a service, so the computed is one line.
+
+### Example — `pages/site/⚡home.blade.php`
+
+```php
+#[Computed]
+public function stats(): array
+{
+    return app(SiteStatsService::class)->frontPage();
+}
+```
+
+```blade
+<x-site.stats :stats="$this->stats" />
+<x-site.faq :faqs="$this->faqs" />
+```
+
+See [components.md](components.md) — *Data comes in, never goes looking*.
+
+---
+
 ## Avoid
 
-- Inventing a seventh shape. Pick the closest of the six.
+- Inventing an eighth shape. Pick the closest of the seven.
+- A query, a service call or a site-flag read in the Blade half of a page or in a
+  component — it belongs in a `#[Computed]`, and its logic in a service.
 - A separate create/edit **route** for a config-style resource — use shape A.
 - One giant component for a multi-faceted record — use shape D.
 - Skipping `kSetSiteTitle()`; the sidebar highlight and `<title>` both break.

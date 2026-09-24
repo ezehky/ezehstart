@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\CurrencySymbolPositionEnum;
 use App\Enums\StatusDefault;
 use App\Enums\UserTypeEnum;
 use App\Models\ActivityLog;
@@ -49,6 +50,22 @@ test('a picked currency that is switched off falls back to the default', functio
     expect(kActiveCurrency($member)['code'])->toBe('NGN');
 });
 
+test('a currency that writes its symbol after the amount is printed that way', function () {
+    $sek = Currency::create([
+        'name' => 'Swedish Krona',
+        'code' => 'SEK',
+        'symbol' => 'kr',
+        'symbol_position' => CurrencySymbolPositionEnum::AFTER,
+        'rate' => 0.007,
+    ]);
+    app(CurrencyService::class)->flush();
+
+    $member = userOfType(UserTypeEnum::USER, ['currency_id' => $sek->id]);
+
+    expect(kMoneyFormat(100000, decodeHtml: true, user: $member))->toBe('700 kr')
+        ->and(kMoneyFormat(100000, decodeHtml: true))->toBe('₦100,000');
+});
+
 test('an explicit symbol means the amount is already in that currency', function () {
     $member = userOfType(UserTypeEnum::USER, ['currency_id' => $this->usd->id]);
 
@@ -95,7 +112,7 @@ test('an administrator adds a currency and the write is logged', function () {
         ->call('save')
         ->assertHasNoErrors();
 
-    expect(Currency::query()->where('code', 'JPY')->exists())->toBeTrue()
+    expect(Currency::query()->where('code', 'JPY')->first()->symbol_position)->toBe(CurrencySymbolPositionEnum::BEFORE)
         ->and(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::CURRENCY_CREATE)->exists())->toBeTrue();
 });
 

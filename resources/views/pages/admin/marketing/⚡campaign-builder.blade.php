@@ -226,7 +226,7 @@ new class extends Component
         return $this->name !== $this->campaign->name
             || $this->subject !== $this->campaign->subject
             || (string) $this->preview_text !== (string) $this->campaign->preview_text
-            || $this->blocks !== ($this->campaign->content['blocks'] ?? [])
+            || $this->blocksDifferFrom($this->campaign->content['blocks'] ?? [])
             || $this->design !== ($this->campaign->design ?? [])
             || $this->footer_section_id !== $this->campaign->footer_section_id;
     }

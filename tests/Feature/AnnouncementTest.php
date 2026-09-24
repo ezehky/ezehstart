@@ -10,6 +10,7 @@ use App\Models\Announcement;
 use App\Services\AnnouncementService;
 use App\Services\NewsletterService;
 use App\Services\SiteConfigurationService;
+use Database\Seeders\DemoAnnouncementSeeder;
 use Livewire\Livewire;
 
 function announcement(array $attributes = []): Announcement
@@ -50,6 +51,16 @@ test('the public popup carries the announcement and the sign-up form', function 
         ->assertSee('Summer sale')
         ->assertSee('site-announcement')
         ->assertSee('newsletter-popup', false);
+});
+
+test('the demo announcement is live on the home page and is not doubled by a second run', function () {
+    $this->seed(DemoAnnouncementSeeder::class);
+    $this->seed(DemoAnnouncementSeeder::class);
+
+    expect(Announcement::query()->count())->toBe(1)
+        ->and(app(AnnouncementService::class)->current()?->title)->toBe('Fresh from the blog');
+
+    $this->get(route('home'))->assertOk()->assertSee('Fresh from the blog');
 });
 
 test('with the form off and no copy the popup is the picture alone', function () {

@@ -1,16 +1,20 @@
-{{-- The three newest posts, for the front page.
+{{-- The newest posts, for the front page.
+
+        <x-site.latest-posts :posts="$this->latestPosts" />
 
      A teaser rather than a second blog index: the point is to show the site is
      alive and send somebody to /blog, so there is no pagination, no filtering and
      no search here — that screen already does all three.
 
-     Silent when nothing is published, the same way the FAQ section is. An untouched
-     starter kit should not show an empty "Latest posts" heading. --}}
-@props(['limit' => 3])
+     Presentation only: the page reads the posts through BlogService and hands
+     them in. Silent when handed none, the same way the FAQ section is. An
+     untouched starter kit should not show an empty "Latest posts" heading. --}}
+@props([
+    // App\Models\Post rows, already published, ordered and limited by the caller.
+    'posts' => [],
+])
 
-@php($posts = app(App\Services\BlogService::class)->publishedQuery()->limit($limit)->get())
-
-@if ($posts->isNotEmpty())
+@if (filled($posts))
     <section class="mx-auto w-full max-w-6xl px-6 py-16">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>

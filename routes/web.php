@@ -10,7 +10,7 @@ use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'site.welcome')->name('home');
+Route::livewire('/', 'pages::site.home')->name('home');
 
 // Legal pages. One route per policy type, named after the case, so /terms is
 // route('terms') and adding a case to the enum publishes a page without anything

@@ -54,7 +54,7 @@ new class extends Component
 
         return $this->name !== $this->section->name
             || $this->email_section_type !== $this->section->email_section_type->value
-            || $this->blocks !== ($this->section->content['blocks'] ?? []);
+            || $this->blocksDifferFrom($this->section->content['blocks'] ?? []);
     }
 
     public function save()

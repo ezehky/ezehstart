@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityActionEnum;
+use App\Enums\CurrencySymbolPositionEnum;
 use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusYes;
@@ -26,6 +27,8 @@ new class extends Component
     public string $code = '';
 
     public string $symbol = '';
+
+    public string $symbol_position = 'before';
 
     public ?float $rate = 1;
 
@@ -110,6 +113,7 @@ new class extends Component
         $this->name = $currency->name;
         $this->code = $currency->code;
         $this->symbol = $currency->symbol;
+        $this->symbol_position = $currency->symbol_position->value;
         $this->rate = $currency->rate;
         $this->status = $currency->status->isActive();
 
@@ -128,6 +132,7 @@ new class extends Component
                 Rule::unique(Currency::class, 'code')->ignore($this->currency?->id),
             ],
             'symbol' => ['required', 'string', 'max:20'],
+            'symbol_position' => ['required', Rule::enum(CurrencySymbolPositionEnum::class)],
             // The default is 1 by definition and is not edited here — see save().
             'rate' => ['required', 'numeric', 'gt:0', 'max:1000000000'],
             'status' => ['boolean'],
@@ -157,6 +162,7 @@ new class extends Component
         $this->currency->name = $this->name;
         $this->currency->code = strtoupper($this->code);
         $this->currency->symbol = $this->symbol;
+        $this->currency->symbol_position = CurrencySymbolPositionEnum::from($this->symbol_position);
 
         // Every other rate is quoted against the default, so its own rate is 1 and
         // stays 1, and it cannot be switched off while the ledger is read in it.
@@ -261,7 +267,7 @@ new class extends Component
 
     private function resetForm(): void
     {
-        $this->reset('currency', 'name', 'code', 'symbol', 'rate', 'status');
+        $this->reset('currency', 'name', 'code', 'symbol', 'symbol_position', 'rate', 'status');
         $this->resetValidation();
     }
 };
@@ -372,12 +378,19 @@ new class extends Component
                 <flux:input wire:model="code" label="ISO code" placeholder="USD" maxlength="3" class:input="uppercase" />
             </div>
 
-            <flux:input
-                wire:model="symbol"
-                label="Symbol"
-                placeholder="$"
-                description="The glyph itself, or its HTML entity — &amp;#36; for a dollar sign."
-            />
+            <div class="grid gap-4 sm:grid-cols-2">
+                <flux:input
+                    wire:model="symbol"
+                    label="Symbol"
+                    placeholder="$"
+                    description="The glyph itself, or its HTML entity — &amp;#36; for a dollar sign."
+                />
+                <flux:select wire:model="symbol_position" label="Symbol goes">
+                    @foreach (CurrencySymbolPositionEnum::cases() as $case)
+                        <flux:select.option :value="$case->value">{{ $case->label() }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
 
             @if ($currency?->isDefault())
                 <flux:callout color="zinc" class="text-sm">

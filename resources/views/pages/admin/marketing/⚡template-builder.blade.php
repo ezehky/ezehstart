@@ -7,6 +7,7 @@ use App\Enums\SystemEmailEnum;
 use App\Models\EmailTemplate;
 use App\Services\ActivityLogService;
 use App\Services\EmailSectionService;
+use App\Services\EmailVariableService;
 use App\Traits\WithBlockEditor;
 use App\Traits\WithGateProps;
 use Illuminate\Validation\Rule;
@@ -103,6 +104,24 @@ new class extends Component
     }
 
     /**
+     * The system email's own tokens, first in the builder's "+ Personalize" menu
+     * as well as listed on the details step — the canvas is where they are
+     * actually typed.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public function personalizeTokenGroups(): array
+    {
+        $groups = ['Site & recipient' => app(EmailVariableService::class)->knownTokens()];
+
+        if ($case = $this->systemEmailCase) {
+            $groups = [$case->label() => $case->tokens(), ...$groups];
+        }
+
+        return $groups;
+    }
+
+    /**
      * Whether the screen holds anything the template row does not — what the close
      * button asks before it lets the page go.
      */
@@ -117,7 +136,7 @@ new class extends Component
             || $this->system_email !== (string) $this->template->system_email?->value
             || (string) $this->subject !== (string) $this->template->subject
             || $this->footer_section_id !== $this->template->footer_section_id
-            || $this->blocks !== ($this->template->content['blocks'] ?? [])
+            || $this->blocksDifferFrom($this->template->content['blocks'] ?? [])
             || $this->design !== ($this->template->design ?? []);
     }
 

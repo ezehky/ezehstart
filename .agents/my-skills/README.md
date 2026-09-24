@@ -65,7 +65,7 @@ This is a **starter kit**, not an application: authentication, roles, two worksp
 | Skill | Read it when |
 | --- | --- |
 | [livewire.md](livewire.md) | Writing any component |
-| [pages.md](pages.md) | Building a screen — the six page shapes |
+| [pages.md](pages.md) | Building a screen — the seven page shapes |
 | [routing.md](routing.md) | Adding a route or a nav entry |
 | [layouts.md](layouts.md) | Anything about the page shell, title, or SEO |
 | [components.md](components.md) | Creating or using a Blade component |
