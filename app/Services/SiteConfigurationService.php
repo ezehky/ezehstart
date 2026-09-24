@@ -200,7 +200,7 @@ class SiteConfigurationService
         }
 
         // CHECK IF ITS IMAGE
-        return $image ? kSafeImage() : null;
+        return $image ? kSafeImage(altImage: $key) : null;
     }
 
     private function getRawData()
@@ -225,7 +225,7 @@ class SiteConfigurationService
             'logo-dark',
             'favicon',
         ] as $key) {
-            data_set($data, $key, $this->getUploadFile(real_path: data_get($data, $key)));
+            data_set($data, $key, $this->getUploadFile($key, data_get($data, $key), $data));
         }
 
         foreach ([

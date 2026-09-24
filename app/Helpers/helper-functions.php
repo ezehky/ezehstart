@@ -49,7 +49,12 @@ if (! function_exists('kSafeImage')) {
 
         // If still empty or invalid, use fallback
         if (empty($output)) {
-            $output = $noImage;
+            $output = match ($altImage) {
+                'logo' => asset('logo.png'),
+                'logo-dark' => asset('logo-dark.png'),
+                'favicon' => asset('favicon.png'),
+                default => $noImage,
+            };
         }
 
         return $output;
