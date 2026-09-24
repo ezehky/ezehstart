@@ -29,8 +29,16 @@ new class extends Component
 
     public ?string $body = null;
 
+    /**
+     * What sits where the picture goes: 'image' or 'icon'. Form state only — the
+     * row carries whichever one was filled in, and save() clears the other.
+     */
+    public string $media = 'image';
+
     /** The picture, kept in step with the 'image' slot by WithImagePicker. */
     public ?int $image_id = null;
+
+    public ?string $icon = null;
 
     public ?string $link_url = null;
 
@@ -127,6 +135,8 @@ new class extends Component
         $this->announcement = $announcement;
         $this->title = $announcement->title;
         $this->body = $announcement->body;
+        $this->media = $announcement->showsIcon() ? 'icon' : 'image';
+        $this->icon = $announcement->icon;
         $this->link_url = $announcement->link_url;
         $this->link_label = $announcement->link_label;
         $this->show_newsletter = $announcement->showsNewsletter();
@@ -144,11 +154,14 @@ new class extends Component
     protected function rules(): array
     {
         return [
-            'title' => ['nullable', 'string', 'max:255'],
+            'title' => [Rule::requiredIf(fn () => $this->media === 'icon' && ! $this->body), 'nullable', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:1000'],
+            'media' => ['required', Rule::in(['image', 'icon'])],
             // A popup needs something in it. Only the image is required outright,
             // unless there is copy to carry the message instead.
-            'image_id' => [Rule::requiredIf(fn () => ! $this->title && ! $this->body), 'nullable', 'integer'],
+            'image_id' => [Rule::requiredIf(fn () => $this->media === 'image' && ! $this->title && ! $this->body), 'nullable', 'integer'],
+            // An icon is decoration, not a message, so it never stands in for the copy.
+            'icon' => [Rule::requiredIf(fn () => $this->media === 'icon'), 'nullable', 'string', Rule::in(kFluxIcons())],
             'link_url' => ['nullable', 'url:http,https', 'max:500'],
             'link_label' => ['nullable', 'string', 'max:60'],
             'show_newsletter' => ['boolean'],
@@ -164,6 +177,8 @@ new class extends Component
     {
         return [
             'image_id.required' => 'Add a picture, or write a title or some copy for the popup to show.',
+            'icon.required' => 'Choose an icon, or switch back to a picture.',
+            'title.required' => 'An icon needs a title or some copy beside it.',
         ];
     }
 
@@ -182,7 +197,14 @@ new class extends Component
 
         $this->announcement->title = $this->title ?: null;
         $this->announcement->body = $this->body ?: null;
+        // One or the other, so switching the choice does not leave the old one
+        // quietly attached — or its image usage row holding the picture.
+        if ($this->media === 'icon') {
+            $this->clearImages('image');
+        }
+
         $this->announcement->image_id = $this->image_id;
+        $this->announcement->icon = $this->media === 'icon' ? $this->icon : null;
         $this->announcement->link_url = $this->link_url ?: null;
         $this->announcement->link_label = $this->link_url ? ($this->link_label ?: null) : null;
         $this->announcement->show_newsletter = StatusYes::tryFrom((int) $this->show_newsletter);
@@ -257,7 +279,7 @@ new class extends Component
     private function resetForm(): void
     {
         $this->reset(
-            'announcement', 'title', 'body', 'image_id', 'link_url', 'link_label',
+            'announcement', 'title', 'body', 'media', 'image_id', 'icon', 'link_url', 'link_label',
             'show_newsletter', 'layout', 'starts_on', 'ends_on', 'status', 'image_slots'
         );
         $this->resetValidation();
@@ -299,6 +321,10 @@ new class extends Component
                                 <div class="size-12 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
                                     @if ($item->image)
                                         <img src="{{ $item->image->url() }}" alt="" class="size-full object-cover" />
+                                    @elseif ($item->showsIcon())
+                                        <div class="grid size-full place-items-center bg-lime-100 dark:bg-lime-400/10">
+                                            <flux:icon :name="$item->icon" class="size-6 text-lime-700 dark:text-lime-300" />
+                                        </div>
                                     @else
                                         <div class="grid size-full place-items-center">
                                             <flux:icon name="megaphone" class="size-5 text-slate-400" />
@@ -349,12 +375,21 @@ new class extends Component
         <form wire:submit="save" class="space-y-5">
             <flux:heading size="lg">{{ $announcement ? 'Edit announcement' : 'New announcement' }}</flux:heading>
 
-            <x-form.image-slot
-                name="image"
-                label="Picture"
-                :images="$this->slotImages('image')"
-                error="image_id"
-            />
+            <flux:radio.group wire:model.live="media" label="Beside the copy" variant="segmented">
+                <flux:radio value="image" label="Picture" icon="photo" />
+                <flux:radio value="icon" label="Icon" icon="sparkles" />
+            </flux:radio.group>
+
+            @if ($media === 'icon')
+                <x-form.icon-picker wire:model="icon" label="Icon" :icon="$icon" :clearable="false" />
+            @else
+                <x-form.image-slot
+                    name="image"
+                    label="Picture"
+                    :images="$this->slotImages('image')"
+                    error="image_id"
+                />
+            @endif
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <flux:input wire:model="link_url" label="Link" placeholder="https://…" description="Where clicking the picture goes. Optional." />

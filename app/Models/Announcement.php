@@ -45,6 +45,16 @@ class Announcement extends Model
     }
 
     /**
+     * An icon stands in for the picture only when there is no picture. The admin
+     * screen keeps them apart, but a row written some other way should still
+     * render one thing, not both.
+     */
+    public function showsIcon(): bool
+    {
+        return $this->icon && ! $this->image_id;
+    }
+
+    /**
      * Whether it would be shown right now, for the admin listing's badge. The
      * same test as the live() scope, asked of one row.
      */

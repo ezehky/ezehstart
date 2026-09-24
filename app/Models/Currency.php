@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\MoneyCast;
 use App\Enums\CurrencySymbolPositionEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusYes;
@@ -17,10 +18,17 @@ class Currency extends Model
 {
     use WithDynamicModelFormatting;
 
+    /**
+     * How many stored units make one of the rate: eight decimal places. Rates
+     * against the naira run as small as 0.00049, so the two places money is kept
+     * at would store most of them as nothing.
+     */
+    public const RATE_SCALE = 100_000_000;
+
     protected function casts(): array
     {
         return [
-            'rate' => 'float',
+            'rate' => MoneyCast::class.':'.self::RATE_SCALE,
             'symbol_position' => CurrencySymbolPositionEnum::class,
             'is_default' => StatusYes::class,
             'status' => StatusDefault::class,

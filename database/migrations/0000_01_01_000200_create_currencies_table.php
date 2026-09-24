@@ -32,8 +32,8 @@ return new class extends Migration
             // is always 1, and changing the default rebases every other row so
             // that stays true — see CurrencyService::makeDefault().
             //
-            // A decimal and not money-in-kobo: a rate is not money, and 0.00061
-            // naira-to-pound would round to nothing at two places.
+            // Replaced by a whole number of hundred-millionths in
+            // add_integer_rate_to_currencies_table, read back through MoneyCast.
             $table->decimal('rate', 20, 8)->default(1);
 
             // Exactly one row carries this. The ledger is written in the default,

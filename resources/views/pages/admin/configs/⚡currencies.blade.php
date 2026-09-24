@@ -134,7 +134,9 @@ new class extends Component
             'symbol' => ['required', 'string', 'max:20'],
             'symbol_position' => ['required', Rule::enum(CurrencySymbolPositionEnum::class)],
             // The default is 1 by definition and is not edited here — see save().
-            'rate' => ['required', 'numeric', 'gt:0', 'max:1000000000'],
+            // The floor is the smallest step the column stores, Currency::RATE_SCALE;
+            // anything finer would be saved as a rate of nothing.
+            'rate' => ['required', 'numeric', 'min:0.00000001', 'max:1000000000'],
             'status' => ['boolean'],
         ];
     }

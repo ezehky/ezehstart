@@ -31,4 +31,4 @@
      reaches the home page, the blog and the legal pages without three edits — and
      stays out of the two signed-in workspaces, which do not render a footer. It is
      fixed to the viewport, so sitting at the end of the document costs it nothing. --}}
-<x-site.newsletter-popup />
+<livewire:livewire.announcement-popup />

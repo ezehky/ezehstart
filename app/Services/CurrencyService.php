@@ -23,6 +23,9 @@ class CurrencyService
 {
     private const CACHE_KEY = 'currencies.active';
 
+    /** Where a visitor's pick is kept before they have an account to keep it on. */
+    public const SESSION_KEY = 'currency';
+
     /**
      * What an install with no currency rows yet reads amounts in. The naira,
      * because that is what kMoneyFormat() hard-coded before currencies were rows,
@@ -84,7 +87,12 @@ class CurrencyService
 
     /**
      * The currency this account reads amounts in: its own pick while that is
-     * still switched on, otherwise the site default.
+     * still switched on, otherwise the site default. With no account, the pick
+     * this browser made from the site header.
+     *
+     * The session is read for a guest only. An account's pick is written to the
+     * session as well, but the account is the record — a member who changes it
+     * from their settings must not be overruled by what the header said last.
      *
      * Resolved from the cached list rather than the relation, so formatting a
      * table of fifty amounts does not cost fifty queries.
@@ -93,11 +101,21 @@ class CurrencyService
      */
     public function forUser(?User $user): array
     {
-        if ($user?->currency_id && $picked = $this->active()->get($user->currency_id)) {
+        $pickedId = $user ? $user->currency_id : session(self::SESSION_KEY);
+
+        if ($pickedId && $picked = $this->active()->get($pickedId)) {
             return $picked;
         }
 
         return $this->default();
+    }
+
+    /**
+     * Whether the header offers a choice at all. One currency is no choice.
+     */
+    public function isSwitcherEnabled(): bool
+    {
+        return $this->active()->count() > 1;
     }
 
     /**
@@ -135,6 +153,26 @@ class CurrencyService
         $user->forceFill(['currency_id' => $currency?->isDefault() ? null : $currency?->id])->save();
 
         return true;
+    }
+
+    /**
+     * Remember a visitor's pick from the site header. In the session always, so
+     * it holds before sign-in; on the account as well when there is one, the same
+     * as picking it from the account settings.
+     */
+    public function choose(Currency $currency, ?User $user): bool
+    {
+        if (! $currency->status->isActive()) {
+            return false;
+        }
+
+        // The default is kept as nothing, like on the account, so a later change of
+        // default carries the visitor along instead of stranding them on the old one.
+        $currency->isDefault()
+            ? session()->forget(self::SESSION_KEY)
+            : session()->put(self::SESSION_KEY, $currency->id);
+
+        return $user ? $this->setForUser($user, $currency) : true;
     }
 
     /**

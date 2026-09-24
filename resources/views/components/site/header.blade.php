@@ -11,6 +11,7 @@
     />
 
     <div class="flex items-center gap-2">
+        <livewire:livewire.currency-switcher />
         <livewire:livewire.language-switcher />
         <flux:switch x-data x-model="$flux.dark" />
 

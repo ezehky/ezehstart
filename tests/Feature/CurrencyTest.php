@@ -75,6 +75,22 @@ test('an explicit symbol means the amount is already in that currency', function
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // CHANGING THE DEFAULT
 
+test('a rate is stored as a whole number of hundred-millionths and read back exactly', function () {
+    $this->assertDatabaseHas('currencies', ['code' => 'USD', 'rate' => 65_000]);
+    $this->assertDatabaseHas('currencies', ['code' => 'NGN', 'rate' => Currency::RATE_SCALE]);
+
+    expect($this->usd->fresh()->rate)->toBe(0.00065);
+});
+
+test('a rate finer than the column stores is refused', function () {
+    Livewire::actingAs(userOfType(UserTypeEnum::ADMIN))
+        ->test('pages::admin.configs.currencies')
+        ->call('edit', $this->usd->id)
+        ->set('rate', 0.000000001)
+        ->call('save')
+        ->assertHasErrors('rate');
+});
+
 test('making a currency the default rebases every other rate against it', function () {
     $this->usd->update(['rate' => 0.0005]);
 
@@ -189,4 +205,55 @@ test('the money field hands livewire a number and shows the default symbol', fun
         ->toContain('&#8358;')
         ->toContain('NGN')
         ->toContain("\$money(\$input, '.', ',', decimals)");
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// THE HEADER SWITCHER
+
+test('a guest picks a currency from the header and amounts follow it', function () {
+    Livewire::test('livewire.currency-switcher')
+        ->assertSee('USD')
+        ->call('choose', $this->usd->id)
+        ->assertRedirect();
+
+    expect(session(CurrencyService::SESSION_KEY))->toBe($this->usd->id)
+        ->and(kActiveCurrency()['code'])->toBe('USD');
+});
+
+test('picking the default from the header forgets what the guest picked', function () {
+    session()->put(CurrencyService::SESSION_KEY, $this->usd->id);
+
+    Livewire::test('livewire.currency-switcher')->call('choose', $this->ngn->id);
+
+    expect(session()->has(CurrencyService::SESSION_KEY))->toBeFalse();
+});
+
+test('a member who picks from the header has it saved to their account', function () {
+    $member = userOfType(UserTypeEnum::USER);
+
+    Livewire::actingAs($member)
+        ->test('livewire.currency-switcher')
+        ->call('choose', $this->usd->id);
+
+    expect($member->fresh()->currency_id)->toBe($this->usd->id);
+});
+
+test('a switched-off currency cannot be picked from the header', function () {
+    $this->usd->update(['status' => StatusDefault::INACTIVE]);
+    app(CurrencyService::class)->flush();
+
+    Livewire::test('livewire.currency-switcher')
+        ->call('choose', $this->usd->id)
+        ->assertNotFound();
+});
+
+test('with one currency the header offers no choice', function () {
+    Currency::query()->whereKeyNot($this->ngn->id)->delete();
+    app(CurrencyService::class)->flush();
+
+    Livewire::test('livewire.currency-switcher')->assertDontSee('Change currency');
+});
+
+test('the home page carries the currency switcher', function () {
+    $this->get(route('home'))->assertOk()->assertSee('Change currency');
 });

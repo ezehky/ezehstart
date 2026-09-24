@@ -123,6 +123,42 @@ test('an announcement needs a picture or some copy', function () {
         ->assertHasErrors('image_id');
 });
 
+test('an announcement can carry an icon in place of a picture', function () {
+    Livewire::actingAs(userOfType(UserTypeEnum::ADMIN))
+        ->test('pages::admin.content.announcements')
+        ->call('create')
+        ->set('media', 'icon')
+        ->set('icon', 'envelope')
+        ->set('title', 'Stay in the loop')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $saved = Announcement::query()->firstWhere('title', 'Stay in the loop');
+
+    expect($saved->icon)->toBe('envelope')
+        ->and($saved->image_id)->toBeNull()
+        ->and($saved->showsIcon())->toBeTrue();
+});
+
+test('an icon needs copy beside it', function () {
+    Livewire::actingAs(userOfType(UserTypeEnum::ADMIN))
+        ->test('pages::admin.content.announcements')
+        ->call('create')
+        ->set('media', 'icon')
+        ->set('icon', 'envelope')
+        ->call('save')
+        ->assertHasErrors('title');
+});
+
+test('the public popup draws the icon of an icon announcement', function () {
+    announcement(['title' => 'Stay in the loop', 'icon' => 'envelope']);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Stay in the loop')
+        ->assertSee('bg-lime-100', false);
+});
+
 test('a member cannot open the announcements screen', function () {
     $this->actingAs(userOfType(UserTypeEnum::USER))
         ->get(route('admin.announcements'))
