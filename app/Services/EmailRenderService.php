@@ -490,7 +490,7 @@ class EmailRenderService
             : '';
 
         return sprintf(
-            '<p style="margin:0;font-family:Arial,sans-serif;font-weight:bold;font-size:13px;color:#0F172A;"><a href="%s" style="color:#0F172A;text-decoration:none;">%s</a></p>%s%s<p style="margin:10px 0 0;font-family:Arial,sans-serif;font-weight:bold;font-size:12px;"><a href="%s" style="color:#65A30D;text-decoration:none;">%s &rarr;</a></p>',
+            '<p style="margin:0;font-family:Arial,sans-serif;font-weight:bold;font-size:13px;color:#0F172A;"><a href="%s" style="color:#0F172A;text-decoration:none;">%s</a></p>%s%s<p style="margin:10px 0 0;font-family:Arial,sans-serif;font-weight:bold;font-size:12px;"><a href="%s" style="color:#0F766E;text-decoration:none;">%s &rarr;</a></p>',
             $card['url'],
             e($card['title']),
             $excerpt,

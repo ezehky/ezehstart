@@ -32,7 +32,7 @@ class EmailBlockItemService
             EmailBlockItemEnum::LEVEL => 'h1',
 
             // BRAND
-            EmailBlockItemEnum::BRAND_COLOR => '#A3E635',
+            EmailBlockItemEnum::BRAND_COLOR => '#2DD4B5',
 
             // FONTS
             EmailBlockItemEnum::ALIGN => 'center',

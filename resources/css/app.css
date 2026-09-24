@@ -24,6 +24,23 @@
     --color-zinc-950: var(--color-slate-950);
 }
 
+/* Brand color: #2DD4B5. Every `lime-*` utility in the app resolves through this
+   scale, so re-anchoring the palette here changes the brand color everywhere at
+   once, the same way the zinc→slate remap above does for gray. */
+@theme {
+    --color-lime-50: #f0fdfa;
+    --color-lime-100: #ccfbf1;
+    --color-lime-200: #99f6e4;
+    --color-lime-300: #5eead4;
+    --color-lime-400: #2dd4b5;
+    --color-lime-500: #14b8a6;
+    --color-lime-600: #0d9488;
+    --color-lime-700: #0f766e;
+    --color-lime-800: #115e59;
+    --color-lime-900: #134e4a;
+    --color-lime-950: #042f2e;
+}
+
 @theme {
     --color-accent: var(--color-lime-400);
     --color-accent-content: var(--color-lime-600);
