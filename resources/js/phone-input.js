@@ -23,8 +23,6 @@ export default (config = {}) => ({
 
     iso2: config.iso2 ?? null,
 
-    iti: null,
-
     /**
      * Whether the form stores the country apart from the number. Decided once,
      * from whether a dialCode property was entangled at all.
@@ -36,7 +34,15 @@ export default (config = {}) => ({
     init() {
         const input = this.$refs.input;
 
-        this.iti = intlTelInput(input, {
+        // Alpine's x-data wraps every returned property — this.iti included — in a
+        // reactive proxy, and intl-tel-input's instance methods read private class
+        // fields (#selectedCountry etc.) straight off `this`. A method called
+        // through that proxy throws "Cannot read private member ... from an object
+        // whose class did not declare it", because a Proxy never passes a private-
+        // field brand check. intl-tel-input already stashes the raw instance on the
+        // input element itself (`input.iti = iti`), and elements are never proxied,
+        // so every call below goes through that instead of the reactive this.iti.
+        intlTelInput(input, {
             // The countries table stores iso2 in capitals; intl-tel-input wants lower.
             initialCountry: (this.iso2 || config.defaultCountry || "ng").toLowerCase(),
             separateDialCode: true,
@@ -48,7 +54,7 @@ export default (config = {}) => ({
         });
 
         if (this.number) {
-            this.iti.setNumber(this.number);
+            input.iti.setNumber(this.number);
         }
 
         // A form that stores no dialling code still has to learn which country
@@ -67,14 +73,15 @@ export default (config = {}) => ({
     },
 
     apply() {
+        const input = this.$refs.input;
         const current = this.read();
 
         if (this.split && this.iso2 && this.iso2 !== current.iso2) {
-            this.iti.setSelectedCountry(this.iso2.toLowerCase());
+            input.iti.setSelectedCountry(this.iso2.toLowerCase());
         }
 
         if (this.number !== this.read().number) {
-            this.iti.setNumber(this.number ?? "");
+            input.iti.setNumber(this.number ?? "");
         }
     },
 
@@ -82,11 +89,25 @@ export default (config = {}) => ({
      * Read the field as the properties want it.
      */
     read() {
-        const country = this.iti.getSelectedCountry();
-        const typed = this.$refs.input.value.replace(/[^\d+]/g, "");
+        const input = this.$refs.input;
+        const country = input.iti.getSelectedCountry();
+        const typed = input.value.replace(/[^\d+]/g, "");
+
+        // getNumber() throws until intl-tel-input's lazily-loaded utils chunk has
+        // resolved, which a fast typist can easily outrun — fall back to the raw
+        // digits rather than letting that throw skip the sync() assignment.
+        let full = null;
+
+        if (typed && !this.split) {
+            try {
+                full = input.iti.getNumber();
+            } catch {
+                full = null;
+            }
+        }
 
         return {
-            number: !typed ? null : this.split ? typed : this.iti.getNumber() || typed,
+            number: !typed ? null : this.split ? typed : full || typed,
             dialCode: country ? `+${country.dialCode}` : null,
             iso2: country?.iso2?.toUpperCase() ?? null,
         };
@@ -104,6 +125,6 @@ export default (config = {}) => ({
     },
 
     destroy() {
-        this.iti?.destroy();
+        this.$refs.input.iti?.destroy();
     },
 });

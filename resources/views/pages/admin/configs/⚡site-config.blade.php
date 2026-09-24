@@ -2,6 +2,7 @@
 
 use App\Enums\GateAccessEnum;
 use App\Rules\ImageRule;
+use App\Rules\PhoneRule;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
 use Livewire\Component;
@@ -40,7 +41,7 @@ new class extends Component
     {
         return [
             'config.name' => ['required', 'string', 'max:150'],
-            'config.phone' => ['nullable', 'string', 'max:40'],
+            'config.phone' => [new PhoneRule(required: false)],
             'config.email' => ['nullable', 'email', 'max:190'],
             'config.contact-email' => ['nullable', 'email', 'max:190'],
             'config.address' => ['nullable', 'string', 'max:500'],

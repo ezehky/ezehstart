@@ -562,12 +562,18 @@
     --iti-icon-color: var(--color-slate-400);
 }
 
+.iti {
+    @apply w-full;
+}
+
 .iti__dropdown-content {
     @apply rounded-lg shadow-lg dark:bg-slate-900 dark:text-slate-100;
+    @apply z-[100]! border border-slate-200 dark:border-slate-700;
 }
 
 .iti__search-input {
     @apply bg-transparent text-sm outline-none dark:text-slate-100;
+    @apply dark:bg-background-dark dark:border-slate-700;
 }
 
 .iti__dial-code {
@@ -576,4 +582,28 @@
 
 .iti__selected-dial-code {
     @apply text-sm text-slate-700 dark:text-slate-300;
+}
+
+.iti__country-list {
+    @apply dark:bg-background-dark;
+}
+
+.iti__country-container {
+    @apply p-0;
+}
+.iti__selected-country {
+    @apply pl-3 pr-2 bg-transparent;
+}
+.iti__selected-country-primary {
+    @apply bg-transparent!;
+}
+.iti--separate-dial-code .iti__selected-dial-code {
+    @apply ml-2 text-sm;
+}
+.iti__country.iti__highlight {
+    @apply dark:bg-slate-800;
+}
+.iti__country-name,
+.iti__dial-code {
+    @apply dark:text-slate-300;
 }
