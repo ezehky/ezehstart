@@ -118,6 +118,36 @@ site configuration editable from the admin rather than from a deploy, 250 countr
 seeded from a file in the repository rather than a network call, and a styled
 confirmation modal in front of every destructive write.
 
+**Passkeys** — WebAuthn through `spatie/laravel-passkeys`, behind `security.passkeys`.
+The package does the cryptography; `PasskeyService` does the signing in, so the status
+check, the audit trail and the login alert run exactly as they do for a password.
+
+**Email marketing** — a block-based template builder with saved headers, footers and
+calls to action; campaigns sent to chosen addresses, every account, or everybody
+subscribed to a notification type; test sends; scheduling in the sender's time zone with
+daily-to-quarterly recurrence; and a sent history. `{{token | default: "…"}}` resolves
+the same way in a subject as in a block. A builder template can also stand in for a
+system mailable (`SystemEmailEnum`, `WithSystemTemplate`); unassigned, the Blade view is
+sent as before.
+
+**Newsletter and announcements** — no subscribers table: an address is a `users` row
+and the subscription is the `ANNOUNCEMENTS` switch it already carries. The public popup
+shows the latest live announcement, falling back to the plain sign-up.
+
+**Currencies** — rates against one default. The ledger is stored in the default and
+`kMoneyFormat()` converts for the viewer, so changing somebody's currency never touches
+a stored row.
+
+**Languages** — `LocaleEnum` plus `lang/{code}.json`, a case offered only once its file
+exists. `lang:extract` collects the strings, and `lang:translate` machine-translates
+them in development — never at runtime.
+
+## Documentation
+
+The full documentation (installation, configuration, every feature, extending the kit and
+going to production) is the companion `ezehstart-doc` site. Run `npm install && npm run dev`
+in that folder.
+
 ## Getting started
 
 ```bash
@@ -209,6 +239,22 @@ Pint · Larastan.
 
 [`CHANGELOG.md`](CHANGELOG.md) records what changed in each version, and what an
 existing project has to do to take it.
+
+## License and trademark
+
+The code is open source under the [MIT License](LICENSE). Use it, change it, and sell
+what you build with it. Keep the copyright notice in copies of the kit's source.
+
+The **name** is a different matter. "Ezeh Start" and its logo are trademarks of Kingsley
+Uchenna Ezeh, and the MIT License doesn't grant them. "Built with Ezeh Start" is always
+fine; naming your product, fork, company, domain or paid service after the kit needs
+permission. [`TRADEMARK.md`](TRADEMARK.md) has the details. It's adapted from the
+[Cachet trademark policy](https://cachethq.io/trademark).
+
+The legal pages and policies the kit *serves* (terms, privacy, cookies, and the ones
+`DemoSeeder` publishes) are placeholders that show the shape of a policy. They're not
+legal advice, and shipping the tools for consent and deletion doesn't by itself make an
+application compliant with any law.
 
 ## Adding a third workspace
 

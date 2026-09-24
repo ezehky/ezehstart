@@ -307,6 +307,75 @@ copy nobody wrote. Every seeder under it matches on a natural key, so a second r
 refreshes rather than doubles, and the uploaded images and saved dashboard arrangements
 are cleared first.
 
+#### Passkeys
+
+**`PasskeyService`** over `spatie/laravel-passkeys`, behind `security.passkeys`. The
+package's actions build the challenge, check the signature and store the public key; its
+routes and components are not used, because its controller calls `auth()->login()` and
+nothing else, which would skip the status check, the audit trail and the login-alert
+email. Members manage theirs on the security screen, admins on the admin profile.
+
+#### Email marketing
+
+- **A template builder** under **Marketing**: heading, paragraph, button, image,
+  divider, spacer, columns, raw HTML, logo, favicon, social links, and dynamic- and
+  related-content blocks, with design settings for the whole template.
+- **Saved sections** (`EmailSectionService`) — a header, footer, call to action or
+  promotional block designed once and dropped into any template or campaign.
+- **Campaigns** (`EmailCampaignService`) to specific addresses, every account, or
+  everybody subscribed to chosen notification types, with test sends, scheduling in the
+  sender's own time zone, and `EmailRecurrenceEnum` — daily to quarterly, each
+  occurrence its own campaign. **`email:send-campaigns`** runs every minute and works
+  through recipients 200 at a time. A **Sent** history and custom sending domains
+  (`EmailSenderEnum`).
+- **`{{token}}` and `{{token | default: "…"}}`** resolve through `EmailVariableService`,
+  one resolver for subject, preview text and block content alike, including
+  `{{unsubscribe_url}}`.
+- **System emails** — a builder template can stand in for a mailable through
+  `email_templates.system_email` (`SystemEmailEnum`: login, welcome) and the
+  `WithSystemTemplate` trait. Unassigned, the Blade view is sent as before.
+
+#### Announcements
+
+**`AnnouncementService`** — the public popup, always the latest live
+`announcements` row: a picture or an icon, a link, an optional newsletter form, stacked
+or split (`AnnouncementLayoutEnum`). Older live rows are not queued behind it; with none
+live, the popup falls back to the plain newsletter sign-up. The separate newsletter popup
+component is gone.
+
+#### Currencies
+
+**`CurrencyService`** and `currencies`, holding rates against one default.
+`users.currency_id` null means the default. The ledger is written in the default and
+nothing else; `kMoneyFormat()` converts on the way out (`convert: false` for a limit or
+an input), so changing somebody's currency never touches a stored row.
+`<x-form.money-field>` hands Livewire a plain number.
+
+#### Languages
+
+`LocaleEnum` and `lang/{code}.json`, a case offered only once its file exists — English
+and French ship. **`lang:extract`** collects every `__()` string; **`lang:translate`**
+machine-translates them through `stichoza/google-translate-php`, a dev dependency that
+is never called at runtime. Guest screens are wrapped; dashboards are wrapped as they
+are touched.
+
+#### Log viewer
+
+**`LogFileService`** and **Site configuration → Logs** — the application log read from
+the admin, tail only, because a log nobody has cleared can run to gigabytes and the
+entries anybody opens this screen for are the recent ones.
+
+#### License and trademark
+
+- **`LICENSE`** — the MIT text `composer.json` has always declared, now actually in the
+  repository.
+- **`TRADEMARK.md`** — what the MIT License does not cover: the name. "Built with Ezeh
+  Start" is always fine; naming a product, fork, company, domain or paid service after the
+  kit needs permission. Adapted from the Cachet trademark policy, under CC BY-SA, with the
+  attribution kept.
+- The README gained a **License and trademark** section, and sections for the features
+  above.
+
 ### Changed
 
 - **An admin now carries any number of roles.** `user_roles` — a pivot with a status
@@ -383,6 +452,9 @@ dompdf ships with the kit and needs nothing installed. The other laravel-pdf dri
 browsershot, gotenberg, chrome, weasyprint — each need their own package and binaries;
 `LARAVEL_PDF_DRIVER` picks between them.
 
+Added `spatie/laravel-passkeys` for passkeys, and `stichoza/google-translate-php` as a
+**dev** dependency for `lang:translate`.
+
 ### Upgrading
 
 ```bash
@@ -412,10 +484,11 @@ The captcha switch does nothing until both Turnstile keys are present — delibe
 because a switch turned on against empty credentials renders a widget that can never
 issue a token, and every guest form on the install becomes unsubmittable.
 
-Four scheduled commands are new, and they need a scheduler actually running:
+Five scheduled commands are new, and they need a scheduler actually running:
 `account:send-deletion-reminders` and `account:process-deletions` nightly,
-`blog:publish-scheduled` every minute, and `activity:prune-logs` nightly — the last of
-which does nothing until somebody sets a retention window. Each takes `--dry-run`.
+`blog:publish-scheduled` and `email:send-campaigns` every minute, and
+`activity:prune-logs` nightly — the last of which does nothing until somebody sets a
+retention window. Each takes `--dry-run`.
 
 Defaults worth knowing before an install goes live: account deletion is **on**,
 anonymize-after-deletion is **on**, the data download is **on**, the captcha is **off**,
