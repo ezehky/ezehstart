@@ -30,6 +30,26 @@ Schedule::command('account:process-deletions')
 
 /*
 |--------------------------------------------------------------------------
+| Account lifecycle schedule
+|--------------------------------------------------------------------------
+|
+| Unverified accounts are warned once, then removed once the grace period
+| after the warning has passed; members who have gone quiet get one "we
+| missed you" per absence. Both read their switches on every run, so turning
+| either off on the security screen stops it without a deploy.
+|
+*/
+
+Schedule::command('account:prune-unverified')
+    ->dailyAt('08:30')
+    ->withoutOverlapping();
+
+Schedule::command('account:send-inactivity-reminders')
+    ->dailyAt('10:00')
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
 | Blog schedule
 |--------------------------------------------------------------------------
 |

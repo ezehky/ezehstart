@@ -58,6 +58,8 @@ class User extends Authenticatable implements HasLocalePreference, HasPasskeys
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_seen_at' => 'datetime',
+            'unverified_notice_sent_at' => 'datetime',
+            'inactivity_reminder_sent_at' => 'datetime',
             'deletion_requested_at' => 'datetime',
             'deletion_scheduled_at' => 'datetime',
             'status' => StatusUser::class,

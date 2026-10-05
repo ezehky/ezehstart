@@ -22,12 +22,16 @@ enum SystemEmailEnum: string
 
     case LOGIN = 'login';
     case WELCOME = 'welcome';
+    case UNVERIFIED_WARNING = 'unverified-warning';
+    case INACTIVITY_REMINDER = 'inactivity-reminder';
 
     public function label(bool $lowercase = false): string
     {
         $label = match ($this) {
             self::LOGIN => 'Sign-in alert',
             self::WELCOME => 'Welcome (sign-up)',
+            self::UNVERIFIED_WARNING => 'Unverified account warning',
+            self::INACTIVITY_REMINDER => 'We missed you',
         };
 
         return $lowercase ? mb_strtolower($label) : $label;
@@ -38,6 +42,8 @@ enum SystemEmailEnum: string
         return match ($this) {
             self::LOGIN => 'Sent after every successful sign-in, so the account holder hears about one they did not make.',
             self::WELCOME => 'Sent once, when an account is created. Carries the verification code when email verification is on.',
+            self::UNVERIFIED_WARNING => 'Sent once to an account that has not verified its email, before the sweep removes it.',
+            self::INACTIVITY_REMINDER => 'Sent to a member who has not been seen for the configured number of days. Once per absence.',
         };
     }
 
@@ -49,6 +55,8 @@ enum SystemEmailEnum: string
         return match ($this) {
             self::LOGIN => 'New sign-in to {{site.name}}',
             self::WELCOME => 'Welcome to {{site.name}}',
+            self::UNVERIFIED_WARNING => 'Verify your email to keep your {{site.name}} account',
+            self::INACTIVITY_REMINDER => 'We missed you at {{site.name}}',
         };
     }
 
@@ -70,6 +78,14 @@ enum SystemEmailEnum: string
                 '{{welcome.code}}' => 'Verification code (empty when verification is off)',
                 '{{welcome.expires_minutes}}' => 'Minutes the code is valid for',
                 '{{welcome.dashboard_url}}' => 'Dashboard link',
+            ],
+            self::UNVERIFIED_WARNING => [
+                '{{unverified.days_left}}' => 'Days before the account is removed',
+                '{{unverified.verify_url}}' => 'Verification link',
+            ],
+            self::INACTIVITY_REMINDER => [
+                '{{inactivity.days}}' => 'Days since the last visit',
+                '{{inactivity.login_url}}' => 'Sign-in link',
             ],
         };
     }

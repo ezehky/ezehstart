@@ -40,6 +40,15 @@ class SiteConfigurationService
             'email-settings' => [
                 'verification' => true,
                 'verification-strict' => true,
+
+                // Accounts that never verify. Warned once the notice days have
+                // passed since sign-up, then removed once the delete days have —
+                // counted from the warning, so nobody is removed unwarned. Only
+                // ever runs while verification is on: with it off, every account
+                // is unverified and the sweep would take all of them.
+                'unverified-auto-delete' => true,
+                'unverified-notice-days' => 2,
+                'unverified-delete-days' => 3,
             ],
             'user' => [
                 'account-deletion' => true,
@@ -56,6 +65,11 @@ class SiteConfigurationService
                 // by default and half of a data right is a worse position than
                 // neither — an install that must withhold it can turn it off.
                 'allow-data-download' => true,
+
+                // A "we missed you" email to a member who has not been seen for
+                // this many days. Sent once per absence, not once per day of it.
+                'inactivity-reminder' => true,
+                'inactivity-reminder-days' => 30,
             ],
 
             // Every switch here turns a whole sign-in feature on or off, so the

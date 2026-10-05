@@ -62,6 +62,7 @@ new class extends Component
             // User
             'config.user.account-deletion' => ['required', 'boolean'],
             'config.user.allow-data-download' => ['required', 'boolean'],
+            'config.user.inactivity-reminder' => ['required', 'boolean'],
 
             // Security. Every one of these closes a route as well as hiding a
             // button, so turning one off is a real change rather than cosmetic.
@@ -94,6 +95,19 @@ new class extends Component
         // verification off there is nothing for it to be strict about.
         if ((bool) data_get($this->config, 'email-settings.verification')) {
             $rules['config.email-settings.verification-strict'] = ['required', 'boolean'];
+
+            // Removing unverified accounts is only ever offered while verification
+            // is on — with it off, every account is unverified.
+            $rules['config.email-settings.unverified-auto-delete'] = ['required', 'boolean'];
+
+            if ((bool) data_get($this->config, 'email-settings.unverified-auto-delete')) {
+                $rules['config.email-settings.unverified-notice-days'] = ['required', 'integer', 'min:1', 'max:30'];
+                $rules['config.email-settings.unverified-delete-days'] = ['required', 'integer', 'max:60', 'gt:config.email-settings.unverified-notice-days'];
+            }
+        }
+
+        if ((bool) data_get($this->config, 'user.inactivity-reminder')) {
+            $rules['config.user.inactivity-reminder-days'] = ['required', 'integer', 'min:1', 'max:365'];
         }
 
         // The grace period before an account is really gone, which only exists if
@@ -152,6 +166,33 @@ new class extends Component
                     label="Strict email verification"
                     description="Users cannot reach their workspace until the address is verified."
                 />
+
+                <flux:switch
+                    wire:model.live="config.email-settings.unverified-auto-delete"
+                    label="Auto-delete unverified accounts"
+                    description="Warn an account that has not verified its address, then delete it. Accounts with transactions are never removed."
+                />
+
+                {{-- The delete is counted from the warning, not from sign-up, so the
+                    gap between the two is the grace period the warning promises. --}}
+                @if (data_get($config, 'email-settings.unverified-auto-delete'))
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <x-form.number-field
+                            wire:model="config.email-settings.unverified-notice-days"
+                            label="Warn after (days)"
+                            placeholder="e.g. 2"
+                            min="1"
+                            max="30"
+                        />
+                        <x-form.number-field
+                            wire:model="config.email-settings.unverified-delete-days"
+                            label="Delete after (days)"
+                            placeholder="e.g. 3"
+                            min="2"
+                            max="60"
+                        />
+                    </div>
+                @endif
             @endif
         </flux:card>
         <flux:card class="space-y-2">
@@ -178,12 +219,28 @@ new class extends Component
             @endif
         </flux:card>
         <flux:card class="space-y-2">
-            <flux:heading level="2" size="lg" class="mb-4">Account data</flux:heading>
+            <flux:heading level="2" size="lg" class="mb-4">Account data and reminders</flux:heading>
             <flux:switch
                 wire:model="config.user.allow-data-download"
                 label="Allow data download"
                 description="Users may download a copy of what is held about them — profile, consents, transactions and library index, as one JSON file. Security material is never included. Turning this off closes the route as well as hiding the tab."
             />
+
+            <flux:separator variant="subtle" class="my-5" />
+            <flux:switch
+                wire:model.live="config.user.inactivity-reminder"
+                label="Send “we missed you” reminders"
+                description="Emails a member who has not been seen for a while. Sent once per absence, not once a day."
+            />
+            @if (data_get($config, 'user.inactivity-reminder'))
+                <x-form.number-field
+                    wire:model="config.user.inactivity-reminder-days"
+                    label="Inactive for (days)"
+                    placeholder="e.g. 30"
+                    min="1"
+                    max="365"
+                />
+            @endif
         </flux:card>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

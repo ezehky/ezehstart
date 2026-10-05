@@ -288,15 +288,22 @@ test('a subscriber row cannot be signed in to with a password', function () {
     expect(auth()->check())->toBeFalse();
 });
 
-test('a subscriber address is refused a password reset', function () {
+test('a subscriber address is sent no reset code, and is not told why', function () {
+    Mail::fake();
     newsletterConfig();
 
     app(NewsletterService::class)->subscribe('reader@example.com');
 
+    // A newsletter row has no password to reset, so nothing is sent — but the
+    // screen moves on exactly as it would for an account, because saying "that
+    // is only on the newsletter" says which addresses are registered.
     Livewire::test('pages::auth.forgot-password')
         ->set('email', 'reader@example.com')
         ->call('step1')
-        ->assertHasErrors('email');
+        ->assertHasNoErrors()
+        ->assertSet('step', 2);
+
+    Mail::assertNothingSent();
 });
 
 test('the status is not something an administrator can assign', function () {

@@ -9,9 +9,120 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
-Larger than a minor, and it renames things that already shipped — `users.type`,
-`UserRoleEnum`, the `user_roles` table, `admin.members`. By the rule at the top of this
-file that makes the next release a major. See **Upgrading**.
+## [2.1.0] - 2026-10-02
+
+Two scheduled sweeps that look after the member list on their own, and a password reset
+that no longer says which addresses are registered. Nothing that shipped in 2.0.0 is
+renamed — two columns, two enum cases and two commands are added — so this is a minor.
+See **Upgrading**.
+
+### Added
+
+#### Unverified accounts are warned, then removed
+
+An account that never verifies its address holds a unique email forever and never
+becomes anybody. `account:prune-unverified` now looks after them, daily at 08:30.
+
+- **Warned first, then removed.** Once the notice days have passed since sign-up
+  (default 2), the account is sent one warning. Once the grace period after that
+  warning has passed (default: delete on day 3, so one day), the account is removed.
+  The delete is counted from the **warning**, not from sign-up, so an account that was
+  already old the first time the sweep saw it — one registered while verification was
+  off, say — still gets the whole window the warning promised. Nobody is removed on the
+  same run that warns them.
+- **Never while verification is off.** With verification off nobody can verify, so
+  every account is unverified and the sweep would take the whole member list. The
+  service checks both switches, not just its own.
+- **Only what it should touch.** Active member accounts only. Administrators,
+  newsletter rows, accounts already in their deletion grace period and **any account
+  with ledger rows** are never swept — money history is not something a schedule gets
+  to erase.
+- **Removed the way every account is removed.** Through
+  `AccountDeletionService::hardDelete()`, so the account's library files, sessions and
+  notifications go with it. The audit trail only records a signed-in actor and a
+  scheduled run has none, so each removal is also written to the `ezeh` log channel —
+  a deletion nobody asked for leaves a trace.
+- **Settings** on **Site configuration → Security**, under Email Verification:
+  `email-settings.unverified-auto-delete` (on), `unverified-notice-days` (2) and
+  `unverified-delete-days` (3). The delete day must come after the notice day, and the
+  service clamps both again so a hand-edited JSON file cannot land the warning and the
+  delete on one run.
+
+#### "We missed you"
+
+`account:send-inactivity-reminders`, daily at 10:00, emails a member who has not been
+seen for the configured number of days (default 30).
+
+- **Once per absence.** Another is only sent after the member has been seen again
+  since the last one, so an account that never comes back is mailed once rather than on
+  every run forever.
+- **Proven addresses only** while verification is on — an unverified address belongs
+  to the sweep above, and may not be the account holder's. Suspended accounts,
+  administrators and accounts never seen at all are left alone.
+- **Settings** on **Security → Account data and reminders**: `user.inactivity-reminder`
+  (on) and `user.inactivity-reminder-days` (30).
+
+#### Shared by both
+
+- **`AccountLifecycleService`** (`#[Singleton]`) holds the switches, the queries and the
+  sends, so the two commands stay thin. Each send is claimed with a conditional update
+  before the mail is queued, so two overlapping runs cannot mail the same account twice.
+- **Two system-email slots**: `SystemEmailEnum::UNVERIFIED_WARNING` and
+  `INACTIVITY_REMINDER`, with `UnverifiedAccountWarningEmail` and
+  `InactivityReminderEmail` behind them. Both can be redesigned in the template builder,
+  with `{{unverified.days_left}}`, `{{unverified.verify_url}}`, `{{inactivity.days}}`
+  and `{{inactivity.login_url}}` as their tokens; unassigned, the Blade views
+  (`emails.auth.unverified-warning`, `emails.auth.missed-you`) are sent.
+- **Two columns on `users`**: `unverified_notice_sent_at` and
+  `inactivity_reminder_sent_at`, both nullable.
+- **`PasswordResetOtpService::sendTo(string $email)`**, the forgot-password screen's
+  entry point — see Changed.
+
+### Changed
+
+- **Forgot password no longer checks whether the address exists.** Any well-formed
+  address moves on to the code step with the same "if it belongs to an account" reply;
+  only a real account is sent a code. The resend floor starts for every address, known
+  or not — otherwise "please wait" would be the answer the screen no longer gives. A
+  newsletter row is treated as unknown rather than told it is only on the newsletter.
+
+### Fixed
+
+- **A password could be reset without the code.** Step one of forgot password loaded
+  the account and step three trusted it, so calling `step3()` straight after step one
+  set a new password without a verified code. The account is now loaded only once a
+  code verifies, and step three refuses without one.
+
+### Upgrading
+
+```bash
+php artisan migrate
+php artisan lang:translate fr
+php artisan lang:translate es
+```
+
+The migration adds two nullable columns and touches no existing data. `lang/en.json`
+already carries the two new forgot-password strings; the translate step fills them in
+for the other languages.
+
+Two scheduled commands are new, and both read their switches on every run:
+`account:prune-unverified` at 08:30 and `account:send-inactivity-reminders` at 10:00.
+Each takes `--dry-run` — **run the prune with it once before the first real night** on
+an install that has been collecting unverified sign-ups, and see who it would warn.
+
+Both are **on** by default. An install that would rather not remove anybody turns
+**Auto-delete unverified accounts** off on the Security screen; one that would rather
+not send reminders turns that switch off beside it.
+
+A test that expected forgot password to refuse an unknown or newsletter-only address
+now gets the code step instead.
+
+Suite at this point: 971 tests, 2468 assertions, all passing.
+
+## [2.0.0] - 2026-09-25
+
+A major, because it renames things that already shipped — `users.type`,
+`UserRoleEnum`, the `user_roles` table, `admin.members`. See **Upgrading**.
 
 ### Added
 

@@ -16,7 +16,11 @@ new #[Layout('layouts::auth')] class extends Component
 {
     use WithAuthWorker, WithCaptcha, WithPasswordTools;
 
-    public User $user;
+    /**
+     * Only ever set once a reset code has been verified — a code only exists for a
+     * real account, so this is where the screen first learns there is one.
+     */
+    public ?User $user = null;
 
     public string $email;
 
@@ -51,34 +55,21 @@ new #[Layout('layouts::auth')] class extends Component
         // Step one is the step that sends mail to whatever address was typed, so it
         // is the step the captcha guards. The code prompt after it is already
         // bounded by a six-digit code with an expiry.
+        // Any well-formed address goes through, whether or not it has an account.
+        // Saying which addresses are registered would hand anybody with a list a
+        // way to sort it — so an unknown address, or a newsletter row with no
+        // account behind it, sees exactly what a real one does and gets no mail.
         $this->validate($this->captchaRules([
-            'email' => ['required', 'email', 'exists:users,email'],
+            'email' => ['required', 'string', 'email', 'max:190'],
         ]));
 
-        // Get the user by email
-        $this->user = User::query()->where('email', $this->email)->first();
-
-        // If the user does not exist, respond with an error message
-        $this->respondError('invalid credentials', ! $this->user, field: 'email');
-
-        // An address on the newsletter list passes the exists check but has no
-        // account and no password to reset. Letting the flow run would set a
-        // password on a row that cannot sign in — and hand a reset code to an
-        // address that never asked for one.
-        $this->respondError(
-            __('That address is on our newsletter list but does not have an account yet. Please register to create one.'),
-            $this->user->status->isNewsletterSubscriber(),
-            field: 'email'
-        );
-
-        // Send the OTP to the user's email
         $this->sendOtp();
 
         $this->step = 2; // Move to the next step (OTP verification)
         $this->tag = __('Check your inbox');
         $this->title = __('Verification code sent');
-        $this->description = __('Enter the six-digit code sent to :email. Please check your inbox and enter the code to proceed with resetting your password.', [
-            'email' => Str::mask($this->user->email, '*', 2, 6),
+        $this->description = __('If :email belongs to an account, a six-digit code is on its way. Please check your inbox and enter the code to proceed with resetting your password.', [
+            'email' => Str::mask($this->email, '*', 2, 6),
         ]);
         $this->dispatchNext($this->tag, $this->title, $this->description);
         $this->resetValidation(); // Clear any previous validation errors
@@ -97,6 +88,12 @@ new #[Layout('layouts::auth')] class extends Component
             'otp'
         );
 
+        // A code verified, so the address has an account behind it — no code is
+        // ever issued for one that does not.
+        $this->user = User::query()->registered()->where('email', $this->email)->first();
+
+        $this->respondError(__('That reset code is invalid or has expired.'), ! $this->user, field: 'otp');
+
         $this->step = 3; // Move to the next step (password reset)
         $this->tag = __('Reset your password');
         $this->title = __('Set a new password');
@@ -107,6 +104,10 @@ new #[Layout('layouts::auth')] class extends Component
 
     public function step3()
     {
+        // Step two is the only thing that sets the account, so getting here without
+        // one means the steps were skipped rather than walked.
+        abort_if($this->user === null, 403);
+
         $this->validate(['password' => ['required', 'string', 'confirmed', $this->passwordStrengthRule()]]);
 
         // Checked after validation rather than as a rule, so somebody who typed a weak
@@ -151,15 +152,12 @@ new #[Layout('layouts::auth')] class extends Component
     public function resendOtp()
     {
         $this->sendOtp();
-        session()->flash('status', 'A new verification code has been sent to your email address.');
+        session()->flash('status', __('If the address belongs to an account, a new code is on its way.'));
         $this->resetValidation(); // Clear any previous validation errors
     }
 
     private function sendOtp(): void
     {
-        // If the user does not exist, respond with an error message
-        $this->respondError('invalid credentials', ! $this->user);
-
         $service = app(PasswordResetOtpService::class);
 
         // The resend floor. Without it the captcha on step one buys one pass at an
@@ -173,7 +171,7 @@ new #[Layout('layouts::auth')] class extends Component
             field: $this->step === 1 ? 'email' : 'otp'
         );
 
-        $service->send($this->user);
+        $service->sendTo($this->email);
     }
 };
 ?>

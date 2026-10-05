@@ -29,6 +29,28 @@ class PasswordResetOtpService
     use WithOtpGuard;
 
     /**
+     * The forgot-password screen's entry point: send a code if the address belongs
+     * to an account, and do nothing a visitor can see if it does not.
+     *
+     * The resend floor starts for every address, known or not. Starting it only for
+     * real accounts would turn "please wait" into the very answer the screen no
+     * longer gives — type an address twice and see whether it was held back.
+     * A newsletter row is not an account, so it is treated as unknown too.
+     */
+    public function sendTo(string $email): void
+    {
+        $user = User::query()->registered()->where('email', $email)->first();
+
+        if (! $user) {
+            $this->startOtpWindow($this->scope($email));
+
+            return;
+        }
+
+        $this->send($user);
+    }
+
+    /**
      * Issue a fresh code for this account and mail it, replacing any code already
      * outstanding for the address.
      */

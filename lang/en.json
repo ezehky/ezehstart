@@ -50,6 +50,8 @@
     "Got it": "Got it",
     "I agree to the": "I agree to the",
     "I agree to the terms of service and privacy policy.": "I agree to the terms of service and privacy policy.",
+    "If :email belongs to an account, a six-digit code is on its way. Please check your inbox and enter the code to proceed with resetting your password.": "If :email belongs to an account, a six-digit code is on its way. Please check your inbox and enter the code to proceed with resetting your password.",
+    "If the address belongs to an account, a new code is on its way.": "If the address belongs to an account, a new code is on its way.",
     "I lost my device — use a recovery code": "I lost my device — use a recovery code",
     "It takes less than a minute.": "It takes less than a minute.",
     "Keep me signed in": "Keep me signed in",

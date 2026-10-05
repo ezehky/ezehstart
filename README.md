@@ -11,7 +11,9 @@ email verification by six-digit code, and a passwordless flow that both register
 signs in from a code. Every emailed code carries the same two bounds: five wrong
 guesses destroy it, and another cannot be asked for inside 60 seconds. An expiry alone
 is not a bound — six digits is a million guesses wide, and at an unlimited guess rate
-the whole space fits inside the window.
+the whole space fits inside the window. Password reset never says whether an address is
+registered: every well-formed address gets the same reply, and only a real account gets
+a code.
 
 **Sign-in hardening** — a login throttle keyed on the email *and* the address together,
 so nobody can lock out an address they know. Configurable password strength and a
@@ -93,6 +95,13 @@ email cancels without signing in, and only when the window runs out does the nig
 sweep act: anonymize where there is history worth keeping, remove outright where there is
 not. Anonymized rows are soft-deleted, so they surface only on **Deleted accounts**,
 where they can be restored or purged for good.
+
+**Accounts that look after themselves** — an account that never verifies its address
+is warned once (day 2 by default) and removed after a grace period counted from the
+warning (day 3), never while verification is off and never with ledger rows behind it.
+A member not seen for 30 days gets one "we missed you", and another only after they have
+been back. Both are switches with their own day counts on the Security screen, and both
+emails are template-builder slots.
 
 **Impersonation** — an administrator views the site as a member, because "the button
 does not work" is unanswerable from the outside. Never admin to admin, the real identity
@@ -179,10 +188,11 @@ run refreshes rather than doubles. The policies it publishes are boilerplate sho
 than edited, so replacing it means drafting v2.0 from Admin → Site configuration →
 Policies and publishing that.
 
-Four commands run on the schedule, so a live install needs the scheduler running:
-account deletion reminders and the deletion sweep nightly, scheduled posts every minute,
-and the activity-log prune nightly (which does nothing until somebody sets a retention
-window). Each takes `--dry-run`.
+Seven commands run on the schedule, so a live install needs the scheduler running:
+account deletion reminders and the deletion sweep daily, the unverified-account sweep
+and the "we missed you" reminders daily, scheduled posts and email campaigns every
+minute, and the activity-log prune daily (which does nothing until somebody sets a
+retention window). Each takes `--dry-run`.
 
 Two optional environment keys: `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` for the
 captcha — the switch does nothing without both — and `LARAVEL_PDF_DRIVER`, which is
