@@ -30,6 +30,39 @@ class SiteConfigurationService
             'email' => kStripDomainProtocols(prefix: 'info'),
             'contact-email' => kStripDomainProtocols(prefix: 'support'),
             'address' => '',
+
+            // Offices, branches, shops — each a label, an address, any number of
+            // phones and emails, and an optional map. The single phone, email and
+            // address above stay the site's main contact, the one emails and
+            // templates read; these are what the public contact section lists.
+            // Empty means no section. See contactLocations().
+            //
+            // Placeholders, so a fresh install shows what the section looks like.
+            // Replace or delete them from Configuration › Contact locations. The
+            // maps use Google's output=embed form, which needs no API key.
+            'contact-locations' => [
+                [
+                    'label' => 'Head office',
+                    'address' => "12 Allen Avenue\nIkeja, Lagos",
+                    'phones' => ['+2348000000001', '+2348000000002'],
+                    'emails' => ['hello@example.com', 'sales@example.com'],
+                    'map-embed' => 'https://maps.google.com/maps?q=Allen+Avenue%2C+Ikeja%2C+Lagos&output=embed',
+                ],
+                [
+                    'label' => 'Abuja branch',
+                    'address' => "3 Aminu Kano Crescent\nWuse II, Abuja",
+                    'phones' => ['+2349000000003'],
+                    'emails' => ['abuja@example.com'],
+                    'map-embed' => 'https://maps.google.com/maps?q=Aminu+Kano+Crescent%2C+Wuse+II%2C+Abuja&output=embed',
+                ],
+                [
+                    'label' => 'Support desk',
+                    'address' => '',
+                    'phones' => ['+2347000000004'],
+                    'emails' => ['support@example.com'],
+                    'map-embed' => '',
+                ],
+            ],
             'timezone' => config('app.timezone'),
             'logo' => null,
             'logo-dark' => null,
@@ -183,6 +216,27 @@ class SiteConfigurationService
         ];
     }
 
+    /**
+     * Lay the stored values over the defaults, recursing only into keyed groups.
+     *
+     * A list is taken whole from whichever side has it. array_replace_recursive()
+     * merges lists by position, so a stored list shorter than its default would
+     * get the default's tail back — two contact locations deleted down to one
+     * would return as three on the next save, and none of them could be removed.
+     */
+    private function mergeInitials(array $initials, array $stored): array
+    {
+        foreach ($stored as $key => $value) {
+            $initial = $initials[$key] ?? null;
+
+            $initials[$key] = \is_array($value) && \is_array($initial) && ! array_is_list($value) && ! array_is_list($initial)
+                ? $this->mergeInitials($initial, $value)
+                : $value;
+        }
+
+        return $initials;
+    }
+
     private function setFile(): string
     {
         $file = 'site-configuration.json';
@@ -328,7 +382,7 @@ class SiteConfigurationService
         }
         // MERGE
         if ($output && $mergeInitial) {
-            $output = array_replace_recursive($this->initials(), $output);
+            $output = $this->mergeInitials($this->initials(), $output);
         }
 
         // |||||||||||||||||||||||||||||||||||||||||||||||||
@@ -408,6 +462,86 @@ class SiteConfigurationService
         }
 
         return $output;
+    }
+
+    /**
+     * The embed link a map frame may point at, or null.
+     *
+     * Accepts what an administrator is most likely to paste: the whole <iframe>
+     * from Google Maps' "Embed a map" dialog, or just its src. Only an https link to
+     * a Google Maps or OpenStreetMap embed passes — the result lands in the src of
+     * an iframe on the public site, so anything else is refused rather than framed.
+     *
+     * The admin form stores what this returns, and the public page asks again at
+     * render time, so a value edited by hand in the JSON file is held to the same
+     * rule as one saved through the form.
+     */
+    public function mapEmbedUrl(?string $value = null): ?string
+    {
+        $value = trim((string) $value);
+
+        // A pasted iframe: keep only its src.
+        if (preg_match('/<iframe\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i', $value, $matches)) {
+            $value = $matches[1];
+        }
+
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5);
+
+        if ($value === '' || ! filter_var($value, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = strtolower($parts['host'] ?? '');
+        $path = $parts['path'] ?? '';
+        parse_str($parts['query'] ?? '', $query);
+
+        if ($scheme !== 'https') {
+            return null;
+        }
+
+        $isGoogle = \in_array($host, ['www.google.com', 'google.com', 'maps.google.com'], true) &&
+            (str_starts_with($path, '/maps/embed') || (str_starts_with($path, '/maps') && ($query['output'] ?? null) === 'embed'));
+
+        $isOpenStreetMap = \in_array($host, ['www.openstreetmap.org', 'openstreetmap.org'], true) &&
+            $path === '/export/embed.html';
+
+        return $isGoogle || $isOpenStreetMap ? $value : null;
+    }
+
+    /**
+     * The contact locations the public site shows, ready to render.
+     *
+     * Blank phones and emails are dropped and every map is asked again through
+     * mapEmbedUrl(), so a location edited by hand in the JSON file cannot put
+     * anything into the page that the admin form would have refused.
+     *
+     * A config saved before this key existed has no list at all, and then the
+     * defaults stand in — the same ones the admin screen merges in, so the site
+     * shows what that screen shows. Presence is what is checked, not emptiness:
+     * an administrator who deleted every location saved an empty list, and that
+     * means no section, not the placeholders back.
+     *
+     * @return list<array{label: string, address: ?string, phones: list<string>, emails: list<string>, map: ?string}>
+     */
+    public function contactLocations(): array
+    {
+        $locations = Arr::exists($this->cacheSiteConfig(), 'contact-locations')
+            ? $this->getConfigs('contact-locations', default: [])
+            : $this->initials()['contact-locations'];
+
+        return collect((array) $locations)
+            ->filter(fn ($location) => \is_array($location))
+            ->map(fn (array $location) => [
+                'label' => (string) data_get($location, 'label', ''),
+                'address' => data_get($location, 'address') ?: null,
+                'phones' => array_values(array_filter((array) data_get($location, 'phones', []), 'filled')),
+                'emails' => array_values(array_filter((array) data_get($location, 'emails', []), 'filled')),
+                'map' => $this->mapEmbedUrl(data_get($location, 'map-embed')),
+            ])
+            ->values()
+            ->all();
     }
 
     public function normalizeSupportUrl(?string $value = null, bool $isWhatsApp = false): ?string

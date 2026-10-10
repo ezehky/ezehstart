@@ -2,6 +2,7 @@
 
 use App\Models\Faq;
 use App\Services\BlogService;
+use App\Services\SiteConfigurationService;
 use App\Services\SiteStatsService;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -52,6 +53,15 @@ new #[Layout('layouts::site')] class extends Component
     {
         return Faq::query()->active()->inFlowOrder()->get();
     }
+
+    /**
+     * @return list<array{label: string, address: ?string, phones: list<string>, emails: list<string>, map: ?string}>
+     */
+    #[Computed]
+    public function contactLocations(): array
+    {
+        return app(SiteConfigurationService::class)->contactLocations();
+    }
 };
 ?>
 
@@ -97,4 +107,6 @@ new #[Layout('layouts::site')] class extends Component
     <x-site.latest-posts :posts="$this->latestPosts" />
 
     <x-site.faq :faqs="$this->faqs" />
+
+    <x-site.contact :locations="$this->contactLocations" />
 </div>

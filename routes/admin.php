@@ -12,6 +12,7 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/preferences', 'pages::admin.configs.preferences')->name('preferences');
     Route::livewire('/email-senders', 'pages::admin.configs.email-senders')->name('email-senders');
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
+    Route::livewire('/contact-locations', 'pages::admin.configs.contact-locations')->name('contact-locations');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');
     Route::livewire('/notification-types', 'pages::admin.configs.notification-types')->name('notification-types');
     Route::livewire('/currencies', 'pages::admin.configs.currencies')->name('currencies');

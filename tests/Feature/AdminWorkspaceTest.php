@@ -21,6 +21,7 @@ test('an admin can open every workspace page', function (string $route) {
     'admin.config.site',
     'admin.config.security',
     'admin.config.social-handles',
+    'admin.config.contact-locations',
     'admin.static.policies',
     'admin.static.faqs',
     'admin.admins',
