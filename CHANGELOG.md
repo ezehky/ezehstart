@@ -9,6 +9,199 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-13
+
+Gateway payments, refunds and vendor-billed subscriptions, plus contact locations on the
+public site. Everything is added rather than renamed — new tables, columns, enum cases,
+routes and commands — so this is a minor. One thing does need a hand on an existing
+install: the new `transaction_gateways` columns. See **Upgrading**.
+
+### Added
+
+#### Payments
+
+An in-house replacement for PayZephyr, which pinned guzzle at `^7`. Seven vendors ship —
+**Paystack, Flutterwave, Stripe, PayPal, OPay, Monnify and Korapay** — all as plain
+`Http::` calls. No vendor SDK is a dependency. The whole module is described in
+`.agents/my-skills/payments.md`.
+
+- **One way in, one way to settle.** `PaymentService::checkout()` writes a `PROCESSING`
+  ledger row and sends the customer to the vendor. The callback, the webhook and the
+  reconcile sweep all end in `PaymentService::verify()`, which asks the vendor, locks
+  the row, and settles it once. Nothing the browser carries back is believed.
+- **Short or wrong-currency money is held, not credited.** The row stays `PROCESSING`
+  with `failure_reason` set, and admins are notified (`PaymentNeedsReview`). Money that
+  lands on a row already closed becomes `CONFIRMED_BUT_NOT_LOGGED`. A person settles
+  both.
+- **Webhooks are signed, stored and queued.** `POST /webhooks/payments/{vendor}` checks
+  the vendor's own signature scheme before it reads the body, stores the call in
+  `payment_webhooks` (duplicates die on `unique(vendor, event_key)`), and answers at
+  once. `ProcessPaymentWebhook` does the work on the queue, with retries. Turning
+  signature checks off only works in `local` and `testing`.
+- **The callback**, `GET /payments/{vendor}/callback/{reference}`, sits outside the
+  auth group. A session that expires during checkout doesn't cost the customer their
+  confirmation.
+- **Domain events** are the extension points: `PaymentInitialized`, `PaymentSucceeded`,
+  `PaymentFailed`, `PaymentNeedsReview`, `PaymentWebhookReceived`, `RefundInitiated`,
+  `RefundProcessed`, `RefundFailed`, `SubscriptionStarted`, `SubscriptionRenewed`,
+  `SubscriptionPaymentFailed`, `SubscriptionCancelled` and `SubscriptionEnded`. A
+  project fulfils an order from a listener on `PaymentSucceeded`, so the kit stays free
+  of any domain.
+- **Optional tracing.** `payment_traces` holds one redacted row per vendor call, with
+  what was asked, what came back and how long it took. It's off by default
+  (`PAYMENTS_TRACING`) and pruned after 30 days.
+- **Keys live in the environment only**, never in the site configuration. A vendor is
+  offered once every key it needs is filled in. `config/payments.php` has the
+  checkout expiry, webhook IP allowlist, queue, reconcile windows, tracing and HTTP
+  timeouts.
+- **Screens.** Members get **Add funds** on their transactions page. Admins get a
+  **Payments** screen (gate `payments`) showing webhooks, traces and which gateways
+  are configured. The **Transactions** screen gains refunds and "check with provider".
+- **Notifications.** There are seven new `NotificationTopicEnum` cases:
+  `PAYMENT_CONFIRMED`, `PAYMENT_FAILED`, `PAYMENT_REFUNDED`, `SUBSCRIPTION_STARTED`,
+  `SUBSCRIPTION_PAYMENT_FAILED`, `SUBSCRIPTION_ENDED` and `ADMIN_PAYMENT_REVIEW`.
+  `SendPaymentNotifications` and `SendSubscriptionNotifications` raise them.
+
+#### Refunds
+
+- **A refund is its own `REFUND` row** pointing at the payment. The payment itself is
+  never edited. It stays `CONFIRMED`, because it happened.
+- **Partial and full refunds.** What's left to refund is the payment minus every refund
+  that is `CONFIRMED` or `PROCESSING`. The check and the new row are written under a lock
+  on the payment, so two admins can't refund more than came in between them. A deposit
+  the member has partly spent can't be refunded past their balance.
+- **Through the vendor, or by hand.** A gateway payment is refunded through the vendor
+  and stays `PROCESSING` until the vendor confirms it. An approved bank transfer is paid
+  back by hand and recorded as `CONFIRMED` straight away.
+- A refund made from the vendor's own dashboard arrives as a webhook with no row behind
+  it, and raises `PaymentNeedsReview`.
+
+#### Subscriptions
+
+The vendor does the billing: it holds the card, runs the schedule and retries. Paystack,
+Flutterwave, Stripe and PayPal implement `SupportsSubscriptions`. OPay, Monnify and
+Korapay don't, so they're never offered for a plan.
+
+- **Plans** (`subscription_plans`) are managed from the new admin **Subscriptions**
+  screen (gate `subscriptions`). A plan can be free, recommended, carry trial days, or
+  include another plan ("Everything in Basic, plus").
+- **Prices** (`subscription_plan_prices`) are one row per `SubscriptionIntervalEnum`
+  interval. The card works out what a longer interval saves. Each price is synced to a
+  vendor when its first subscriber arrives (`subscription_plan_vendors`). Changing an
+  amount gives new subscribers a new vendor plan, and existing subscribers keep theirs.
+- **Features** (`subscription_plan_features`) are one row per `SubscriptionFeatureEnum`
+  case, with an optional `feature_limit` (null means unlimited). Gate by feature, never
+  by plan name: `SubscriptionService::allows()` and `limitFor()`. The four shipped cases
+  are examples to replace.
+- **One free plan at most.** It's the fallback when nothing else gives access, with no
+  row per account.
+- **Card-less trials** are run by the kit, not the vendor. It's one `TRIALING` row per
+  account, and it ends as soon as the member pays.
+- **The lifecycle.** Renewals come in by webhook and are deduplicated by the vendor's
+  charge id. A failed renewal sets `PAST_DUE`. A cancelled plan keeps access until
+  `current_period_ends_at`, then becomes `EXPIRED`.
+- **Members** get a **Subscriptions** page where they can pick a plan and interval,
+  start a trial, or cancel.
+- `TransactionGroupEnum::SUBSCRIPTION` covers the first payment and every renewal.
+- No coupons ship. A yearly price below twelve monthlies is the built-in discount.
+
+#### Commands
+
+| Command | Schedule | Does |
+| --- | --- | --- |
+| `payments:reconcile` | every 10 minutes | Asks the vendor about checkouts still processing after 15 minutes, and closes unpaid ones 24 hours past expiry |
+| `payments:sync-subscriptions` | hourly | Keeps each subscription in step with its vendor, and ends cancelled ones and trials whose time is up |
+| `payments:prune-traces` | daily, 07:50 | Removes traces past the retention window |
+| `payments:retry-webhooks` | — | Puts failed webhooks back on the queue (`--id=`, `--dry-run`) |
+| `payments:health` | — | Makes one authenticated call to each configured vendor. It's a command on purpose, not a public endpoint |
+
+#### Contact locations
+
+- **Configuration → Contact locations** holds any number of offices, branches or desks.
+  Each has a label, an address, any number of phones and emails, and an optional map.
+  The home page lists them in a contact section. An empty list means no section.
+- **Maps are Google Maps or OpenStreetMap embeds only.** You can paste the whole
+  `<iframe>` or just its `src`. `SiteConfigurationService::mapEmbedUrl()` accepts only
+  an https embed from either provider. It runs on save (`MapEmbedRule`) and again at
+  render time, so a hand-edited JSON file is held to the same rule.
+- A fresh install has three placeholder locations to show the shape.
+- The site's single phone, email and address stay the main contact that emails and
+  templates read.
+
+#### House style
+
+- `Events`, `Listeners` and `Jobs` are now sanctioned folders under `app/`, making
+  sixteen. `.agents/my-skills/events.md` and `jobs.md` now say when each is the right
+  tool, rather than banning them. A feature that owns several services gets one
+  folder under `Services/` (`Services/Payment/`).
+- New library file: `.agents/my-skills/payments.md`.
+
+### Changed
+
+- **Transaction references are longer.** `kReferenceId()` now uses twelve
+  independently drawn random characters instead of two three-character shuffles. The old scheme allowed about 254,000 references a day, and because the
+  reference is unique, a site taking a few hundred payments a day would have seen
+  checkouts fail on collisions.
+- **Lists in the site configuration are replaced whole, not merged.** Stored values are
+  laid over the defaults with a merge that recurses only into keyed groups.
+  `array_replace_recursive()` merged lists by position, so a contact list cut from three
+  to one would have come back as three on the next save.
+- **The kit's `add_*` migrations are folded into their `create_*_table` files.** This
+  covers image folder visibility, currency symbol position and integer rate,
+  announcement icon, the 2.1.0 lifecycle columns on `users`, and the new payment and
+  subscription columns. While this repo is the starter kit, a table is changed in its
+  create migration. A project made from the kit goes back to `add_*` migrations. See
+  `CLAUDE.md`.
+
+### Dependencies
+
+- None added. The payments module runs on the guzzle 8 the app already uses.
+
+### Upgrading
+
+```bash
+php artisan migrate
+```
+
+That creates `payment_webhooks`, `payment_traces`, `subscription_plans`,
+`subscription_plan_prices`, `subscription_plan_features`, `subscription_plan_vendors`
+and `subscriptions`.
+
+**`transaction_gateways` needs five columns by hand.** They were folded into
+`create_transaction_gateways_table`, which an existing install has already run. Add
+them in a migration of your own:
+
+```php
+Schema::table('transaction_gateways', function (Blueprint $table) {
+    $table->string('currency', 10)->nullable()->after('vendor');
+    $table->string('channel', 100)->nullable();
+    $table->string('failure_reason')->nullable();
+    $table->timestamp('paid_at')->nullable();
+    $table->timestamp('verified_at')->nullable();
+});
+```
+
+The other folded migrations describe columns a 2.1.0 install already has, so nothing
+else changes. Don't run `migrate:fresh` to "catch up".
+
+Then:
+
+- Copy the payments block from `.env.example` and fill in the vendors you'll use. Leave
+  the others empty to keep them off. Run `php artisan payments:health` to check the keys.
+- In each vendor's dashboard, register `https://your-site/webhooks/payments/{vendor}`
+  as the webhook URL. The callback URL is sent with each checkout, so it needs no
+  setting up. `webhooks/*` is already outside CSRF.
+- **Run a queue worker.** Webhooks are worked on the queue, and the reconcile sweep is
+  only a safety net.
+- Three new scheduled commands need the scheduler running: `payments:reconcile`,
+  `payments:sync-subscriptions` and `payments:prune-traces`.
+- Replace the example `SubscriptionFeatureEnum` cases with your own before creating
+  plans. A case can't be removed while rows still use it.
+- Roles that should see **Payments** or **Subscriptions** need those gates granted. The
+  protected admin role already has them.
+
+Suite at this point: 1067 tests, 2812 assertions, all passing.
+
 ## [2.1.0] - 2026-10-02
 
 Two scheduled sweeps that look after the member list on their own, and a password reset

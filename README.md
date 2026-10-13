@@ -54,6 +54,22 @@ lock, so a balance can never silently disagree with the ledger that explains it.
 is integer minor units throughout. Administrators get a review queue and a manual
 adjustment that records who moved what and why.
 
+**Payments** — gateway checkouts for Paystack, Flutterwave, Stripe, PayPal, OPay,
+Monnify and Korapay, as plain HTTP calls with no vendor SDKs. A payment is never
+confirmed from the URL: the callback, the signed and queued webhook, and a reconcile
+sweep every ten minutes all ask the vendor, and short or wrong-currency money is held
+for review instead of credited. Partial and full refunds go through the vendor, or are
+recorded by hand for a bank transfer. Domain events (`PaymentSucceeded`,
+`RefundProcessed` and others) let a project fulfil an order without the kit knowing
+what an order is. An admin **Payments** screen shows the webhooks, the traces and which
+vendors are configured.
+
+**Subscriptions** — billed by the vendor (Paystack, Flutterwave, Stripe, PayPal). Each
+plan has one price per interval, and the pricing card works out what a longer interval
+saves. There's an optional free plan, card-less trials the kit runs itself, and plans
+that include another plan. Paid features are gated by feature, never by plan name:
+`SubscriptionService::allows()` and `limitFor()` with a `SubscriptionFeatureEnum` case.
+
 **Roles and workspaces** — a role is a row an administrator creates from the dashboard,
 not an enum case, and it divides up the admin workspace only. An admin carries **any
 number** of them through the `role_user` pivot, and their gate maps merge with the
@@ -80,13 +96,13 @@ queue; admin and member listings with search, filters and exports; a roles page;
 searchable activity log with an optional retention window; a single-account view; a
 deleted-accounts screen; and a manage-roles modal with guards (you cannot revoke your
 own admin role, or the last one). Blog posts, categories and tags. The transaction
-ledger and its review queue. Site configuration across four screens — branding, security
+ledger and its review queue, refunds, payments and subscription plans. Site configuration across four screens — branding, security
 switches, preferences, social handles, the legal pages, the FAQs and notification types
 — plus a raw JSON editor for the key no screen has grown a field for yet.
 
 **Member workspace** — dashboard with a next-steps checklist, profile, preferences,
 security settings (password, email, sessions, two-factor, connected accounts), their own
-image and video libraries, their transaction statement, a download of everything held
+image and video libraries, their transaction statement with **Add funds**, their subscription, a download of everything held
 about them, and account deletion.
 
 **Account deletion is a window, not an event** — asking to be deleted schedules the
@@ -117,7 +133,9 @@ version accepted, with timestamp, IP and user agent. Publish a replacement and e
 is outstanding again until they accept it.
 
 **Public site** — a landing page with an FAQ section whose questions and markdown
-answers are editable from the admin, and a footer that links the legal pages straight
+answers are editable from the admin, a contact section listing any number of offices
+with their phones, emails and an optional Google Maps or OpenStreetMap embed, and a
+footer that links the legal pages straight
 off the enum.
 
 **Cross-cutting** — an audit trail that records what changed and what it changed from,
@@ -188,15 +206,19 @@ run refreshes rather than doubles. The policies it publishes are boilerplate sho
 than edited, so replacing it means drafting v2.0 from Admin → Site configuration →
 Policies and publishing that.
 
-Seven commands run on the schedule, so a live install needs the scheduler running:
+Ten commands run on the schedule, so a live install needs the scheduler running:
 account deletion reminders and the deletion sweep daily, the unverified-account sweep
 and the "we missed you" reminders daily, scheduled posts and email campaigns every
-minute, and the activity-log prune daily (which does nothing until somebody sets a
-retention window). Each takes `--dry-run`.
+minute, the activity-log prune daily (which does nothing until somebody sets a
+retention window), the payment reconcile sweep every ten minutes, the subscription sync
+hourly, and the payment-trace prune daily. A live install also needs a **queue worker**,
+because payment webhooks are processed on the queue.
 
-Two optional environment keys: `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` for the
-captcha — the switch does nothing without both — and `LARAVEL_PDF_DRIVER`, which is
-`dompdf` and needs nothing installed.
+Optional environment keys: `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` for the
+captcha (the switch does nothing without both), `LARAVEL_PDF_DRIVER`, which is `dompdf`
+and needs nothing installed, and the payments block in `.env.example`. A payment vendor
+is offered once every key it needs is filled in. `php artisan payments:health` checks
+them, and each vendor's webhook URL is `/webhooks/payments/{vendor}`.
 
 ## Working on it
 
@@ -211,7 +233,7 @@ composer test                            # all three, as CI runs them
 ## The house style
 
 This kit is opinionated, and the opinions are written down in **`.agents/my-skills/`** —
-44 files covering where code goes, how it is named, and what this project deliberately
+45 files covering where code goes, how it is named, and what this project deliberately
 does not use. Start at [`agent.md`](.agents/my-skills/agent.md), finish at
 [`checklist.md`](.agents/my-skills/checklist.md), and use
 [`README.md`](.agents/my-skills/README.md) as the index.
@@ -236,9 +258,10 @@ The short version:
 - Every destructive action confirms through `<x-dashboard.confirm-modal>`, never
   `wire:confirm` — the browser dialog cannot be styled, cannot carry a consequence, and
   is suppressed outright in some in-app browsers.
-- There is no `app/Actions`, `app/Repositories`, `app/Jobs`, `app/Events`,
-  `app/Policies`, or `app/Http/Requests` — each has a file in the library explaining
-  what this project does instead.
+- There is no `app/Actions`, `app/Repositories`, `app/Policies`, `app/Observers` or
+  `app/Http/Requests`. Each has a file in the library explaining what this project does
+  instead. `Events`, `Listeners` and `Jobs` exist for payments, and the library says
+  when each is the right tool.
 
 ## Stack
 
