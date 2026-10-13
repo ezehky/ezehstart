@@ -20,6 +20,9 @@ enum TransactionGroupEnum: string
     case PURCHASE = 'purchase';
     case REFUND = 'refund';
 
+    /** A subscription's first payment and every renewal after it. */
+    case SUBSCRIPTION = 'subscription';
+
     /** A manual correction by an administrator, always evidenced in the log. */
     case ADJUSTMENT = 'adjustment';
 
@@ -43,6 +46,11 @@ enum TransactionGroupEnum: string
         return $this === self::REFUND;
     }
 
+    public function isSubscription(): bool
+    {
+        return $this === self::SUBSCRIPTION;
+    }
+
     public function isAdjustment(): bool
     {
         return $this === self::ADJUSTMENT;
@@ -58,6 +66,7 @@ enum TransactionGroupEnum: string
             self::WITHDRAWAL => 'red',
             self::PURCHASE => 'blue',
             self::REFUND => 'yellow',
+            self::SUBSCRIPTION => 'purple',
             self::ADJUSTMENT => 'gray',
         };
     }

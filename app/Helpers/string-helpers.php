@@ -138,12 +138,20 @@ if (! function_exists('kReferenceId')) {
             }
         }
 
-        // GENERATE RANDOM STRING
-        $firstShuffle = str()->substr(str_shuffle($string), 0, 3);
-        $secondShuffle = str()->substr(str_shuffle($string), 0, 3);
+        // Twelve characters, each drawn independently with random_int(). Two
+        // three-character shuffles gave about 254,000 references a day, which a
+        // site taking a few hundred payments a day would collide on — and the
+        // reference is unique, so a collision is a checkout that fails. Twelve
+        // digits is 9^12, around 282 billion a day.
+        $random = '';
+        $last = \strlen($string) - 1;
+
+        for ($index = 0; $index < 12; $index++) {
+            $random .= $string[random_int(0, $last)];
+        }
 
         // RETURN REFERENCE ID
-        return "{$prefix}{$firstShuffle}{$secondShuffle}".date('Ymd');
+        return "{$prefix}{$random}".date('Ymd');
     }
 }
 

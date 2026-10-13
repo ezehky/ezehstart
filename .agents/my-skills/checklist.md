@@ -7,9 +7,12 @@ If a line does not apply, it is ✓ by default — but read it first.
 
 ## Architecture
 
-- [ ] ✓ No new folder was created under `app/` (only the 13 existing ones)
-- [ ] ✓ No `app/Actions`, `app/Repositories`, `app/Jobs`, `app/Events`, `app/Policies`,
+- [ ] ✓ No new folder was created under `app/` (only the 16 existing ones, plus a
+      feature folder under `Services/` where a feature owns several services)
+- [ ] ✓ No `app/Actions`, `app/Repositories`, `app/Policies`, `app/Observers`,
       `app/Http/Requests`, `app/Livewire` was created
+- [ ] ✓ A domain event is fired *alongside* the direct calls, never instead of them,
+      and implements `ShouldDispatchAfterCommit` if fired inside a transaction
 - [ ] ✓ Business logic lives in a Service, not in a controller or duplicated in a page
 - [ ] ✓ Shared page behaviour lives in a `With*` trait, not copy-pasted
 - [ ] ✓ Follows architecture — see [architecture.md](architecture.md)

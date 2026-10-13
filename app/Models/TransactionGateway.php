@@ -18,6 +18,8 @@ class TransactionGateway extends Model
         return [
             'vendor' => PaymentVendorEnum::class,
             'expires_at' => 'datetime',
+            'paid_at' => 'datetime',
+            'verified_at' => 'datetime',
         ];
     }
 
@@ -30,6 +32,15 @@ class TransactionGateway extends Model
     public function hasExpired(): bool
     {
         return $this->expires_at !== null && $this->expires_at->isPast();
+    }
+
+    /**
+     * Whether a vendor stands behind this row, rather than an administrator
+     * reviewing a bank transfer by hand.
+     */
+    public function isAutomated(): bool
+    {
+        return ! $this->vendor->isManual();
     }
 
     // Relationships

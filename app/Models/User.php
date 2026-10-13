@@ -308,6 +308,11 @@ class User extends Authenticatable implements HasLocalePreference, HasPasskeys
         return $this->hasMany(Transaction::class);
     }
 
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
     public function posts(): HasMany
     {
         return $this->hasMany(Post::class);

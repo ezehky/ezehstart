@@ -1,6 +1,8 @@
 <?php
 
 use App\Enums\PolicyTypeEnum;
+use App\Http\Controllers\PaymentCallbackController;
+use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PolicyPageController;
 use App\Http\Controllers\SocialAuthController;
 use App\Models\User;
@@ -71,6 +73,19 @@ Route::middleware('guest')->group(function (): void {
 // in, and a guest middleware would block the second case.
 Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])->name('social.redirect');
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])->name('social.callback');
+
+// Payments. The callback is where a vendor's checkout sends the customer back
+// to; it asks the vendor what happened and believes nothing in the URL, so it is
+// outside the auth group — a session that expired during checkout must not cost
+// the customer their confirmation. The webhook is outside CSRF ("webhooks/*" in
+// bootstrap/app.php) and authenticates by the vendor's signature instead.
+Route::get('/payments/{vendor}/callback/{reference}', PaymentCallbackController::class)
+    ->middleware('throttle:30,1')
+    ->name('payments.callback');
+
+Route::post('/webhooks/payments/{vendor}', PaymentWebhookController::class)
+    ->middleware('throttle:300,1')
+    ->name('payments.webhook');
 
 // Email Verification
 Route::livewire('/email-verification/{user:email}', 'pages::auth.email-verification')->name('email.verification');

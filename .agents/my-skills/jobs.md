@@ -2,16 +2,20 @@
 
 ## Rule
 
-**This project has no Job classes.** `app/Jobs/` does not exist, and nothing calls
-`dispatch()`, `Bus::`, `Queue::push()`, or a batch.
-
-Background work takes one of two forms:
+Background work takes one of four forms:
 
 | Need | Mechanism |
 | --- | --- |
 | Send an email off the request cycle | a **Mailable** with `ShouldQueue`, sent with `Mail::queue()` |
 | Notify a user in-app | `GeneralNotification implements ShouldQueue` via `NotificationService` |
 | Periodic sweeps, bulk sends, status syncs | a **scheduled Artisan command** |
+| One unit of deferred work that must retry on its own — an inbound webhook | a **Job** in `app/Jobs/` |
+
+`app/Jobs/` was sanctioned on 2026-10-10 for the payments module.
+`ProcessPaymentWebhook` is the model: the controller stores the webhook row and
+answers in milliseconds, and the Job does the slow part with retries and backoff.
+Reach for a Job only when the first three rows do not fit — most deferred work here is
+still "send something" or "sweep something".
 
 The queue infrastructure is present and used — `jobs`, `job_batches`, and `failed_jobs`
 tables exist, and `composer dev` runs `php artisan queue:listen --tries=1` — it is
@@ -122,22 +126,30 @@ Is it periodic, or a bulk sweep over records?
 └── yes → an Artisan command with --dry-run, scheduled in routes/console.php,
           idempotent via a unique index + insertOrIgnore  (see commands.md)
 
-Is it none of these — genuinely a one-off unit of deferred work?
-└── Ask before creating app/Jobs/. It has no precedent here.
+Is it none of these — one unit of work that must retry by itself on failure?
+└── a Job in app/Jobs/, modelled on ProcessPaymentWebhook
 ```
 
-Rules that carry over if a Job is ever genuinely warranted:
+Job conventions:
 
-- Constructor property promotion for its inputs
-- `$this->afterCommit()` if it reads a record written in a transaction
-- Failure isolation and `Log::channel('ezeh')->error()` with a context array
-- Idempotency through a database constraint, not through queue configuration
+- Named for what it does, verb first, no suffix: `ProcessPaymentWebhook`.
+- `use Queueable;` and constructor property promotion for its inputs — a model, never
+  an array of its attributes.
+- Connection and queue read from config in the constructor; `$this->afterCommit()` if
+  it reads a record written in a transaction.
+- `tries()` and `backoff()` as methods; `ShouldBeUnique` with a `uniqueId()` when a
+  manual retry could otherwise run it twice.
+- `handle()` is one call into a service. A `failed()` that records the failure on the
+  row, so it can be retried by hand.
+- Idempotency through a database constraint, not through queue configuration — the
+  webhook's `unique(vendor, event_key)` is what stops a duplicate, not the queue.
 
 ## Avoid
 
-- Creating `app/Jobs/`.
-- `dispatch(new SomeJob(...))`, `SomeJob::dispatch(...)`, `Bus::batch(...)`,
-  `Bus::chain(...)`.
+- A Job for something a queued Mailable, a queued notification or a scheduled command
+  already covers.
+- `dispatch(new SomeJob(...))` — use `SomeJob::dispatch(...)`. `Bus::batch(...)` and
+  `Bus::chain(...)` still have no precedent; ask first.
 - A Job that only wraps `Mail::queue()`.
 - `Mail::send()` (synchronous) instead of `Mail::queue()`.
 - A Mailable or Notification without `ShouldQueue`.

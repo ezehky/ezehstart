@@ -44,6 +44,14 @@ Route::livewire('/video-library/{user}', 'pages::shared.video-library')->name('u
 // Money
 Route::livewire('/transactions', 'pages::admin.transactions')->name('transactions');
 
+// What the payment providers sent and were asked: webhooks, traces, and which
+// providers this install can use. Its own gate, so a role can review payments
+// without seeing the plumbing.
+Route::livewire('/payments', 'pages::admin.payments')->name('payments');
+
+// Subscription plans and the people on them.
+Route::livewire('/subscriptions', 'pages::admin.subscriptions')->name('subscriptions');
+
 // Blog. The editor is its own screen rather than a modal: a post is long-form,
 // and a rich-text editor inside a dialog fights the page for scroll.
 Route::livewire('/categories/{category_group}', 'pages::admin.content.categories')->name('categories');

@@ -146,6 +146,16 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 'link' => route('admin.transactions'),
                 'icon' => 'banknotes',
             ],
+            'payments' => [
+                'label' => 'Payments',
+                'link' => route('admin.payments'),
+                'icon' => 'credit-card',
+            ],
+            'subscriptions' => [
+                'label' => 'Subscriptions',
+                'link' => route('admin.subscriptions'),
+                'icon' => 'arrow-path-rounded-square',
+            ],
             'users' => [
                 'label' => 'Users',
                 'children' => [
@@ -192,6 +202,11 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 'label' => 'Transactions',
                 'link' => route('user.transactions'),
                 'icon' => 'banknotes',
+            ],
+            'subscriptions' => [
+                'label' => 'Subscriptions',
+                'link' => route('user.subscriptions'),
+                'icon' => 'arrow-path-rounded-square',
             ],
             'image-library' => [
                 'label' => 'Image library',

@@ -118,8 +118,9 @@ This is a **starter kit**, not an application: authentication, roles, two worksp
 | --- | --- |
 | [actions.md](actions.md) | No `app/Actions/`. Page methods, traits, services instead |
 | [repositories.md](repositories.md) | No repositories. Computed props, scopes, service getters |
-| [jobs.md](jobs.md) | No `app/Jobs/`. Queued mail + scheduled commands |
-| [events.md](events.md) | No Laravel events. Direct calls + Livewire/Alpine browser events |
+| [jobs.md](jobs.md) | Queued mail + scheduled commands first; a Job only for retried units of work |
+| [events.md](events.md) | Direct calls for the kit's own side effects; domain events as extension points |
+| [payments.md](payments.md) | Adding a payment vendor, taking a payment, reacting to one |
 
 ---
 

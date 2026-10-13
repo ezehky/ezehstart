@@ -96,3 +96,33 @@ Schedule::command('activity:prune-logs')
     ->dailyAt('07:45')
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+|--------------------------------------------------------------------------
+| Payments
+|--------------------------------------------------------------------------
+|
+| The reconcile sweep is the safety net under webhooks: every ten minutes it
+| asks the vendor about checkouts still processing, so a webhook that never
+| arrived costs a customer minutes rather than a support ticket. Traces are
+| pruned nightly; with tracing off there is nothing to prune.
+|
+*/
+
+Schedule::command('payments:reconcile')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Subscriptions are billed by the vendor; this keeps each row in step with it
+// and ends the cancelled ones once their paid time runs out. Hourly, because
+// "ends at midnight" that takes until morning is still the same day.
+Schedule::command('payments:sync-subscriptions')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+Schedule::command('payments:prune-traces')
+    ->dailyAt('07:50')
+    ->withoutOverlapping()
+    ->runInBackground();

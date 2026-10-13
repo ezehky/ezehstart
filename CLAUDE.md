@@ -35,6 +35,7 @@ project.
 | Video library | The same again for embeds — folders, per-video visibility, a delete guard backed by `video_usages`. A row is a **reference** (provider + id), never a file; the player URL is rebuilt from the pair on every render |
 | Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages. The seeded **Author** role narrows an account to the posts it wrote and gives it a public byline — bio and social handles on `user_profiles` |
 | Money | `transactions` plus gateways, metas, evidence, balances and charges; balances derived from confirmed rows, never stored |
+| Payments | Gateway checkouts for Paystack, Flutterwave, Stripe, PayPal, OPay, Monnify and Korapay — plain `Http::`, no SDKs. Signed webhooks stored and worked on a queue, partial and full refunds (through the vendor, or recorded by hand for a bank transfer), vendor-billed subscriptions (plans synced to Paystack, Flutterwave, Stripe, PayPal; gate features on `SubscriptionService::accessFor()`), domain events (`PaymentSucceeded`, `RefundProcessed`, `SubscriptionRenewed` …), a reconcile sweep, optional tracing, admin Payments and Subscriptions screens. Writes only through the ledger. See `.agents/my-skills/payments.md` |
 | Reference | 250 countries seeded from `database/data/countries.json` — no network call at seed time |
 | Support | **Impersonation** — an admin views the site as a member, both ends logged, expiring after an hour, with every account-altering screen closed while it runs. Never admin→admin |
 | Accounts | Deletion is a grace period, then anonymize-or-remove. Anonymized rows are soft-deleted and surface only on **Deleted accounts**, where they can be restored or purged. An account holder can also **download a copy** of what is held about them, behind `user.allow-data-download` |
@@ -86,11 +87,12 @@ Change it before the kit becomes a real project.
 
 ## The rules people break most
 
-- **No new base folders under `app/`.** Thirteen names are sanctioned — `Contracts` is
-  one of them and is created on first use — and there is no `Actions`, `Repositories`,
-  `Jobs`, `Events`, `Policies`, `Observers`, `Http/Requests`, or `Livewire`. See
-  `.agents/my-skills/actions.md`, `repositories.md`, `jobs.md`, `events.md`,
-  `policies.md` for what to do instead.
+- **No new base folders under `app/`.** Sixteen names are sanctioned — `Events`,
+  `Listeners` and `Jobs` joined for payments on 2026-10-10 — and there is no `Actions`,
+  `Repositories`, `Policies`, `Observers`, `Http/Requests`, or `Livewire`. See
+  `.agents/my-skills/actions.md`, `repositories.md`, `policies.md` for what to do
+  instead, and `events.md`, `jobs.md` for when an event or a Job is the right tool. A
+  feature owning several services gets one folder under `Services/` (`Services/Payment/`).
 - **No class-based Livewire components.** Screens are SFCs under
   `resources/views/pages/`, routed with `Route::livewire('/path', 'pages::group.name')`.
 - **Validation lives in `protected function rules(): array`** — never `#[Validate]`,
@@ -150,9 +152,13 @@ Change it before the kit becomes a real project.
 - Two-factor and social sign-in are **off by default**; strong passwords, password
   history and passwordless sign-in are **on**. Every switch closes its route as well as
   hiding its button — a route left reachable behind a hidden link is not disabled.
-- `laravel/socialite` holds guzzle at **7.x**. Laravel 13 ships guzzle 8, and
-  `league/oauth1-client` caps below it, so installing Socialite downgraded it for the
-  whole app. Removing Socialite is what lifts that.
+- **Check a package's guzzle constraint before installing it.** The app runs guzzle 8;
+  Socialite once held it at 7 until `league/oauth1-client` caught up. A package capped
+  at `^7` (PayZephyr was one) would pull the whole app back down.
+- **A gateway payment is never confirmed from the URL.** The callback, the webhook and
+  the reconcile sweep all go through `PaymentService::verify()`, which asks the vendor
+  and holds a short or wrong-currency payment for review instead of crediting it. Do
+  not settle a `PAYMENT_GATEWAY` row any other way.
 - The image optimiser shells out to `jpegoptim`/`optipng`/`pngquant`. Where those are
   not installed it does nothing rather than failing — uploads still work, unoptimised.
 - Post HTML is sanitised on the way **in** by `BlogService::sanitize()`. That is what

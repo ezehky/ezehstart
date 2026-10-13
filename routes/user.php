@@ -16,6 +16,7 @@ Route::livewire('/download-data', 'pages::user.account.download-data')->name('do
 
 // Money
 Route::livewire('/transactions', 'pages::user.transactions')->name('transactions');
+Route::livewire('/subscriptions', 'pages::user.subscriptions')->name('subscriptions');
 
 // Image library. Same screen as the admin workspace; the library query is what
 // keeps one member's uploads out of another's picker.

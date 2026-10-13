@@ -26,25 +26,30 @@ app/
 ├── Console/Commands/ scheduled maintenance commands — account deletions, scheduled posts
 ├── Contracts/        interfaces and abstracts. Sanctioned, but not present until the
 │                     first one is written: git does not carry an empty directory.
-├── Enums/            every status, type, category. 28 ship with the kit.
+├── Enums/            every status, type, category.
+├── Events/           domain events, fired from services as extension points —
+│                     the payment events. See events.md
 ├── Helpers/          4 autoloaded function files, all functions prefixed k
 ├── Http/
 │   ├── Controllers/  the public policy pages and the social callback only —
 │   │                 authenticated screens use no controller
 │   └── Middleware/   AdminMiddleware, UserMiddleware
+├── Jobs/             ProcessPaymentWebhook — retried units of work. See jobs.md
+├── Listeners/        auto-discovered; SendPaymentNotifications
 ├── Mail/             11 Mailables, all queued
 ├── Models/           29, from User and Role through the image, video, blog and
 │                     transaction tables — see the directory for the list
 ├── Notifications/    GeneralNotification (database channel only)
 ├── Providers/        AppServiceProvider only
 ├── Rules/            EmailRule, ImageRule, MoneyRule, and two more
-├── Services/         31 services, all #[Singleton]
+├── Services/         all #[Singleton]; Payment/ and Payment/Gateways/ hold the
+│                     payments module
 └── Traits/           23 With* traits
 ```
 
 `Contracts` is the only one of these that may be missing on a fresh clone. It is part
 of the map so a gateway interface has an obvious home — creating it is not "inventing
-architecture", creating a fourteenth sibling is.
+architecture", creating a seventeenth sibling is.
 
 ```
 resources/views/

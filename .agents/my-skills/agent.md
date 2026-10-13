@@ -44,13 +44,19 @@ would keep: an **image library** (folders, per-image visibility, a delete guard)
 `app/` contains exactly these folders:
 
 ```
-Casts  Console  Contracts  Enums  Helpers  Http  Mail  Models
-Notifications  Providers  Rules  Services  Traits
+Casts  Console  Contracts  Enums  Events  Helpers  Http  Jobs  Listeners
+Mail  Models  Notifications  Providers  Rules  Services  Traits
 ```
 
-There is **no** `app/Actions`, `app/Repositories`, `app/Jobs`, `app/Events`,
-`app/Listeners`, `app/Policies`, `app/DTOs`, `app/Livewire`, `app/View/Components`,
-`app/Observers`, `app/Http/Requests`, `app/Http/Resources`.
+`Events`, `Listeners` and `Jobs` were sanctioned on 2026-10-10 for the payments module —
+see [events.md](events.md) and [jobs.md](jobs.md) for when they are the right tool.
+`Services` may hold **one level of feature folder** when a feature owns several
+services — `Services/Payment/` and `Services/Payment/Gateways/` — named in the
+singular, PascalCase.
+
+There is **no** `app/Actions`, `app/Repositories`, `app/Policies`, `app/DTOs`,
+`app/Livewire`, `app/View/Components`, `app/Observers`, `app/Http/Requests`,
+`app/Http/Resources`.
 
 Do **not** create any of them. If you think you need one, you need a **Service**, a
 **Trait**, or a **method on the Livewire page**. See [actions.md](actions.md),
@@ -142,7 +148,7 @@ Never generate any of the following in this project:
 | `Route::view()` for a page that reads anything | `Route::livewire('/path', 'pages::site.name')` with `#[Layout('layouts::site')]` |
 | `Str::slug()` | `kSlug()` |
 | `@livewire('…')` | `<livewire:… />` or the page route |
-| New base folders under `app/` | One of the 13 existing folders |
+| New base folders under `app/` | One of the 16 existing folders |
 | New Composer/NPM dependencies | Ask first |
 | Markdown docs alongside code | Only when explicitly requested |
 
@@ -216,8 +222,9 @@ Follow this order every time.
 | [testing.md](testing.md) | Pest structure, Livewire testing |
 | [actions.md](actions.md) | **Not used** — what to do instead |
 | [repositories.md](repositories.md) | **Not used** — what to do instead |
-| [jobs.md](jobs.md) | **Not used** — queued mail/notifications instead |
-| [events.md](events.md) | **Not used** — Livewire + browser events instead |
+| [jobs.md](jobs.md) | Queued mail and scheduled commands first; a Job for retried units of work |
+| [events.md](events.md) | Livewire/Alpine events, and domain events as extension points |
+| [payments.md](payments.md) | Gateway checkouts, webhooks, events, tracing — the payments module |
 | [templates.md](templates.md) | All copy-paste templates in one place |
 | [checklist.md](checklist.md) | Pre-completion review gate |
 

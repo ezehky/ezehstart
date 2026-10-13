@@ -5,6 +5,8 @@ use App\Enums\StatusTransaction;
 use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Payment\PaymentService;
+use App\Services\Payment\RefundService;
 use App\Services\TransactionService;
 use App\Services\TrendService;
 use App\Traits\WithDataTable;
@@ -46,6 +48,13 @@ new class extends Component
 
     public bool $adjust_credit = true;
 
+    // Refund
+    public ?int $refundId = null;
+
+    public string $refund_amount = '';
+
+    public string $refund_reason = '';
+
     public function mount(): void
     {
         kSetSiteTitle('transactions');
@@ -80,6 +89,7 @@ new class extends Component
     {
         $query = Transaction::query()
             ->with(['user', 'balance', 'gateway'])
+            ->withRefundedSum()
             ->when($this->search !== '', fn (Builder $query) => $query
                 ->where(fn (Builder $group) => $group
                     ->searchMacro(['reference', 'description'], $this->search)
@@ -281,6 +291,87 @@ new class extends Component
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||
+    // GATEWAY
+
+    /**
+     * Ask the vendor now rather than wait for the webhook or the sweep. Settles
+     * the row if the answer is final, exactly as a webhook would.
+     */
+    public function checkWithProvider(int $transactionId): bool
+    {
+        $this->checkGate();
+
+        $transaction = Transaction::query()->with('gateway')->whereKey($transactionId)->first();
+
+        abort_unless((bool) $transaction?->gateway?->isAutomated(), 404);
+
+        $result = app(PaymentService::class)->verify($transaction);
+
+        unset($this->transactions, $this->metrics, $this->tableSummary);
+
+        $this->respondError($result, \is_string($result));
+
+        return $this->respondSuccess(
+            "{$result->gateway->vendor->label()} reports {$result->reference} as "
+            .($result->gateway->failure_reason ? 'held for review: '.$result->gateway->failure_reason : $result->status->label(true).'.')
+        );
+    }
+
+    // ||||||||||||||||||||||||||||||||||||||||||||||||
+    // REFUNDS
+
+    public function confirmRefund(int $transactionId): void
+    {
+        // A refund writes a new row, so it asks for CREATE, like an adjustment.
+        $this->checkGate(GateAccessEnum::CREATE);
+
+        $transaction = Transaction::query()->whereKey($transactionId)->first();
+
+        abort_unless((bool) $transaction, 404);
+
+        $this->respondError('This payment cannot be refunded.', ! $transaction->isRefundable());
+
+        $this->resetValidation();
+        $this->refundId = $transaction->id;
+        $this->refund_amount = (string) $transaction->refundableAmount();
+        $this->refund_reason = '';
+
+        Flux::modal('refundModal')->show();
+    }
+
+    /**
+     * Send the money back. A gateway payment goes back through its vendor; a
+     * bank transfer is recorded as paid back by hand. RefundService decides
+     * which, and refuses anything more than is left.
+     */
+    public function refund(): bool
+    {
+        $this->checkGate(GateAccessEnum::CREATE);
+
+        $this->validate([
+            'refund_amount' => ['required', 'numeric', 'min:0.01'],
+            'refund_reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $transaction = Transaction::query()->whereKey($this->refundId)->first();
+
+        abort_unless((bool) $transaction, 404);
+
+        $result = app(RefundService::class)->refund($transaction, (float) $this->refund_amount, $this->refund_reason);
+
+        $this->respondError($result, \is_string($result), field: 'refund_amount');
+
+        Flux::modal('refundModal')->close();
+        $this->reset('refundId', 'refund_amount', 'refund_reason');
+        unset($this->transactions, $this->metrics, $this->tableSummary);
+
+        return $this->respondSuccess(match (true) {
+            $result->status->isConfirmed() => "Refund {$result->reference} has been recorded.",
+            default => "Refund {$result->reference} has been sent and is being processed.",
+        });
+    }
+
+    // ||||||||||||||||||||||||||||||||||||||||||||||||
     // MANUAL ADJUSTMENT
 
     public function adjust(): bool
@@ -408,6 +499,11 @@ new class extends Component
 
                         <x-table.cell column="amount">
                             <x-transaction.amount :transaction="$item" />
+                            @if ($item->refundedAmount() > 0)
+                                <p class="text-xs text-amber-600 dark:text-amber-400">
+                                    {!! kMoneyFormat($item->refundedAmount()) !!} refunded
+                                </p>
+                            @endif
                         </x-table.cell>
 
                         <x-table.cell column="transaction_group">
@@ -425,12 +521,37 @@ new class extends Component
                         <x-table.cell column="created_at">{{ $item->createdDatetimeHuman() }}</x-table.cell>
 
                         <x-table.cell>
-                            @if ($item->isSettled())
+                            @if ($item->isRefundable() && kGateAction($pageGate, $gateCreate))
+                                <flux:dropdown position="bottom" align="end">
+                                    <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
+                                    <flux:menu>
+                                        <x-dashboard.gate.menu-item
+                                            :gate="$pageGate"
+                                            :level="$gateCreate"
+                                            icon="arrow-uturn-left"
+                                            wire:click="confirmRefund({{ $item->id }})"
+                                        >
+                                            Refund
+                                        </x-dashboard.gate.menu-item>
+                                    </flux:menu>
+                                </flux:dropdown>
+                            @elseif ($item->isSettled())
                                 <flux:text size="sm" class="text-slate-400">Settled</flux:text>
                             @elseif (kGateAction($pageGate, $gateModify))
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
                                     <flux:menu>
+                                        @if ($item->gateway?->isAutomated())
+                                            <x-dashboard.gate.menu-item
+                                                :gate="$pageGate"
+                                                :level="$gateModify"
+                                                icon="arrow-path"
+                                                wire:click="checkWithProvider({{ $item->id }})"
+                                            >
+                                                Check with {{ $item->gateway->vendor->label() }}
+                                            </x-dashboard.gate.menu-item>
+                                            <flux:menu.separator />
+                                        @endif
                                         <x-dashboard.gate.menu-item
                                             :gate="$pageGate"
                                             :level="$gateModify"
@@ -494,6 +615,29 @@ new class extends Component
                     <flux:button variant="ghost" type="button">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Settle</flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    {{-- Refund --}}
+    <flux:modal name="refundModal" class="max-w-md">
+        <form wire:submit="refund" class="space-y-4">
+            <flux:heading size="lg">Refund this payment</flux:heading>
+
+            <flux:text>
+                A gateway payment goes back through the provider it came in by. A bank
+                transfer is recorded as paid back — send the money yourself first. A
+                deposit's refund comes out of the account's balance.
+            </flux:text>
+
+            <x-form.money-field wire:model="refund_amount" label="Amount" />
+            <flux:input wire:model="refund_reason" label="Reason" placeholder="Customer asked to cancel" />
+
+            <div class="flex justify-end gap-3">
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="danger">Refund</flux:button>
             </div>
         </form>
     </flux:modal>

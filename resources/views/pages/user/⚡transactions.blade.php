@@ -1,13 +1,19 @@
 <?php
 
+use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusTransaction;
 use App\Enums\TransactionGroupEnum;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\ImpersonationService;
+use App\Services\Payment\PaymentService;
 use App\Services\TransactionService;
 use App\Traits\WithDataTable;
+use App\Traits\WithFormResponseMessage;
+use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -15,7 +21,7 @@ use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithDataTable, WithPagination;
+    use WithDataTable, WithFormResponseMessage, WithPagination;
 
     public User $user;
 
@@ -24,6 +30,11 @@ new class extends Component
 
     #[Url]
     public string $status = '';
+
+    // Add funds
+    public string $deposit_amount = '';
+
+    public string $deposit_vendor = '';
 
     public function mount(): void
     {
@@ -138,6 +149,80 @@ new class extends Component
         return app(TransactionService::class)->balanceFor($this->user);
     }
 
+    // ||||||||||||||||||||||||||||||||||||||||||||||||
+    // ADD FUNDS
+
+    /**
+     * The vendors a deposit can go through, the configured default first. Empty
+     * hides the button: with no vendor configured there is nothing to offer.
+     *
+     * @return array<int, PaymentVendorEnum>
+     */
+    #[Computed]
+    public function checkoutOptions(): array
+    {
+        return PaymentVendorEnum::checkoutOptions();
+    }
+
+    /**
+     * An impersonating admin sees the statement but never pays from it — a real
+     * card charged in somebody else's name is exactly what impersonation must
+     * not be able to do.
+     */
+    #[Computed]
+    public function canDeposit(): bool
+    {
+        return $this->checkoutOptions !== [] && ! app(ImpersonationService::class)->isImpersonating();
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'deposit_amount' => ['required', 'numeric', 'min:1', 'max:100000000'],
+            'deposit_vendor' => ['required', Rule::in(array_map(fn (PaymentVendorEnum $vendor) => $vendor->value, $this->checkoutOptions))],
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'deposit_amount' => 'amount',
+            'deposit_vendor' => 'payment method',
+        ];
+    }
+
+    public function openDeposit(): void
+    {
+        $this->resetValidation();
+        $this->reset('deposit_amount');
+        $this->deposit_vendor = $this->checkoutOptions[0]->value ?? '';
+
+        Flux::modal('depositModal')->show();
+    }
+
+    /**
+     * Write the deposit as PROCESSING and send the member to the vendor. The
+     * balance only moves once the vendor confirms it, through the callback, a
+     * webhook, or the reconcile sweep — whichever is first.
+     */
+    public function deposit()
+    {
+        abort_if(app(ImpersonationService::class)->isImpersonating(), 404);
+
+        $this->validate();
+
+        $result = app(PaymentService::class)->checkout(
+            $this->user,
+            PaymentVendorEnum::from($this->deposit_vendor),
+            (float) $this->deposit_amount,
+            'Wallet top-up',
+        );
+
+        $this->respondError($result, \is_string($result));
+
+        return $this->redirect($result->gateway->gateway_url);
+    }
+
     /**
      * @return array<int, array{label: string, value: string, icon: string, tone: string}>
      */
@@ -171,6 +256,12 @@ new class extends Component
                 <flux:heading level="2" size="lg">Your statement</flux:heading>
                 <flux:text class="mt-1">Every movement on your account, newest first.</flux:text>
             </div>
+
+            @if ($this->canDeposit)
+                <flux:button variant="primary" icon="plus" wire:click="openDeposit" class="lg:order-last">
+                    Add funds
+                </flux:button>
+            @endif
 
             <div class="flex flex-col gap-3 sm:flex-row">
                 <flux:select wire:model.live="group" class="sm:min-w-44">
@@ -288,4 +379,33 @@ new class extends Component
             </flux:table>
         @endif
     </flux:card>
+
+    {{-- Add funds --}}
+    @if ($this->canDeposit)
+        <flux:modal name="depositModal" class="max-w-md">
+            <form wire:submit="deposit" class="space-y-4">
+                <flux:heading size="lg">Add funds</flux:heading>
+
+                <flux:text>
+                    You will be taken to the payment provider to pay. Your balance updates as
+                    soon as they confirm it.
+                </flux:text>
+
+                <x-form.money-field wire:model="deposit_amount" label="Amount" />
+
+                <flux:radio.group wire:model="deposit_vendor" label="Pay with" variant="cards" class="flex-col">
+                    @foreach ($this->checkoutOptions as $vendor)
+                        <flux:radio value="{{ $vendor->value }}" label="{{ $vendor->label() }}" />
+                    @endforeach
+                </flux:radio.group>
+
+                <div class="flex justify-end gap-3">
+                    <flux:modal.close>
+                        <flux:button variant="ghost" type="button">Cancel</flux:button>
+                    </flux:modal.close>
+                    <flux:button type="submit" variant="primary">Continue to payment</flux:button>
+                </div>
+            </form>
+        </flux:modal>
+    @endif
 </div>

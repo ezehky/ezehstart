@@ -2,25 +2,49 @@
 
 ## Rule
 
-**This project uses no Laravel events.** There is no `app/Events/`, no
-`app/Listeners/`, no `EventServiceProvider`, no `event()` dispatch, no model observers,
-and no broadcasting.
-
-"Events" in this codebase means two things, both Livewire/Alpine:
+"Events" in this codebase means three things:
 
 | Kind | Direction | Mechanism |
 | --- | --- | --- |
 | **Livewire browser event** | PHP → JS | `$this->dispatch('name', key: $value)` → `x-on:name.window` |
 | **Alpine DOM event** | JS → JS | `x-on:click`, `@scroll.window`, `x-on:livewire-upload-progress` |
+| **Domain event** | PHP → PHP | `app/Events/*` fired with `Thing::dispatch()`, handled in `app/Listeners/*` |
 
-When code needs to react to a domain change, it is called **directly** — in the same
-method, or through the service that owns the change.
+Domain events are an **extension point**, not the default way to do a side effect.
+The kit's own reaction to a change — the write, the cascade, the audit entry — is still
+a **direct call**, in order, in the service that owns the change. An event is fired
+*as well*, when a project built on the kit will want to hook in without editing the
+service: a payment succeeding, a refund landing, a subscription renewing.
+
+`app/Events/` and `app/Listeners/` were sanctioned on 2026-10-10 for the payments
+module, whose events are the model to copy (see [payments.md](payments.md)).
+
+### Domain event conventions
+
+- **Past-tense name, no suffix**: `PaymentSucceeded`, `RefundProcessed`. Not
+  `PaymentSucceededEvent`, not `OnPayment`.
+- `use Dispatchable, SerializesModels;` and **promoted public constructor
+  properties** — the model, plus a reason string where one explains it.
+- **`implements ShouldDispatchAfterCommit`** whenever it is fired inside a
+  `DB::transaction()`. A listener must never see a change that is about to roll back.
+- A class docblock saying **when it fires and what it is for** — the hook a project
+  should use it as.
+- Fired from the **service**, never from a Livewire page or a model.
+- **No `EventServiceProvider`.** Listeners are discovered from `app/Listeners/`. One
+  listener class may handle several events through `handleSomething(TheEvent $event)`
+  methods — Laravel discovers any public method starting with `handle`.
+- A listener is thin: it calls a service (`NotificationService`, a mailer). It holds
+  no business rules.
 
 ## Why
 
-- An event bus decouples the emitter from the handler, but this codebase has exactly
-  one handler for each domain change, and the ordering matters (log **after** save,
-  mail **after** commit). Explicit calls make that ordering visible at the call site.
+- An event bus decouples the emitter from the handler, which is wrong for the kit's
+  own reactions: there is exactly one handler for each, and the ordering matters (log
+  **after** save, mail **after** commit). Explicit calls keep that ordering visible at
+  the call site.
+- It is right for the reactions a *project* adds. A starter kit cannot know that one
+  project opens a course on payment and another ships a parcel; an event lets each do
+  its own thing without forking `PaymentService`.
 - Model observers were avoided deliberately: the FAQ markdown cache invalidates through
   a cache key that embeds `updated_at`, which is self-maintaining, whereas an observer
   is a second place to keep in sync (the code says so in as many words).
@@ -168,7 +192,12 @@ Presentation in the same page that Livewire will not re-render
 Purely visual, no server state
 └── Alpine x-data / x-on
 
-A domain side effect (log, mail, notify, cascade)
+A reaction a project built on the kit will want to add
+└── fire a domain event from the service, after the direct calls below
+    (ShouldDispatchAfterCommit), and put the kit's own optional part in a
+    listener — see app/Events/Payment*.php and SendPaymentNotifications
+
+A domain side effect the kit itself needs (log, mail, notify, cascade)
 └── call it directly, in the correct order:
     1. write            $model->save()
     2. cascade          app(TheService::class)->syncSomething($model)
@@ -184,9 +213,12 @@ A sibling Livewire component needs to refresh
 
 ## Avoid
 
-- Creating `app/Events/`, `app/Listeners/`, `app/Observers/`, or an
-  `EventServiceProvider`.
-- `event(new SomethingHappened(...))`, `Event::dispatch()`, `Event::listen()`.
+- Moving the kit's own ordered side effects (ledger write, audit entry, cascade) into a
+  listener. They stay direct calls; the event is fired alongside them.
+- Creating `app/Observers/` or an `EventServiceProvider` — discovery covers listeners.
+- `event(new SomethingHappened(...))` or `Event::dispatch()` — use
+  `SomethingHappened::dispatch(...)`.
+- An event fired inside a transaction without `ShouldDispatchAfterCommit`.
 - Model lifecycle hooks (`static::created(...)`, `booted()`) or observer classes.
 - Broadcasting, Echo, Reverb, or WebSockets.
 - `$this->dispatch()` as a way to move **state** between components — move it to a
