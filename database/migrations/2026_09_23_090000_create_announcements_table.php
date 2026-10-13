@@ -32,6 +32,11 @@ return new class extends Migration
             // stops the image being deleted while it is on the popup.
             $table->foreignId('image_id')->nullable()->constrained()->nullOnDelete();
 
+            // An icon from the set the icon picker offers, drawn large on a tinted
+            // panel where the picture would sit. One or the other: the admin screen
+            // clears whichever was not chosen, and a picture wins if both survive.
+            $table->string('icon', 60)->nullable();
+
             // Where clicking the picture goes, and the button that says so. The
             // label is optional: a linked picture is a link on its own.
             $table->string('link_url', 500)->nullable();

@@ -87,6 +87,13 @@ Change it before the kit becomes a real project.
 
 ## The rules people break most
 
+- **While this repo is the starter kit, change a table by editing its `create_*_table`
+  migration in place — no `add_*_to_*_table` files.** Projects copy the kit once and
+  never sync from it, so no database needs the kit's migration history. If a new
+  foreign key points at a table created later, move that table's migration earlier by
+  its timestamp. **This rule is the kit's alone: delete it when a project is made from
+  the kit**, and from then on follow `.agents/my-skills/migrations.md` — a separate
+  `add_*` migration for every change.
 - **No new base folders under `app/`.** Sixteen names are sanctioned — `Events`,
   `Listeners` and `Jobs` joined for payments on 2026-10-10 — and there is no `Actions`,
   `Repositories`, `Policies`, `Observers`, `Http/Requests`, or `Livewire`. See

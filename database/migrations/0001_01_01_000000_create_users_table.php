@@ -18,6 +18,13 @@ return new class extends Migration
             $table->string('name');
             $table->string('email', 50)->unique();
             $table->timestamp('email_verified_at')->nullable();
+
+            // When the "verify or lose it" warning went out. The sweep counts its
+            // grace period from here rather than from sign-up, so an account that
+            // was already old the first time the sweep saw it still gets the full
+            // window between the warning and the delete.
+            $table->timestamp('unverified_notice_sent_at')->nullable();
+
             $table->string('password')->nullable();
             // The phone number in three parts, as <x-form.phone-field> hands it
             // over: the national number, the dialling code it belongs to, and the
@@ -59,6 +66,11 @@ return new class extends Migration
 
             $table->tinyInteger('status')->default(StatusUser::ACTIVE);
             $table->timestamp('last_seen_at')->nullable();
+
+            // When the last "we missed you" went out. Another is only sent once the
+            // account has been seen again since, so an account that never comes
+            // back is mailed once rather than on every run forever.
+            $table->timestamp('inactivity_reminder_sent_at')->nullable();
 
             // The account-deletion grace period. Requested is when the account
             // holder asked, scheduled is the moment the command may act. Both are

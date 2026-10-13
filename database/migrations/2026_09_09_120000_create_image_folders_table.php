@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MediaVisibilityEnum;
 use App\Enums\StatusDefault;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -28,6 +29,16 @@ return new class extends Migration
 
             $table->string('name')->index();
             $table->string('slug');
+
+            // Who may browse the folder. This gates the folder, not the images
+            // inside it: an image keeps the visibility it was given, so refiling
+            // it never silently changes who can see it. The folder's setting is
+            // what a new upload starts from, and nothing more.
+            $table->string('visibility', 20)->default(MediaVisibilityEnum::PRIVATE)->index();
+
+            // Only read when visibility is ROLE. Any other case must leave it null,
+            // so changing visibility twice cannot quietly restore an old audience.
+            $table->string('visible_to_type', 20)->nullable()->index(); // UserTypeEnum
 
             $table->boolean('status')->default(StatusDefault::ACTIVE)->index();
 

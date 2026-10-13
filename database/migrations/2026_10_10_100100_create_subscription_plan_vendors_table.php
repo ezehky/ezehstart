@@ -15,6 +15,11 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('subscription_plan_id')->constrained()->cascadeOnDelete();
+
+            // A vendor plan is a price — the monthly and the yearly are two plans
+            // on Paystack, two prices on Stripe.
+            $table->foreignId('subscription_plan_price_id')->constrained()->cascadeOnDelete();
+
             $table->string('vendor', 100); // PaymentVendorEnum
 
             // The plan as the vendor knows it — a Paystack plan_code, a Stripe
@@ -26,9 +31,9 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
 
-            // One copy of a plan per vendor. A price change empties vendor_plan_id
+            // One copy of a price per vendor. A price change empties vendor_plan_id
             // and keeps the product; the next checkout creates a fresh price.
-            $table->unique(['subscription_plan_id', 'vendor']);
+            $table->unique(['subscription_plan_price_id', 'vendor']);
         });
     }
 

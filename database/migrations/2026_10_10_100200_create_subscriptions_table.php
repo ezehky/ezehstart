@@ -21,7 +21,13 @@ return new class extends Migration
             // from under them. Deactivate it instead.
             $table->foreignId('subscription_plan_id')->constrained()->restrictOnDelete();
 
-            $table->string('vendor', 100)->index(); // PaymentVendorEnum
+            // The price signed up to. Null on a trial, which is on a plan but no
+            // price. Restricted for the same reason the plan is.
+            $table->foreignId('subscription_plan_price_id')->nullable()->constrained()->restrictOnDelete();
+
+            // A trial is run by the kit, not a vendor, and bills nothing — so it
+            // has no vendor and no interval.
+            $table->string('vendor', 100)->nullable()->index(); // PaymentVendorEnum
             $table->string('vendor_subscription_id', 191)->nullable()->index();
             $table->string('vendor_customer_id', 191)->nullable();
 
@@ -37,7 +43,7 @@ return new class extends Migration
             // never rewrites what an existing subscriber was told they would pay.
             $table->unsignedBigInteger('amount');
             $table->string('currency', 10);
-            $table->string('billing_interval', 20);
+            $table->string('billing_interval', 20)->nullable();
 
             $table->tinyInteger('status')->default(StatusSubscription::PENDING)->index();
             $table->timestamp('current_period_ends_at')->nullable();
