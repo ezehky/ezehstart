@@ -6,6 +6,7 @@ use App\Contracts\SupportsSubscriptions;
 use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusSubscription;
 use App\Enums\StatusTransaction;
+use App\Enums\SubscriptionFeatureEnum;
 use App\Enums\TransactionGroupEnum;
 use App\Enums\TransactionTypeEnum;
 use App\Enums\TransactionViaEnum;
@@ -21,6 +22,7 @@ use App\Events\SubscriptionStarted;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -41,8 +43,10 @@ use RuntimeException;
  * the first one through the ordinary checkout and verify(), each renewal from
  * a webhook that is checked with the vendor before it is written.
  *
- * Whether an account has what a plan gives is Subscription::grantsAccess(),
- * reached through accessFor().
+ * What an account may do is asked by feature, never by plan name:
+ * allows() and limitFor() read the plan accessFor() finds, falling back to
+ * the free plan. Trials are the kit's own — no vendor, no card — and each
+ * account gets one.
  */
 #[Singleton]
 class SubscriptionService
@@ -54,7 +58,56 @@ class SubscriptionService
      */
     public function activePlans(): Collection
     {
-        return SubscriptionPlan::query()->active()->cheapestFirst()->get();
+        return SubscriptionPlan::query()
+            ->with(['prices', 'features', 'includedPlan.features', 'includedPlan.includedPlan.features'])
+            ->active()
+            ->cheapestFirst()
+            ->get();
+    }
+
+    /**
+     * What an account without a subscription has, if a plan is marked free.
+     */
+    public function freePlan(): ?SubscriptionPlan
+    {
+        return SubscriptionPlan::query()->with(['features', 'includedPlan.features'])->active()->free()->first();
+    }
+
+    /**
+     * The plan an account is on now: the one its subscription or trial gives,
+     * otherwise the free plan, otherwise none.
+     */
+    public function planFor(User $user): ?SubscriptionPlan
+    {
+        return $this->accessFor($user)?->plan ?? $this->freePlan();
+    }
+
+    /**
+     * The check a project gates an on/off feature on.
+     */
+    public function allows(User $user, SubscriptionFeatureEnum $feature): bool
+    {
+        return (bool) $this->planFor($user)?->grants($feature);
+    }
+
+    /**
+     * How many of a limit feature the account may have: null for unlimited, 0
+     * when its plan does not grant it.
+     */
+    public function limitFor(User $user, SubscriptionFeatureEnum $feature): ?int
+    {
+        $plan = $this->planFor($user);
+
+        return $plan ? $plan->limitOf($feature) : 0;
+    }
+
+    /**
+     * One trial an account, whichever plan it was on. Trials are the only
+     * subscriptions without a vendor.
+     */
+    public function hasUsedTrial(User $user): bool
+    {
+        return $user->subscriptions()->whereNull('vendor')->exists();
     }
 
     /**
@@ -78,8 +131,8 @@ class SubscriptionService
     public function accessFor(User $user, ?SubscriptionPlan $plan = null): ?Subscription
     {
         return $user->subscriptions()
-            ->with('plan')
-            ->live()
+            ->with(['plan.features', 'plan.includedPlan.features'])
+            ->current()
             ->when($plan, fn ($query) => $query->where('subscription_plan_id', $plan->id))
             ->newestFirst()
             ->get()
@@ -89,12 +142,31 @@ class SubscriptionService
     /**
      * Why this account cannot subscribe to this plan, or null when it can.
      */
-    public function subscribeBlockedReason(User $user, SubscriptionPlan $plan, PaymentVendorEnum $vendor): ?string
+    public function subscribeBlockedReason(User $user, SubscriptionPlanPrice $price, PaymentVendorEnum $vendor): ?string
+    {
+        $access = $this->accessFor($user);
+
+        return match (true) {
+            ! $price->plan->status->isActive(), ! $price->status->isActive() => 'That plan is not available.',
+            $price->plan->is_free->isYes() => 'That plan is free — there is nothing to subscribe to.',
+            ! \in_array($vendor, $this->vendorOptions(), true) => 'That payment method cannot take subscriptions.',
+            // A trial gives way to a paid subscription; anything else has to be
+            // cancelled first.
+            $access !== null && ! $access->isTrial() => 'You already have an active subscription. Cancel it before starting another.',
+            default => null,
+        };
+    }
+
+    /**
+     * Why this account cannot start a trial of this plan, or null when it can.
+     */
+    public function trialBlockedReason(User $user, SubscriptionPlan $plan): ?string
     {
         return match (true) {
             ! $plan->status->isActive() => 'That plan is not available.',
-            ! \in_array($vendor, $this->vendorOptions(), true) => 'That payment method cannot take subscriptions.',
-            $this->accessFor($user) !== null => 'You already have an active subscription. Cancel it before starting another.',
+            ! $plan->hasTrial() => 'That plan has no free trial.',
+            $this->hasUsedTrial($user) => 'You have already had a free trial.',
+            $this->accessFor($user) !== null => 'You already have an active subscription.',
             default => null,
         };
     }
@@ -102,11 +174,35 @@ class SubscriptionService
     // Actions
 
     /**
-     * The plan as the vendor knows it, created there on first use.
+     * Start the plan's trial: a TRIALING row that bills nothing and runs out
+     * on its own. Returns why it could not, or the trial.
      */
-    public function vendorPlan(SubscriptionPlan $plan, PaymentVendorEnum $vendor): string|SubscriptionPlanVendor
+    public function startTrial(User $user, SubscriptionPlan $plan): string|Subscription
     {
-        $existing = $plan->vendorPlans()->where('vendor', $vendor)->first();
+        if ($blocked = $this->trialBlockedReason($user, $plan)) {
+            return $blocked;
+        }
+
+        $subscription = Subscription::query()->create([
+            'user_id' => $user->id,
+            'subscription_plan_id' => $plan->id,
+            'amount' => 0,
+            'currency' => strtoupper(kDefaultCurrency()['code']),
+            'status' => StatusSubscription::TRIALING,
+            'current_period_ends_at' => now()->addDays($plan->trial_days),
+        ]);
+
+        SubscriptionStarted::dispatch($subscription);
+
+        return $subscription;
+    }
+
+    /**
+     * The price as the vendor knows it, created there on first use.
+     */
+    public function vendorPlan(SubscriptionPlanPrice $price, PaymentVendorEnum $vendor): string|SubscriptionPlanVendor
+    {
+        $existing = $price->vendorPlans()->where('vendor', $vendor)->first();
 
         if ($existing && $existing->vendor_plan_id !== '') {
             return $existing;
@@ -118,29 +214,39 @@ class SubscriptionService
             return "{$vendor->label()} does not bill subscriptions.";
         }
 
-        // A row emptied by a price change still holds its product, which the new
-        // price hangs off — so a vendor's dashboard does not fill up with one
-        // product per price change.
-        $synced = $gateway->syncPlan($plan, $existing);
+        // The product belongs to the plan, so a new price — or a row emptied by
+        // a price change — hangs off whichever product the plan already has
+        // there. A vendor's dashboard keeps one product a plan.
+        $productDonor = $existing ?? SubscriptionPlanVendor::query()
+            ->where('subscription_plan_id', $price->subscription_plan_id)
+            ->where('vendor', $vendor)
+            ->whereNotNull('vendor_product_id')
+            ->first();
+
+        $synced = $gateway->syncPlan($price, $productDonor);
 
         if (\is_string($synced)) {
             return $synced;
         }
 
         return SubscriptionPlanVendor::query()->updateOrCreate(
-            ['subscription_plan_id' => $plan->id, 'vendor' => $vendor],
-            ['vendor_plan_id' => $synced['vendor_plan_id'], 'vendor_product_id' => $synced['vendor_product_id']],
+            ['subscription_plan_price_id' => $price->id, 'vendor' => $vendor],
+            [
+                'subscription_plan_id' => $price->subscription_plan_id,
+                'vendor_plan_id' => $synced['vendor_plan_id'],
+                'vendor_product_id' => $synced['vendor_product_id'],
+            ],
         );
     }
 
     /**
-     * Forget the vendor plans of a plan whose price, currency or interval just
+     * Forget the vendor copies of a price whose amount or currency just
      * changed, keeping the products they hang off. Existing subscribers keep
      * the vendor plan they signed up to; the next new subscriber gets a fresh one.
      */
-    public function planChanged(SubscriptionPlan $plan): void
+    public function priceChanged(SubscriptionPlanPrice $price): void
     {
-        $plan->vendorPlans()->update(['vendor_plan_id' => '']);
+        $price->vendorPlans()->update(['vendor_plan_id' => '']);
     }
 
     /**
@@ -148,27 +254,29 @@ class SubscriptionService
      * transaction, and the vendor's checkout. Returns the reason it could not
      * be opened, or the transaction whose gateway_url the member goes to.
      */
-    public function subscribe(User $user, SubscriptionPlan $plan, PaymentVendorEnum $vendor): string|Transaction
+    public function subscribe(User $user, SubscriptionPlanPrice $price, PaymentVendorEnum $vendor): string|Transaction
     {
-        if ($blocked = $this->subscribeBlockedReason($user, $plan, $vendor)) {
+        if ($blocked = $this->subscribeBlockedReason($user, $price, $vendor)) {
             return $blocked;
         }
 
-        $vendorPlan = $this->vendorPlan($plan, $vendor);
+        $plan = $price->plan;
+        $vendorPlan = $this->vendorPlan($price, $vendor);
 
         if (\is_string($vendorPlan)) {
             return $vendorPlan;
         }
 
-        [$subscription, $transaction] = DB::transaction(function () use ($user, $plan, $vendor, $vendorPlan) {
+        [$subscription, $transaction] = DB::transaction(function () use ($user, $plan, $price, $vendor, $vendorPlan) {
             $subscription = Subscription::query()->create([
                 'user_id' => $user->id,
                 'subscription_plan_id' => $plan->id,
+                'subscription_plan_price_id' => $price->id,
                 'vendor' => $vendor,
                 'vendor_plan_id' => $vendorPlan->vendor_plan_id,
-                'amount' => (float) $plan->amount,
-                'currency' => $plan->currency,
-                'billing_interval' => $plan->billing_interval,
+                'amount' => (float) $price->amount,
+                'currency' => $price->currency,
+                'billing_interval' => $price->billing_interval,
                 'status' => StatusSubscription::PENDING,
             ]);
 
@@ -176,8 +284,8 @@ class SubscriptionService
                 $user,
                 TransactionTypeEnum::DIRECT,
                 TransactionGroupEnum::SUBSCRIPTION,
-                (float) $plan->amount,
-                "{$plan->name} subscription",
+                (float) $price->amount,
+                "{$plan->name} subscription ({$price->billing_interval->label(true)})",
                 TransactionViaEnum::PAYMENT_GATEWAY,
                 TransactionWalletEnum::NONE,
                 StatusTransaction::PROCESSING,
@@ -185,7 +293,7 @@ class SubscriptionService
                 vendor: $vendor,
             );
 
-            $transaction->gateway->currency = $plan->currency;
+            $transaction->gateway->currency = $price->currency;
             $transaction->gateway->expires_at = now()->addMinutes(max(5, (int) config('payments.checkout.expires_in_minutes', 60)));
             $transaction->gateway->save();
 
@@ -234,6 +342,13 @@ class SubscriptionService
         $subscription->vendor_customer_id ??= $verification['customer_id'] ?? null;
         $subscription->current_period_ends_at = $subscription->billing_interval->addTo(now());
         $subscription->save();
+
+        // Paying ends a trial there and then — the paid period starts today. It
+        // is not announced as ended: nothing was taken away.
+        Subscription::query()
+            ->where('user_id', $subscription->user_id)
+            ->trialing()
+            ->update(['status' => StatusSubscription::EXPIRED, 'ended_at' => now()]);
 
         SubscriptionStarted::dispatch($subscription);
     }
@@ -366,7 +481,7 @@ class SubscriptionService
      */
     public function sync(): array
     {
-        $counts = ['checked' => 0, 'ended' => 0, 'errors' => 0];
+        $counts = ['checked' => 0, 'ended' => $this->endTrials(), 'errors' => 0];
 
         Subscription::query()->live()->chunkById(100, function ($subscriptions) use (&$counts) {
             foreach ($subscriptions as $subscription) {
@@ -569,6 +684,27 @@ class SubscriptionService
 
             SubscriptionEnded::dispatch($subscription);
         }
+    }
+
+    /**
+     * Trials past their end are over. They have no vendor to ask.
+     */
+    protected function endTrials(): int
+    {
+        $ended = 0;
+
+        Subscription::query()->trialing()->where('current_period_ends_at', '<=', now())->chunkById(100, function ($trials) use (&$ended) {
+            foreach ($trials as $trial) {
+                $trial->status = StatusSubscription::EXPIRED;
+                $trial->ended_at = now();
+                $trial->save();
+
+                SubscriptionEnded::dispatch($trial);
+                $ended++;
+            }
+        });
+
+        return $ended;
     }
 
     /**

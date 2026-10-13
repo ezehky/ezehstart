@@ -4,6 +4,8 @@ use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusSubscription;
 use App\Enums\StatusTransaction;
+use App\Enums\StatusYes;
+use App\Enums\SubscriptionFeatureEnum;
 use App\Enums\SubscriptionIntervalEnum;
 use App\Enums\TransactionGroupEnum;
 use App\Enums\TransactionTypeEnum;
@@ -44,9 +46,13 @@ beforeEach(function () {
     $this->plan = SubscriptionPlan::query()->create([
         'name' => 'Pro',
         'slug' => 'pro',
+        'status' => StatusDefault::ACTIVE,
+    ]);
+
+    $this->price = $this->plan->prices()->create([
+        'billing_interval' => SubscriptionIntervalEnum::MONTHLY,
         'amount' => 5000,
         'currency' => 'NGN',
-        'billing_interval' => SubscriptionIntervalEnum::MONTHLY,
         'status' => StatusDefault::ACTIVE,
     ]);
 });
@@ -66,7 +72,7 @@ function activePaystackSubscription($test): Subscription
         ]]),
     ]);
 
-    $transaction = app(SubscriptionService::class)->subscribe($test->member, $test->plan, PaymentVendorEnum::PAYSTACK);
+    $transaction = app(SubscriptionService::class)->subscribe($test->member, $test->price, PaymentVendorEnum::PAYSTACK);
     app(PaymentService::class)->verify($transaction);
 
     return $transaction->transactionable->fresh();
@@ -104,35 +110,225 @@ test('only vendors that bill subscriptions are offered for a plan', function () 
         ->not->toContain(PaymentVendorEnum::KORAPAY);
 });
 
-test('an admin creates a plan and a price change forgets the vendor plans but keeps the product', function () {
+test('an admin creates a plan with a price an interval and its features', function () {
     Livewire::actingAs($this->admin)
         ->test('pages::admin.subscriptions')
         ->call('create')
         ->set('name', 'Team')
-        ->set('amount', '12000')
-        ->set('billing_interval', 'annually')
-        ->set('features', "Five seats\nPriority support\n")
+        ->set('prices.monthly', '10000')
+        ->set('prices.annually', '117600')
+        ->set('trial_days', '14')
+        ->set('is_recommended', true)
+        ->set('includes_plan_id', (string) $this->plan->id)
+        ->set('featureOn.api-access', true)
+        ->set('featureOn.team-members', true)
+        ->set('featureLimits.team-members', '5')
         ->call('save')
         ->assertHasNoErrors();
 
-    $plan = SubscriptionPlan::query()->where('slug', 'team')->sole();
+    $plan = SubscriptionPlan::query()->with(['prices', 'features'])->where('slug', 'team')->sole();
 
-    expect((float) $plan->amount)->toBe(12000.0)
-        ->and($plan->features)->toBe(['Five seats', 'Priority support'])
-        ->and($plan->billing_interval)->toBe(SubscriptionIntervalEnum::ANNUALLY);
+    expect($plan->activePrices()->map(fn ($price) => [$price->billing_interval, (float) $price->amount])->all())
+        ->toBe([[SubscriptionIntervalEnum::MONTHLY, 10000.0], [SubscriptionIntervalEnum::ANNUALLY, 117600.0]])
+        ->and($plan->trial_days)->toBe(14)
+        ->and($plan->is_recommended)->toBe(StatusYes::YES)
+        ->and($plan->includes_plan_id)->toBe($this->plan->id)
+        ->and($plan->grants(SubscriptionFeatureEnum::API_ACCESS))->toBeTrue()
+        ->and($plan->limitOf(SubscriptionFeatureEnum::TEAM_MEMBERS))->toBe(5)
+        ->and($plan->priceFor(SubscriptionIntervalEnum::ANNUALLY)->savingsAgainst($plan->basePrice()))->toBe(2);
+});
 
-    $plan->vendorPlans()->create(['vendor' => PaymentVendorEnum::STRIPE, 'vendor_plan_id' => 'price_old', 'vendor_product_id' => 'prod_1']);
+test('a plan needs a price unless it is free', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('create')
+        ->set('name', 'Nothing')
+        ->call('save')
+        ->assertHasErrors();
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.subscriptions')
-        ->call('edit', $plan->id)
-        ->set('amount', '15000')
+        ->call('create')
+        ->set('name', 'Starter')
+        ->set('is_free', true)
+        ->set('trial_days', '7')
         ->call('save')
         ->assertHasNoErrors();
 
-    expect($plan->vendorPlans()->sole())
+    expect(SubscriptionPlan::query()->where('slug', 'starter')->sole())
+        ->is_free->toBe(StatusYes::YES)
+        ->trial_days->toBe(0);
+});
+
+test('only one plan is free and only one is recommended', function () {
+    $this->plan->update(['is_free' => StatusYes::YES, 'is_recommended' => StatusYes::YES]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('create')
+        ->set('name', 'Basic')
+        ->set('is_free', true)
+        ->set('is_recommended', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($this->plan->fresh())
+        ->is_free->toBe(StatusYes::NO)
+        ->is_recommended->toBe(StatusYes::NO);
+});
+
+test('a changed amount forgets that price on the vendors but keeps the product, and an emptied interval is switched off', function () {
+    $this->plan->vendorPlans()->create([
+        'subscription_plan_price_id' => $this->price->id,
+        'vendor' => PaymentVendorEnum::STRIPE,
+        'vendor_plan_id' => 'price_old',
+        'vendor_product_id' => 'prod_1',
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('edit', $this->plan->id)
+        ->assertSet('prices.monthly', 5000.0)
+        ->set('prices.monthly', '6000')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($this->price->vendorPlans()->sole())
         ->vendor_plan_id->toBe('')
         ->vendor_product_id->toBe('prod_1');
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('edit', $this->plan->id)
+        ->set('prices.monthly', null)
+        ->set('prices.annually', '60000')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($this->price->fresh()->status)->toBe(StatusDefault::INACTIVE)
+        ->and($this->plan->prices()->count())->toBe(2);
+});
+
+test('a plan cannot include a plan that already includes it', function () {
+    $team = SubscriptionPlan::query()->create(['name' => 'Team', 'slug' => 'team', 'includes_plan_id' => $this->plan->id]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('edit', $this->plan->id)
+        ->set('includes_plan_id', (string) $team->id)
+        ->call('save')
+        ->assertHasErrors('includes_plan_id');
+});
+
+test('a plan another plan includes cannot be deleted', function () {
+    SubscriptionPlan::query()->create(['name' => 'Team', 'slug' => 'team', 'includes_plan_id' => $this->plan->id]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions')
+        ->call('confirmDeletePlan', $this->plan->id)
+        ->call('deletePlan')
+        ->assertHasErrors();
+
+    expect($this->plan->fresh())->not->toBeNull();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// FEATURES
+
+test('a plan grants what it includes, and the more generous limit wins', function () {
+    $this->plan->features()->createMany([
+        ['feature' => SubscriptionFeatureEnum::PRIORITY_SUPPORT],
+        ['feature' => SubscriptionFeatureEnum::TEAM_MEMBERS, 'feature_limit' => 3],
+    ]);
+
+    $team = SubscriptionPlan::query()->create(['name' => 'Team', 'slug' => 'team', 'includes_plan_id' => $this->plan->id]);
+    $team->features()->createMany([
+        ['feature' => SubscriptionFeatureEnum::TEAM_MEMBERS, 'feature_limit' => null],
+        ['feature' => SubscriptionFeatureEnum::API_ACCESS],
+    ]);
+
+    expect($team->grants(SubscriptionFeatureEnum::PRIORITY_SUPPORT))->toBeTrue()
+        ->and($team->limitOf(SubscriptionFeatureEnum::TEAM_MEMBERS))->toBeNull()
+        ->and($team->limitOf(SubscriptionFeatureEnum::PROJECTS))->toBe(0)
+        ->and($team->featureLines())->toBe(['API access', 'Unlimited team members']);
+});
+
+test('feature checks fall back to the free plan when nothing is subscribed', function () {
+    $service = app(SubscriptionService::class);
+
+    expect($service->allows($this->member, SubscriptionFeatureEnum::API_ACCESS))->toBeFalse()
+        ->and($service->limitFor($this->member, SubscriptionFeatureEnum::PROJECTS))->toBe(0);
+
+    $free = SubscriptionPlan::query()->create(['name' => 'Free', 'slug' => 'free', 'is_free' => StatusYes::YES]);
+    $free->features()->create(['feature' => SubscriptionFeatureEnum::PROJECTS, 'feature_limit' => 2]);
+
+    expect($service->limitFor($this->member, SubscriptionFeatureEnum::PROJECTS))->toBe(2);
+
+    $this->plan->features()->create(['feature' => SubscriptionFeatureEnum::API_ACCESS]);
+    activePaystackSubscription($this);
+
+    expect($service->allows($this->member, SubscriptionFeatureEnum::API_ACCESS))->toBeTrue()
+        ->and($service->limitFor($this->member, SubscriptionFeatureEnum::PROJECTS))->toBe(0);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// TRIALS
+
+test('a member starts a card-less trial once, and it ends on its own', function () {
+    Event::fake([SubscriptionEnded::class]);
+
+    $this->plan->update(['trial_days' => 14]);
+    $this->plan->features()->create(['feature' => SubscriptionFeatureEnum::API_ACCESS]);
+
+    Livewire::actingAs($this->member)
+        ->test('pages::user.subscriptions')
+        ->assertSee('Try it free for 14 days')
+        ->call('startTrial', $this->plan->id)
+        ->assertHasNoErrors();
+
+    $trial = $this->member->subscriptions()->sole();
+
+    expect($trial->status)->toBe(StatusSubscription::TRIALING)
+        ->and($trial->vendor)->toBeNull()
+        ->and(app(SubscriptionService::class)->allows($this->member, SubscriptionFeatureEnum::API_ACCESS))->toBeTrue();
+
+    $this->travelTo($trial->current_period_ends_at->addMinute());
+    $this->artisan('payments:sync-subscriptions')->assertSuccessful();
+
+    expect($trial->fresh()->status)->toBe(StatusSubscription::EXPIRED)
+        ->and(app(SubscriptionService::class)->allows($this->member, SubscriptionFeatureEnum::API_ACCESS))->toBeFalse()
+        ->and(app(SubscriptionService::class)->startTrial($this->member, $this->plan))->toBe('You have already had a free trial.');
+
+    Event::assertDispatched(SubscriptionEnded::class);
+});
+
+test('paying during a trial ends the trial', function () {
+    $this->plan->update(['trial_days' => 14]);
+    $trial = app(SubscriptionService::class)->startTrial($this->member, $this->plan);
+
+    $subscription = activePaystackSubscription($this);
+
+    expect($subscription->status)->toBe(StatusSubscription::ACTIVE)
+        ->and($trial->fresh()->status)->toBe(StatusSubscription::EXPIRED)
+        ->and(app(SubscriptionService::class)->accessFor($this->member)->is($subscription))->toBeTrue();
+});
+
+test('the pricing cards show the saving on a longer interval and the recommended plan', function () {
+    $this->plan->update(['is_recommended' => StatusYes::YES]);
+    $this->plan->prices()->create([
+        'billing_interval' => SubscriptionIntervalEnum::ANNUALLY,
+        'amount' => 54000,
+        'currency' => 'NGN',
+        'status' => StatusDefault::ACTIVE,
+    ]);
+
+    Livewire::actingAs($this->member)
+        ->test('pages::user.subscriptions')
+        ->assertSet('interval', 'monthly')
+        ->assertSee('Recommended')
+        ->assertDontSee('Save 10%')
+        ->set('interval', 'annually')
+        ->assertSee('Save 10%');
 });
 
 test('a plan somebody subscribed to cannot be deleted', function () {
@@ -156,7 +352,7 @@ test('subscribing syncs the plan, writes a pending subscription and opens the ch
         'api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/sub']]),
     ]);
 
-    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->plan, PaymentVendorEnum::PAYSTACK);
+    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->price, PaymentVendorEnum::PAYSTACK);
 
     expect($transaction->gateway->gateway_url)->toBe('https://checkout.paystack.com/sub')
         ->and($transaction->transaction_group)->toBe(TransactionGroupEnum::SUBSCRIPTION)
@@ -193,14 +389,14 @@ test('a checkout the vendor refuses ends the pending subscription', function () 
         'api.paystack.co/transaction/initialize' => Http::response(['status' => false, 'message' => 'Plan inactive'], 400),
     ]);
 
-    expect(app(SubscriptionService::class)->subscribe($this->member, $this->plan, PaymentVendorEnum::PAYSTACK))->toBe('Plan inactive')
+    expect(app(SubscriptionService::class)->subscribe($this->member, $this->price, PaymentVendorEnum::PAYSTACK))->toBe('Plan inactive')
         ->and(Subscription::query()->sole()->status)->toBe(StatusSubscription::EXPIRED);
 });
 
 test('an account with access cannot take out a second subscription', function () {
     activePaystackSubscription($this);
 
-    expect(app(SubscriptionService::class)->subscribe($this->member, $this->plan, PaymentVendorEnum::PAYSTACK))
+    expect(app(SubscriptionService::class)->subscribe($this->member, $this->price, PaymentVendorEnum::PAYSTACK))
         ->toContain('already have an active subscription');
 });
 
@@ -346,7 +542,7 @@ test('a member chooses a plan and is sent to the checkout', function () {
 
     Livewire::actingAs($this->member)
         ->test('pages::user.subscriptions')
-        ->call('choosePlan', $this->plan->id)
+        ->call('choosePrice', $this->price->id)
         ->assertSet('vendor', 'paystack')
         ->call('subscribe')
         ->assertRedirect('https://checkout.paystack.com/s1');
@@ -367,7 +563,7 @@ test('Stripe subscriptions run through a subscription-mode session and invoice r
         'api.stripe.com/v1/invoices/in_2' => Http::response(['id' => 'in_2', 'status' => 'paid', 'amount_paid' => 500000, 'currency' => 'ngn']),
     ]);
 
-    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->plan, PaymentVendorEnum::STRIPE);
+    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->price, PaymentVendorEnum::STRIPE);
     $subscription = $transaction->transactionable;
 
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/prices')
@@ -417,7 +613,7 @@ test('the first PayPal sale is not counted again as a renewal', function () {
         'api-m.sandbox.paypal.com/v1/notifications/verify-webhook-signature' => Http::response(['verification_status' => 'SUCCESS']),
     ]);
 
-    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->plan, PaymentVendorEnum::PAYPAL);
+    $transaction = app(SubscriptionService::class)->subscribe($this->member, $this->price, PaymentVendorEnum::PAYPAL);
     $verified = app(PaymentService::class)->verify($transaction);
 
     expect($verified->status)->toBe(StatusTransaction::CONFIRMED)

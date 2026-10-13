@@ -69,6 +69,22 @@ enum SubscriptionIntervalEnum: string
     }
 
     /**
+     * The average length in days — only for comparing prices across intervals
+     * ("save 2% yearly"), never for working out a date. addTo() does that.
+     */
+    public function averageDays(): float
+    {
+        return match ($this) {
+            self::DAILY => 1,
+            self::WEEKLY => 7,
+            self::MONTHLY => 365.25 / 12,
+            self::QUARTERLY => 365.25 / 4,
+            self::BIANNUALLY => 365.25 / 2,
+            self::ANNUALLY => 365.25,
+        };
+    }
+
+    /**
      * Paystack's spelling. It has every one of ours under the same names.
      */
     public function paystackInterval(): string

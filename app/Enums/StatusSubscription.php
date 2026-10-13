@@ -25,6 +25,12 @@ enum StatusSubscription: int
     case CANCELLED = 3;
     case EXPIRED = 4;
 
+    /**
+     * A free trial the kit runs itself: no vendor, no card, nothing billed.
+     * It ends at current_period_ends_at unless the member subscribes first.
+     */
+    case TRIALING = 5;
+
     public function isPending(): bool
     {
         return $this === self::PENDING;
@@ -50,9 +56,15 @@ enum StatusSubscription: int
         return $this === self::EXPIRED;
     }
 
+    public function isTrialing(): bool
+    {
+        return $this === self::TRIALING;
+    }
+
     public function color(): string
     {
         return match ($this) {
+            self::TRIALING => 'sky',
             self::PENDING => 'zinc',
             self::ACTIVE => 'green',
             self::PAST_DUE => 'amber',

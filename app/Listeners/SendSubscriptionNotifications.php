@@ -21,7 +21,9 @@ class SendSubscriptionNotifications
         app(NotificationService::class)->notifyUser(
             $subscription->user,
             NotificationTopicEnum::SUBSCRIPTION_STARTED,
-            "Your {$subscription->plan?->name} subscription is active.",
+            $subscription->isTrial()
+                ? "Your free trial of {$subscription->plan?->name} has started. It ends on {$subscription->current_period_ends_at?->format('M d, Y')}."
+                : "Your {$subscription->plan?->name} subscription is active.",
             ['url' => route('user.subscriptions')],
         );
     }
@@ -45,7 +47,9 @@ class SendSubscriptionNotifications
         app(NotificationService::class)->notifyUser(
             $subscription->user,
             NotificationTopicEnum::SUBSCRIPTION_ENDED,
-            "Your {$subscription->plan?->name} subscription has ended.",
+            $subscription->vendor === null
+                ? "Your free trial of {$subscription->plan?->name} has ended. Subscribe to keep what it gave you."
+                : "Your {$subscription->plan?->name} subscription has ended.",
             ['url' => route('user.subscriptions')],
         );
     }

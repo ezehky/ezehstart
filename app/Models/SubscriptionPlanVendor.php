@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A plan's copy on one vendor. Written the first time somebody subscribes
- * through that vendor; its plan id is emptied when the plan's price or
- * interval changes, and filled again by the next checkout.
+ * A price's copy on one vendor. Written the first time somebody subscribes to
+ * that price through that vendor; its plan id is emptied when the amount
+ * changes, and filled again by the next checkout.
+ *
+ * The product a vendor hangs prices off (Stripe, PayPal) belongs to the plan,
+ * so every price of one plan shares it.
  */
 #[Unguarded]
 class SubscriptionPlanVendor extends Model
@@ -27,5 +30,10 @@ class SubscriptionPlanVendor extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
+    }
+
+    public function price(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionPlanPrice::class, 'subscription_plan_price_id');
     }
 }

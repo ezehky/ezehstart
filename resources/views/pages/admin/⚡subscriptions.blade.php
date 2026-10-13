@@ -4,14 +4,19 @@ use App\Enums\ActivityActionEnum;
 use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Enums\StatusSubscription;
+use App\Enums\StatusYes;
+use App\Enums\SubscriptionFeatureEnum;
 use App\Enums\SubscriptionIntervalEnum;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Services\ActivityLogService;
 use App\Services\Payment\SubscriptionService;
 use App\Traits\WithGateProps;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -35,13 +40,24 @@ new class extends Component
 
     public string $description = '';
 
-    public string $features = '';
+    public bool $is_free = false;
 
-    public string $amount = '';
+    public bool $is_recommended = false;
 
-    public string $billing_interval = 'monthly';
+    public string $trial_days = '';
+
+    public string $includes_plan_id = '';
 
     public bool $active = true;
+
+    /** @var array<string, mixed> interval value => amount, empty when not offered */
+    public array $prices = [];
+
+    /** @var array<string, bool> feature value => granted */
+    public array $featureOn = [];
+
+    /** @var array<string, string> feature value => limit, empty for unlimited */
+    public array $featureLimits = [];
 
     /** The plan or subscription a confirm dialog is about. */
     public ?int $targetId = null;
@@ -73,10 +89,27 @@ new class extends Component
     public function plans()
     {
         return SubscriptionPlan::query()
-            ->withCount(['subscriptions as live_count' => fn (Builder $query) => $query->live()])
-            ->with('vendorPlans')
+            ->withCount(['subscriptions as live_count' => fn (Builder $query) => $query->current()])
+            ->with(['prices', 'vendorPlans', 'includedPlan'])
             ->cheapestFirst()
             ->get();
+    }
+
+    /**
+     * The plans this one may build on: any other plan, short of one that
+     * already builds on this one — that would be a loop.
+     *
+     * @return Collection<int, SubscriptionPlan>
+     */
+    #[Computed]
+    public function includableOptions(): Collection
+    {
+        return $this->plans
+            ->reject(fn (SubscriptionPlan $plan) => $this->editingId !== null && (
+                $plan->id === $this->editingId
+                || collect($plan->includedChain())->contains('id', $this->editingId)
+            ))
+            ->values();
     }
 
     #[Computed]
@@ -97,10 +130,26 @@ new class extends Component
         return [
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'features' => ['nullable', 'string', 'max:3000'],
-            'amount' => ['required', 'numeric', 'min:1'],
-            'billing_interval' => ['required', Rule::enum(SubscriptionIntervalEnum::class)],
+            'is_free' => ['boolean'],
+            'is_recommended' => ['boolean'],
+            'trial_days' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'includes_plan_id' => ['nullable', Rule::in($this->includableOptions->pluck('id')->map(fn ($id) => (string) $id)->all())],
             'active' => ['boolean'],
+            'prices' => ['array'],
+            'prices.*' => ['nullable', 'numeric', 'min:1'],
+            'featureOn' => ['array'],
+            'featureOn.*' => ['boolean'],
+            'featureLimits' => ['array'],
+            'featureLimits.*' => ['nullable', 'integer', 'min:1'],
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'includes_plan_id' => 'included plan',
+            'prices.*' => 'price',
+            'featureLimits.*' => 'limit',
         ];
     }
 
@@ -109,9 +158,10 @@ new class extends Component
         $this->checkGate(GateAccessEnum::CREATE);
 
         $this->resetValidation();
-        $this->reset('editingId', 'name', 'description', 'features', 'amount');
-        $this->billing_interval = SubscriptionIntervalEnum::MONTHLY->value;
+        $this->reset('editingId', 'name', 'description', 'is_free', 'is_recommended', 'trial_days', 'includes_plan_id', 'prices', 'featureOn', 'featureLimits');
+        $this->prices = array_fill_keys(SubscriptionIntervalEnum::values(), null);
         $this->active = true;
+        unset($this->includableOptions);
 
         Flux::modal('planModal')->show();
     }
@@ -120,24 +170,44 @@ new class extends Component
     {
         $this->checkGate();
 
-        $plan = SubscriptionPlan::query()->findOrFail($planId);
+        $plan = SubscriptionPlan::query()->with(['prices', 'features'])->findOrFail($planId);
 
         $this->resetValidation();
         $this->editingId = $plan->id;
         $this->name = $plan->name;
         $this->description = (string) $plan->description;
-        $this->features = implode("\n", (array) $plan->features);
-        $this->amount = (string) $plan->amount;
-        $this->billing_interval = $plan->billing_interval->value;
+        $this->is_free = $plan->is_free->isYes();
+        $this->is_recommended = $plan->is_recommended->isYes();
+        $this->trial_days = $plan->trial_days ? (string) $plan->trial_days : '';
+        $this->includes_plan_id = (string) $plan->includes_plan_id;
         $this->active = $plan->status->isActive();
+
+        // Every interval gets a key, so each price box is entangled to something.
+        $this->prices = array_merge(
+            array_fill_keys(SubscriptionIntervalEnum::values(), null),
+            $plan->activePrices()
+                ->mapWithKeys(fn (SubscriptionPlanPrice $price) => [$price->billing_interval->value => (float) $price->amount])
+                ->all(),
+        );
+
+        $this->featureOn = [];
+        $this->featureLimits = [];
+
+        foreach ($plan->features as $row) {
+            $this->featureOn[$row->feature->value] = true;
+            $this->featureLimits[$row->feature->value] = $row->feature_limit !== null ? (string) $row->feature_limit : '';
+        }
+
+        unset($this->includableOptions);
 
         Flux::modal('planModal')->show();
     }
 
     /**
-     * A change to the price, currency or interval forgets the plan's vendor
-     * copies, so the next subscriber is billed the new terms. Subscribers
-     * already on the plan keep what they signed up to.
+     * A plan's prices are one row an interval. An emptied interval is switched
+     * off rather than deleted, because subscribers on it point at it; a changed
+     * amount forgets that price's vendor copies, so the next subscriber is
+     * billed the new amount and existing ones keep what they signed up to.
      */
     public function save(): bool
     {
@@ -145,28 +215,46 @@ new class extends Component
 
         $this->validate();
 
-        $plan = $this->editingId ? SubscriptionPlan::query()->findOrFail($this->editingId) : new SubscriptionPlan;
+        $amounts = collect(SubscriptionIntervalEnum::cases())
+            ->mapWithKeys(fn (SubscriptionIntervalEnum $interval) => [$interval->value => $this->prices[$interval->value] ?? null])
+            ->filter(fn ($amount) => filled($amount) && (float) $amount > 0)
+            ->map(fn ($amount) => (float) $amount);
+
+        $this->respondError('Give the plan a price for at least one interval, or mark it free.', ! $this->is_free && $amounts->isEmpty());
+
+        $plan = $this->editingId ? SubscriptionPlan::query()->with(['prices', 'features'])->findOrFail($this->editingId) : new SubscriptionPlan;
         $isNew = ! $plan->exists;
 
         $plan->name = $this->name;
         $plan->slug = $isNew ? $this->uniqueSlug($this->name) : $plan->slug;
         $plan->description = $this->description ?: null;
-        $plan->features = array_values(array_filter(array_map('trim', explode("\n", $this->features)))) ?: null;
-        $plan->amount = (float) $this->amount;
-        $plan->currency = $plan->currency ?: strtoupper(kDefaultCurrency()['code']);
-        $plan->billing_interval = SubscriptionIntervalEnum::from($this->billing_interval);
+        $plan->is_free = $this->is_free ? StatusYes::YES : StatusYes::NO;
+        $plan->is_recommended = $this->is_recommended ? StatusYes::YES : StatusYes::NO;
+        // A free plan is what everybody has already; there is nothing to try.
+        $plan->trial_days = $this->is_free ? 0 : (int) $this->trial_days;
+        $plan->includes_plan_id = $this->includes_plan_id !== '' ? (int) $this->includes_plan_id : null;
         $plan->status = $this->active ? StatusDefault::ACTIVE : StatusDefault::INACTIVE;
-
-        $termsChanged = ! $isNew && $plan->isDirty(['amount', 'currency', 'billing_interval']);
 
         $serviceInstance = app(ActivityLogService::class);
         $affectedColumns = $serviceInstance->affectedColumns($plan);
 
-        $plan->save();
+        DB::transaction(function () use ($plan, $amounts) {
+            $plan->save();
 
-        if ($termsChanged) {
-            app(SubscriptionService::class)->planChanged($plan);
-        }
+            // One free plan and one recommended plan at a time: the free plan is
+            // what an account without a subscription has, and two of either
+            // could not both be what the label says.
+            if ($plan->is_free->isYes()) {
+                SubscriptionPlan::query()->whereKeyNot($plan->id)->update(['is_free' => StatusYes::NO]);
+            }
+
+            if ($plan->is_recommended->isYes()) {
+                SubscriptionPlan::query()->whereKeyNot($plan->id)->update(['is_recommended' => StatusYes::NO]);
+            }
+
+            $this->savePrices($plan, $this->is_free ? collect() : $amounts);
+            $this->saveFeatures($plan);
+        });
 
         $serviceInstance->logActivity(
             $isNew ? ActivityActionEnum::CREATE : ActivityActionEnum::UPDATE,
@@ -176,7 +264,7 @@ new class extends Component
         );
 
         Flux::modal('planModal')->close();
-        unset($this->plans);
+        unset($this->plans, $this->includableOptions);
 
         return $this->respondSuccess($isNew ? 'Plan created.' : 'Plan updated.');
     }
@@ -203,6 +291,11 @@ new class extends Component
             $plan->subscriptions()->exists(),
         );
 
+        $this->respondError(
+            'Another plan includes everything in this one. Change that plan first.',
+            $plan->includingPlans()->exists(),
+        );
+
         $plan->delete();
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::DELETE, " subscription plan: {$plan->name}", model: $plan);
@@ -221,6 +314,8 @@ new class extends Component
         $this->checkGate();
 
         $subscription = Subscription::query()->findOrFail($subscriptionId);
+
+        $this->respondError('A trial has no payment provider to ask.', $subscription->vendor === null);
 
         $result = app(SubscriptionService::class)->refresh($subscription);
 
@@ -265,6 +360,59 @@ new class extends Component
     }
 
     // Tools
+
+    /**
+     * @param  Collection<string, float>  $amounts  interval value => amount
+     */
+    protected function savePrices(SubscriptionPlan $plan, Collection $amounts): void
+    {
+        $existing = $plan->prices()->get()->keyBy(fn (SubscriptionPlanPrice $price) => $price->billing_interval->value);
+        $currency = strtoupper(kDefaultCurrency()['code']);
+
+        foreach (SubscriptionIntervalEnum::cases() as $interval) {
+            $price = $existing->get($interval->value);
+            $amount = $amounts->get($interval->value);
+
+            if ($amount === null) {
+                if ($price?->status->isActive()) {
+                    $price->status = StatusDefault::INACTIVE;
+                    $price->save();
+                }
+
+                continue;
+            }
+
+            $price ??= new SubscriptionPlanPrice(['subscription_plan_id' => $plan->id, 'billing_interval' => $interval]);
+            $price->amount = $amount;
+            $price->currency = $price->currency ?: $currency;
+            $price->status = StatusDefault::ACTIVE;
+
+            $amountChanged = $price->exists && $price->isDirty(['amount', 'currency']);
+
+            $price->save();
+
+            if ($amountChanged) {
+                app(SubscriptionService::class)->priceChanged($price);
+            }
+        }
+    }
+
+    protected function saveFeatures(SubscriptionPlan $plan): void
+    {
+        $granted = collect(SubscriptionFeatureEnum::cases())
+            ->filter(fn (SubscriptionFeatureEnum $feature) => (bool) ($this->featureOn[$feature->value] ?? false));
+
+        $plan->features()->whereNotIn('feature', $granted->map(fn (SubscriptionFeatureEnum $feature) => $feature->value)->all())->delete();
+
+        foreach ($granted as $feature) {
+            $limit = $this->featureLimits[$feature->value] ?? '';
+
+            $plan->features()->updateOrCreate(
+                ['feature' => $feature],
+                ['feature_limit' => $feature->isLimit() && $limit !== '' ? (int) $limit : null],
+            );
+        }
+    }
 
     protected function uniqueSlug(string $name): string
     {
@@ -317,7 +465,7 @@ new class extends Component
                 <flux:table>
                     <flux:table.columns>
                         <flux:table.column>Plan</flux:table.column>
-                        <flux:table.column>Price</flux:table.column>
+                        <flux:table.column>Prices</flux:table.column>
                         <flux:table.column>Subscribers</flux:table.column>
                         <flux:table.column>On providers</flux:table.column>
                         <flux:table.column>Status</flux:table.column>
@@ -328,19 +476,38 @@ new class extends Component
                         @foreach ($this->plans as $plan)
                             <flux:table.row wire:key="plan-{{ $plan->id }}">
                                 <flux:table.cell>
-                                    <p class="font-medium text-slate-950 dark:text-white">{{ $plan->name }}</p>
-                                    @if ($plan->description)
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <p class="font-medium text-slate-950 dark:text-white">{{ $plan->name }}</p>
+                                        @if ($plan->is_free->isYes())
+                                            <flux:badge size="sm" color="slate" inset="top bottom">Free</flux:badge>
+                                        @endif
+                                        @if ($plan->is_recommended->isYes())
+                                            <flux:badge size="sm" color="lime" inset="top bottom">Recommended</flux:badge>
+                                        @endif
+                                        @if ($plan->hasTrial())
+                                            <flux:badge size="sm" color="sky" inset="top bottom">{{ $plan->trial_days }}-day trial</flux:badge>
+                                        @endif
+                                    </div>
+                                    @if ($plan->includedPlan)
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">Everything in {{ $plan->includedPlan->name }}, plus more</p>
+                                    @elseif ($plan->description)
                                         <p class="max-w-xs truncate text-xs text-slate-500 dark:text-slate-400">{{ $plan->description }}</p>
                                     @endif
                                 </flux:table.cell>
-                                <flux:table.cell>{{ $plan->priceLabel() }}</flux:table.cell>
+                                <flux:table.cell>
+                                    @forelse ($plan->activePrices() as $price)
+                                        <p class="text-sm">{{ $price->priceLabel() }}</p>
+                                    @empty
+                                        <span class="text-xs text-slate-400">No charge</span>
+                                    @endforelse
+                                </flux:table.cell>
                                 <flux:table.cell>{{ $plan->live_count }}</flux:table.cell>
                                 <flux:table.cell>
                                     {{-- Created on a provider the first time somebody subscribes through it. --}}
-                                    @forelse ($plan->vendorPlans->where('vendor_plan_id', '!=', '') as $copy)
+                                    @forelse ($plan->vendorPlans->where('vendor_plan_id', '!=', '')->unique(fn ($copy) => $copy->vendor->value) as $copy)
                                         <flux:badge size="sm" inset="top bottom">{{ $copy->vendor->label() }}</flux:badge>
                                     @empty
-                                        <span class="text-xs text-slate-400">On first subscriber</span>
+                                        <span class="text-xs text-slate-400">{{ $plan->is_free->isYes() ? '—' : 'On first subscriber' }}</span>
                                     @endforelse
                                 </flux:table.cell>
                                 <flux:table.cell><x-util.e-badge :enum="$plan->status" /></flux:table.cell>
@@ -399,24 +566,28 @@ new class extends Component
                                 </flux:table.cell>
                                 <flux:table.cell>
                                     {{ $subscription->plan?->name }}
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $subscription->priceLabel() }} · {{ $subscription->vendor->label() }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $subscription->priceLabel() }}@if ($subscription->vendor) · {{ $subscription->vendor->label() }}@endif
+                                    </p>
                                 </flux:table.cell>
                                 <flux:table.cell><x-util.e-badge :enum="$subscription->status" /></flux:table.cell>
                                 <flux:table.cell>{{ $subscription->current_period_ends_at?->format('M d, Y') ?? '—' }}</flux:table.cell>
                                 <flux:table.cell align="end">
-                                    <flux:dropdown position="bottom" align="end">
-                                        <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
-                                        <flux:menu>
-                                            <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="arrow-path" wire:click="refreshSubscription({{ $subscription->id }})">
-                                                Check with {{ $subscription->vendor->label() }}
-                                            </x-dashboard.gate.menu-item>
-                                            @if ($subscription->canBeCancelled())
-                                                <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="x-circle" variant="danger" wire:click="confirmCancel({{ $subscription->id }})">
-                                                    Cancel
+                                    @if ($subscription->vendor)
+                                        <flux:dropdown position="bottom" align="end">
+                                            <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" />
+                                            <flux:menu>
+                                                <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="arrow-path" wire:click="refreshSubscription({{ $subscription->id }})">
+                                                    Check with {{ $subscription->vendor->label() }}
                                                 </x-dashboard.gate.menu-item>
-                                            @endif
-                                        </flux:menu>
-                                    </flux:dropdown>
+                                                @if ($subscription->canBeCancelled())
+                                                    <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="x-circle" variant="danger" wire:click="confirmCancel({{ $subscription->id }})">
+                                                        Cancel
+                                                    </x-dashboard.gate.menu-item>
+                                                @endif
+                                            </flux:menu>
+                                        </flux:dropdown>
+                                    @endif
                                 </flux:table.cell>
                             </flux:table.row>
                         @endforeach
@@ -426,29 +597,79 @@ new class extends Component
         @endif
     </flux:card>
 
-    <flux:modal name="planModal" class="max-w-lg">
-        <form wire:submit="save" class="space-y-4">
+    <flux:modal name="planModal" class="w-full max-w-2xl">
+        <form wire:submit="save" class="space-y-6">
             <flux:heading size="lg">{{ $editingId ? 'Edit plan' : 'New plan' }}</flux:heading>
 
-            <flux:input wire:model="name" label="Name" placeholder="Pro" />
-            <flux:textarea wire:model="description" label="Description" rows="2" />
-            <flux:textarea wire:model="features" label="Features" rows="4" description="One per line. Shown as a checklist on the plan." />
+            <div class="space-y-4">
+                <flux:input wire:model="name" label="Name" placeholder="Pro" />
+                <flux:textarea wire:model="description" label="Description" rows="2" placeholder="For growing teams that need more room and faster help." />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-form.money-field wire:model="amount" label="Price" />
-                <flux:select wire:model="billing_interval" label="Billed">
-                    @foreach (SubscriptionIntervalEnum::cases() as $interval)
-                        <flux:select.option value="{{ $interval->value }}">{{ $interval->label() }}</flux:select.option>
-                    @endforeach
-                </flux:select>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <flux:switch wire:model.live="is_free" label="Free plan" description="What every account without a subscription has. One plan at a time." />
+                    <flux:switch wire:model="is_recommended" label="Recommended" description="Highlighted on the pricing cards. One plan at a time." />
+                </div>
             </div>
 
-            @if ($editingId)
-                <flux:text size="sm">
-                    Changing the price or how often it bills applies to new subscribers. Existing
-                    subscribers keep the terms they signed up to.
-                </flux:text>
-            @endif
+            @unless ($is_free)
+                <flux:separator variant="subtle" />
+
+                <div class="space-y-3">
+                    <div>
+                        <flux:heading>Prices</flux:heading>
+                        <flux:text size="sm">Fill in each interval the plan is offered on; leave the rest empty. Members see what a longer interval saves against the shortest one.</flux:text>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        @foreach (SubscriptionIntervalEnum::cases() as $interval)
+                            <x-form.money-field wire:key="price-{{ $interval->value }}" wire:model="prices.{{ $interval->value }}" :label="$interval->label()" placeholder="Not offered" />
+                        @endforeach
+                    </div>
+
+                    @if ($editingId)
+                        <flux:text size="sm">
+                            A new amount applies to new subscribers. Existing subscribers keep the terms
+                            they signed up to.
+                        </flux:text>
+                    @endif
+
+                    <flux:input wire:model="trial_days" type="number" min="0" max="365" label="Free trial" placeholder="14" description="Days an account can try the plan before paying — no card asked for, one trial per account. Leave empty for none." class="sm:max-w-56" />
+                </div>
+            @endunless
+
+            <flux:separator variant="subtle" />
+
+            <div class="space-y-3">
+                <div>
+                    <flux:heading>Features</flux:heading>
+                    <flux:text size="sm">What the plan gives. The code checks these, and the pricing card lists them.</flux:text>
+                </div>
+
+                <flux:select wire:model.live="includes_plan_id" label="Includes everything in" placeholder="No other plan">
+                    <flux:select.option value="">No other plan</flux:select.option>
+                    @foreach ($this->includableOptions as $option)
+                        <flux:select.option value="{{ $option->id }}">{{ $option->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+
+                <div class="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+                    @foreach (SubscriptionFeatureEnum::cases() as $feature)
+                        <div wire:key="feature-{{ $feature->value }}" class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <flux:checkbox wire:model.live="featureOn.{{ $feature->value }}" :label="$feature->label()" />
+
+                            @if ($feature->isLimit() && ($featureOn[$feature->value] ?? false))
+                                <flux:input wire:model="featureLimits.{{ $feature->value }}" type="number" min="1" size="sm" placeholder="Unlimited" class="sm:max-w-36" />
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                @if ($includes_plan_id !== '')
+                    <flux:text size="sm">
+                        Tick only what this plan adds or raises — it already has everything in the plan it includes.
+                    </flux:text>
+                @endif
+            </div>
 
             <flux:switch wire:model="active" label="Offered to members" />
 
@@ -469,7 +690,8 @@ new class extends Component
         confirm-icon="trash"
         wire:click="deletePlan"
     >
-        A plan nobody has subscribed to can go. One with subscribers stays on file — switch it off instead.
+        A plan nobody has subscribed to, and no other plan includes, can go. Otherwise it stays
+        on file — switch it off instead.
     </x-dashboard.confirm-modal>
 
     <x-dashboard.confirm-modal

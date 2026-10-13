@@ -7,7 +7,7 @@ use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -24,12 +24,14 @@ use Carbon\CarbonInterface;
 interface SupportsSubscriptions
 {
     /**
-     * Create the plan on the vendor. $existing is the copy already there, whose
-     * product a new price can hang off; the plan id is always new.
+     * Create one of a plan's prices on the vendor — a plan of its own on
+     * Paystack and Flutterwave, a price under the plan's product on Stripe and
+     * PayPal. $existing is a copy already there, whose product a new price can
+     * hang off; the plan id is always new.
      *
      * @return string|array{vendor_plan_id: string, vendor_product_id: ?string}
      */
-    public function syncPlan(SubscriptionPlan $plan, ?SubscriptionPlanVendor $existing = null): string|array;
+    public function syncPlan(SubscriptionPlanPrice $price, ?SubscriptionPlanVendor $existing = null): string|array;
 
     /**
      * Open the checkout for a subscription's first payment. $transaction is the

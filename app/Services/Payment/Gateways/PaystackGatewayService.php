@@ -12,7 +12,7 @@ use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -186,14 +186,14 @@ class PaystackGatewayService extends BasePaymentGateway implements SupportsSubsc
 
     // Subscriptions
 
-    public function syncPlan(SubscriptionPlan $plan, ?SubscriptionPlanVendor $existing = null): string|array
+    public function syncPlan(SubscriptionPlanPrice $price, ?SubscriptionPlanVendor $existing = null): string|array
     {
         $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/plan', [
-            'name' => $plan->name,
-            'amount' => $this->toMinor((float) $plan->amount),
-            'interval' => $plan->billing_interval->paystackInterval(),
-            'currency' => $plan->currency,
-            'description' => str()->limit((string) $plan->description, 200),
+            'name' => $price->label(),
+            'amount' => $this->toMinor((float) $price->amount),
+            'interval' => $price->billing_interval->paystackInterval(),
+            'currency' => $price->currency,
+            'description' => str()->limit((string) $price->plan->description, 200),
         ]);
 
         if (! $response?->successful() || ! $response->json('status')) {

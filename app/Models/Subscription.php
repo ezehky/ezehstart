@@ -45,7 +45,7 @@ class Subscription extends Model
     {
         return match ($this->status) {
             StatusSubscription::ACTIVE, StatusSubscription::PAST_DUE => true,
-            StatusSubscription::CANCELLED => $this->current_period_ends_at?->isFuture() ?? false,
+            StatusSubscription::CANCELLED, StatusSubscription::TRIALING => $this->current_period_ends_at?->isFuture() ?? false,
             default => false,
         };
     }
@@ -64,8 +64,17 @@ class Subscription extends Model
         return $this->status->isActive() || $this->status->isPastDue();
     }
 
+    public function isTrial(): bool
+    {
+        return $this->status->isTrialing();
+    }
+
     public function priceLabel(): string
     {
+        if ($this->isTrial() || ! $this->billing_interval) {
+            return 'Free trial';
+        }
+
         return kMoneyFormat((float) $this->amount, decodeHtml: true).' / '.$this->billing_interval->perLabel();
     }
 
@@ -86,6 +95,11 @@ class Subscription extends Model
         return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
     }
 
+    public function price(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionPlanPrice::class, 'subscription_plan_price_id');
+    }
+
     /**
      * The first payment and every renewal, as ledger rows.
      */
@@ -104,6 +118,21 @@ class Subscription extends Model
     protected function live(Builder $query): void
     {
         $query->whereIn('status', [StatusSubscription::ACTIVE, StatusSubscription::PAST_DUE, StatusSubscription::CANCELLED]);
+    }
+
+    /**
+     * Anything that might give access: live, or a trial. What accessFor() reads.
+     */
+    #[Scope]
+    protected function current(Builder $query): void
+    {
+        $query->whereIn('status', [StatusSubscription::ACTIVE, StatusSubscription::PAST_DUE, StatusSubscription::CANCELLED, StatusSubscription::TRIALING]);
+    }
+
+    #[Scope]
+    protected function trialing(Builder $query): void
+    {
+        $query->where('status', StatusSubscription::TRIALING);
     }
 
     #[Scope]

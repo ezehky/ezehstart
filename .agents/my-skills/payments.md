@@ -101,7 +101,11 @@ Korapay do not, and are never offered for a plan.
 
 | Piece | How |
 | --- | --- |
-| Plan | `subscription_plans`, admin-managed. Synced to a vendor on its first subscriber (`subscription_plan_vendors`). A price/interval change empties the vendor plan id and keeps the product; existing subscribers keep `subscriptions.vendor_plan_id` |
+| Plan | `subscription_plans`, admin-managed: name, `is_free`, `is_recommended`, `trial_days`, `includes_plan_id`. Prices live apart from it |
+| Price | `subscription_plan_prices`, one row an interval — monthly and yearly are separate amounts, and the card shows what a longer interval saves (`savingsAgainst()`, computed, never typed in). An emptied interval is switched off, not deleted. A **price** is what is synced to a vendor on its first subscriber (`subscription_plan_vendors`, unique per price and vendor); the product it hangs off is the plan's. A changed amount empties that price's vendor plan id and keeps the product; existing subscribers keep `subscriptions.vendor_plan_id` |
+| Features | `subscription_plan_features`, one row a `SubscriptionFeatureEnum` case the plan grants, `feature_limit` for a limit case (null = unlimited). A plan with `includes_plan_id` grants everything in that plan too ("Everything in Basic, plus") — the more generous limit wins, and its card lists only what it adds. The shipped cases are examples; replace them |
+| Free plan | at most one; no prices; nobody subscribes to it. It is what `planFor()` falls back to when nothing else gives access — no row per account |
+| Trial | the kit's own, not the vendor's: `startTrial()` writes a `TRIALING` row with no vendor, no card, no charge, ending at `current_period_ends_at`. One per account (a trial is the only vendor-less row). Paying ends it at once; otherwise the sync sweep ends it |
 | Start | `SubscriptionService::subscribe()` writes a PENDING subscription and the first payment's PROCESSING row (`SUBSCRIPTION` group, `DIRECT`, `NONE` wallet, against the subscription), then the vendor checkout |
 | First payment | the ordinary callback / webhook / sweep → `PaymentService::verify()`, which uses `verifySubscriptionCheckout()` for these rows and calls `activate()` on confirm |
 | Renewal | a webhook the driver reads as `RENEWED` → `verifyRenewal()` asks the vendor about that charge → one `SUBSCRIPTION` row, deduplicated by the vendor's charge id across every payment on the subscription |
@@ -109,9 +113,14 @@ Korapay do not, and are never offered for a plan.
 | Anything else | `CHANGED` → the subscription is re-read from the vendor (`refresh()`) |
 | Cancel | stops the vendor billing; the row is `CANCELLED` with access to `current_period_ends_at`, then `EXPIRED` via `payments:sync-subscriptions` (hourly) |
 
-**Gate paid features on `app(SubscriptionService::class)->accessFor($user)`** (or
-`Subscription::grantsAccess()`), never on the status column alone — `CANCELLED` still
-has access until the period ends.
+**Gate paid features by feature, never by plan name:**
+`app(SubscriptionService::class)->allows($user, SubscriptionFeatureEnum::API_ACCESS)`
+and `->limitFor($user, SubscriptionFeatureEnum::PROJECTS)` (null is unlimited, 0 is not
+granted). Both read the plan `accessFor()` finds — which already counts a `CANCELLED`
+row with time left and a running trial — and fall back to the free plan.
+
+No coupons or discount codes ship. A yearly price below twelve monthlies is the
+built-in discount.
 
 Vendor notes: a renewal on Paystack is `charge.success` with a plan and a Paystack
 reference; on Flutterwave, `charge.completed` whose `tx_ref` is not ours, matched by the

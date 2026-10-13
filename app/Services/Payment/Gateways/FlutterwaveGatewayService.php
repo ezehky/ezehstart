@@ -12,7 +12,7 @@ use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -193,13 +193,13 @@ class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSu
 
     // Subscriptions
 
-    public function syncPlan(SubscriptionPlan $plan, ?SubscriptionPlanVendor $existing = null): string|array
+    public function syncPlan(SubscriptionPlanPrice $price, ?SubscriptionPlanVendor $existing = null): string|array
     {
         $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/payment-plans', [
-            'name' => $plan->name,
-            'amount' => round((float) $plan->amount, 2),
-            'interval' => $plan->billing_interval->flutterwaveInterval(),
-            'currency' => $plan->currency,
+            'name' => $price->label(),
+            'amount' => round((float) $price->amount, 2),
+            'interval' => $price->billing_interval->flutterwaveInterval(),
+            'currency' => $price->currency,
         ]);
 
         if (! $response?->successful() || $response->json('status') !== 'success') {

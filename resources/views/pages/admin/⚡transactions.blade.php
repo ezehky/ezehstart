@@ -608,7 +608,7 @@ new class extends Component
                 one moves the account's balance.
             </flux:text>
 
-            <flux:textarea wire:model="settleNote" label="Note" rows="2" description="Recorded in the activity log." />
+            <flux:textarea wire:model="settleNote" label="Note" rows="2" placeholder="Matched against the bank statement for 12 Oct." description="Recorded in the activity log." />
 
             <div class="flex justify-end gap-3">
                 <flux:modal.close>
@@ -652,7 +652,7 @@ new class extends Component
                 mistake, not as a routine way to pay somebody.
             </flux:text>
 
-            <flux:input type="number" wire:model="adjust_user_id" label="Account id" />
+            <flux:input type="number" wire:model="adjust_user_id" label="Account id" placeholder="1024" />
             <x-form.money-field wire:model="adjust_amount" label="Amount" />
             <flux:input wire:model="adjust_reason" label="Reason" placeholder="Refund for duplicate charge" />
             <flux:switch wire:model="adjust_credit" label="Credit the account" description="Turn off to debit instead." />

@@ -12,7 +12,7 @@ use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -275,7 +275,7 @@ class PaypalGatewayService extends BasePaymentGateway implements SupportsSubscri
 
     // Subscriptions
 
-    public function syncPlan(SubscriptionPlan $plan, ?SubscriptionPlanVendor $existing = null): string|array
+    public function syncPlan(SubscriptionPlanPrice $price, ?SubscriptionPlanVendor $existing = null): string|array
     {
         if (! $this->accessToken()) {
             return 'PayPal could not be reached. Please try again.';
@@ -285,7 +285,7 @@ class PaypalGatewayService extends BasePaymentGateway implements SupportsSubscri
 
         if (! $productId) {
             $product = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/v1/catalogs/products', [
-                'name' => str()->limit($plan->name, 120),
+                'name' => str()->limit($price->plan->name, 120),
                 'type' => 'SERVICE',
             ]);
 
@@ -296,11 +296,11 @@ class PaypalGatewayService extends BasePaymentGateway implements SupportsSubscri
             $productId = (string) $product->json('id');
         }
 
-        [$unit, $count] = $plan->billing_interval->unitAndCount();
+        [$unit, $count] = $price->billing_interval->unitAndCount();
 
         $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/v1/billing/plans', [
             'product_id' => $productId,
-            'name' => str()->limit($plan->name, 120),
+            'name' => str()->limit($price->label(), 120),
             'status' => 'ACTIVE',
             'billing_cycles' => [[
                 'frequency' => ['interval_unit' => strtoupper($unit), 'interval_count' => $count],
@@ -309,8 +309,8 @@ class PaypalGatewayService extends BasePaymentGateway implements SupportsSubscri
                 'total_cycles' => 0,
                 'pricing_scheme' => [
                     'fixed_price' => [
-                        'value' => $this->toPaypalAmount((float) $plan->amount, $plan->currency),
-                        'currency_code' => $plan->currency,
+                        'value' => $this->toPaypalAmount((float) $price->amount, $price->currency),
+                        'currency_code' => $price->currency,
                     ],
                 ],
             ]],

@@ -12,7 +12,7 @@ use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
@@ -251,14 +251,14 @@ class StripeGatewayService extends BasePaymentGateway implements SupportsSubscri
 
     // Subscriptions
 
-    public function syncPlan(SubscriptionPlan $plan, ?SubscriptionPlanVendor $existing = null): string|array
+    public function syncPlan(SubscriptionPlanPrice $price, ?SubscriptionPlanVendor $existing = null): string|array
     {
         $productId = $existing?->vendor_product_id;
 
         if (! $productId) {
             $product = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/products', [
-                'name' => $plan->name,
-                'metadata' => ['subscription_plan_id' => $plan->id],
+                'name' => $price->plan->name,
+                'metadata' => ['subscription_plan_id' => $price->subscription_plan_id],
             ]);
 
             if (! $product?->successful()) {
@@ -269,22 +269,22 @@ class StripeGatewayService extends BasePaymentGateway implements SupportsSubscri
         }
 
         // Stripe prices cannot be edited, so a changed price is always a new one
-        // on the same product.
-        [$unit, $count] = $plan->billing_interval->unitAndCount();
+        // on the same product. The monthly and the yearly are two prices on it.
+        [$unit, $count] = $price->billing_interval->unitAndCount();
 
-        $price = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/prices', [
+        $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/prices', [
             'product' => $productId,
-            'currency' => strtolower($plan->currency),
-            'unit_amount' => $this->toStripeAmount((float) $plan->amount, $plan->currency),
+            'currency' => strtolower($price->currency),
+            'unit_amount' => $this->toStripeAmount((float) $price->amount, $price->currency),
             'recurring' => ['interval' => $unit, 'interval_count' => $count],
-            'metadata' => ['subscription_plan_id' => $plan->id],
+            'metadata' => ['subscription_plan_id' => $price->subscription_plan_id, 'subscription_plan_price_id' => $price->id],
         ]);
 
-        if (! $price?->successful()) {
-            return $this->errorMessage($price);
+        if (! $response?->successful()) {
+            return $this->errorMessage($response);
         }
 
-        return ['vendor_plan_id' => (string) $price->json('id'), 'vendor_product_id' => $productId];
+        return ['vendor_plan_id' => (string) $response->json('id'), 'vendor_product_id' => $productId];
     }
 
     public function subscribe(Subscription $subscription, Transaction $transaction, string $vendorPlanId): string|array
