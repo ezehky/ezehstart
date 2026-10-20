@@ -26,7 +26,7 @@ new #[Layout('layouts::auth')] class extends Component
         // Reaching this page without having passed the first factor is either a
         // stale tab or somebody trying it on. Either way there is nothing here.
         if (! session()->has(self::TWO_FACTOR_SESSION_KEY)) {
-            return $this->redirectRoute('login', navigate: true);
+            return $this->redirectRoute('login');
         }
 
         kSetSiteTitle('two-factor');
@@ -57,7 +57,7 @@ new #[Layout('layouts::auth')] class extends Component
         if (! $user) {
             session()->forget([self::TWO_FACTOR_SESSION_KEY, self::TWO_FACTOR_REMEMBER_KEY]);
 
-            return $this->redirectRoute('login', navigate: true);
+            return $this->redirectRoute('login');
         }
 
         // Throttled on the account id rather than the email, which is not asked

@@ -136,7 +136,7 @@ new #[Layout('layouts::site')] class extends Component
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($this->posts as $post)
                 <article wire:key="post-{{ $post->id }}" class="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
-                    <a href="{{ route('blog.show', $post) }}" wire:navigate class="block aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <a href="{{ route('blog.show', $post) }}" class="block aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
                         <img
                             src="{{ $post->image?->url() ?? kSafeImage() }}"
                             alt="{{ $post->image?->alt_text ?: $post->title }}"
@@ -153,7 +153,7 @@ new #[Layout('layouts::site')] class extends Component
                         </div>
 
                         <flux:heading level="2" size="lg">
-                            <a href="{{ route('blog.show', $post) }}" wire:navigate class="hover:underline">
+                            <a href="{{ route('blog.show', $post) }}" class="hover:underline">
                                 {{ $post->title }}
                             </a>
                         </flux:heading>

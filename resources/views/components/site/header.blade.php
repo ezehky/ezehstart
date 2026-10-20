@@ -6,7 +6,6 @@
         href="{{ route('home') }}"
         :logo="$_configs['logo'] ?? ''"
         :logoDark="$_configs['logo-dark'] ?? ''"
-        :name="$_configs['name']"
         alt="{{ $_configs['name'] }} official logo"
     />
 
@@ -20,13 +19,12 @@
                 :href="auth()->user()->isAdmin() ? route('admin.dashboard') : route('user.dashboard')"
                 variant="primary"
                 size="sm"
-                wire:navigate
             >
                 {{ __('Dashboard') }}
             </flux:button>
         @else
-            <flux:button :href="route('login')" variant="ghost" size="sm" wire:navigate>{{ __('Sign in') }}</flux:button>
-            <flux:button :href="route('register')" variant="primary" size="sm" wire:navigate>{{ __('Get started') }}</flux:button>
+            <flux:button :href="route('login')" variant="ghost" size="sm">{{ __('Sign in') }}</flux:button>
+            <flux:button :href="route('register')" variant="primary" size="sm">{{ __('Get started') }}</flux:button>
         @endauth
     </div>
 </header>

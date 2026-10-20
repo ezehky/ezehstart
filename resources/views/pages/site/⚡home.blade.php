@@ -78,7 +78,7 @@ new #[Layout('layouts::site')] class extends Component
 
             <div class="mt-8 flex flex-wrap gap-3">
                 @guest
-                    <flux:button :href="route('register')" variant="primary" icon="arrow-right" wire:navigate>
+                    <flux:button :href="route('register')" variant="primary" icon="arrow-right">
                         {{ __('Create an account') }}
                     </flux:button>
                     <x-auth.passwordless :enabled="$this->passwordlessEnabled" />

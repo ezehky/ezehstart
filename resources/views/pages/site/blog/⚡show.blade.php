@@ -54,7 +54,7 @@ new #[Layout('layouts::site')] class extends Component
         <div class="space-y-3">
             <div class="flex flex-wrap gap-1">
                 @foreach ($post->categories as $category)
-                    <a href="{{ route('blog.index', ['category' => $category->slug]) }}" wire:navigate>
+                    <a href="{{ route('blog.index', ['category' => $category->slug]) }}">
                         <flux:badge size="sm" inset="top bottom">{{ $category->name }}</flux:badge>
                     </a>
                 @endforeach
@@ -85,7 +85,7 @@ new #[Layout('layouts::site')] class extends Component
             <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-6 dark:border-slate-800">
                 <flux:text size="sm">{{ __('Tagged') }}</flux:text>
                 @foreach ($post->tags as $tag)
-                    <a href="{{ route('blog.index', ['tag' => $tag->slug]) }}" wire:navigate>
+                    <a href="{{ route('blog.index', ['tag' => $tag->slug]) }}">
                         <flux:badge size="sm" inset="top bottom">{{ $tag->name }}</flux:badge>
                     </a>
                 @endforeach
@@ -104,7 +104,6 @@ new #[Layout('layouts::site')] class extends Component
                     <a
                         wire:key="related-{{ $item->id }}"
                         href="{{ route('blog.show', $item) }}"
-                        wire:navigate
                         class="group space-y-2"
                     >
                         <div class="aspect-video overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
