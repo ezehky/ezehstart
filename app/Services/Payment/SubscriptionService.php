@@ -3,6 +3,7 @@
 namespace App\Services\Payment;
 
 use App\Contracts\SupportsSubscriptions;
+use App\Enums\LogChannelEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusSubscription;
 use App\Enums\StatusTransaction;
@@ -32,6 +33,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -487,8 +489,14 @@ class SubscriptionService
             foreach ($subscriptions as $subscription) {
                 $counts['checked']++;
 
-                if (\is_string($this->refresh($subscription))) {
+                if (\is_string($error = $this->refresh($subscription))) {
                     $counts['errors']++;
+
+                    Log::channel(LogChannelEnum::PAYMENTS->value)->warning('Subscription sync could not refresh a subscription', [
+                        'subscription' => $subscription->id,
+                        'vendor' => $subscription->vendor?->value,
+                        'error' => $error,
+                    ]);
                 }
 
                 if ($this->endIfOver($subscription)) {

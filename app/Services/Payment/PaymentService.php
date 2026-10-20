@@ -3,6 +3,7 @@
 namespace App\Services\Payment;
 
 use App\Contracts\SupportsSubscriptions;
+use App\Enums\LogChannelEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusPaymentWebhook;
 use App\Enums\StatusTransaction;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -313,6 +315,12 @@ class PaymentService
         $webhook->status = StatusPaymentWebhook::FAILED;
         $webhook->last_error = str()->limit($error, 1000);
         $webhook->save();
+
+        Log::channel(LogChannelEnum::PAYMENTS->value)->error('Payment webhook gave up', [
+            'webhook' => $webhook->id,
+            'vendor' => $webhook->vendor?->value,
+            'error' => $error,
+        ]);
     }
 
     /**
@@ -368,6 +376,12 @@ class PaymentService
 
                     if (\is_string($result)) {
                         $counts['errors']++;
+
+                        Log::channel(LogChannelEnum::PAYMENTS->value)->warning('Reconcile could not verify a payment', [
+                            'transaction' => $transaction->id,
+                            'vendor' => $transaction->gateway?->vendor?->value,
+                            'error' => $result,
+                        ]);
 
                         continue;
                     }

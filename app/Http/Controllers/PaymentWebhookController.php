@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LogChannelEnum;
 use App\Enums\PaymentTraceStepEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Services\Payment\PaymentService;
@@ -62,7 +63,7 @@ class PaymentWebhookController extends Controller
             return false;
         }
 
-        Log::error('PAYMENTS_WEBHOOK_VERIFY_SIGNATURE is off outside local/testing; it has been ignored and signatures are still checked.');
+        Log::channel(LogChannelEnum::PAYMENTS->value)->error('PAYMENTS_WEBHOOK_VERIFY_SIGNATURE is off outside local/testing; it has been ignored and signatures are still checked.');
 
         return true;
     }

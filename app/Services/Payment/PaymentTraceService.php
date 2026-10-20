@@ -2,6 +2,7 @@
 
 namespace App\Services\Payment;
 
+use App\Enums\LogChannelEnum;
 use App\Enums\PaymentTraceStepEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Models\PaymentTrace;
@@ -87,7 +88,7 @@ class PaymentTraceService
                 'context' => $this->redact($context),
             ]);
         } catch (Throwable $exception) {
-            Log::warning('Payment trace could not be written.', ['error' => $exception->getMessage()]);
+            Log::channel(LogChannelEnum::PAYMENTS->value)->warning('Payment trace could not be written.', ['error' => $exception->getMessage()]);
 
             return null;
         }

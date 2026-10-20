@@ -11,6 +11,7 @@ enum LogChannelEnum: string
     case LARAVEL = 'laravel';
     case EZEH = 'ezeh';
     case SITE_CONFIG = 'site-config';
+    case PAYMENTS = 'payments';
 
     public function isLaravel(): bool
     {
@@ -25,6 +26,11 @@ enum LogChannelEnum: string
     public function isSiteConfig(): bool
     {
         return $this === self::SITE_CONFIG;
+    }
+
+    public function isPayments(): bool
+    {
+        return $this === self::PAYMENTS;
     }
 
     /**
