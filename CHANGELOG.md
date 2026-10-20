@@ -9,6 +9,47 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-10-20
+
+A small follow-up to 2.2.0. Payments now write to a log file of their own, and the
+public site's links load whole pages again. There are no migrations and nothing is
+renamed.
+
+### Added
+
+- **A `payments` log channel.** `LogChannelEnum::PAYMENTS` writes to
+  `storage/logs/payments.log`. Its channel is built in `config/logging.php` the same way
+  as `ezeh` and `site-config`, and it shows up in the admin **Logs** screen picker
+  without any extra setup. These events are written there:
+  - a webhook that runs out of retries (`PaymentService::failWebhook()`), with the
+    webhook id, the vendor and the error;
+  - a checkout the reconcile sweep couldn't verify, with the transaction id, the vendor
+    and the error. Before this, these only showed up in the command's error count;
+  - a subscription `payments:sync-subscriptions` couldn't refresh, with the same detail.
+    Before this, these were also only counted;
+  - the warning raised when `PAYMENTS_WEBHOOK_VERIFY_SIGNATURE` is turned off outside
+    `local`/`testing`, and a payment trace that couldn't be written. Both used to go to
+    Laravel's own log.
+
+### Changed
+
+- **The public site no longer uses `wire:navigate`.** Its links now load full pages:
+  the header's Dashboard, Sign in and Get started buttons, the home page's Create an
+  account button, the latest-posts cards, the blog index cards, and the category, tag
+  and related-post links on a post. The two-factor challenge also sends you back to the
+  login page with an ordinary redirect. Dashboard navigation hasn't changed.
+- The site header's logo no longer receives a `name` prop. The site name is still the
+  logo's `alt` text.
+
+### Upgrading
+
+Nothing to migrate. If the config is cached, rebuild it so the new channel is
+registered:
+
+```bash
+php artisan config:cache
+```
+
 ## [2.2.0] - 2026-10-13
 
 Gateway payments, refunds and vendor-billed subscriptions, plus contact locations on the
