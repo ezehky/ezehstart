@@ -9,6 +9,134 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-30
+
+The public pages are now plain controllers, policies and FAQ answers are written in the
+rich-text editor, and the brand colour has a name of its own. Gateways can also carry a
+processing fee, and administrators can import whole folders into the image library.
+There are no migrations and no route is renamed. **An existing install does need to
+convert its policy and FAQ text once.** See **Upgrading**.
+
+### Added
+
+- **A processing fee for each gateway.** `PaymentFeeService` holds a percentage, a flat
+  amount and an optional cap for each vendor. They're stored in the site configuration
+  under `payments.fees` and set from a new **Processing fee** column on **Payments ›
+  Gateways**. Every fee starts at zero: passing the card cost on to customers is the
+  owner's call, so nothing is added until someone sets one.
+  - `PaymentService::checkout()` adds the fee to a **purchase**. The row's amount is
+    the total the vendor is asked for, so `verify()` checks the same figure, and the
+    fee is kept as a `TransactionChargeEnum::FEE` charge row so a receipt can show it.
+  - A **wallet deposit** never carries a fee, because its amount is what lands in the
+    wallet. That includes **Add funds**.
+  - Manual vendors never carry a fee.
+  - A change to a fee is logged with both the old and the new terms. It applies from
+    the next checkout. A payment that's already open keeps its fee.
+  - To show the fee before the customer leaves for the vendor, call
+    `app(PaymentFeeService::class)->feeFor($vendor, $price)` in the page's
+    `#[Computed]`. Don't work the fee out anywhere else.
+  - The admin **Transactions** listing shows "incl. … charges" under any amount that
+    carries charge rows.
+- **Folder import in the image library (admins only).** A new **Import** tab takes
+  whole folders, picked or dropped, and rebuilds them as library folders, up to eight
+  levels deep. You choose the settings once for the whole import before anything is
+  sent: parent folder, visibility, shared or personal, and whether to keep the folder
+  structure. The browser then sends the images ten at a time
+  (`resources/js/folder-import.js`, registered as the `folderImport` Alpine component).
+  A folder with the same name in the same place is reused, so importing the same
+  folder twice fills one tree instead of making two. When the import brought in a
+  single folder, the library opens it at the end. The new
+  `ImageLibraryService::folderForPath()` does the folder matching. The tab is hidden
+  from members, and every method checks again on the server.
+- **`<x-util.brand>`**, the site's linked logo. It replaces `<flux:brand>` in the site
+  header, the dashboard sidebar and the sign-in layout. It shows the light logo or the
+  dark one to match the theme, and takes `href` and a `size` (any `max-w-*`, default
+  `max-w-16`).
+- **A dark logo is no longer required.** If a site has uploaded a logo but no dark one,
+  its own logo is used in dark mode. Before this, dark mode showed the kit's
+  placeholder logo.
+- **`<x-layouts.site>`**, the component form of `layouts::site`, for pages rendered by
+  a controller. The two files must stay identical below their header comments.
+- **Public pages fade in as they load.** `.page-enter` on the layout's `<main>` brings
+  the page's sections in one after another, 60 ms apart. The delay stops growing after
+  the sixth section, and reduced motion turns the animation off.
+- **A new folder opens as soon as it's made**, in both the image and video libraries,
+  since the next upload is usually headed there.
+
+### Changed
+
+- **The home page and the blog are controllers.** `Site\HomeController` and
+  `Site\BlogController` (`index`, `show`) render `resources/views/site/home.blade.php`
+  and `site/blog/{index,show}.blade.php` on `<x-layouts.site>`. The blog's category,
+  search and page filters are query strings. The route names (`home`, `blog.index`,
+  `blog.show`) and URLs are unchanged. A read-only public page is now always a
+  controller. Only a page the visitor fills in, such as unsubscribe, is a Livewire
+  page, and a form inside a read-only page is an embedded `<livewire:…>` (`pages.md`
+  shape G).
+- **Policies and FAQ answers are written in the rich-text editor.** Both admin screens
+  use `<x-form.rich-text>` and save through `BlogService::sanitize()`, which is what
+  makes printing them unescaped safe.
+  - `PolicyContentService::sections()` now takes the stored HTML and splits it on
+    `<h2>`. Headings may carry attributes, and markup inside a heading becomes plain
+    text in the contents sidebar.
+  - An anchor is still pinned at the end of a heading, written as
+    `5. Refunds {#refunds}` (without the `##` now).
+  - The policy preview still shows the sections and where each anchor lands. The FAQ
+    screen no longer has a preview, because the editor shows the answer as it will
+    look.
+  - `Faq::answerHtml()` returns the stored answer as it is. Its markdown cache is gone.
+  - `MarkdownService` now only converts text that arrives as markdown: the policy and
+    FAQ seeders, and an imported FAQ file. Its output goes through `sanitize()` like
+    everything else.
+- **The brand colour is `brand-*`.** The `#2DD4B5` scale is now defined as
+  `--color-brand-*`, and every class in the kit uses `brand-*`. `lime-*` points at the
+  same scale and stays only because Flux's `color="lime"` prop is how a Flux component
+  asks for the brand. Use `brand-*` in a class.
+- Rendered policy and FAQ text is styled by `.rich-prose`, the same class as blog posts.
+- `<x-form.rich-text>` shows "Start writing…" when no placeholder is passed.
+
+### Removed
+
+- `<x-form.markdown-field>`, the `kMarkdownFormat()` helper, and the `.markdown-prose`
+  CSS class.
+- The `pages::site.home`, `pages::site.blog.index` and `pages::site.blog.show`
+  Livewire pages, replaced by the controllers above.
+
+### Upgrading
+
+Nothing to migrate. Rebuild the front end for the `brand-*` palette and the page
+entrance:
+
+```bash
+npm run build
+```
+
+**Convert the stored policy and FAQ text to HTML, once.** An existing install holds it
+as markdown, and the public pages now print it as HTML. Run this in `php artisan
+tinker` or a one-off migration. It doesn't touch `updated_at`, so the "last updated"
+date on a legal page stays the same.
+
+```php
+use App\Services\BlogService;
+use App\Services\MarkdownService;
+use Illuminate\Support\Facades\DB;
+
+$toHtml = fn (?string $markdown) => app(BlogService::class)->sanitize(app(MarkdownService::class)->toHtml($markdown));
+
+DB::table('faqs')->orderBy('id')->each(fn ($row) => DB::table('faqs')->where('id', $row->id)->update(['answer' => $toHtml($row->answer)]));
+DB::table('policies')->orderBy('id')->each(fn ($row) => DB::table('policies')->where('id', $row->id)->update(['content' => $toHtml($row->content)]));
+```
+
+Run it **once only**. `MarkdownService` escapes raw HTML, so a second run would turn
+the converted text back into visible tags. If you can, re-seeding a fresh install
+(`FaqSeeder`, `PolicySeeder`) stores HTML directly.
+
+If your project changed the old public SFCs, move those changes into
+`resources/views/site/` and the matching `Site\` controller. Replace any
+`<x-form.markdown-field>` with `<x-form.rich-text>` and save its value through
+`BlogService::sanitize()`. Replace any `.markdown-prose` with `.rich-prose`. Existing
+`lime-*` classes still render correctly, but new ones should be `brand-*`.
+
 ## [2.2.1] - 2026-10-20
 
 A small follow-up to 2.2.0. Payments now write to a log file of their own, and the

@@ -32,6 +32,10 @@ a role, or everybody. Deletion is guarded by an `image_usages` table with a rest
 foreign key, so an image on a published post refuses to go rather than leaving a broken
 picture behind. Members have a configurable quota; administrators do not. Uploads run
 through `spatie/laravel-image-optimizer` where its binaries are installed.
+Administrators can also **import whole folders**, picked or dropped. The folders are
+rebuilt as library folders under one set of settings chosen before anything is sent,
+and the images go up ten at a time. A folder already there with the same name is
+reused, so importing the same folder twice doesn't make two.
 
 **Video library** — the same again for embeds, and deliberately the same shape. A row is
 a *reference* — a provider and the provider's own id — never a file and never a URL, and
@@ -46,7 +50,8 @@ without a second table and a second admin screen. Posts can be scheduled, featur
 archived, and the scheduler publishes them to the minute and tells the subscribers. The
 HTML is sanitised on the way in. A seeded **Author** role narrows an account to the
 posts it wrote and gives it a public byline. Public index and post pages with related
-reading.
+reading, rendered by plain controllers so they're crawlable and need no
+Livewire snapshot.
 
 **Transaction ledger** — `transactions` with gateway, meta, evidence, balance and charge
 rows alongside. Balances are derived from confirmed rows rather than stored, under a row
@@ -61,8 +66,11 @@ sweep every ten minutes all ask the vendor, and short or wrong-currency money is
 for review instead of credited. Partial and full refunds go through the vendor, or are
 recorded by hand for a bank transfer. Domain events (`PaymentSucceeded`,
 `RefundProcessed` and others) let a project fulfil an order without the kit knowing
-what an order is. An admin **Payments** screen shows the webhooks, the traces and which
-vendors are configured.
+what an order is. An optional **processing fee** per vendor (a percentage, plus a flat
+amount, up to a cap) goes on top of a purchase. It's kept as its own charge row and
+never added to a wallet deposit. Every fee is zero until an owner sets one. An admin
+**Payments** screen shows the webhooks, the traces, which vendors are configured, and
+each vendor's fee.
 
 **Subscriptions** — billed by the vendor (Paystack, Flutterwave, Stripe, PayPal). Each
 plan has one price per interval, and the pricing card works out what a longer interval
@@ -124,16 +132,18 @@ does not work" is unanswerable from the outside. Never admin to admin, the real 
 in the session rather than in a link, both ends logged as the administrator, an hour's
 expiry, and every account-altering screen closed while it runs.
 
-**Legal pages and consent** — `/terms`, `/privacy` and `/cookies`, written in markdown
-from the admin and served as plain crawlable pages with a contents sidebar. A policy is
+**Legal pages and consent** — `/terms`, `/privacy` and `/cookies`, written in the
+rich-text editor from the admin, sanitised on save, and served as plain crawlable pages with a contents sidebar. A policy is
 versioned: published text is superseded by a new draft rather than edited, and the old
 version stays readable at `?version=`, because a consent record points at it. Terms and
 privacy are marked as requiring consent, so registration asks for it and records the
 version accepted, with timestamp, IP and user agent. Publish a replacement and everyone
 is outstanding again until they accept it.
 
-**Public site** — a landing page with an FAQ section whose questions and markdown
-answers are editable from the admin, a contact section listing any number of offices
+**Public site** — read-only pages are plain controllers under `Site\` rendering
+`resources/views/site/` views, so they're crawlable and cost no Livewire snapshot. Only a
+page the visitor fills in is a Livewire page. A landing page has an FAQ section whose
+questions and rich-text answers are editable from the admin, a contact section listing any number of offices
 with their phones, emails and an optional Google Maps or OpenStreetMap embed, and a
 footer that links the legal pages straight
 off the enum.
