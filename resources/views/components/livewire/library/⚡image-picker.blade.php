@@ -84,9 +84,9 @@ new class extends Component
      * @param  array<int, int>  $ids
      */
     #[On('imagesUploaded')]
-    public function whenUploaded(array $ids): void
+    public function whenUploaded(array $ids, ?int $folder = null): void
     {
-        $this->afterUpload($ids);
+        $this->afterUpload($ids, $folder);
     }
 
     /**

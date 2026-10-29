@@ -30,7 +30,11 @@ If you read nothing else before starting:
 2. **Every screen is a Livewire single-file component** at
    `resources/views/pages/**/⚡name.blade.php`, routed with
    `Route::livewire('/path', 'pages::group.name')`. Never a class component, never
-   a `render()` method.
+   a `render()` method. The one exception is a **read-only public page**: a
+   `Site\{Section}Controller` method returning a `resources/views/site/` view on
+   `<x-layouts.site>`. A public page the visitor fills in (unsubscribe today) stays a
+   Livewire page — see
+   `.agents/my-skills/pages.md` shape G.
 3. **Every status is an enum** using `WithEnumHelpers`, with one `is{CASE}()` per case.
    Status enums are prefixed (`StatusUser`); everything else is suffixed (`UserTypeEnum`).
 4. **Every model** is `#[Unguarded]` with a `casts()` method and `#[Scope]` scopes.

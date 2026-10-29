@@ -31,14 +31,14 @@
     @class([
         // data-loading is Livewire's own mark on the element whose click is in
         // flight, so the block answers the click before the server does
-        'group relative cursor-pointer data-loading:outline-2 data-loading:outline-dashed data-loading:outline-offset-[-2px] data-loading:outline-lime-400',
-        'outline outline-2 outline-offset-[-2px] outline-lime-500' => $selectedBlockId === $block['id'],
+        'group relative cursor-pointer data-loading:outline-2 data-loading:outline-dashed data-loading:outline-offset-[-2px] data-loading:outline-brand-400',
+        'outline outline-2 outline-offset-[-2px] outline-brand-500' => $selectedBlockId === $block['id'],
     ])
 >
     {{-- -top-3 --}}
     <div @class([
         'pointer-events-none absolute group-hover:-top-3 start-2.5 z-10',
-        'rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
+        'rounded bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
         // 'opacity-100 -top-3' => $selectedBlockId === $block['id'],
     ])>{{ $case->label() }}</div>
 

@@ -355,6 +355,17 @@ test('a video is added from the page by pasting a link', function () {
     expect(Video::query()->where('title', 'A talk')->exists())->toBeTrue();
 });
 
+test('a folder made from the page is opened straight away', function () {
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.video-library')
+        ->call('newFolder')
+        ->set('folder_name', 'Talks')
+        ->call('saveFolder')
+        ->assertHasNoErrors();
+
+    $component->assertSet('folder', VideoFolder::query()->where('name', 'Talks')->value('id'));
+});
+
 test('a link from a host we do not allow is refused with a message naming the ones we do', function () {
     Livewire::actingAs($this->member)
         ->test('pages::shared.video-library')

@@ -187,7 +187,7 @@
                                 x-text="preset.label"
                                 x-on:click="applyPreset(preset.key)"
                                 x-bind:class="isPreset(preset.key)
-                                    ? 'bg-lime-600 font-medium text-white dark:bg-lime-500'
+                                    ? 'bg-brand-600 font-medium text-white dark:bg-brand-500'
                                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'"
                             ></button>
                         </template>
@@ -237,9 +237,9 @@
                                                     x-on:click="select(cell)"
                                                     x-on:mouseenter="hovering = toISO(cell)"
                                                     x-bind:class="{
-                                                        'bg-lime-600 font-semibold text-white dark:bg-lime-500': isSelected(cell),
-                                                        'bg-lime-50 dark:bg-lime-400/10': ! isSelected(cell) && inRange(cell),
-                                                        'font-semibold text-lime-700 dark:text-lime-300': ! isSelected(cell) && isToday(cell),
+                                                        'bg-brand-600 font-semibold text-white dark:bg-brand-500': isSelected(cell),
+                                                        'bg-brand-50 dark:bg-brand-400/10': ! isSelected(cell) && inRange(cell),
+                                                        'font-semibold text-brand-700 dark:text-brand-300': ! isSelected(cell) && isToday(cell),
                                                         'cursor-not-allowed opacity-30': disabled(cell),
                                                         'hover:bg-slate-100 dark:hover:bg-white/10': ! isSelected(cell) && ! disabled(cell),
                                                     }"

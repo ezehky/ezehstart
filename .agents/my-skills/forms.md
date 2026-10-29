@@ -227,7 +227,7 @@ which case it is the "choose one" row.
 | Number | `<x-form.number-field label="…" wire:model="…" />` |
 | Phone | `<x-form.phone-field wire:model="phone_number" />` |
 | Password | `<x-form.password … />` |
-| Long text / markdown | `<x-form.markdown-field label="…" wire:model="…" rows="8" markdown />` |
+| Long text | `<x-form.rich-text wire:model="…" name="…" label="…" placeholder="…" />`, sanitised on save with `BlogService::sanitize()`. Markdown fields are retired |
 | Image upload | `<x-form.image-field label="…" wire:model="logoUpload" :temporary="…" :default="…" />` |
 | File upload | `<x-form.file-field … />` |
 | Select | `<flux:select>` + `<flux:select.option>` (or bare `<option>` in filter bars) |

@@ -172,6 +172,23 @@ public function handle(PaymentSucceeded $event): void
 }
 ```
 
+### The processing fee
+
+`PaymentFeeService` holds a fee per vendor — a percentage, plus a flat amount, under
+an optional cap — set from **Payments › Gateways** and stored in the site
+configuration under `payments.fees`. All zero until an owner decides to pass the
+card cost on.
+
+`checkout()` adds it to a **purchase** only: the row's amount is the total the vendor
+is asked for (so `verify()` checks against the same figure), and the fee is kept as a
+`TransactionChargeEnum::FEE` charge row so a receipt can say what it was. A
+**deposit** is never charged it — its amount is what lands in the wallet, and a
+balance is a sum of amounts.
+
+Tell the customer before they leave for the vendor:
+`app(PaymentFeeService::class)->feeFor($vendor, $price)` in the page's `#[Computed]`,
+shown next to the total. Never work the fee out anywhere else.
+
 ## Adding a vendor
 
 1. A case in `PaymentVendorEnum`, its `label()` arm and its `gateway()` arm.

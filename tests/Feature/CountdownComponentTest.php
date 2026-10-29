@@ -94,10 +94,10 @@ test('the boxed variant tiles its units and the plain one does not', function ()
     $boxed = Blade::render('<x-util.countdown :until="now()->addHour()" tone="lime" />');
     $plain = Blade::render('<x-util.countdown :until="now()->addHour()" tone="lime" variant="plain" />');
 
-    expect($boxed)->toContain('bg-lime-100');
+    expect($boxed)->toContain('bg-brand-100');
     expect($plain)
-        ->not->toContain('bg-lime-100')
-        ->toContain('text-lime-700');
+        ->not->toContain('bg-brand-100')
+        ->toContain('text-brand-700');
 });
 
 test('the inline variant reads as one line of shorthand', function () {

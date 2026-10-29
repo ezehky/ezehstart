@@ -31,7 +31,7 @@ project.
 | Phone | `<x-form.phone-field>` over intl-tel-input, stored as `phone_number` + `phone_dial_code` + `phone_iso2`; `User::phoneInternational()` joins them |
 | Announcements | The public popup: the latest live `announcements` row (picture or icon, link, optional newsletter form), falling back to the plain newsletter sign-up |
 | System emails | A builder template can stand in for a mailable via `email_templates.system_email` (`SystemEmailEnum`) and the `WithSystemTemplate` trait; unassigned, the Blade view is sent as before |
-| Image library | Folders, multiple upload, per-image visibility, rename-without-changing-the-URL, a delete guard backed by `image_usages` |
+| Image library | Folders, multiple upload, per-image visibility, rename-without-changing-the-URL, a delete guard backed by `image_usages`. **Folder import** (admins only): whole folders picked or dropped, rebuilt as library folders under one set of settings chosen first, sent in batches of ten by `resources/js/folder-import.js` |
 | Video library | The same again for embeds — folders, per-video visibility, a delete guard backed by `video_usages`. A row is a **reference** (provider + id), never a file; the player URL is rebuilt from the pair on every render |
 | Blog | Posts with a tiptap editor, **polymorphic** categories (grouped by `CategoryGroupEnum`) and tags, public index and post pages. The seeded **Author** role narrows an account to the posts it wrote and gives it a public byline — bio and social handles on `user_profiles` |
 | Money | `transactions` plus gateways, metas, evidence, balances and charges; balances derived from confirmed rows, never stored |
@@ -45,7 +45,7 @@ project.
 | Framework | Laravel 13, PHP 8.3+ |
 | UI | Livewire 4 — **single-file components only** (`⚡name.blade.php`) |
 | Components | Flux UI free v2 |
-| CSS | Tailwind v4, CSS-first config, lime accent, `zinc`→`slate` remap |
+| CSS | Tailwind v4, CSS-first config, `brand-*` accent (`lime` kept only as Flux's alias), `zinc`→`slate` remap |
 | JS | Alpine (bundled with Livewire) |
 | Tests | Pest 5 |
 | Format | Laravel Pint, default preset |
@@ -102,6 +102,13 @@ Change it before the kit becomes a real project.
   feature owning several services gets one folder under `Services/` (`Services/Payment/`).
 - **No class-based Livewire components.** Screens are SFCs under
   `resources/views/pages/`, routed with `Route::livewire('/path', 'pages::group.name')`.
+- **A read-only public page is a controller, not a component.** `Site\{Section}Controller`
+  hands its reads to a `resources/views/site/` view on `<x-layouts.site>`; filters are
+  query strings. Only a public page the visitor fills in (unsubscribe) is an SFC, and
+  a form inside a read-only page is an embedded `<livewire:…>`. See `pages.md` shape G.
+- **Long text is rich text.** `<x-form.rich-text>`, sanitised on save with
+  `BlogService::sanitize()`. Markdown fields are retired; `MarkdownService` only
+  converts seeder and import text.
 - **Validation lives in `protected function rules(): array`** — never `#[Validate]`,
   never a `$rules` property.
 - **Models are `#[Unguarded]`** with `casts()` and `#[Scope]`, never `$fillable` or

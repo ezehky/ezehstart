@@ -11,6 +11,7 @@ import turnstileWidget from "./turnstile";
 import passkey from "./passkey";
 import phoneInput from "./phone-input";
 import moneyInput from "./money-input";
+import folderImport from "./folder-import";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
@@ -79,6 +80,13 @@ Alpine.data("phoneInput", phoneInput);
  * caret.
  */
 Alpine.data("moneyInput", moneyInput);
+
+/**
+ * The folder import on the image library's Import tab. Registered once here so a
+ * Livewire re-render keeps the folders already chosen rather than emptying the
+ * list under somebody halfway through choosing.
+ */
+Alpine.data("folderImport", folderImport);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance

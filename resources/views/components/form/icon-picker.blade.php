@@ -118,7 +118,7 @@
                                         {{ $wireModel }}
                                     />
 
-                                    <span class="grid aspect-square place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 peer-checked:border-accent peer-checked:bg-lime-100 peer-checked:text-lime-700 peer-focus-visible:ring-2 peer-focus-visible:ring-accent dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 dark:peer-checked:bg-lime-400/10 dark:peer-checked:text-lime-300">
+                                    <span class="grid aspect-square place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 peer-checked:border-accent peer-checked:bg-brand-100 peer-checked:text-brand-700 peer-focus-visible:ring-2 peer-focus-visible:ring-accent dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 dark:peer-checked:bg-brand-400/10 dark:peer-checked:text-brand-300">
                                         {{-- `data-icon` is what the trigger clones the selected glyph from. --}}
                                         <flux:icon :name="$name" class="size-5" data-icon="{{ $name }}" />
                                     </span>

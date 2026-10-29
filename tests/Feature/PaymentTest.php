@@ -5,7 +5,11 @@ use App\Enums\PaymentVendorEnum;
 use App\Enums\PaymentWebhookTopicEnum;
 use App\Enums\StatusPaymentWebhook;
 use App\Enums\StatusTransaction;
+use App\Enums\TransactionChargeEnum;
+use App\Enums\TransactionGroupEnum;
+use App\Enums\TransactionTypeEnum;
 use App\Enums\TransactionViaEnum;
+use App\Enums\TransactionWalletEnum;
 use App\Enums\UserTypeEnum;
 use App\Events\PaymentFailed;
 use App\Events\PaymentNeedsReview;
@@ -15,6 +19,7 @@ use App\Models\PaymentWebhook;
 use App\Models\Transaction;
 use App\Services\Payment\Gateways\KorapayGatewayService;
 use App\Services\Payment\Gateways\OpayGatewayService;
+use App\Services\Payment\PaymentFeeService;
 use App\Services\Payment\PaymentService;
 use App\Services\TransactionService;
 use Illuminate\Http\Request;
@@ -156,6 +161,86 @@ test('a vendor without keys cannot be checked out with', function () {
 
     expect($result)->toBeString()
         ->and(Transaction::query()->count())->toBe(0);
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// PROCESSING FEE
+
+test('a fee is a percentage plus a flat amount, held under its cap', function () {
+    $fees = app(PaymentFeeService::class);
+
+    $fees->saveTerms(PaymentVendorEnum::PAYSTACK, 1.5, 100, 2000);
+
+    expect($fees->feeFor(PaymentVendorEnum::PAYSTACK, 10000))->toBe(250.0)
+        // 1.5% of 200,000 is 3,000, plus 100 — the cap takes over.
+        ->and($fees->feeFor(PaymentVendorEnum::PAYSTACK, 200000))->toBe(2000.0)
+        // Nothing set for this vendor, so nothing is added.
+        ->and($fees->feeFor(PaymentVendorEnum::STRIPE, 10000))->toBe(0.0)
+        ->and($fees->feeFor(PaymentVendorEnum::MANUAL, 10000))->toBe(0.0);
+});
+
+test('a purchase carries the fee on top and keeps it as its own charge', function () {
+    app(PaymentFeeService::class)->saveTerms(PaymentVendorEnum::PAYSTACK, 1.5, 100, 0);
+
+    Http::fake([
+        'api.paystack.co/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => ['authorization_url' => 'https://checkout.paystack.com/abc', 'access_code' => 'abc', 'reference' => 'ignored'],
+        ]),
+    ]);
+
+    $transaction = app(PaymentService::class)->checkout(
+        $this->member,
+        PaymentVendorEnum::PAYSTACK,
+        10000,
+        'An order',
+        TransactionGroupEnum::PURCHASE,
+        TransactionTypeEnum::DIRECT,
+        TransactionWalletEnum::NONE,
+    );
+
+    expect((float) $transaction->amount)->toBe(10250.0)
+        ->and($transaction->totalCharges())->toBe(250.0)
+        ->and($transaction->charges->sole()->charge_type)->toBe(TransactionChargeEnum::FEE);
+
+    // The vendor is asked for the total, so verify() holds it against the same figure.
+    Http::assertSent(fn ($request) => $request['amount'] === 1025000);
+});
+
+test('a wallet deposit is never charged the fee', function () {
+    app(PaymentFeeService::class)->saveTerms(PaymentVendorEnum::PAYSTACK, 1.5, 100, 0);
+
+    $transaction = openPaystackDeposit($this->member, 5000);
+
+    expect((float) $transaction->amount)->toBe(5000.0)
+        ->and($transaction->charges)->toBeEmpty();
+});
+
+test('an administrator sets a vendor fee from the gateways tab', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.payments', ['tab' => 'gateways'])
+        ->call('editFee', PaymentVendorEnum::PAYSTACK->value)
+        ->set('feePercent', 1.5)
+        ->set('feeFlat', 100)
+        ->set('feeCap', 2000)
+        ->call('saveFee')
+        ->assertHasNoErrors();
+
+    expect(app(PaymentFeeService::class)->termsFor(PaymentVendorEnum::PAYSTACK))
+        ->toBe(['percent' => 1.5, 'flat' => 100.0, 'cap' => 2000.0]);
+});
+
+test('a fee over a hundred percent is refused', function () {
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.payments', ['tab' => 'gateways'])
+        ->call('editFee', PaymentVendorEnum::PAYSTACK->value)
+        ->set('feePercent', 150)
+        ->call('saveFee')
+        ->assertHasErrors('feePercent');
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||

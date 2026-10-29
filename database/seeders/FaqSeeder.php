@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Enums\FaqTypeEnum;
 use App\Enums\StatusDefault;
 use App\Models\Faq;
+use App\Services\BlogService;
+use App\Services\MarkdownService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -16,8 +18,9 @@ use Illuminate\Database\Seeder;
  * Replace them as soon as you have something of your own to explain.
  *
  * Seeded in display order and matched on the question itself, so re-running
- * refreshes the answers without duplicating any of them. Answers are markdown,
- * and links are written relative so they follow whichever site the seeder runs
+ * refreshes the answers without duplicating any of them. Answers are written
+ * here in markdown because it is easier to read in a PHP file, and stored as the
+ * same sanitised HTML the rich-text editor saves. Links are written relative so they follow whichever site the seeder runs
  * against rather than baking in whatever APP_URL happened to be set.
  */
 class FaqSeeder extends Seeder
@@ -29,6 +32,7 @@ class FaqSeeder extends Seeder
                 ['question' => $faq['question']],
                 [
                     ...$faq,
+                    'answer' => app(BlogService::class)->sanitize(app(MarkdownService::class)->toHtml($faq['answer'])),
                     'faq_type' => FaqTypeEnum::GENERAL,
                     'flow_order' => $order + 1,
                     'status' => StatusDefault::ACTIVE,

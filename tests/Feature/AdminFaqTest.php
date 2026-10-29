@@ -124,18 +124,19 @@ test('a question is deleted only after the dialog is confirmed', function () {
     expect(Faq::query()->count())->toBe(0);
 });
 
-test('an answer is stored as written and compiled on the way out', function () {
+test('an answer keeps its formatting and loses anything that could run', function () {
     Livewire::actingAs($this->admin)
         ->test('pages::admin.static.faqs')
         ->call('create', FaqTypeEnum::GENERAL->value)
-        ->set('question', 'Does markdown work?')
-        ->set('answer', 'Yes, **it does**.')
-        ->call('save');
+        ->set('question', 'Does formatting work?')
+        ->set('answer', "<p>Yes, <strong>it does</strong>.</p><script>alert('x')</script>")
+        ->call('save')
+        ->assertHasNoErrors();
 
     $faq = Faq::query()->first();
 
-    expect($faq->answer)->toBe('Yes, **it does**.')
-        ->and($faq->answerHtml())->toContain('<strong>it does</strong>');
+    expect($faq->answerHtml())->toContain('<strong>it does</strong>')
+        ->and($faq->answerHtml())->not->toContain('<script>');
 });
 
 test('every write is recorded in the activity log', function () {
@@ -163,8 +164,9 @@ test('a file of questions and answers becomes a FAQ list', function () {
         ->assertHasNoErrors();
 
     expect(Faq::query()->count())->toBe(2)
+        // A spreadsheet cell is plain text; it is stored the way the editor stores it.
         ->and(Faq::query()->where('question', 'How do I sign in?')->first()->answer)
-        ->toBe('With your email address.');
+        ->toBe('<p>With your email address.</p>');
 });
 
 test('a question with no answer is named rather than written blank', function () {
@@ -190,7 +192,7 @@ test('a question already on the list is left where it is', function () {
         ->call('import');
 
     expect(Faq::query()->count())->toBe(1)
-        ->and(Faq::query()->first()->answer)->toBe('With your email address.')
+        ->and(Faq::query()->first()->answer)->toBe('<p>With your email address.</p>')
         ->and($component->get('importedCount'))->toBe(0);
 });
 

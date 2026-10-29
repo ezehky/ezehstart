@@ -93,7 +93,12 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ No query, service call or `kSiteFlag()` decision in Blade — not in the page's
       view half, not in a component. The page's `#[Computed]` reads it (logic in a
       service) and passes it down as a prop
-- [ ] ✓ A public page is a `pages/site/` SFC on `layouts::site`, never `Route::view()`
+- [ ] ✓ A read-only public page is a `Site\{Section}Controller` method and a `site/` view on
+      `<x-layouts.site>`; only a page the visitor fills in (unsubscribe today) is a
+      `pages/site/` SFC on `layouts::site`. Never
+      `Route::view()`
+- [ ] ✓ A public filter, tab or stepper is a query string — links and GET forms, the
+      controller normalising each value — and a paginator carries `->withQueryString()`
 - [ ] ✓ Computed caches are invalidated with `unset($this->name)` after writes
 - [ ] ✓ Validation is `protected function rules(): array`
 - [ ] ✓ Save path: `validate()` → fill → `respondPrimary(if: $model->isClean())` →
@@ -132,7 +137,9 @@ If a line does not apply, it is ✓ by default — but read it first.
 - [ ] ✓ Locked or settled records are refused in the **method**, not just hidden in
       the UI — a disabled button is not a guard
 - [ ] ✓ Multi-write operations are wrapped in `DB::transaction()`
-- [ ] ✓ User-authored HTML is escaped (`MarkdownService`), never `{!! !!}` on raw input
+- [ ] ✓ Rich text is sanitised on the way in (`BlogService::sanitize()`) before it is ever printed with `{!! !!}`; never `{!! !!}` on raw input
+- [ ] ✓ Long-form text (answers, policies, bios, descriptions) is `<x-form.rich-text>`, not a markdown field or a tall textarea
+- [ ] ✓ Every `<img>` has a meaningful `alt` — the image's alt text, else the record's title; never `alt=""`
 
 ## Audit & feedback
 

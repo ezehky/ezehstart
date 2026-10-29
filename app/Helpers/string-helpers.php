@@ -269,30 +269,6 @@ if (! function_exists('kRemoveUnicode')) {
     }
 }
 
-// |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-// MARKDOWN
-if (! function_exists('kMarkdownFormat')) {
-    /**
-     * Get markdown syntax reference guide.
-     *
-     * @return array List of markdown patterns and their meanings.
-     */
-    function kMarkdownFormat(): array
-    {
-        return [
-            ['#text', 'Heading 1. (No. of # determines the Heading)'],
-            ['**text** or __text__', 'Bold Text'],
-            ['_text_ or *text*', 'Italic Text'],
-            ['<ins>text</ins>', 'Underlined text'],
-            ['~~text~~', 'Strikethrough Text'],
-            ['<br>', 'Break line'],
-            ['double-space-down', 'Create a paragraph text'],
-            ['***', 'Horizontal Rule(Line)'],
-            ['[Title](url)', 'Will create a plain link'],
-        ];
-    }
-}
-
 if (! function_exists('kPhoneInternational')) {
     /**
      * Put a national number and its dialling code back together as one E.164

@@ -4,13 +4,11 @@ namespace App\Models;
 
 use App\Enums\FaqTypeEnum;
 use App\Enums\StatusDefault;
-use App\Services\MarkdownService;
 use App\Traits\WithDynamicModelFormatting;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 #[Unguarded]
@@ -34,17 +32,13 @@ class Faq extends Model
     // Getters
 
     /**
-     * The answer, compiled from markdown.
-     *
-     * Cached against the row's updated_at, so editing an answer changes the key and
-     * the old entry falls away on its own, with no observer to keep in sync.
+     * The answer, ready to print. It is written in the rich-text editor and passed
+     * through BlogService::sanitize() on the way in — from the screen, an import or
+     * a seeder — so what is stored is already safe to render unescaped.
      */
     public function answerHtml(): string
     {
-        return Cache::rememberForever(
-            "faq:{$this->id}:answer:{$this->updated_at?->getTimestamp()}",
-            fn () => app(MarkdownService::class)->toHtml($this->answer)
-        );
+        return (string) $this->answer;
     }
 
     /**

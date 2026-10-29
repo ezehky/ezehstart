@@ -4,6 +4,7 @@ use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusPaymentWebhook;
 use App\Models\PaymentTrace;
 use App\Models\PaymentWebhook;
+use App\Services\Payment\PaymentFeeService;
 use App\Services\Payment\PaymentService;
 use App\Traits\WithGateProps;
 use Flux\Flux;
@@ -37,6 +38,20 @@ new class extends Component
     public array $health = [];
 
     public bool $healthChecked = false;
+
+    /**
+     * The fee dialog. Its own three fields rather than WithSiteConfigProcessor:
+     * that trait carries the whole site configuration through the browser and
+     * saves it back whole, and an account here for payments has no business
+     * reading or writing the security switches.
+     */
+    public string $feeVendor = '';
+
+    public $feePercent = 0;
+
+    public $feeFlat = 0;
+
+    public $feeCap = 0;
 
     public function mount(): void
     {
@@ -95,7 +110,7 @@ new class extends Component
      * Every vendor the kit can talk to and whether this install can use it. Keys
      * are never shown — only whether they are there.
      *
-     * @return array<int, array{vendor: PaymentVendorEnum, configured: bool, available: bool, default: bool}>
+     * @return array<int, array{vendor: PaymentVendorEnum, configured: bool, available: bool, default: bool, fee: ?string}>
      */
     #[Computed]
     public function gateways(): array
@@ -107,9 +122,19 @@ new class extends Component
                 'configured' => $vendor->isConfigured(),
                 'available' => $vendor->isAvailable(),
                 'default' => config('payments.default') === $vendor->value,
+                'fee' => app(PaymentFeeService::class)->describe($vendor),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * The provider the fee dialog is open for, for its heading.
+     */
+    #[Computed]
+    public function feeVendorLabel(): string
+    {
+        return PaymentVendorEnum::tryFrom($this->feeVendor)?->label() ?? '';
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||
@@ -158,6 +183,70 @@ new class extends Component
 
         $this->health = app(PaymentService::class)->health();
         $this->healthChecked = true;
+    }
+
+    public function editFee(string $vendor): void
+    {
+        $this->checkGate();
+
+        $case = PaymentVendorEnum::tryFrom($vendor);
+
+        abort_unless($case && ! $case->isManual(), 404);
+
+        $terms = app(PaymentFeeService::class)->termsFor($case);
+
+        $this->resetValidation();
+        $this->feeVendor = $case->value;
+        $this->feePercent = $terms['percent'];
+        $this->feeFlat = $terms['flat'];
+        $this->feeCap = $terms['cap'];
+
+        unset($this->feeVendorLabel);
+
+        Flux::modal('feeModal')->show();
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'feePercent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'feeFlat' => ['required', 'numeric', 'min:0'],
+            'feeCap' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return [
+            'feePercent' => 'percentage',
+            'feeFlat' => 'flat amount',
+            'feeCap' => 'cap',
+        ];
+    }
+
+    /**
+     * What a customer pays on top of a purchase through this vendor. Takes
+     * effect on the next checkout; a payment already opened keeps its fee.
+     */
+    public function saveFee(): bool
+    {
+        $this->checkGate();
+
+        $vendor = PaymentVendorEnum::tryFrom($this->feeVendor);
+
+        abort_unless($vendor && ! $vendor->isManual(), 404);
+
+        $this->validate();
+
+        $error = app(PaymentFeeService::class)->saveTerms($vendor, (float) $this->feePercent, (float) $this->feeFlat, (float) $this->feeCap);
+
+        $this->respondError($error, $error !== null);
+
+        unset($this->gateways);
+
+        Flux::modal('feeModal')->close();
+
+        return $this->respondSuccess($vendor->label().' processing fee saved.');
     }
 
     // Tools
@@ -349,6 +438,7 @@ new class extends Component
                     <flux:table.column>Keys</flux:table.column>
                     <flux:table.column>Checkout</flux:table.column>
                     <flux:table.column>Connection</flux:table.column>
+                    <flux:table.column>Processing fee</flux:table.column>
                 </flux:table.columns>
 
                 <flux:table.rows>
@@ -380,12 +470,44 @@ new class extends Component
                                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $health[$row['vendor']->value] }}</p>
                                 @endif
                             </flux:table.cell>
+                            <flux:table.cell>
+                                <div class="flex items-center gap-2">
+                                    <span @class(['text-slate-900 dark:text-white' => $row['fee'], 'text-slate-400' => ! $row['fee']])>{{ $row['fee'] ?? 'None' }}</span>
+                                    <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" type="button" size="xs" variant="ghost" icon="pencil-square" tooltip="Edit fee" wire:click="editFee('{{ $row['vendor']->value }}')" />
+                                </div>
+                            </flux:table.cell>
                         </flux:table.row>
                     @endforeach
                 </flux:table.rows>
             </flux:table>
         @endif
     </flux:card>
+
+    <flux:modal name="feeModal" class="w-full max-w-md">
+        <form wire:submit="saveFee" class="space-y-5">
+            <div>
+                <flux:heading size="lg">{{ $this->feeVendorLabel }} processing fee</flux:heading>
+                <flux:text class="mt-1">
+                    Added on top of a purchase paid through this provider, and shown to the
+                    customer before they pay. Wallet deposits are never charged it.
+                </flux:text>
+            </div>
+
+            <flux:input wire:model="feePercent" type="number" step="0.01" min="0" max="100" label="Percentage of the price" placeholder="e.g. 1.5" suffix="%" />
+
+            <div wire:key="fee-money-{{ $feeVendor }}" class="grid gap-4 sm:grid-cols-2">
+                <x-form.money-field wire:model="feeFlat" label="Plus a flat amount" placeholder="e.g. 100" />
+                <x-form.money-field wire:model="feeCap" label="Capped at" placeholder="0 for no cap" description="0 for no cap." />
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary">Save fee</flux:button>
+            </div>
+        </form>
+    </flux:modal>
 
     <flux:modal name="inspectModal" class="max-w-2xl">
         <div class="space-y-4">

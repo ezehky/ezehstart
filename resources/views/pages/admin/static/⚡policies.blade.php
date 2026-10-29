@@ -7,6 +7,7 @@ use App\Enums\StatusPolicy;
 use App\Enums\StatusYes;
 use App\Models\Policy;
 use App\Services\ActivityLogService;
+use App\Services\BlogService;
 use App\Services\PolicyContentService;
 use App\Traits\WithDataTable;
 use Flux\Flux;
@@ -38,7 +39,7 @@ new class extends Component
     /** The draft queued for publishing, held while the dialog states what it costs. */
     public ?int $publishId = null;
 
-    /** Show the compiled markdown instead of the editor. */
+    /** Show the body split into its sections instead of the editor. */
     public bool $previewing = false;
 
     public function mount(): void
@@ -122,14 +123,16 @@ new class extends Component
     }
 
     /**
-     * The compiled preview of whatever is currently in the editor.
+     * Whatever is in the editor, split into the sections the public page will show,
+     * so the author can see where each anchor lands. Sanitised first: it is printed
+     * unescaped, and it has not been saved through the sanitiser yet.
      *
      * @return array<int, array<string, mixed>>
      */
     #[Computed]
     public function preview(): array
     {
-        return app(PolicyContentService::class)->sections($this->content);
+        return app(PolicyContentService::class)->sections(app(BlogService::class)->sanitize($this->content));
     }
 
     public function create(string $type): void
@@ -214,7 +217,7 @@ new class extends Component
         $this->policy->version = $this->version;
         $this->policy->title = $this->title;
         $this->policy->intro = $this->intro;
-        $this->policy->content = $this->content;
+        $this->policy->content = app(BlogService::class)->sanitize($this->content);
         $this->policy->requires_consent = StatusYes::from((int) $this->requires_consent);
 
         $this->respondPrimary(if: $this->policy->isClean());
@@ -450,22 +453,22 @@ new class extends Component
                                 </h2>
                                 <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Anchor: #{{ $section['id'] }}</p>
                             @endif
-                            <div class="markdown-prose mt-3">{!! $section['html'] !!}</div>
+                            <div class="rich-prose mt-3">{!! $section['html'] !!}</div>
                         </section>
                     @empty
                         <flux:text>Nothing to preview yet.</flux:text>
                     @endforelse
                 </div>
             @else
-                <x-form.markdown-field label="Policy content" wire:model="content" rows="18" markdown />
+                <x-form.rich-text wire:model="content" name="content" label="Policy content" placeholder="e.g. 1. Who we are {#who-we-are}, then the paragraphs under it" />
 
                 {{-- Worth saying outright: the anchors are what outside links point
                      at, and rewording a heading silently moves one unless it is
                      pinned. --}}
                 <flux:callout icon="information-circle" class="text-sm">
-                    Every <strong>##</strong> heading starts a new section and gets its own anchor.
-                    To keep an existing link working when you reword a heading, pin the anchor:
-                    <code>## 5. Refunds &lbrace;#refunds&rbrace;</code>. Lists and pipe tables are supported.
+                    Every <strong>Heading 2</strong> starts a new section and gets its own anchor.
+                    To keep an existing link working when you reword a heading, pin the anchor at
+                    the end of it: <code>5. Refunds &lbrace;#refunds&rbrace;</code>. Lists and tables are supported.
                 </flux:callout>
             @endif
 

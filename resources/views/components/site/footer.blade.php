@@ -17,7 +17,7 @@
             @foreach ($policies as $policy)
                 <a
                     href="{{ $policy->url() }}"
-                    class="text-sm text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500 dark:text-slate-400 dark:hover:text-white"
+                    class="text-sm text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:text-slate-400 dark:hover:text-white"
                 >
                     {{ $policy->defaultTitle() }}
                 </a>

@@ -29,14 +29,14 @@
                     <dl class="space-y-3 text-sm">
                         @if ($location['address'])
                             <div class="flex gap-3">
-                                <dt><flux:icon.map-pin class="size-5 text-lime-600 dark:text-lime-400" /><span class="sr-only">{{ __('Address') }}</span></dt>
+                                <dt><flux:icon.map-pin class="size-5 text-brand-600 dark:text-brand-400" /><span class="sr-only">{{ __('Address') }}</span></dt>
                                 <dd class="text-slate-700 dark:text-slate-300 whitespace-pre-line">{{ $location['address'] }}</dd>
                             </div>
                         @endif
 
                         @if ($location['phones'])
                             <div class="flex gap-3">
-                                <dt><flux:icon.phone class="size-5 text-lime-600 dark:text-lime-400" /><span class="sr-only">{{ __('Phone') }}</span></dt>
+                                <dt><flux:icon.phone class="size-5 text-brand-600 dark:text-brand-400" /><span class="sr-only">{{ __('Phone') }}</span></dt>
                                 <dd class="flex flex-wrap gap-x-4 gap-y-1">
                                     @foreach ($location['phones'] as $phone)
                                         <flux:link href="tel:{{ kPhoneInternational($phone) }}" variant="subtle">{{ $phone }}</flux:link>
@@ -47,7 +47,7 @@
 
                         @if ($location['emails'])
                             <div class="flex gap-3">
-                                <dt><flux:icon.envelope class="size-5 text-lime-600 dark:text-lime-400" /><span class="sr-only">{{ __('Email') }}</span></dt>
+                                <dt><flux:icon.envelope class="size-5 text-brand-600 dark:text-brand-400" /><span class="sr-only">{{ __('Email') }}</span></dt>
                                 <dd class="flex flex-wrap gap-x-4 gap-y-1">
                                     @foreach ($location['emails'] as $email)
                                         <flux:link href="mailto:{{ $email }}" variant="subtle">{{ $email }}</flux:link>

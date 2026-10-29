@@ -207,6 +207,17 @@ trait WithImageLibrary
     }
 
     /**
+     * Folder import is an administrator's tool. It can pour hundreds of images
+     * and a whole tree of folders into the library in one go, which is how the
+     * platform's own media arrives — not how a member adds a profile picture.
+     */
+    #[Computed]
+    public function canImportFolders(): bool
+    {
+        return $this->user->isAdmin() && kGateAction(self::LIBRARY_GATE, GateAccessEnum::CREATE);
+    }
+
+    /**
      * Role visibility is only meaningful to somebody who can see more than their
      * own role, so users get the two simple options and administrators get all
      * three.
@@ -255,7 +266,9 @@ trait WithImageLibrary
 
     public function switchTab(string $tab): void
     {
-        $this->tab = \in_array($tab, ['library', 'upload'], true) ? $tab : 'library';
+        $tabs = $this->canImportFolders ? ['library', 'upload', 'import'] : ['library', 'upload'];
+
+        $this->tab = \in_array($tab, $tabs, true) ? $tab : 'library';
 
         $this->panel = null;
     }
@@ -628,7 +641,7 @@ trait WithImageLibrary
 
             $service->updateFolder($folder, $this->folder_name, $visibility, $role);
         } else {
-            $service->createFolder(
+            $created = $service->createFolder(
                 $this->user,
                 $this->folder_name,
                 $this->folder_parent_id ? ImageFolder::query()->find($this->folder_parent_id) : null,
@@ -640,6 +653,11 @@ trait WithImageLibrary
 
         $this->closePanel();
         unset($this->folders, $this->images);
+
+        // A folder just made is where the next upload is headed, so open it.
+        if (isset($created)) {
+            $this->selectFolder($created->id);
+        }
 
         return $this->respondSuccess('The folder has been saved.');
     }
@@ -672,9 +690,12 @@ trait WithImageLibrary
      * The uploader announces what it stored. Landing back on the grid with the
      * new images already ticked is the whole point of uploading from in here.
      *
+     * A folder import names the one folder it brought in, when there was only
+     * one, and the library opens it — the images are in there, not here.
+     *
      * @param  array<int, int>  $ids
      */
-    public function afterUpload(array $ids): void
+    public function afterUpload(array $ids, ?int $folder = null): void
     {
         $this->guardLibrary(GateAccessEnum::CREATE, 'upload');
 
@@ -688,9 +709,15 @@ trait WithImageLibrary
 
         $this->tab = 'library';
 
-        $this->resetPage();
+        unset($this->images, $this->remaining, $this->folders);
 
-        unset($this->images, $this->remaining);
+        if ($folder !== null) {
+            $this->selectFolder($folder);
+
+            return;
+        }
+
+        $this->resetPage();
     }
 
     // ||||||||||||||||||||||||||||||||||||||||||||||||

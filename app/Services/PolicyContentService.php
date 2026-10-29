@@ -8,11 +8,11 @@ use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Collection;
 
 /**
- * Resolves which version of a policy is in force, and compiles its markdown into
+ * Resolves which version of a policy is in force, and splits its rich-text body into
  * the linkable sections the legal page renders.
  *
  * Each level-2 heading starts a new section and gets its own anchor. A heading may
- * carry an explicit one as `## 5. Refunds {#refunds}`, which is what keeps a deep
+ * carry an explicit one as `5. Refunds {#refunds}`, which is what keeps a deep
  * link such as /terms#refunds working after somebody rewords the heading — and
  * legal pages are linked to from contracts and emails that nobody can go back and
  * edit.
@@ -69,25 +69,27 @@ class PolicyContentService
     // Tools
 
     /**
-     * Compile markdown into sections.
+     * Split a policy body into sections.
      *
-     * A section with a null title is content that appeared before the first
-     * heading — it renders, but it is left out of the contents sidebar, where an
-     * untitled entry would be a link with nothing to say.
+     * The body is the sanitised HTML the rich-text editor saved. A section with a
+     * null title is content that appeared before the first heading — it renders,
+     * but it is left out of the contents sidebar, where an untitled entry would be
+     * a link with nothing to say.
      *
      * @return array<int, array{id: string, title: ?string, html: string}>
      */
-    public function sections(?string $markdown): array
+    public function sections(?string $html): array
     {
-        $html = app(MarkdownService::class)->toHtml($markdown);
+        $html = trim((string) $html);
 
         if ($html === '') {
             return [];
         }
 
         // The capturing group is what makes this work: the split yields preamble,
-        // heading, body, heading, body… rather than dropping the headings.
-        $parts = preg_split('/<h2>(.*?)<\/h2>/s', $html, flags: PREG_SPLIT_DELIM_CAPTURE);
+        // heading, body, heading, body… rather than dropping the headings. The
+        // editor may put attributes on a heading, so the tag is matched loosely.
+        $parts = preg_split('/<h2\b[^>]*>(.*?)<\/h2>/s', $html, flags: PREG_SPLIT_DELIM_CAPTURE);
 
         $sections = [];
         $preamble = trim((string) array_shift($parts));
@@ -97,7 +99,9 @@ class PolicyContentService
         }
 
         foreach (array_chunk($parts, 2) as $index => [$heading, $body]) {
-            [$title, $anchor] = $this->splitAnchor(trim($heading));
+            // The title is printed escaped, so a bold word or an &amp; inside the
+            // heading comes out as text rather than as markup shown literally.
+            [$title, $anchor] = $this->splitAnchor(trim(html_entity_decode(strip_tags($heading), ENT_QUOTES | ENT_HTML5)));
 
             $sections[] = [
                 'id' => $anchor ?: $this->slug($title, $index),

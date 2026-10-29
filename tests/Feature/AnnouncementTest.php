@@ -156,7 +156,7 @@ test('the public popup draws the icon of an icon announcement', function () {
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Stay in the loop')
-        ->assertSee('bg-lime-100', false);
+        ->assertSee('bg-brand-100', false);
 });
 
 test('a member cannot open the announcements screen', function () {

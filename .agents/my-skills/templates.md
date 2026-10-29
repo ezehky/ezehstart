@@ -568,7 +568,7 @@ new class extends Component
                 </flux:select>
             </div>
 
-            <x-form.markdown-field label="Notes" wire:model="notes" placeholder="Anything the customer should know." markdown />
+            <x-form.rich-text wire:model="notes" name="notes" label="Notes" placeholder="Anything the customer should know." />
 
             <flux:switch wire:model="status" label="Issued" description="Turn off to keep this as a draft." />
 
@@ -835,7 +835,7 @@ new class extends Component
             <x-form.number-field label="Payment terms (days)" wire:model="config.invoicing.due-days" min="1" />
         </div>
 
-        <x-form.markdown-field label="Invoice footer" wire:model="config.invoicing.footer" markdown />
+        <x-form.rich-text wire:model="config.invoicing.footer" name="config.invoicing.footer" label="Invoice footer" placeholder="e.g. Thank you for your business." />
 
         <x-form.image-field
             label="Invoice banner"
@@ -1003,7 +1003,7 @@ Widths: `md:w-96` confirm · `md:w-150` standard form · `md:w-3xl` form with an
         'amber' => 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
         'emerald' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
         'rose' => 'bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300',
-        'lime' => 'bg-lime-100 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300',
+        'lime' => 'bg-brand-100 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300',
         default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
     };
 @endphp

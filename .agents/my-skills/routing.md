@@ -81,10 +81,18 @@ Route::livewire('/site-config/faqs', 'pages::admin.configs.faqs')->name('config.
 Route::livewire('/site-config/policies', 'pages::admin.configs.policies')->name('config.policies');
 ```
 
-### Controllers — invokable only, and only for these four cases
+### Controllers — the public site, policy pages, payment callbacks and webhooks
+
+The read-only public pages are controllers in `App\Http\Controllers\Site`, one per
+section with a method per page; a one-page section is invokable. Every other
+controller is invokable. See [pages.md](pages.md) shape G for which public pages
+stay Livewire.
 
 ```php
-Route::get('/', LandingPageController::class)->name('home');
+Route::get('/', Site\HomeController::class)->name('home');
+Route::get('/blog', [Site\BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/{post:slug}', [Site\BlogController::class, 'show'])->name('blog.show');
+Route::livewire('/unsubscribe/{user:email}', 'pages::site.unsubscribe')->name('newsletter.unsubscribe');   // interactive: stays a page
 Route::get('/'.$policyType->value, PolicyPageController::class)->defaults('type', $policyType->value)->name($policyType->routeName());
 Route::get('/payment/{vendor}/{transaction:reference}', Callback\PaymentCallbackController::class)->name('payment');
 Route::post('/payment/{vendor}', Webhook\PaymentWebhookController::class)->name('payment');

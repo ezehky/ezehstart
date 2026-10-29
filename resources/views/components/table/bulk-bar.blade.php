@@ -41,9 +41,9 @@
 ])
 
 @if ($count > 0)
-    <div {{ $attributes->class('flex flex-col gap-3 rounded-xl border border-lime-200 bg-lime-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-lime-400/20 dark:bg-lime-400/10')->merge() }}>
+    <div {{ $attributes->class('flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-brand-400/20 dark:bg-brand-400/10')->merge() }}>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span class="font-medium text-lime-900 dark:text-lime-200">
+            <span class="font-medium text-brand-900 dark:text-brand-200">
                 {{ number_format($count) }} {{ $subject }} selected
             </span>
 

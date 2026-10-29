@@ -17,7 +17,7 @@
 @php($tokenGroups = $this->personalizeTokenGroups())
 
 <flux:dropdown position="bottom" align="end">
-    <button type="button" class="text-xs font-medium text-lime-700 hover:text-lime-800 dark:text-lime-400">+ Personalize</button>
+    <button type="button" class="text-xs font-medium text-brand-700 hover:text-brand-800 dark:text-brand-400">+ Personalize</button>
     <flux:menu>
         {{-- A heading only once there is something to tell apart — a lone group
              reads the same as the plain list it always was. --}}

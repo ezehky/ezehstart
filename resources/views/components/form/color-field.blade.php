@@ -117,7 +117,7 @@
                 <button
                     type="button"
                     class="mb-3 flex w-full items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
-                    x-bind:class="current === @js($brandToken) && 'ring-2 ring-lime-500'"
+                    x-bind:class="current === @js($brandToken) && 'ring-2 ring-brand-500'"
                     x-on:click="$wire.set(@js($model), @js($brandToken)); open = false"
                 >
                     <span

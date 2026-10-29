@@ -18,7 +18,7 @@
 --}}
 
 <span
-    class="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 p-2 focus-within:border-lime-400 dark:border-slate-700"
+    class="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 p-2 focus-within:border-brand-400 dark:border-slate-700"
     x-on:click="$refs.entry.focus()"
 >
     @foreach ($emails as $email)

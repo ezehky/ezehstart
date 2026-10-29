@@ -8,7 +8,7 @@
 
 @if ($image)
     @if ($announcement->link_url)
-        <a href="{{ $announcement->link_url }}" class="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
+        <a href="{{ $announcement->link_url }}" class="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
             <img src="{{ $image->url() }}" alt="{{ $image->alt_text ?: $announcement->title }}" {{ $attributes }} />
         </a>
     @else

@@ -2,12 +2,7 @@
 
 <aside class="flex h-full w-72 flex-col border-r border-slate-200 bg-accent-foreground px-4 py-5 dark:border-slate-800 dark:bg-slate-950 lg:w-64">
     <div class="shrink-0">
-        <flux:brand
-            href="{{ $dashboardRoute }}"
-            :logo="$_configs['logo'] ?? ''"
-            :logoDark="$_configs['logo-dark'] ?? ''"
-            alt="{{ $_configs['name'] }} official logo"
-        />
+        <x-util.brand :href="$dashboardRoute" />
     </div>
 
     <div class="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -26,7 +21,7 @@
                                 :aria-expanded="open"
                                 @class([
                                     'press flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors duration-150 ease-out',
-                                    'bg-slate-900 text-white shadow-sm dark:bg-lime-400 dark:text-slate-950' => $active,
+                                    'bg-slate-900 text-white shadow-sm dark:bg-brand-400 dark:text-slate-950' => $active,
                                     'text-white hover:bg-slate-700 hover:text-slate-100 dark:text-slate-300 dark:hover:bg-slate-900' => ! $active,
                                 ])
                                 @if (! $active) :class="open && 'bg-slate-700 text-slate-100 dark:bg-slate-900'" @endif
@@ -45,7 +40,7 @@
                                 x-transition:leave="transition duration-100 ease-out-strong"
                                 x-transition:leave-start="translate-y-0 opacity-100"
                                 x-transition:leave-end="-translate-y-1 opacity-0"
-                                class="space-y-1 border-l border-lime-700 py-1 pl-4 dark:border-slate-800"
+                                class="space-y-1 border-l border-brand-700 py-1 pl-4 dark:border-slate-800"
                             >
                                 @foreach ($children as $keyChild => $child)
                                     @php($childActive = kCheckActiveTitle($keyChild, false))
@@ -53,7 +48,7 @@
                                         href="{{ $child['link'] }}"
                                         @class([
                                             'press flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out',
-                                            'bg-slate-700 text-white dark:bg-lime-200 dark:text-slate-950' => $childActive,
+                                            'bg-slate-700 text-white dark:bg-brand-200 dark:text-slate-950' => $childActive,
                                             'text-slate-100 hover:bg-slate-400 hover:text-slate-950 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800' => ! $childActive,
                                         ])
                                         @if ($child['spa']) wire:navigate @endif
@@ -68,7 +63,7 @@
                             href="{{ $navigationLink['link'] }}"
                             @class([
                                 'press flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ease-out',
-                                'bg-slate-900 text-white shadow-sm dark:bg-lime-400 dark:text-slate-950' => $active,
+                                'bg-slate-900 text-white shadow-sm dark:bg-brand-400 dark:text-slate-950' => $active,
                                 'text-white hover:bg-slate-700 hover:text-slate-100 dark:text-slate-300 dark:hover:bg-slate-900' => ! $active,
                             ])
                             @if ($navigationLink['spa']) wire:navigate @endif
@@ -82,7 +77,7 @@
         </div>
     </div>
 
-    <div class="mt-4 shrink-0 border-t border-lime-700 pt-4 dark:border-slate-800">
+    <div class="mt-4 shrink-0 border-t border-brand-700 pt-4 dark:border-slate-800">
         <div class="flex items-center gap-3 px-2">
             <x-dashboard.avatar :user="auth()->user()" />
             <div class="min-w-0 flex-1">

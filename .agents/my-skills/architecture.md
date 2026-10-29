@@ -4,8 +4,10 @@
 
 The application is a **four-layer, service-centred Laravel app with no controller
 layer for authenticated work**. Every authenticated screen is a Livewire 4 single-file
-component that talks directly to a Service. Controllers exist only for the public
-marketing site, payment callbacks, and webhooks.
+component that talks directly to a Service. Controllers exist only for the read-only
+public site (`Http/Controllers/Site/`, views under `resources/views/site/`), policy
+pages, payment callbacks, and webhooks. A public page the visitor fills in stays a
+Livewire page.
 
 ```
 Route (Route::livewire)
@@ -31,7 +33,8 @@ app/
 │                     the payment events. See events.md
 ├── Helpers/          4 autoloaded function files, all functions prefixed k
 ├── Http/
-│   ├── Controllers/  the public policy pages and the social callback only —
+│   ├── Controllers/  Site/ (the read-only public pages, one per section), the
+│   │                 policy pages, payments and the social callback —
 │   │                 authenticated screens use no controller
 │   └── Middleware/   AdminMiddleware, UserMiddleware
 ├── Jobs/             ProcessPaymentWebhook — retried units of work. See jobs.md
@@ -56,7 +59,7 @@ resources/views/
 ├── components/
 │   ├── dashboard/    avatar, stat-card, mini-stat, icon-box, sidebar, tab-nav,
 │   │                 top-navigation, user-roles, workspace-no-record, …
-│   ├── form/         file-field, image-field, markdown-field, number-field,
+│   ├── form/         file-field, image-field, rich-text, number-field,
 │   │                 password, phone-field
 │   ├── layouts/      base, email, email/*
 │   ├── lv/           ⚡notifications  (a Livewire SFC used as a component, not a page)
@@ -108,6 +111,9 @@ no code at all.
 
 - **No controllers for authenticated screens** — Livewire pages already own the state
   and the actions; a controller would be a second place to look.
+- **Controllers for the read-only public site** — a page a visitor only reads has
+  nothing to react to. A controller and a Blade view are crawlable and cheap, and the
+  filters become shareable query strings. Interactive public pages stay Livewire.
 - **Services are singletons** so cross-cutting state (site config cache, the current
   user on `UserService`) resolves once per request.
 - **Enums everywhere** so status semantics (`->isConcluded()`, `->color()`,
@@ -172,6 +178,6 @@ Steps 1-4 are optional; steps 5, 6 and 10 never are.
   writes, sends mail, or spans several tables.
 - Putting business logic in a Blade component.
 - Calling a Service from a model. The one exception is a read-only compile step —
-  a model method that renders stored markdown through `MarkdownService`, say. Follow
+  a model method that formats a stored value for display, say. Follow
   that only for pure formatting, never for anything that writes.
 - Bypassing the workspace route files — never register an admin page in `web.php`.

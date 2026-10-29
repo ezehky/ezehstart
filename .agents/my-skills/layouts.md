@@ -8,9 +8,9 @@ Five layout surfaces.
 | --- | --- | --- |
 | `layouts::app` | `resources/views/layouts/app.blade.php` | **default** for every authenticated page |
 | `layouts::auth` | `resources/views/layouts/auth.blade.php` | guest pages, via `#[Layout('layouts::auth')]` |
-| `layouts::site` | `resources/views/layouts/site.blade.php` | public Livewire pages (the blog), via `#[Layout('layouts::site')]` |
+| `layouts::site` | `resources/views/layouts/site.blade.php` | the interactive public Livewire pages (unsubscribe today), via `#[Layout('layouts::site')]` |
+| `x-layouts.site` | `resources/views/components/layouts/site.blade.php` | every controller-rendered public view under `resources/views/site/` — the same header/footer shell as a Blade component |
 | `x-layouts.base` | `resources/views/components/layouts/base.blade.php` | the HTML document, wrapped by both above |
-| `x-layouts.site-master` | `resources/views/components/layouts/site-master.blade.php` | public marketing pages (controller-rendered) |
 | `x-layouts.email` | `resources/views/components/layouts/email.blade.php` | every Mailable view |
 
 `layouts::app` is the **Livewire default** (`livewire.component_layout`). Authenticated
@@ -32,6 +32,19 @@ is the header/footer shell those pages use instead:
 
 ```php
 new #[Layout('layouts::site')] class extends Component
+```
+
+A controller-rendered public view wraps itself in the component form of the same
+shell. The two files must stay identical below the comment — change one, change both:
+
+```blade
+<x-layouts.site>
+    <div class="mx-auto max-w-6xl px-4 py-12">
+        <flux:heading level="1" size="xl">{{ __('Blog') }}</flux:heading>
+        …
+    </div>
+    …
+</x-layouts.site>
 ```
 
 ### `x-layouts.base` — the document
@@ -136,13 +149,13 @@ A page never has to provide any of these.
 ### `layouts::auth` — the split guest screen
 
 Left column: brand, named slots, the page's `{{ $slot }}`, optional social buttons,
-optional extra. Right column: a lime marketing panel (hidden below `lg`).
+optional extra. Right column: a brand-coloured marketing panel (hidden below `lg`).
 
 Named slots:
 
 | Slot | Renders as |
 | --- | --- |
-| `$tag` | small lime eyebrow text |
+| `$tag` | small brand-coloured eyebrow text |
 | `$title` | `h2.font-heading.text-3xl` |
 | `$description` | muted paragraph |
 | `$socialConnect` | when set **and** `SocialProviderEnum::activeCases()` is non-empty, renders the "or" divider and provider buttons |

@@ -72,7 +72,7 @@
 
     @case(\App\Enums\EmailBlockTypeEnum::BUTTON)
         <div class="space-y-4">
-            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.text" label="Button text" />
+            <flux:input wire:model.live.debounce.1000ms="{{ $prefix }}.text" label="Button text" placeholder="e.g. Read more" />
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <flux:label>URL</flux:label>
@@ -101,7 +101,7 @@
                      is too small to tell two similar images apart. --}}
                 @if ($image)
                     <div class="mt-1 flex items-start gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-                        <img src="{{ $image->url() }}" alt="" class="size-12 shrink-0 rounded object-cover">
+                        <img src="{{ $image->url() }}" alt="{{ $image->alt_text ?: $image->title }}" class="size-12 shrink-0 rounded object-cover">
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-xs font-medium text-slate-700 dark:text-slate-200">{{ $image->title }}</p>
                             <p class="break-all text-[11px] text-slate-400" title="{{ $image->url() }}">
@@ -140,7 +140,7 @@
                 Advanced. This HTML is sanitized on save — scripts, handlers, and anything not on the
                 allowed-tag list are stripped.
             </flux:callout>
-            <flux:textarea wire:model.live.debounce.1000ms="{{ $prefix }}.html" rows="8" class="font-mono text-xs" />
+            <flux:textarea wire:model.live.debounce.1000ms="{{ $prefix }}.html" placeholder="<p>Your HTML here</p>" rows="8" class="font-mono text-xs" />
         </div>
         @break
 
@@ -184,7 +184,7 @@
             @endif
 
             @unless (($data['mode'] ?? '') === 'specific')
-                <flux:input type="number" min="1" max="6" wire:model.live="{{ $prefix }}.limit" label="Number of items" />
+                <flux:input type="number" min="1" max="6" wire:model.live="{{ $prefix }}.limit" label="Number of items" placeholder="e.g. 3" />
             @endunless
 
             <flux:select wire:model.live="{{ $prefix }}.layout" label="Layout">
@@ -200,7 +200,7 @@
                 <flux:checkbox wire:model.live="{{ $prefix }}.show_date" label="Date" />
             </div>
 
-            <flux:input wire:model.live="{{ $prefix }}.button_text" label="Button text" />
+            <flux:input wire:model.live="{{ $prefix }}.button_text" label="Button text" placeholder="e.g. See all" />
         </div>
         @break
 
@@ -220,9 +220,9 @@
                 @endforeach
             </flux:select>
 
-            <flux:input type="number" min="1" max="6" wire:model.live="{{ $prefix }}.limit" label="Number of items" />
-            <flux:input wire:model.live="{{ $prefix }}.heading" label="Heading" />
-            <flux:input wire:model.live="{{ $prefix }}.button_text" label="Button text" />
+            <flux:input type="number" min="1" max="6" wire:model.live="{{ $prefix }}.limit" label="Number of items" placeholder="e.g. 3" />
+            <flux:input wire:model.live="{{ $prefix }}.heading" label="Heading" placeholder="e.g. Latest from the blog" />
+            <flux:input wire:model.live="{{ $prefix }}.button_text" label="Button text" placeholder="e.g. See all" />
         </div>
         @break
 

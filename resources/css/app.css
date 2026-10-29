@@ -24,36 +24,54 @@
     --color-zinc-950: var(--color-slate-950);
 }
 
-/* Brand color: #2DD4B5. Every `lime-*` utility in the app resolves through this
-   scale, so re-anchoring the palette here changes the brand color everywhere at
-   once, the same way the zinc→slate remap above does for gray. */
+/* Brand color: #2DD4B5 (brand-400). Every `brand-*` utility in the app resolves
+   through this scale, so re-anchoring the palette here changes the brand color
+   everywhere at once, the same way the zinc→slate remap above does for gray. */
 @theme {
-    --color-lime-50: #f0fdfa;
-    --color-lime-100: #ccfbf1;
-    --color-lime-200: #99f6e4;
-    --color-lime-300: #5eead4;
-    --color-lime-400: #2dd4b5;
-    --color-lime-500: #14b8a6;
-    --color-lime-600: #0d9488;
-    --color-lime-700: #0f766e;
-    --color-lime-800: #115e59;
-    --color-lime-900: #134e4a;
-    --color-lime-950: #042f2e;
+    --color-brand-50: #f0fdfa;
+    --color-brand-100: #ccfbf1;
+    --color-brand-200: #99f6e4;
+    --color-brand-300: #5eead4;
+    --color-brand-400: #2dd4b5;
+    --color-brand-500: #14b8a6;
+    --color-brand-600: #0d9488;
+    --color-brand-700: #0f766e;
+    --color-brand-800: #115e59;
+    --color-brand-900: #134e4a;
+    --color-brand-950: #042f2e;
+}
+
+/* Flux's own colour props stop at Tailwind's palette names, so `color="lime"` on a
+   badge, text or callout is how a Flux component asks for the brand. Pointing lime
+   at the brand scale keeps those on-brand. Write `brand-*` in a class; `lime-*` is
+   here for Flux only. */
+@theme {
+    --color-lime-50: var(--color-brand-50);
+    --color-lime-100: var(--color-brand-100);
+    --color-lime-200: var(--color-brand-200);
+    --color-lime-300: var(--color-brand-300);
+    --color-lime-400: var(--color-brand-400);
+    --color-lime-500: var(--color-brand-500);
+    --color-lime-600: var(--color-brand-600);
+    --color-lime-700: var(--color-brand-700);
+    --color-lime-800: var(--color-brand-800);
+    --color-lime-900: var(--color-brand-900);
+    --color-lime-950: var(--color-brand-950);
 }
 
 @theme {
-    --color-accent: var(--color-lime-400);
-    --color-accent-content: var(--color-lime-600);
-    --color-accent-foreground: var(--color-lime-900);
-    --color-primary: var(--color-lime-500);
+    --color-accent: var(--color-brand-400);
+    --color-accent-content: var(--color-brand-600);
+    --color-accent-foreground: var(--color-brand-900);
+    --color-primary: var(--color-brand-500);
     --color-secondary: var(--color-emerald-500);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-lime-400);
-        --color-accent-content: var(--color-lime-400);
-        --color-accent-foreground: var(--color-lime-950);
+        --color-accent: var(--color-brand-400);
+        --color-accent-content: var(--color-brand-400);
+        --color-accent-foreground: var(--color-brand-950);
     }
 }
 
@@ -82,6 +100,7 @@
     --animate-slide-up: slideUp 0.5s ease-in;
     --animate-marquee: marquee 34s linear infinite;
     --animate-float: float 7s var(--ease-in-out-strong) infinite;
+    --animate-page-enter: pageEnter 0.5s var(--ease-out-strong) both;
 
     @keyframes fadeIn {
         0% {
@@ -95,6 +114,18 @@
         0% {
             opacity: 0;
             transform: translateY(100%);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    /* A short rise, not a slide: the page is already where it will be, it only
+       settles into place. Twelve pixels reads as motion without reading as travel. */
+    @keyframes pageEnter {
+        0% {
+            opacity: 0;
+            transform: translateY(12px);
         }
         100% {
             opacity: 1;
@@ -218,66 +249,35 @@
         @apply h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)]! max-w-none!;
     }
 
+    /* Public pages settle in on load. The layout's <main> carries the class and
+       every page's root holds its sections, so the sections are what animate —
+       one after another, sixty milliseconds apart, so the eye reads down the page
+       rather than seeing it arrive as one block. Past the sixth the delay stops
+       growing: anything that far down is below the fold and should not wait.
+       Reduced motion is honoured by the global rule above, which collapses the
+       animation to nothing. */
+    .page-enter > * > * {
+        @apply animate-page-enter;
+    }
+    .page-enter > * > :nth-child(2) {
+        animation-delay: 60ms;
+    }
+    .page-enter > * > :nth-child(3) {
+        animation-delay: 120ms;
+    }
+    .page-enter > * > :nth-child(4) {
+        animation-delay: 180ms;
+    }
+    .page-enter > * > :nth-child(5) {
+        animation-delay: 240ms;
+    }
+    .page-enter > * > :nth-child(n + 6) {
+        animation-delay: 300ms;
+    }
+
     /* Log or plain-text output that wraps rather than scrolling sideways. */
     .log-pre {
         @apply min-h-0 flex-1 overflow-auto rounded-lg bg-slate-50 p-4 font-mono text-xs break-words whitespace-pre-wrap text-slate-700 dark:bg-slate-800/50 dark:text-slate-300;
-    }
-
-    /* Rendered admin-authored markdown (policy pages, FAQ answers). The HTML is
-       produced by MarkdownService, so it cannot carry utility classes of its own. */
-    .markdown-prose > * + * {
-        @apply mt-4;
-    }
-    .markdown-prose p,
-    .markdown-prose li {
-        @apply text-[15px] leading-relaxed text-slate-600 dark:text-slate-400;
-    }
-    .markdown-prose h3 {
-        @apply mt-8 font-heading text-base font-semibold text-slate-900 dark:text-white;
-    }
-    .markdown-prose strong {
-        @apply font-semibold text-slate-800 dark:text-slate-200;
-    }
-    .markdown-prose a {
-        @apply font-medium text-lime-700 underline underline-offset-2 transition-colors hover:text-lime-800 dark:text-lime-300 dark:hover:text-lime-200;
-    }
-    .markdown-prose ul,
-    .markdown-prose ol {
-        @apply mt-5 space-y-2.5 ps-5;
-    }
-    .markdown-prose ul {
-        @apply list-disc marker:text-lime-500 dark:marker:text-lime-400;
-    }
-    .markdown-prose ol {
-        @apply list-decimal marker:text-slate-400;
-    }
-    .markdown-prose blockquote {
-        @apply border-s-2 border-lime-400 ps-4 italic;
-    }
-    .markdown-prose code {
-        @apply rounded-md bg-slate-100 px-1.5 py-0.5 text-sm dark:bg-white/10;
-    }
-    .markdown-prose hr {
-        @apply my-8 border-slate-200 dark:border-white/10;
-    }
-    /* Wide tables scroll inside their own wrapper so the page never scrolls sideways. */
-    .markdown-prose .table-scroll {
-        @apply mt-6 overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10;
-    }
-    .markdown-prose table {
-        @apply w-full min-w-[36rem] border-collapse text-left text-sm;
-    }
-    .markdown-prose thead {
-        @apply bg-slate-50 dark:bg-white/[0.04];
-    }
-    .markdown-prose th {
-        @apply px-4 py-3 font-semibold text-slate-900 dark:text-white;
-    }
-    .markdown-prose td {
-        @apply border-t border-slate-200 px-4 py-3 align-top text-slate-600 dark:border-white/10 dark:text-slate-400;
-    }
-    .markdown-prose tbody tr td:first-child {
-        @apply font-medium text-slate-800 dark:text-slate-200;
     }
 
     /* Rich-text (tiptap) output — the editor surface in <x-form.rich-text> and the
@@ -327,14 +327,14 @@
         top: -0.5em;
     }
     .rich-prose a {
-        @apply font-medium text-lime-700 underline underline-offset-2 transition-colors hover:text-lime-800 dark:text-lime-300 dark:hover:text-lime-200;
+        @apply font-medium text-brand-700 underline underline-offset-2 transition-colors hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200;
     }
     .rich-prose ul,
     .rich-prose ol {
         @apply mt-5 space-y-2.5 ps-5;
     }
     .rich-prose ul {
-        @apply list-disc marker:text-lime-500 dark:marker:text-lime-400;
+        @apply list-disc marker:text-brand-500 dark:marker:text-brand-400;
     }
     .rich-prose ol {
         @apply list-decimal marker:text-slate-400;
@@ -347,7 +347,7 @@
         @apply mt-2.5;
     }
     .rich-prose blockquote {
-        @apply border-s-2 border-lime-400 ps-4 italic;
+        @apply border-s-2 border-brand-400 ps-4 italic;
     }
     .rich-prose code {
         @apply rounded-md bg-slate-100 px-1.5 py-0.5 text-sm dark:bg-white/10;
@@ -410,7 +410,7 @@
 
     /* The bar that follows the pointer while a column border is being dragged. */
     .ProseMirror .column-resize-handle {
-        @apply pointer-events-none absolute -end-0.5 bottom-0 top-0 z-20 w-1 bg-lime-500;
+        @apply pointer-events-none absolute -end-0.5 bottom-0 top-0 z-20 w-1 bg-brand-500;
     }
     .ProseMirror.resize-cursor {
         cursor: col-resize;
@@ -419,7 +419,7 @@
     /* Cells inside a multi-cell selection. A tint over the cell rather than a
        background on it, so the cell's own header fill still shows through. */
     .ProseMirror .selectedCell::after {
-        @apply pointer-events-none absolute inset-0 z-[2] bg-lime-500/20;
+        @apply pointer-events-none absolute inset-0 z-[2] bg-brand-500/20;
         content: "";
     }
 
@@ -438,7 +438,7 @@
     }
 
     .ProseMirror .ProseMirror-selectednode {
-        @apply outline-2 outline-offset-2 outline-lime-500;
+        @apply outline-2 outline-offset-2 outline-brand-500;
     }
 
     /* A resizable image in the editor. The wrapper is the node view's root and
@@ -455,7 +455,7 @@
     /* Shown only while the node is selected: four permanent dots on every image
        would turn a page of pictures into a page of dots. */
     .ProseMirror .rich-image-handle {
-        @apply absolute z-10 hidden size-3 rounded-full border-2 border-white bg-lime-500 shadow-sm dark:border-slate-900;
+        @apply absolute z-10 hidden size-3 rounded-full border-2 border-white bg-brand-500 shadow-sm dark:border-slate-900;
     }
     .ProseMirror .ProseMirror-selectednode .rich-image-handle {
         @apply block;

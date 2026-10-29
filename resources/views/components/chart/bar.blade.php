@@ -7,5 +7,5 @@
 <g
     x-init="registerSeries({ field: @js($field), type: 'bar' })"
     x-html="renderBars(@js($field), { radius: @js($radius), width: @js($width) })"
-    {{ $attributes->class('text-emerald-500 dark:text-lime-400') }}
+    {{ $attributes->class('text-emerald-500 dark:text-brand-400') }}
 ></g>

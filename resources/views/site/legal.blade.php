@@ -5,14 +5,19 @@
     <div class="flex min-h-screen flex-col">
         <x-site.header />
 
-        <x-site.legal-page
-            :$title
-            :$intro
-            :$version
-            :$updatedAt
-            :$sections
-            :$related
-        />
+        {{-- Not <x-layouts.site>: the legal page is its own <main>, with the skip
+             link's target on it, and a main inside a main is not allowed. The
+             wrapper carries the entrance the layout gives every other page. --}}
+        <div class="page-enter flex flex-1 flex-col">
+            <x-site.legal-page
+                :$title
+                :$intro
+                :$version
+                :$updatedAt
+                :$sections
+                :$related
+            />
+        </div>
 
         <x-site.footer />
     </div>

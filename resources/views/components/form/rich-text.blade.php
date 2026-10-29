@@ -1,7 +1,7 @@
 @props([
     'label' => null,
     'description' => null,
-    'placeholder' => '',
+    'placeholder' => 'Start writing…',
     'name' => null,
 ])
 
@@ -151,7 +151,7 @@
                                 <button
                                     type="button"
                                     class="size-5 rounded ring-1 ring-inset ring-black/10 transition hover:scale-110 dark:ring-white/20"
-                                    x-bind:class="active.{{ $kind }} === @js($preset) && 'ring-2 ring-lime-500'"
+                                    x-bind:class="active.{{ $kind }} === @js($preset) && 'ring-2 ring-brand-500'"
                                     style="background-color: {{ $preset }}"
                                     x-on:click="setColor(@js($kind), @js($preset)); open = false"
                                     aria-label="{{ $preset }}"

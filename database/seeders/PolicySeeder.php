@@ -6,6 +6,8 @@ use App\Enums\PolicyTypeEnum;
 use App\Enums\StatusPolicy;
 use App\Enums\StatusYes;
 use App\Models\Policy;
+use App\Services\BlogService;
+use App\Services\MarkdownService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -22,6 +24,9 @@ use Illuminate\Database\Seeder;
  * up duplicate versions. Once a real 2.0 has been published, editing 1.0 here no
  * longer changes what the public page shows — that is the point of the versioning.
  *
+ * The copy is written here in markdown, which reads far better in a PHP file, and
+ * stored as the same sanitised HTML the rich-text editor saves.
+ *
  * Headings carry explicit `{#anchor}` markers. Legal pages get deep-linked from
  * contracts and emails nobody can go back and edit, so the anchors must survive
  * a reworded heading.
@@ -35,6 +40,7 @@ class PolicySeeder extends Seeder
                 ['policy_type' => $policy['policy_type'], 'version' => '1.0'],
                 [
                     ...$policy,
+                    'content' => app(BlogService::class)->sanitize(app(MarkdownService::class)->toHtml($policy['content'])),
                     'status' => StatusPolicy::PUBLISHED,
                     'effective_at' => now(),
                 ]

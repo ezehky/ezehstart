@@ -28,7 +28,7 @@
         'rose' => 'bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300',
         'emerald' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
         'slate' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-        default => 'bg-lime-100 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300',
+        default => 'bg-brand-100 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300',
     };
 @endphp
 

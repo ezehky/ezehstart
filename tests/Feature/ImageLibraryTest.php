@@ -258,6 +258,17 @@ test('two people may each have a folder of the same name', function () {
     expect(ImageFolder::query()->where('slug', 'banners')->count())->toBe(2);
 });
 
+test('a folder made from the page is opened straight away', function () {
+    $component = Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->call('newFolder')
+        ->set('folder_name', 'Banners')
+        ->call('saveFolder')
+        ->assertHasNoErrors();
+
+    $component->assertSet('folder', ImageFolder::query()->where('name', 'Banners')->value('id'));
+});
+
 test('a member only sees their own folders plus the shared ones', function () {
     $service = app(ImageLibraryService::class);
 
@@ -1148,4 +1159,88 @@ test('both switches off sends nothing at all', function () {
 
     Mail::assertNothingQueued();
     Notification::assertNothingSent();
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// FOLDER IMPORT
+
+test('a path becomes nested folders, and the same path again reuses them', function () {
+    $service = app(ImageLibraryService::class);
+
+    $beach = $service->folderForPath($this->admin, ['Holiday', 'Beach']);
+    $again = $service->folderForPath($this->admin, ['Holiday', 'Beach']);
+
+    expect($again->id)->toBe($beach->id)
+        ->and($beach->parent->name)->toBe('Holiday')
+        ->and(ImageFolder::query()->count())->toBe(2);
+});
+
+test('an administrator imports a folder tree in batches and lands in it', function () {
+    $component = Livewire::actingAs($this->admin)
+        ->test('livewire.library.image-folder-importer')
+        ->set('visibility', MediaVisibilityEnum::PUBLIC->value);
+
+    expect($component->call('startImport')->effects['returns'][0] ?? null)->toBeTrue();
+
+    $component
+        ->set('importFiles', [uploadedImage('a.jpg'), uploadedImage('b.jpg')])
+        ->call('importChunk', ['Holiday/Beach/a.jpg', 'Holiday/b.jpg'])
+        ->set('importFiles', [uploadedImage('c.jpg')])
+        ->call('importChunk', ['Holiday/Beach/c.jpg'])
+        ->call('finishImport');
+
+    $holiday = ImageFolder::query()->where('name', 'Holiday')->sole();
+    $beach = ImageFolder::query()->where('name', 'Beach')->sole();
+
+    expect($beach->parent_id)->toBe($holiday->id)
+        ->and(Image::query()->where('image_folder_id', $beach->id)->count())->toBe(2)
+        ->and(Image::query()->where('image_folder_id', $holiday->id)->count())->toBe(1)
+        ->and(Image::query()->where('visibility', MediaVisibilityEnum::PUBLIC)->count())->toBe(3);
+
+    // One folder chosen, so the library is told to open it.
+    $component->assertDispatched('imagesUploaded', folder: $holiday->id);
+});
+
+test('with subfolders off, every image goes into the folder that was chosen', function () {
+    Livewire::actingAs($this->admin)
+        ->test('livewire.library.image-folder-importer')
+        ->set('keep_structure', false)
+        ->call('startImport')
+        ->set('importFiles', [uploadedImage('a.jpg'), uploadedImage('b.jpg')])
+        ->call('importChunk', ['Holiday/Beach/a.jpg', 'Holiday/b.jpg'])
+        ->call('finishImport');
+
+    expect(ImageFolder::query()->pluck('name')->all())->toBe(['Holiday'])
+        ->and(Image::query()->count())->toBe(2);
+});
+
+test('a batch cannot be sent before the settings are fixed', function () {
+    Livewire::actingAs($this->admin)
+        ->test('livewire.library.image-folder-importer')
+        ->set('importFiles', [uploadedImage('a.jpg')])
+        ->call('importChunk', ['Holiday/a.jpg'])
+        ->assertStatus(409);
+
+    expect(Image::query()->count())->toBe(0);
+});
+
+test('folder import is for administrators only', function () {
+    Livewire::actingAs($this->member)
+        ->test('livewire.library.image-folder-importer')
+        ->assertForbidden();
+
+    // The tab does not open for a member either, even when asked for by name.
+    Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->call('switchTab', 'import')
+        ->assertSet('tab', 'library')
+        ->assertDontSee('Import folders');
+});
+
+test('an administrator is offered the import tab', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::shared.image-library')
+        ->assertSee('Import folders')
+        ->call('switchTab', 'import')
+        ->assertSet('tab', 'import');
 });

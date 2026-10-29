@@ -18,8 +18,8 @@ $sizeClasses = match ($size) {
     {{ $attributes->class([
         'grid shrink-0 place-items-center overflow-hidden rounded-full text-sm font-semibold ',
         $sizeClasses,
-        'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => ! $colored,
-        'bg-lime-400 text-slate-950' => $colored,
+        'bg-slate-900 text-white dark:bg-brand-400 dark:text-slate-950' => ! $colored,
+        'bg-brand-400 text-slate-950' => $colored,
         'ring-2 ring-white/20' => $ring,
     ]) }}
 >

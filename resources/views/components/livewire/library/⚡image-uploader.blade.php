@@ -220,7 +220,7 @@ new class extends Component
                 <li wire:key="staged-{{ $index }}-{{ $staged->getFilename() }}" class="flex items-center gap-3">
                     <div class="size-11 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                         @if ($staged->isPreviewable())
-                            <img src="{{ $staged->temporaryUrl() }}" alt="" class="size-full object-cover" />
+                            <img src="{{ $staged->temporaryUrl() }}" alt="{{ __('Preview of :name', ['name' => $staged->getClientOriginalName()]) }}" class="size-full object-cover" />
                         @endif
                     </div>
 

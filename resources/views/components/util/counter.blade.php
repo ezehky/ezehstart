@@ -82,7 +82,7 @@
         'rose' => 'text-rose-600 dark:text-rose-300',
         'emerald' => 'text-emerald-700 dark:text-emerald-300',
         'slate' => 'text-slate-900 dark:text-white',
-        default => 'text-lime-700 dark:text-lime-300',
+        default => 'text-brand-700 dark:text-brand-300',
     };
 
     $iconText = match ($iconTone) {
@@ -91,7 +91,7 @@
         'rose' => 'text-rose-600 dark:text-rose-300',
         'emerald' => 'text-emerald-700 dark:text-emerald-300',
         'slate' => 'text-slate-900 dark:text-white',
-        default => 'text-lime-700 dark:text-lime-300',
+        default => 'text-brand-700 dark:text-brand-300',
     };
 
     $decimals = max(0, (int) $decimals);

@@ -4,6 +4,8 @@ use App\Enums\PolicyTypeEnum;
 use App\Http\Controllers\PaymentCallbackController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PolicyPageController;
+use App\Http\Controllers\Site\BlogController;
+use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\SocialAuthController;
 use App\Models\User;
 use App\Services\AccountDeletionService;
@@ -12,7 +14,9 @@ use App\Services\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::livewire('/', 'pages::site.home')->name('home');
+// The read-only public pages are controllers under Site\, one per section; only a
+// page the visitor fills in (unsubscribe below) is a Livewire page.
+Route::get('/', HomeController::class)->name('home');
 
 // Legal pages. One route per policy type, named after the case, so /terms is
 // route('terms') and adding a case to the enum publishes a page without anything
@@ -34,8 +38,8 @@ Route::livewire('/unsubscribe/{user:email}', 'pages::site.unsubscribe')
 
 // Blog. Public and unauthenticated — the show page refuses anything that is not
 // live, so drafts and scheduled posts are not reachable by guessing a slug.
-Route::livewire('/blog', 'pages::site.blog.index')->name('blog.index');
-Route::livewire('/blog/{post:slug}', 'pages::site.blog.show')->name('blog.show');
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/{post:slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // Authentication Routes
 Route::middleware('guest')->group(function (): void {

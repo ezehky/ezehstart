@@ -266,6 +266,40 @@ class ImageLibraryService
     }
 
     /**
+     * The folder at the end of a path, made wherever it is missing.
+     *
+     * Used by the folder import, where "Holiday/Beach" on somebody's computer
+     * becomes the same two folders in the library. A folder already sitting in
+     * that place under that name, for the same owner, is reused rather than
+     * doubled, so importing the same folder twice files into one tree.
+     *
+     * @param  array<int, string>  $segments
+     */
+    public function folderForPath(
+        User $user,
+        array $segments,
+        ?ImageFolder $parent = null,
+        bool $shared = false,
+        ?MediaVisibilityEnum $visibility = null,
+        ?UserTypeEnum $visibleToType = null,
+    ): ?ImageFolder {
+        $ownerId = ($shared && $user->isAdmin()) ? null : $user->id;
+
+        foreach ($segments as $name) {
+            $existing = ImageFolder::query()
+                ->active()
+                ->where('user_id', $ownerId)
+                ->where('parent_id', $parent?->id)
+                ->where('name', $name)
+                ->first();
+
+            $parent = $existing ?? $this->createFolder($user, $name, $parent, $shared, $visibility, $visibleToType);
+        }
+
+        return $parent;
+    }
+
+    /**
      * Rename a folder and reset who may browse it.
      *
      * Only the folder moves. The images inside keep the visibility they were

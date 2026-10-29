@@ -28,7 +28,7 @@ test('a new policy is saved as a draft and stays off the public page', function 
         ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('title', 'Terms of Service')
-        ->set('content', '## 1. Overview')
+        ->set('content', '<h2>1. Overview</h2>')
         ->call('save')
         ->assertHasNoErrors();
 
@@ -40,18 +40,33 @@ test('a new policy is saved as a draft and stays off the public page', function 
     $this->get(route('terms'))->assertDontSee('1. Overview');
 });
 
+test('a policy body keeps its formatting and loses anything that could run', function () {
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.static.policies')
+        ->call('create', PolicyTypeEnum::TERMS->value)
+        ->set('title', 'Terms of Service')
+        ->set('content', "<h2>1. Overview</h2><p><strong>Read</strong> this.</p><script>alert('x')</script>")
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $content = Policy::query()->first()->content;
+
+    expect($content)->toContain('<strong>Read</strong>')
+        ->and($content)->not->toContain('<script>');
+});
+
 /**
  * A new version starts from the text in force rather than a blank page — writing
  * v2 is nearly always an edit of v1, and retyping it is how clauses get lost.
  */
 test('drafting a new version starts from the one in force', function () {
-    publishedPolicy(attributes: ['content' => '## Existing clause', 'intro' => 'The intro in force.']);
+    publishedPolicy(attributes: ['content' => '<h2>Existing clause</h2>', 'intro' => 'The intro in force.']);
 
     Livewire::actingAs($this->admin)
         ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->assertSet('version', '2.0')
-        ->assertSet('content', '## Existing clause')
+        ->assertSet('content', '<h2>Existing clause</h2>')
         ->assertSet('intro', 'The intro in force.');
 });
 
@@ -63,7 +78,7 @@ test('two versions of the same policy cannot share a number', function () {
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('version', '1.0')
         ->set('title', 'Terms of Service')
-        ->set('content', '## Something')
+        ->set('content', '<h2>Something</h2>')
         ->call('save')
         ->assertHasErrors('version');
 });
@@ -80,7 +95,7 @@ test('different policies may share a version number', function () {
         ->call('create', PolicyTypeEnum::PRIVACY->value)
         ->set('version', '1.0')
         ->set('title', 'Privacy Policy')
-        ->set('content', '## What we collect')
+        ->set('content', '<h2>What we collect</h2>')
         ->call('save')
         ->assertHasNoErrors();
 
@@ -105,13 +120,13 @@ test('a published version cannot be edited', function () {
 // ==================== Publishing
 
 test('publishing puts a draft in force and archives what it replaces', function () {
-    $superseded = publishedPolicy(attributes: ['version' => '1.0', 'content' => '## Old']);
+    $superseded = publishedPolicy(attributes: ['version' => '1.0', 'content' => '<h2>Old</h2>']);
 
     $draft = Policy::query()->create([
         'policy_type' => PolicyTypeEnum::TERMS,
         'version' => '2.0',
         'title' => 'Terms of Service',
-        'content' => '## New',
+        'content' => '<h2>New</h2>',
         'status' => StatusPolicy::DRAFT,
     ]);
 
@@ -145,7 +160,7 @@ test('publishing is recorded in the activity log as its own action', function ()
         'policy_type' => PolicyTypeEnum::TERMS,
         'version' => '1.0',
         'title' => 'Terms of Service',
-        'content' => '## Overview',
+        'content' => '<h2>Overview</h2>',
         'status' => StatusPolicy::DRAFT,
     ]);
 
@@ -162,7 +177,7 @@ test('saving a draft is recorded against the policy', function () {
         ->test('pages::admin.static.policies')
         ->call('create', PolicyTypeEnum::TERMS->value)
         ->set('title', 'Terms of Service')
-        ->set('content', '## 1. Overview')
+        ->set('content', '<h2>1. Overview</h2>')
         ->call('save');
 
     expect(ActivityLog::query()->where('activity_log_action', ActivityActionEnum::POLICY_CREATE)->exists())->toBeTrue();

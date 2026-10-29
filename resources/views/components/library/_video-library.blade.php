@@ -192,7 +192,7 @@
                             @endforeach
                         </flux:select>
 
-                        @if ($folder_visibility === 'role')
+                        @if ($folder_visibility === App\Enums\MediaVisibilityEnum::TYPE->value)
                             <flux:select wire:model="folder_visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
                                 @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)
@@ -222,8 +222,8 @@
                     <flux:card class="space-y-4">
                         <flux:heading size="md">Video details</flux:heading>
 
-                        <flux:input wire:model="title" label="Title" description="Only ever used inside the library." />
-                        <flux:textarea wire:model="description" label="Notes" rows="3" description="Optional. For whoever picks this video later." />
+                        <flux:input wire:model="title" label="Title" placeholder="e.g. Product walkthrough" description="Only ever used inside the library." />
+                        <flux:textarea wire:model="description" label="Notes" placeholder="e.g. Use on the pricing page, not the homepage" rows="3" description="Optional. For whoever picks this video later." />
 
                         {{-- Typed rather than fetched: nothing here calls out to a
                              provider API, so a length nobody enters stays unknown and
@@ -249,7 +249,7 @@
                             @endforeach
                         </flux:select>
 
-                        @if ($visibility === 'role')
+                        @if ($visibility === App\Enums\MediaVisibilityEnum::TYPE->value)
                             <flux:select wire:model="visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
                                 @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)

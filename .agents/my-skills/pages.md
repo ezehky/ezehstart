@@ -13,7 +13,7 @@ them. Identify the shape first, then copy the template.
 | **D. Tabbed record** | `pages/admin/training/⚡cohort-*.blade.php` (10 files) | shared trait + `x-dashboard.tab-nav` + one tab's content |
 | **E. Dashboard** | `pages/admin/⚡dashboard.blade.php`, `pages/user/⚡dashboard.blade.php` | greeting + stat cards + chart + feeds |
 | **F. Guest / auth** | `pages/auth/⚡login.blade.php` | `#[Layout('layouts::auth')]` + named slots |
-| **G. Public page** | `pages/site/⚡home.blade.php`, `pages/site/blog/⚡index.blade.php` | `#[Layout('layouts::site')]` + `#[Computed]` reads handed to `x-site.*` components |
+| **G. Public page** | `Site\HomeController` + `site/home.blade.php`, `Site\BlogController` + `site/blog/index.blade.php` | a controller in `Http/Controllers/Site/` hands its reads to a Blade view on `<x-layouts.site>`; a Livewire SFC under `pages/site/` only when the visitor fills something in |
 
 All pages start with `kSetSiteTitle(...)` in `mount()` and end with a single root
 `<div class="space-y-6">` (or `<form>` for shape C).
@@ -278,7 +278,7 @@ new class extends Component
 
             <flux:input label="Name" wire:model="name" placeholder="e.g. Something" autofocus badge="required" />
 
-            <x-form.markdown-field label="Description" wire:model="description" placeholder="Describe it." markdown />
+            <x-form.rich-text wire:model="description" name="description" label="Description" placeholder="Describe it." />
 
             <flux:switch wire:model="status" label="Active" description="Available for use." />
 
@@ -664,26 +664,99 @@ See [auth.md](auth.md), [layouts.md](layouts.md).
 
 ### Rule
 
-`new #[Layout('layouts::site')] class extends Component`, routed in `web.php` with
-`Route::livewire()` — never `Route::view()`, which leaves the data nowhere to be
-read but the Blade. The layout brings the header and footer; the page reads every
-section's data in a `#[Computed]` and hands it to an `x-site.*` component as a
-prop. The logic behind a read (what counts, what is hidden while the install is
-empty) belongs to a service, so the computed is one line.
+A public page a visitor only **reads** is a controller and a Blade view, not a
+Livewire component:
 
-### Example — `pages/site/⚡home.blade.php`
+- the controller lives in `app/Http/Controllers/Site/`, one per section of the site
+  (`BlogController` …), a method per page — or invokable when the section is one
+  page (`HomeController`);
+- the view lives under `resources/views/site/`, mirroring the section
+  (`site/blog/show.blade.php`), and its root is `<x-layouts.site>`;
+- the route is `Route::get('/path', [Site\BlogController::class, 'show'])`.
+
+The layout's `<main>` carries `page-enter`, so every public page settles in on load:
+the children of the view's root element rise and fade in one after another. Keep a
+single root element holding the page's sections and the entrance comes for free.
+
+A public page the visitor **fills in or steps through** stays a Livewire SFC under
+`pages/site/` on `#[Layout('layouts::site')]`, routed with `Route::livewire()`. Today
+that is one: `⚡unsubscribe` (newsletter preferences). A form
+*inside* a read-only page — the newsletter sign-up, the announcement popup — is a
+`<livewire:…>` component dropped into the Blade view, not a reason to make the page
+a component.
+
+Why the split: a read-only page has nothing for a component to react to. As a
+controller it is crawlable, cacheable and costs no component snapshot, and its
+filters become a query string anybody can share.
+
+The controller does what `mount()` and the `#[Computed]` methods did: it calls
+`kSetSiteTitle()` (and `kSetMetaData()` where the page has its own), `abort_unless`s
+anything unpublished, reads through the services, and hands every value to the view
+as data. The logic behind a read still belongs to a service, so each entry is a line.
+The view never queries, never calls `app()`, and never decides a `kSiteFlag()`.
+
+### Filters, steppers and search
+
+There is no `wire:model`, so state lives in the query string:
+
+| Was | Now |
+| --- | --- |
+| `#[Url] public string $when` | `$request->query('when')`, normalised in the controller to a known value |
+| A tab or segmented control `wire:click="$set(…)"` | `<flux:button size="sm" :variant="… ? 'primary' : 'ghost'" :href="route(…, [...])">` inside a `<nav aria-label>` |
+| A previous / next stepper | The controller works out `previous` and `next` and the view links to them |
+| `wire:model.live` search | `<form method="GET" role="search">` with `<flux:input name="q" :value="$q">` — Enter submits |
+| `wire:model.live` select | `<flux:select name="…" onchange="this.form.requestSubmit()">`, options with `:selected` |
+| `wire:model.live` checkbox | A native checkbox after a hidden `0` of the same name — an unticked box sends nothing, which would read as the default |
+| `WithPagination` | `->paginate(12)->withQueryString()`, rendered with `{{ $items->links() }}` |
+
+Use `onchange`, not `x-on:change`: a plain page has no `x-data` root, so an Alpine
+directive outside one never initialises. Alpine still works wherever the view opens
+its own `x-data` (a lightbox, a click-to-play video).
+
+Class names in a plain view are fully qualified (`\App\Enums\CategoryGroupEnum::cases()`)
+— there is no `use` block above the Blade any more.
+
+### Example — `Site\BlogController::index()`
 
 ```php
-#[Computed]
-public function stats(): array
+public function index(Request $request): View
 {
-    return app(SiteStatsService::class)->frontPage();
+    kSetSiteTitle('blog');
+
+    $search = trim((string) $request->query('search', ''));
+    $category = $request->query('category') ? (string) $request->query('category') : null;
+
+    $activeCategory = $category
+        ? Category::query()->active()->inGroup(CategoryGroupEnum::BLOG)->where('slug', $category)->first()
+        : null;
+
+    return view('site.blog.index', [
+        'search' => $search,
+        'category' => $category,
+        'activeCategory' => $activeCategory,
+        'categories' => app(CategoryService::class)->categoriesFor(CategoryGroupEnum::BLOG),
+        'posts' => app(BlogService::class)->publishedQuery($activeCategory, null, $search ?: null)->paginate(9)->withQueryString(),
+    ]);
 }
 ```
 
 ```blade
-<x-site.stats :stats="$this->stats" />
-<x-site.faq :faqs="$this->faqs" />
+<x-layouts.site>
+    <div class="mx-auto max-w-6xl space-y-8 px-4 py-12">
+        <nav class="flex flex-wrap gap-2" aria-label="{{ __('Categories') }}">
+            @foreach ($categories as $item)
+                <flux:button size="sm" :variant="$category === $item->slug ? 'primary' : 'ghost'" :href="route('blog.index', ['category' => $item->slug])">
+                    {{ $item->name }}
+                </flux:button>
+            @endforeach
+        </nav>
+
+        <form method="GET" action="{{ route('blog.index') }}" role="search">
+            <flux:input name="search" :value="$search" :placeholder="__('e.g. Getting started')" icon="magnifying-glass" />
+        </form>
+        …
+    </div>
+</x-layouts.site>
 ```
 
 See [components.md](components.md) — *Data comes in, never goes looking*.
@@ -694,7 +767,10 @@ See [components.md](components.md) — *Data comes in, never goes looking*.
 
 - Inventing an eighth shape. Pick the closest of the seven.
 - A query, a service call or a site-flag read in the Blade half of a page or in a
-  component — it belongs in a `#[Computed]`, and its logic in a service.
+  component — it belongs in a `#[Computed]` (or, for a read-only public page, the
+  controller), and its logic in a service.
+- A Livewire component for a public page nobody fills in, or a controller for one
+  they do — see shape G.
 - A separate create/edit **route** for a config-style resource — use shape A.
 - One giant component for a multi-faceted record — use shape D.
 - Skipping `kSetSiteTitle()`; the sidebar highlight and `<title>` both break.

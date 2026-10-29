@@ -279,7 +279,7 @@ new class extends Component
             @php($reachable = $template !== null)
             <button type="button" wire:click="$set('step', 'details')" @class([
                 'press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
-                'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => $step === 'details',
+                'bg-slate-900 text-white dark:bg-brand-400 dark:text-slate-950' => $step === 'details',
                 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900' => $step !== 'details',
             ])>
                 @if ($step === 'builder')
@@ -289,7 +289,7 @@ new class extends Component
             </button>
             <button type="button" @if ($reachable) wire:click="$set('step', 'builder')" @else disabled @endif @class([
                 'press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
-                'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => $step === 'builder',
+                'bg-slate-900 text-white dark:bg-brand-400 dark:text-slate-950' => $step === 'builder',
                 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900' => $step !== 'builder' && $reachable,
                 'text-slate-300 dark:text-slate-700' => ! $reachable,
             ])>

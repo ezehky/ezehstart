@@ -2,12 +2,7 @@
      cannot drift apart — a policy page that does not look like the site it belongs
      to reads as somebody else's. --}}
 <header class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-6">
-    <flux:brand
-        href="{{ route('home') }}"
-        :logo="$_configs['logo'] ?? ''"
-        :logoDark="$_configs['logo-dark'] ?? ''"
-        alt="{{ $_configs['name'] }} official logo"
-    />
+    <x-util.brand />
 
     <div class="flex items-center gap-2">
         <livewire:livewire.currency-switcher />

@@ -15,7 +15,7 @@
                     wire:click="$set('template_id', null)"
                     @class([
                         'rounded-lg border-2 p-3 text-center text-xs font-medium',
-                        'border-lime-500 bg-lime-50 dark:bg-lime-400/10' => ! $template_id,
+                        'border-brand-500 bg-brand-50 dark:bg-brand-400/10' => ! $template_id,
                         'border-slate-200 dark:border-slate-700' => (bool) $template_id
                     ])
                 >
@@ -27,7 +27,7 @@
                         wire:click="$set('template_id', {{ $item->id }})"
                         @class([
                             'rounded-lg border-2 p-3 text-center text-xs font-medium',
-                            'border-lime-500 bg-lime-50 dark:bg-lime-400/10' => $template_id === $item->id,
+                            'border-brand-500 bg-brand-50 dark:bg-brand-400/10' => $template_id === $item->id,
                             'border-slate-200 dark:border-slate-700' => $template_id !== $item->id
                         ])
                     >

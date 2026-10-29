@@ -6,6 +6,7 @@ use App\Enums\GateAccessEnum;
 use App\Enums\StatusDefault;
 use App\Models\Faq;
 use App\Services\ActivityLogService;
+use App\Services\BlogService;
 use App\Services\MarkdownService;
 use App\Traits\WithDataTable;
 use App\Traits\WithFileImport;
@@ -35,9 +36,6 @@ new class extends Component
 
     /** The question queued for deletion, held while the dialog asks. */
     public ?int $deleteId = null;
-
-    /** Show the compiled markdown instead of the editor. */
-    public bool $previewing = false;
 
     public function mount(): void
     {
@@ -173,7 +171,9 @@ new class extends Component
             return false;
         }
 
-        $faq->answer = $answer;
+        // A file is typed in a spreadsheet, so its answer is plain text or markdown.
+        // It is stored the way the editor's own output is.
+        $faq->answer = app(BlogService::class)->sanitize(app(MarkdownService::class)->toHtml($answer));
         $faq->flow_order = (int) ($row['order'] ?? $row['flow_order'] ?? 0)
             ?: (int) Faq::query()->where('faq_type', $type)->max('flow_order') + 1;
         $faq->status = StatusDefault::ACTIVE;
@@ -199,15 +199,6 @@ new class extends Component
         $this->resetValidation();
 
         Flux::modal('faqImportModal')->show();
-    }
-
-    /**
-     * The compiled preview of whatever is currently in the editor.
-     */
-    #[Computed]
-    public function preview(): string
-    {
-        return app(MarkdownService::class)->toHtml($this->answer);
     }
 
     public function create(string $type): void
@@ -272,7 +263,7 @@ new class extends Component
 
         $this->faq->faq_type = FaqTypeEnum::from($this->faq_type);
         $this->faq->question = $this->question;
-        $this->faq->answer = $this->answer;
+        $this->faq->answer = app(BlogService::class)->sanitize($this->answer);
         $this->faq->flow_order = $this->flow_order;
         $this->faq->status = StatusDefault::from((int) $this->status);
 
@@ -361,7 +352,7 @@ new class extends Component
     private function resetForm(): void
     {
         $this->resetValidation();
-        $this->reset('faq', 'question', 'answer', 'flow_order', 'status', 'previewing');
+        $this->reset('faq', 'question', 'answer', 'flow_order', 'status');
     }
 };
 ?>
@@ -371,8 +362,8 @@ new class extends Component
         <div>
             <flux:heading level="2" size="lg" class="font-heading font-bold">FAQs</flux:heading>
             <flux:text class="mt-1">
-                The questions answered on the public site. Answers are written in markdown, the
-                same as the policy pages, so a link or a short list renders properly.
+                The questions answered on the public site. Answers are written in the same
+                editor as the policy pages, so a link or a short list renders properly.
             </flux:text>
         </div>
 
@@ -583,30 +574,13 @@ new class extends Component
 
             <flux:separator variant="subtle" />
 
-            <div class="flex items-center justify-between">
-                <flux:heading size="md" class="font-heading font-bold">Answer</flux:heading>
-                <flux:button size="sm" variant="ghost" type="button" wire:click="$toggle('previewing')">
-                    {{ $previewing ? 'Back to editor' : 'Preview' }}
-                </flux:button>
-            </div>
+            <x-form.rich-text wire:model="answer" name="answer" label="Answer" placeholder="e.g. Yes. Choose Sign in with an email code and we send you a six-digit code." />
 
-            @if ($previewing)
-                <div class="max-h-125 overflow-y-auto rounded-xl border border-slate-200 p-5 dark:border-white/10">
-                    @if (filled($this->preview))
-                        <div class="markdown-prose">{!! $this->preview !!}</div>
-                    @else
-                        <flux:text>Nothing to preview yet.</flux:text>
-                    @endif
-                </div>
-            @else
-                <x-form.markdown-field label="Answer" wire:model="answer" rows="8" markdown />
-
-                <flux:callout icon="information-circle" class="text-sm">
-                    Keep answers short. Link out to a policy or a page rather than repeating it
-                    here — an answer that restates the terms is one more place to keep in step
-                    with them.
-                </flux:callout>
-            @endif
+            <flux:callout icon="information-circle" class="text-sm">
+                Keep answers short. Link out to a policy or a page rather than repeating it
+                here — an answer that restates the terms is one more place to keep in step
+                with them.
+            </flux:callout>
 
             <div class="flex justify-end gap-3">
                 <flux:modal.close>

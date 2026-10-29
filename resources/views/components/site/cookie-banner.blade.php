@@ -44,7 +44,7 @@
                 {{ __('This site uses cookies to keep you signed in and to remember what you were doing.') }}
                 <a
                     href="{{ App\Enums\PolicyTypeEnum::COOKIES->url() }}"
-                    class="font-medium text-slate-900 underline underline-offset-2 transition-colors hover:text-lime-600 dark:text-white dark:hover:text-lime-400"
+                    class="font-medium text-slate-900 underline underline-offset-2 transition-colors hover:text-brand-600 dark:text-white dark:hover:text-brand-400"
                 >
                     {{ App\Enums\PolicyTypeEnum::COOKIES->defaultTitle() }}
                 </a>

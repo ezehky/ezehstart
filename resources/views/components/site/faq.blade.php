@@ -1,7 +1,7 @@
 @props([
     // App\Models\Faq rows, already filtered and ordered by the caller. The answer
-    // is compiled through answerHtml(), which escapes raw input, so it is safe to
-    // render unescaped.
+    // was sanitised by BlogService::sanitize() before it was stored, so it is safe
+    // to render unescaped.
     'faqs' => [],
 ])
 
@@ -30,14 +30,14 @@
                                 x-on:click="active = active === {{ $index }} ? null : {{ $index }}"
                                 x-bind:aria-expanded="(active === {{ $index }}).toString()"
                                 aria-controls="faq-panel-{{ $index }}"
-                                class="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lime-500 dark:hover:bg-white/5"
+                                class="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500 dark:hover:bg-white/5"
                             >
                                 <span class="font-heading text-base font-semibold text-slate-900 dark:text-white">
                                     {{ $faq->question }}
                                 </span>
                                 <span
                                     class="grid size-8 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 transition-transform duration-300 dark:border-white/10 dark:text-slate-300"
-                                    x-bind:class="active === {{ $index }} ? 'rotate-45 border-lime-400 text-lime-600 dark:text-lime-400' : ''"
+                                    x-bind:class="active === {{ $index }} ? 'rotate-45 border-brand-400 text-brand-600 dark:text-brand-400' : ''"
                                 >
                                     <flux:icon name="plus" class="size-4" />
                                 </span>
@@ -45,7 +45,7 @@
                         </h3>
 
                         <div id="faq-panel-{{ $index }}" x-show="active === {{ $index }}" x-collapse x-cloak>
-                            <div class="markdown-prose px-6 pb-5">
+                            <div class="rich-prose px-6 pb-5">
                                 {!! $faq->answerHtml() !!}
                             </div>
                         </div>

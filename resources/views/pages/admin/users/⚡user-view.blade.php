@@ -716,8 +716,8 @@ new class extends Component
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <flux:input label="Name" wire:model="name" autofocus badge="required" />
-                <flux:input type="email" label="Email" wire:model="email" badge="required" />
+                <flux:input label="Name" wire:model="name" placeholder="e.g. Ada Obi" autofocus badge="required" />
+                <flux:input type="email" label="Email" wire:model="email" placeholder="e.g. ada@example.com" badge="required" />
                 <x-form.phone-field label="Phone number" wire:model="phone_number" dial-code="phone_dial_code" iso2="phone_iso2" />
                 <flux:input
                     type="password"

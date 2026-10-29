@@ -88,7 +88,7 @@ new class extends Component
     protected function tableQuery(): Builder
     {
         $query = Transaction::query()
-            ->with(['user', 'balance', 'gateway'])
+            ->with(['user', 'balance', 'gateway', 'charges'])
             ->withRefundedSum()
             ->when($this->search !== '', fn (Builder $query) => $query
                 ->where(fn (Builder $group) => $group
@@ -499,6 +499,11 @@ new class extends Component
 
                         <x-table.cell column="amount">
                             <x-transaction.amount :transaction="$item" />
+                            @if ($item->charges->isNotEmpty())
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    incl. {!! kMoneyFormat($item->totalCharges()) !!} charges
+                                </p>
+                            @endif
                             @if ($item->refundedAmount() > 0)
                                 <p class="text-xs text-amber-600 dark:text-amber-400">
                                     {!! kMoneyFormat($item->refundedAmount()) !!} refunded

@@ -122,8 +122,14 @@ modal.
 
 Defined in `resources/css/app.css` (Tailwind v4 CSS-first `@theme`):
 
-- **Accent is lime.** `--color-accent: var(--color-lime-400)`,
-  `--color-primary: var(--color-lime-500)`, `--color-secondary: var(--color-emerald-500)`.
+- **The brand is `brand-*`.** One scale, `--color-brand-50` … `-950`, anchored at
+  `brand-400`. `--color-accent: var(--color-brand-400)`,
+  `--color-primary: var(--color-brand-500)`, `--color-secondary: var(--color-emerald-500)`.
+  Re-anchoring that scale re-colours the whole app.
+- **Write `brand-*`, never `lime-*`, in a class.** `lime-*` is aliased to the brand
+  scale for Flux's sake only: a Flux prop takes a Tailwind palette name, so
+  `<flux:badge color="lime">` is how a Flux component asks for the brand. The tone
+  *name* `lime` (stat cards, icon boxes) is the same idea and stays.
 - **Flux's `zinc` is remapped to `slate`** — so `zinc-*` and `slate-*` are the same
   palette. New code writes `slate-*`; Flux internals emit `zinc-*`. Both are correct.
 - Surfaces: `--color-background-light: #f5f6f8`, `--color-background-dark: #101622`,
@@ -140,7 +146,7 @@ Six tones, used by `x-dashboard.stat-card`, `x-dashboard.icon-box`, and any colo
 chip. Each is a light/dark pair:
 
 ```
-lime     bg-lime-100 text-lime-700        dark:bg-lime-400/10 dark:text-lime-300
+lime     bg-brand-100 text-brand-700      dark:bg-brand-400/10 dark:text-brand-300
 emerald  bg-emerald-50 text-emerald-700   dark:bg-emerald-400/10 dark:text-emerald-300
 sky      bg-sky-50 text-sky-700           dark:bg-sky-400/10 dark:text-sky-300
 amber    bg-amber-50 text-amber-700       dark:bg-amber-400/10 dark:text-amber-300
@@ -284,13 +290,13 @@ Heroicons names, kebab-case: `plus`, `pencil-square`, `trash`, `eye`, `eye-slash
 `<flux:icon :name="$icon" class="size-5" />` when dynamic;
 `<flux:icon.check-badge class="size-6" />` when static.
 
-### Markdown output
+### Rich-text output
 
-Compiled markdown is rendered inside `.markdown-prose`, and wide tables inside
-`.table-scroll` (both added by `MarkdownService`):
+Stored rich text — post bodies, FAQ answers, policy sections — is rendered inside
+`.rich-prose`. It was sanitised on the way in, so `{!! !!}` is safe:
 
 ```blade
-<div class="markdown-prose">{!! $this->preview !!}</div>
+<div class="rich-prose">{!! $faq->answerHtml() !!}</div>
 ```
 
 ## Why

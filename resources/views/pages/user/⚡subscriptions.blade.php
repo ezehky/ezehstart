@@ -316,7 +316,7 @@ new class extends Component
                         wire:key="plan-{{ $plan->id }}"
                         @class([
                             'relative flex flex-col gap-4 rounded-xl border p-5',
-                            'border-lime-500 ring-1 ring-lime-500 dark:border-lime-400 dark:ring-lime-400' => $recommended,
+                            'border-brand-500 ring-1 ring-brand-500 dark:border-brand-400 dark:ring-brand-400' => $recommended,
                             'border-slate-200 dark:border-slate-700' => ! $recommended,
                         ])
                     >
@@ -349,7 +349,7 @@ new class extends Component
                                 @endif
                                 @foreach ($plan->featureLines() as $line)
                                     <li class="flex gap-2">
-                                        <flux:icon.check class="size-4 shrink-0 text-lime-600 dark:text-lime-400" />
+                                        <flux:icon.check class="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
                                         {{ $line }}
                                     </li>
                                 @endforeach

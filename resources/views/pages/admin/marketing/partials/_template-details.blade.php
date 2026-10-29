@@ -12,7 +12,7 @@
     </div>
 
     <flux:input wire:model="name" label="Template name" placeholder="e.g. Newsletter Template" />
-    <flux:input wire:model="description" label="Description" description="Internal only — shown to admins picking a starting point for a campaign." />
+    <flux:input wire:model="description" label="Description" placeholder="e.g. Monthly newsletter with three posts" description="Internal only — shown to admins picking a starting point for a campaign." />
 
     <flux:separator variant="subtle" />
 

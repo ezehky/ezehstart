@@ -67,7 +67,7 @@
                     <button
                         type="button"
                         wire:click="addBlock('{{ $case->value }}', {{ $selectedIndex ?? 'null' }})"
-                        class="press flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 p-2.5 text-center hover:border-lime-400 hover:bg-lime-50 dark:border-slate-700 dark:hover:border-lime-400 dark:hover:bg-lime-400/10"
+                        class="press flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 p-2.5 text-center hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:hover:border-brand-400 dark:hover:bg-brand-400/10"
                     >
                         <flux:icon :name="$case->icon()" class="size-4 text-slate-500 dark:text-slate-300" />
                         <span class="text-[11px] font-medium text-slate-600 dark:text-slate-300">{{ $case->label() }}</span>
@@ -165,7 +165,7 @@
         wire:target="selectBlock, addBlock, addColumnBlock, duplicateBlock, duplicateColumnBlock"
         class="absolute inset-0 z-20 items-center justify-center bg-white/70 backdrop-blur-[1px] dark:bg-slate-950/70"
     >
-        <flux:icon.loading class="size-5 text-lime-600 dark:text-lime-400" />
+        <flux:icon.loading class="size-5 text-brand-600 dark:text-brand-400" />
     </div>
     <div class="{{ $canvasHeight }} overflow-y-auto p-4 custom-scrollbar">
         @if (! $selected)
@@ -181,7 +181,7 @@
                  to blocks.0.data.text while the paragraph is selected. --}}
             <div wire:key="block-settings-{{ data_get($selected, 'id') }}">
             <div class="mb-3">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-lime-600 dark:text-lime-400">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-brand-600 dark:text-brand-400">
                     {{ $blockCase->group() }}
                 </p>
                 <p class="font-medium text-slate-950 dark:text-white">

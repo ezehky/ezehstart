@@ -106,7 +106,7 @@ new class extends Component
                         <button
                             type="button"
                             aria-label="{{ __('Close') }}"
-                            class="absolute end-3 top-3 z-10 grid size-9 cursor-pointer place-items-center rounded-full bg-white/90 text-slate-700 shadow-md ring-1 ring-black/5 backdrop-blur transition hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-white/10 dark:hover:bg-slate-800 dark:hover:text-white"
+                            class="absolute end-3 top-3 z-10 grid size-9 cursor-pointer place-items-center rounded-full bg-white/90 text-slate-700 shadow-md ring-1 ring-black/5 backdrop-blur transition hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-white/10 dark:hover:bg-slate-800 dark:hover:text-white"
                         >
                             <flux:icon name="x-mark" variant="micro" class="size-4" />
                         </button>
@@ -132,9 +132,9 @@ new class extends Component
                                     @else
                                         {{-- The icon in place of a picture: large, on the accent's
                                              lightest tint, with a soft glow behind it for depth. --}}
-                                        <div class="absolute inset-0 grid place-items-center bg-lime-100 dark:bg-lime-400/10">
-                                            <div class="absolute size-48 rounded-full bg-lime-300/50 blur-3xl dark:bg-lime-400/20"></div>
-                                            <flux:icon :name="$announcement->icon" class="relative size-24 text-lime-700 dark:text-lime-300" />
+                                        <div class="absolute inset-0 grid place-items-center bg-brand-100 dark:bg-brand-400/10">
+                                            <div class="absolute size-48 rounded-full bg-brand-300/50 blur-3xl dark:bg-brand-400/20"></div>
+                                            <flux:icon :name="$announcement->icon" class="relative size-24 text-brand-700 dark:text-brand-300" />
                                         </div>
                                     @endif
                                 </div>

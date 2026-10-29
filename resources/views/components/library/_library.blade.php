@@ -27,6 +27,16 @@
         >
             Upload
         </x-dashboard.gate.button>
+        @if ($this->canImportFolders)
+            <flux:button
+                size="sm"
+                icon="folder-arrow-down"
+                variant="{{ $tab === 'import' ? 'primary' : 'ghost' }}"
+                wire:click="switchTab('import')"
+            >
+                Import folders
+            </flux:button>
+        @endif
     </div>
 
     @if ($tab === 'upload')
@@ -37,6 +47,11 @@
                 ? 'They will be filed in ' . $this->currentFolder->name . '.'
                 : 'They will land in the root of your library.'"
             :key="'uploader-' . ($folder ?? 'root')"
+        />
+    @elseif ($tab === 'import')
+        <livewire:livewire.library.image-folder-importer
+            :folder="$folder"
+            :key="'importer-' . ($folder ?? 'root')"
         />
     @else
         {{-- Folders: a rail beside the grid on desktop, a strip above it on a
@@ -155,7 +170,7 @@
                             @endforeach
                         </flux:select>
 
-                        @if ($folder_visibility === 'role')
+                        @if ($folder_visibility === App\Enums\MediaVisibilityEnum::TYPE->value)
                             <flux:select wire:model="folder_visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
                                 @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)
@@ -185,8 +200,8 @@
                     <flux:card class="space-y-4">
                         <flux:heading size="md">Image details</flux:heading>
 
-                        <flux:input wire:model="title" label="Title" description="Renaming here does not change the image's URL." />
-                        <flux:input wire:model="alt_text" label="Alt text" description="Describes the image to screen readers." />
+                        <flux:input wire:model="title" label="Title" placeholder="e.g. Spring banner" description="Renaming here does not change the image's URL." />
+                        <flux:input wire:model="alt_text" label="Alt text" placeholder="e.g. Two people laughing over coffee" description="Describes the image to screen readers." />
 
                         <flux:select wire:model="image_folder_id" label="Folder">
                             <flux:select.option value="">No folder</flux:select.option>
@@ -201,7 +216,7 @@
                             @endforeach
                         </flux:select>
 
-                        @if ($visibility === 'role')
+                        @if ($visibility === App\Enums\MediaVisibilityEnum::TYPE->value)
                             <flux:select wire:model="visible_to_type" label="Visible to role">
                                 <flux:select.option value="">Choose a role</flux:select.option>
                                 @foreach (App\Enums\UserTypeEnum::forSelect() as $value => $label)

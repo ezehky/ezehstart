@@ -63,7 +63,7 @@
     @case(\App\Enums\EmailBlockTypeEnum::DYNAMIC_CONTENT)
         @php($provider = app(\App\Services\DynamicContentRegistryService::class)->provider(data_get($data, 'content_type', 'post')))
         <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-xs font-semibold text-lime-700 dark:text-lime-400">
+            <div class="flex items-center gap-2 text-xs font-semibold text-brand-700 dark:text-brand-400">
                 <flux:icon name="newspaper" class="size-4" />
                 {{ $provider?->label() ?? 'Content' }} ·
                 {{ ucfirst(data_get($data, 'mode', 'latest')) }} ·

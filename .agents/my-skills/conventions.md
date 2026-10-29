@@ -257,8 +257,8 @@ if a case is added later. Include `default` only when the input is open-ended.
 
 ### Blade
 
-- `{{ }}` for text, `{!! !!}` only for content that is already-compiled HTML from
-  `MarkdownService` or a component slot.
+- `{{ }}` for text, `{!! !!}` only for rich text that was sanitised on save
+  (`BlogService::sanitize()`) or a component slot.
 - `@php(...)` inline for one-liners; `@php … @endphp` blocks for setup at the top of a
   component.
 - `@class([...])` and `$attributes->class([...])` for conditional classes.

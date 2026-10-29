@@ -6,8 +6,10 @@ use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Str;
 
 /**
- * Renders the markdown administrators write — policy bodies, FAQ answers — into the
- * HTML the public pages show.
+ * Turns markdown into HTML, for text that arrives as markdown rather than from the
+ * rich-text editor: the seeders' policy and FAQ copy, and an imported FAQ file.
+ * What it returns is stored the way the editor's output is — through
+ * BlogService::sanitize() — so nothing downstream knows which way it came in.
  *
  * Raw HTML in the source is escaped rather than rendered: the copy is written by
  * administrators, but escaping means a compromised account cannot inject scripts

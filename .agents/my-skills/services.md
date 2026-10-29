@@ -13,8 +13,8 @@ lives in `app/Services/`. Nineteen ship with the starter:
 | `RoleService` | Role records, who is on which, account type, and the guards on each |
 | `NotificationService` | Database notifications behind the bell menu |
 | `SiteConfigurationService` | The site-configuration JSON file and its cache |
-| `MarkdownService` | Stored markdown → HTML, with raw HTML escaped |
-| `PolicyContentService` | Compiling a policy's markdown into its numbered sections |
+| `MarkdownService` | Markdown → HTML for text that arrives as markdown (seeders, a FAQ import); the result is sanitised and stored like editor output |
+| `PolicyContentService` | Splitting a policy's rich-text body into its numbered sections |
 | `AccountDeletionService` | Anonymising or hard-deleting an account |
 | `AccountOtpService` | Codes confirming a sensitive account change |
 | `EmailVerificationOtpService` | Welcome mail and email-verification codes |
@@ -226,8 +226,8 @@ class AdminActionService
 | `NotificationService` | database notifications in and out of the bell menu |
 | `AdminActionService` | live "work waiting on an admin" queue |
 | `SiteConfigurationService` | the JSON site config, its cache, and uploads |
-| `PolicyContentService` | current policy version, consent set, markdown sections |
-| `MarkdownService` | markdown → safe HTML |
+| `PolicyContentService` | current policy version, consent set, rich-text sections |
+| `MarkdownService` | markdown → HTML, for seeders and imports |
 | `CurriculumImportService` | bulk curriculum import |
 | `TrainerService` | trainer-scoped resources |
 | `AccountDeletionService` | anonymise / delete an account |

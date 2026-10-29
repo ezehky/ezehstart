@@ -16,7 +16,8 @@
 | Notification | `{Subject}Notification` | `GeneralNotification` |
 | Middleware | `{Role}Middleware` | `AdminMiddleware`, `TrainerMiddleware`, `UserMiddleware` |
 | Console command | `{Verb}{Subject}Command` | `SendClassReminderCommand`, `SyncCohortStatusCommand` |
-| Controller | `{Subject}Controller`, invokable | `LandingPageController`, `PaymentCallbackController` |
+| Controller | `{Subject}Controller`, invokable; a public site section is `Site\{Section}Controller` with a method per page | `PaymentCallbackController`, `Site\HomeController`, `Site\BlogController@show` |
+| Public site view | `resources/views/site/{section}/{page}.blade.php`, no ⚡ | `site/blog/show.blade.php`, `site/home.blade.php` |
 | Model | Singular `StudlyCase` | `Cohort`, `ClassSession`, `TransactionCharge` |
 | Seeder | `{Model}Seeder` | `FaqSeeder`, `RoleSeeder`, `SiteConfigSeeder` |
 | Factory | `{Model}Factory` | `UserFactory` |

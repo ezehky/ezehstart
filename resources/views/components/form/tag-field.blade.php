@@ -40,7 +40,7 @@
                         wire:model="{{ $model }}"
                     />
 
-                    <span class="inline-block rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 peer-checked:border-accent peer-checked:bg-lime-100 peer-checked:text-lime-700 peer-focus-visible:ring-2 peer-focus-visible:ring-accent dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 dark:peer-checked:bg-lime-400/10 dark:peer-checked:text-lime-300">
+                    <span class="inline-block rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 peer-checked:border-accent peer-checked:bg-brand-100 peer-checked:text-brand-700 peer-focus-visible:ring-2 peer-focus-visible:ring-accent dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 dark:peer-checked:bg-brand-400/10 dark:peer-checked:text-brand-300">
                         {{ $tag }}
                     </span>
                 </label>

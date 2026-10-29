@@ -320,10 +320,10 @@ new class extends Component
                             <div class="flex items-center gap-3">
                                 <div class="size-12 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
                                     @if ($item->image)
-                                        <img src="{{ $item->image->url() }}" alt="" class="size-full object-cover" />
+                                        <img src="{{ $item->image->url() }}" alt="{{ $item->image->alt_text ?: $item->title }}" class="size-full object-cover" />
                                     @elseif ($item->showsIcon())
-                                        <div class="grid size-full place-items-center bg-lime-100 dark:bg-lime-400/10">
-                                            <flux:icon :name="$item->icon" class="size-6 text-lime-700 dark:text-lime-300" />
+                                        <div class="grid size-full place-items-center bg-brand-100 dark:bg-brand-400/10">
+                                            <flux:icon :name="$item->icon" class="size-6 text-brand-700 dark:text-brand-300" />
                                         </div>
                                     @else
                                         <div class="grid size-full place-items-center">

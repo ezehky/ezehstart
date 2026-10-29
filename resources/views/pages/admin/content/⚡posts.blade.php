@@ -296,7 +296,7 @@ new class extends Component
                             <x-table.cell column="title">
                                 <div class="flex items-center gap-3">
                                     @if ($item->image)
-                                        <img src="{{ $item->image->url() }}" alt="" class="size-10 rounded object-cover" />
+                                        <img src="{{ $item->image->url() }}" alt="{{ $item->image->alt_text ?: $item->title }}" class="size-10 rounded object-cover" />
                                     @else
                                         <x-dashboard.icon-box size="sm" icon="newspaper" tone="slate" />
                                     @endif

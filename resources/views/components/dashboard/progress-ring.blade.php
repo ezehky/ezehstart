@@ -2,7 +2,7 @@
     'percent' => 0,
     'size' => 'size-28',
     'label' => null,
-    'color' => 'text-lime-400',
+    'color' => 'text-brand-400',
     'trackColor' => 'text-white/10',
     'numberColor' => '',
 ])

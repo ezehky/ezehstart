@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\EmailSenderEnum;
 use App\Enums\LogChannelEnum;
+use App\Enums\PaymentVendorEnum;
 use App\Enums\SocialProviderEnum;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Support\Arr;
@@ -70,6 +71,22 @@ class SiteConfigurationService
             'whatsapp-support' => null,
             'telegram-support' => null,
             'social-handles' => [],
+
+            // A processing fee added on top of a purchase paid through a gateway,
+            // one per vendor because each prices its service differently. Percent
+            // of the price, plus a flat amount, held under a cap (0 means no cap);
+            // flat and cap are in the default currency, the one the ledger keeps.
+            // All zero: what to pass on to a customer is the owner's decision,
+            // so nothing is added until somebody sets it on Payments › Gateways.
+            'payments' => [
+                'fees' => collect(PaymentVendorEnum::cases())
+                    ->reject(fn (PaymentVendorEnum $vendor) => $vendor->isManual())
+                    ->mapWithKeys(fn (PaymentVendorEnum $vendor) => [
+                        $vendor->value => ['percent' => 0, 'flat' => 0, 'cap' => 0],
+                    ])
+                    ->all(),
+            ],
+
             'email-settings' => [
                 'verification' => true,
                 'verification-strict' => true,
@@ -287,6 +304,13 @@ class SiteConfigurationService
 
     private function setSiteConfigForCache(array $data): array
     {
+        // A site that uploaded its own logo but no dark one would otherwise show
+        // the kit's placeholder in dark mode, which is somebody else's mark. Its
+        // own logo on a dark ground is the nearer answer.
+        if (filled(data_get($data, 'logo')) && blank(data_get($data, 'logo-dark'))) {
+            data_set($data, 'logo-dark', data_get($data, 'logo'));
+        }
+
         // Favicon & Logo
         foreach ([
             'logo',

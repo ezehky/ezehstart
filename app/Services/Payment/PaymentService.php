@@ -7,6 +7,7 @@ use App\Enums\LogChannelEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusPaymentWebhook;
 use App\Enums\StatusTransaction;
+use App\Enums\TransactionChargeEnum;
 use App\Enums\TransactionGroupEnum;
 use App\Enums\TransactionTypeEnum;
 use App\Enums\TransactionViaEnum;
@@ -135,17 +136,25 @@ class PaymentService
             return 'The amount must be more than zero.';
         }
 
+        // The processing fee goes on top of a purchase, and the row carries the
+        // total: that is what the vendor is asked to charge and what verify()
+        // holds its answer against. The fee is kept as its own charge row so a
+        // receipt can say what it was. A deposit is left alone — its amount is
+        // what lands in the wallet, and a balance is a sum of amounts.
+        $fee = $wallet->isBalance() ? 0.0 : app(PaymentFeeService::class)->feeFor($vendor, $amount);
+
         $transaction = app(TransactionService::class)->record(
             $user,
             $type,
             $group,
-            $amount,
+            round($amount + $fee, 2),
             $description,
             TransactionViaEnum::PAYMENT_GATEWAY,
             $wallet,
             StatusTransaction::PROCESSING,
             $against,
             $meta,
+            charges: [TransactionChargeEnum::FEE->value => $fee],
             vendor: $vendor,
         );
 

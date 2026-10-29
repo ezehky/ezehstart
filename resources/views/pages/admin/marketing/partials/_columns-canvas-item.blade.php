@@ -27,11 +27,11 @@
     wire:click.stop="selectBlock('{{ $block['id'] }}')"
     @class([
         'group relative cursor-pointer',
-        'outline outline-2 outline-offset-[-2px] outline-lime-500' => $rowSelected,
+        'outline outline-2 outline-offset-[-2px] outline-brand-500' => $rowSelected,
     ])
 >
     <div @class([
-        'pointer-events-none absolute -top-3 start-2.5 z-10 rounded bg-lime-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
+        'pointer-events-none absolute -top-3 start-2.5 z-10 rounded bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-slate-950 opacity-0 group-hover:opacity-100',
         'opacity-100' => $rowSelected,
     ])>Columns</div>
 

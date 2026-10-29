@@ -258,8 +258,8 @@ new class extends Component
 
             <flux:card class="space-y-4">
                 <flux:heading level="2" size="sm">Search engine listing</flux:heading>
-                <flux:input wire:model="meta_title" label="Meta title" description="Falls back to the post title." />
-                <flux:textarea wire:model="meta_description" label="Meta description" rows="2" description="Falls back to the excerpt." />
+                <flux:input wire:model="meta_title" label="Meta title" placeholder="e.g. Ten ways to start the week well" description="Falls back to the post title." />
+                <flux:textarea wire:model="meta_description" label="Meta description" placeholder="One or two sentences search results show under the title" rows="2" description="Falls back to the excerpt." />
             </flux:card>
         </div>
 

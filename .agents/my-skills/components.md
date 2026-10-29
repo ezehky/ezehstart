@@ -12,13 +12,12 @@ with `@props([...])`.
 A component is presentation. Everything it shows arrives as a prop, already
 fetched, filtered and ordered by the page that renders it. No `Model::query()`, no
 `app(SomeService::class)`, no `kSiteFlag()` switch deciding what appears: the page
-reads those in a `#[Computed]`, the logic behind the read lives in a service, and
-the component is handed the answer.
+reads those in a `#[Computed]` — or, on a read-only public page, its controller —
+the logic behind the read lives in a service, and the component is handed the answer.
 
 ```blade
-{{-- pages/site/⚡home.blade.php --}}
-<x-site.stats :stats="$this->stats" />      {{-- stats(): SiteStatsService::frontPage() --}}
-<x-site.latest-posts :posts="$this->latestPosts" />
+{{-- site/contact.blade.php, rendered by Site\PageController::contact() --}}
+<x-site.contact :locations="$locations" />   {{-- SiteConfigurationService::contactLocations() --}}
 ```
 
 What a component *may* work out for itself is how to draw what it was given — a
@@ -33,13 +32,13 @@ by the data, not by a query inside the component.
 | --- | --- | --- |
 | `dashboard/` | Authenticated workspace chrome and tiles | `avatar`, `stat-card`, `stat-pill`, `mini-stat`, `icon-box`, `progress-ring`, `item`, `sidebar`, `top-navigation`, `tab-nav`, `workspace-no-record`, `confirm-modal`, plus the `gate.*` and `role.*` sub-groups below |
 | `chart/` | The SVG chart set — see [dashboard.md](dashboard.md) | `chart`, `chart.svg`, `chart.line`, `chart.area`, `chart.bar`, `chart.point`, `chart.axis`, `chart.axis.grid`, `chart.axis.line`, `chart.axis.tick`, `chart.cursor`, `chart.tooltip`, `chart.tooltip.heading`, `chart.tooltip.value` |
-| `form/` | Field wrappers Flux does not provide | `markdown-field`, `image-field`, `file-field`, `number-field`, `phone-field`, `password` |
+| `form/` | Field wrappers Flux does not provide | `rich-text`, `image-field`, `file-field`, `number-field`, `phone-field`, `password` |
 | `site/` | Public marketing sections | `hero`, `features`, `trainings`, `cohorts`, `trainers`, `testimonials`, `faq`, `cta`, `contact`, `footer`, `navbar`, `brand`, `reveal`, `section-heading`, `empty-state`, `legal-page`, `training-card`, `cohort-card` |
 | `training/` | Cohort/class domain widgets | `cohort-card`, `cohort-status`, `cohort-actions`, `cohort-completion`, `cohort-locked-callout`, `class-session-form`, `banner-badge`, `refund-destination`, `trainer-drop-links` |
 | `finance/` | Money widgets | `withdraw-button-card`, `withdraw-modal` |
-| `layouts/` | Page shells | `base`, `email`, `site-master`, `email/theme`, `email/label-value` |
+| `layouts/` | Page shells | `base`, `email`, `site`, `email/theme`, `email/label-value` |
 | `lv/` | Embedded **Livewire** SFCs | `⚡notifications`, `⚡newsletter-form` |
-| `util/` | Small standalone widgets | `e-badge` (`<x-util.e-badge :enum="…" />`), `countdown`, `floating-actions` |
+| `util/` | Small standalone widgets | `e-badge` (`<x-util.e-badge :enum="…" />`), `brand` (the logo — `<x-util.brand />`, never `flux:brand`), `countdown`, `floating-actions` |
 
 ### Sub-groups
 
@@ -152,7 +151,7 @@ Tone mapping uses a `match` with a `default`:
         'rose' => 'bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300',
         'emerald' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
         'slate' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-        default => 'bg-lime-100 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300',
+        default => 'bg-brand-100 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300',
     };
 @endphp
 ```
@@ -288,7 +287,7 @@ the call site. (The same file renders a switch instead when the page passes `id`
         'amber' => 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
         'emerald' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300',
         'rose' => 'bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300',
-        'lime' => 'bg-lime-100 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300',
+        'lime' => 'bg-brand-100 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300',
         default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
     };
 @endphp
@@ -326,4 +325,4 @@ Used as:
 - A tone outside the six-tone palette (see [ui.md](ui.md)).
 - Missing `dark:` variants on hand-written colour classes.
 - `{!! !!}` on genuinely user-supplied strings (names, questions, descriptions) — only
-  on project-authored markup props and compiled markdown from `MarkdownService`.
+  on project-authored markup props and rich text sanitised by `BlogService::sanitize()` on save.

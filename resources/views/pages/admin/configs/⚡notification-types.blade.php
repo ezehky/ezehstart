@@ -305,10 +305,11 @@ new class extends Component
             <flux:input
                 wire:model="notification_type"
                 label="Key"
+                placeholder="e.g. new-post"
                 description="The identifier code matches on. Changing it on an existing type orphans anything referring to it."
             />
-            <flux:textarea wire:model="description" label="Description" rows="2" description="Shown under the switch on the member's settings page." />
-            <flux:input type="number" wire:model="flow_order" label="Order" />
+            <flux:textarea wire:model="description" label="Description" placeholder="e.g. An email whenever a new post goes live" rows="2" description="Shown under the switch on the member's settings page." />
+            <flux:input type="number" wire:model="flow_order" label="Order" placeholder="e.g. 1" />
             <flux:switch wire:model="status" label="Offered to users" description="Turning this off silences the type for everybody, whatever their own switch says." />
 
             <div class="flex justify-end gap-3">

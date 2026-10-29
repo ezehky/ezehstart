@@ -7,5 +7,5 @@
 <g
     x-init="registerSeries({ field: @js($field), type: 'area' })"
     x-html="renderArea(@js($field), { curve: @js($curve), opacity: @js($opacity) })"
-    {{ $attributes->class('text-lime-500 dark:text-lime-400') }}
+    {{ $attributes->class('text-brand-500 dark:text-brand-400') }}
 ></g>

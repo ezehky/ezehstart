@@ -22,7 +22,7 @@
 
         <main class="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-16">
             @if ($code)
-                <p class="font-heading text-7xl font-bold tracking-tight text-lime-600 sm:text-8xl dark:text-lime-400">
+                <p class="font-heading text-7xl font-bold tracking-tight text-brand-600 sm:text-8xl dark:text-brand-400">
                     {{ $code }}
                 </p>
             @endif

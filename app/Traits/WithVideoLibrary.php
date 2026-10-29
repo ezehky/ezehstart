@@ -694,7 +694,7 @@ trait WithVideoLibrary
 
             $service->updateFolder($folder, $this->folder_name, $visibility, $role);
         } else {
-            $service->createFolder(
+            $created = $service->createFolder(
                 $this->user,
                 $this->folder_name,
                 $this->folder_parent_id ? VideoFolder::query()->find($this->folder_parent_id) : null,
@@ -706,6 +706,11 @@ trait WithVideoLibrary
 
         $this->closePanel();
         unset($this->folders, $this->videos);
+
+        // A folder just made is where the next video is headed, so open it.
+        if (isset($created)) {
+            $this->selectFolder($created->id);
+        }
 
         return $this->respondSuccess('The folder has been saved.');
     }

@@ -128,7 +128,7 @@ Never generate any of the following in this project:
 
 | Banned | Use instead |
 | --- | --- |
-| `app/Livewire/*.php` class components | SFC at `resources/views/pages/**/⚡name.blade.php` |
+| `app/Livewire/*.php` class components | SFC at `resources/views/pages/**/⚡name.blade.php` — or, for a read-only public page, a controller in `app/Http/Controllers/Site/` |
 | `Route::get(..., SomeLivewireClass::class)` | `Route::livewire('/path', 'pages::group.name')` |
 | `render()` method in a Livewire component | The Blade below the `?>` in the SFC |
 | `$rules` public array property | `protected function rules(): array` |
@@ -145,7 +145,8 @@ Never generate any of the following in this project:
 | Raw `number_format($money)` for currency | `kMoneyFormat()` / `->fooMoney()` |
 | `Carbon::parse($x)->format(...)` in Blade | `->fooHuman()` / `kDatetimeConverter()` |
 | A query, `app(SomeService::class)`, or a `kSiteFlag()` decision in a Blade view or component | A `#[Computed]` on the page, backed by a service; the component takes the result as a prop |
-| `Route::view()` for a page that reads anything | `Route::livewire('/path', 'pages::site.name')` with `#[Layout('layouts::site')]` |
+| `Route::view()` for a page that reads anything | A read-only public page: a `Site\{Section}Controller` method returning a `site.*` view on `<x-layouts.site>`. A public page the visitor fills in: `Route::livewire('/path', 'pages::site.name')` with `#[Layout('layouts::site')]`. See [pages.md](pages.md) shape G |
+| A Livewire component for a public page nobody fills in | The controller + Blade view above; filters are query-string links and GET forms |
 | `Str::slug()` | `kSlug()` |
 | `@livewire('…')` | `<livewire:… />` or the page route |
 | New base folders under `app/` | One of the 16 existing folders |

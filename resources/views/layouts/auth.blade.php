@@ -8,12 +8,7 @@
                     <livewire:livewire.language-switcher />
                 </div>
 
-                <flux:brand
-                    href="{{ route('home') }}"
-                    :logo="$_configs['logo'] ?? ''"
-                    :logoDark="$_configs['logo-dark'] ?? ''"
-                    alt="{{ $_configs['name'] }} official logo"
-                />
+                <x-util.brand />
 
                 <div class="mt-10">
                     @isset($tag)
@@ -38,7 +33,7 @@
             </div>
         </section>
 
-        <aside class="relative hidden overflow-hidden bg-lime-400 p-16 text-slate-950 lg:flex lg:flex-col lg:justify-between">
+        <aside class="relative hidden overflow-hidden bg-brand-400 p-16 text-slate-950 lg:flex lg:flex-col lg:justify-between">
             <div
                 class="absolute inset-0 opacity-20"
                 style="background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 22px 22px;"

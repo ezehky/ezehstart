@@ -50,7 +50,7 @@
         'amber' => 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300',
         'sky' => 'bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300',
         'rose' => 'bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300',
-        'lime' => 'bg-lime-100 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300',
+        'lime' => 'bg-brand-100 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300',
         default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
     };
 
@@ -62,7 +62,7 @@
         'sky' => 'text-sky-500 dark:text-sky-400',
         'rose' => 'text-rose-500 dark:text-rose-400',
         'slate' => 'text-slate-400 dark:text-slate-500',
-        default => 'text-lime-500 dark:text-lime-400',
+        default => 'text-brand-500 dark:text-brand-400',
     };
 
     $trend = $trend instanceof \Illuminate\Support\Collection ? $trend->values()->all() : $trend;

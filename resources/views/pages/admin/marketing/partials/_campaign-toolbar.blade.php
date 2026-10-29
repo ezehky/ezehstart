@@ -55,7 +55,7 @@
                 @if ($reachable) wire:click="$set('step', '{{ $key }}')" @else disabled @endif
                 @class([
                     'press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
-                    'bg-slate-900 text-white dark:bg-lime-400 dark:text-slate-950' => $step === $key,
+                    'bg-slate-900 text-white dark:bg-brand-400 dark:text-slate-950' => $step === $key,
                     'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900' => $step !== $key && $reachable,
                     'text-slate-300 dark:text-slate-700' => ! $reachable,
                 ])

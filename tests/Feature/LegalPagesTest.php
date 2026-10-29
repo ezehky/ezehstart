@@ -41,13 +41,13 @@ test('a policy nobody has written yet still answers, and says so', function () {
 });
 
 test('a draft is never shown on the public page', function () {
-    publishedPolicy(attributes: ['content' => '## Live section', 'version' => '1.0']);
+    publishedPolicy(attributes: ['content' => '<h2>Live section</h2>', 'version' => '1.0']);
 
     Policy::query()->create([
         'policy_type' => PolicyTypeEnum::TERMS,
         'version' => '2.0',
         'title' => 'Terms of Service',
-        'content' => '## Draft section',
+        'content' => '<h2>Draft section</h2>',
         'requires_consent' => StatusYes::YES,
         'status' => StatusPolicy::DRAFT,
     ]);
@@ -63,13 +63,13 @@ test('a draft is never shown on the public page', function () {
  * people are actually held to until the new one starts.
  */
 test('a version published ahead of its date is not yet in force', function () {
-    publishedPolicy(attributes: ['content' => '## Current terms']);
+    publishedPolicy(attributes: ['content' => '<h2>Current terms</h2>']);
 
     Policy::query()->create([
         'policy_type' => PolicyTypeEnum::TERMS,
         'version' => '2.0',
         'title' => 'Terms of Service',
-        'content' => '## Future terms',
+        'content' => '<h2>Future terms</h2>',
         'requires_consent' => StatusYes::YES,
         'status' => StatusPolicy::PUBLISHED,
         'effective_at' => now()->addMonth(),
@@ -88,7 +88,7 @@ test('a version published ahead of its date is not yet in force', function () {
 test('an archived version stays readable by its version number', function () {
     publishedPolicy(attributes: [
         'version' => '1.0',
-        'content' => '## Old wording',
+        'content' => '<h2>Old wording</h2>',
         'status' => StatusPolicy::ARCHIVED,
     ]);
 
@@ -98,13 +98,13 @@ test('an archived version stays readable by its version number', function () {
 });
 
 test('a draft cannot be reached by its version number either', function () {
-    publishedPolicy(attributes: ['content' => '## Live wording']);
+    publishedPolicy(attributes: ['content' => '<h2>Live wording</h2>']);
 
     Policy::query()->create([
         'policy_type' => PolicyTypeEnum::TERMS,
         'version' => '9.0',
         'title' => 'Terms of Service',
-        'content' => '## Unpublished wording',
+        'content' => '<h2>Unpublished wording</h2>',
         'requires_consent' => StatusYes::YES,
         'status' => StatusPolicy::DRAFT,
     ]);
@@ -138,7 +138,7 @@ test('the landing page footer links to every policy', function () {
 
 test('each heading becomes a section with an anchor derived from it', function () {
     $sections = app(PolicyContentService::class)
-        ->sections("## 1. What we collect\n\nSome text.\n\n## 2. Your rights\n\nMore text.");
+        ->sections('<h2>1. What we collect</h2><p>Some text.</p><h2>2. Your rights</h2><p>More text.</p>');
 
     expect($sections)->toHaveCount(2)
         // The leading numbering is dropped, so renumbering the sections later does
@@ -153,8 +153,8 @@ test('each heading becomes a section with an anchor derived from it', function (
  * contracts and emails nobody can go back and edit.
  */
 test('an explicit anchor survives the heading being reworded', function () {
-    $first = app(PolicyContentService::class)->sections('## 5. Refunds {#refunds}');
-    $second = app(PolicyContentService::class)->sections('## 5. Refunds and cancellations {#refunds}');
+    $first = app(PolicyContentService::class)->sections('<h2>5. Refunds {#refunds}</h2>');
+    $second = app(PolicyContentService::class)->sections('<h2>5. Refunds and cancellations {#refunds}</h2>');
 
     expect($first[0]['id'])->toBe('refunds')
         ->and($second[0]['id'])->toBe('refunds')
@@ -163,7 +163,7 @@ test('an explicit anchor survives the heading being reworded', function () {
 
 test('two headings that slug the same still get distinct anchors', function () {
     $sections = app(PolicyContentService::class)
-        ->sections("## Contact\n\nOne.\n\n## Contact\n\nTwo.");
+        ->sections('<h2>Contact</h2><p>One.</p><h2>Contact</h2><p>Two.</p>');
 
     expect($sections[0]['id'])->not->toBe($sections[1]['id']);
 });
@@ -174,18 +174,19 @@ test('two headings that slug the same still get distinct anchors', function () {
  */
 test('a preamble renders but stays out of the contents', function () {
     $sections = app(PolicyContentService::class)
-        ->sections("An opening paragraph.\n\n## 1. First\n\nBody.");
+        ->sections('<p>An opening paragraph.</p><h2>1. First</h2><p>Body.</p>');
 
     expect($sections)->toHaveCount(2)
         ->and($sections[0]['title'])->toBeNull()
         ->and($sections[0]['html'])->toContain('An opening paragraph.');
 });
 
-test('markdown in a policy cannot inject script into the page', function () {
+test('markup inside a heading reaches the contents as plain text', function () {
     $sections = app(PolicyContentService::class)
-        ->sections("## Heading\n\n<script>alert('x')</script>");
+        ->sections('<h2><strong>Fees</strong> &amp; refunds</h2><p>Body.</p>');
 
-    expect($sections[0]['html'])->not->toContain('<script>');
+    expect($sections[0]['title'])->toBe('Fees & refunds')
+        ->and($sections[0]['id'])->toBe('fees-and-refunds');
 });
 
 test('nothing compiles to no sections at all', function () {
@@ -238,14 +239,15 @@ test('the FAQ section is absent entirely when nothing is published', function ()
         ->assertDontSee('Frequently asked questions');
 });
 
-test('an answer is rendered as markdown, with raw html escaped', function () {
-    $faq = Faq::query()->create([
-        'question' => 'Is markdown supported?',
-        'answer' => "Yes, **bold** works.\n\n<script>alert('x')</script>",
+test('an answer is printed with its formatting', function () {
+    Faq::query()->create([
+        'question' => 'Is formatting supported?',
+        'answer' => '<p>Yes, <strong>bold</strong> works.</p>',
         'flow_order' => 1,
         'status' => StatusDefault::ACTIVE,
     ]);
 
-    expect($faq->answerHtml())->toContain('<strong>bold</strong>')
-        ->and($faq->answerHtml())->not->toContain('<script>');
+    $this->get(route('home'))
+        ->assertSuccessful()
+        ->assertSee('<strong>bold</strong>', false);
 });

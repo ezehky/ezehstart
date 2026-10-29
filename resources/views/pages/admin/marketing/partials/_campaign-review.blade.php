@@ -9,7 +9,7 @@
             <flux:heading level="2" size="lg">Email settings</flux:heading>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <flux:input wire:model="from_name" label="From name" />
+                <flux:input wire:model="from_name" label="From name" placeholder="e.g. The team at Ezeh" />
 
                 {{-- A select, not a box. An address the mail service has never been told
                     to send for is a campaign that lands in spam, so the only choices

@@ -29,7 +29,7 @@ complete.
 | PHP | 8.3+ |
 | UI | Livewire 4 — **single-file components only** (`⚡name.blade.php`) |
 | Components | Flux UI free v2 |
-| CSS | Tailwind v4 (CSS-first, lime accent, `zinc`→`slate` remap) |
+| CSS | Tailwind v4 (CSS-first, `brand-*` accent, `zinc`→`slate` remap) |
 | JS | Alpine (bundled with Livewire) |
 | Tests | Pest 5 |
 | Format | Laravel Pint, default preset |

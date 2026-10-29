@@ -6,7 +6,7 @@
         </div>
 
         <div class="space-y-3">
-            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'all_users' ? 'border-lime-500 bg-lime-50 dark:bg-lime-400/10' : 'border-slate-200 dark:border-slate-700' }}">
+            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'all_users' ? 'border-brand-500 bg-brand-50 dark:bg-brand-400/10' : 'border-slate-200 dark:border-slate-700' }}">
                 <input type="radio" wire:model.live="email_recipient_type" value="all_users" class="mt-1">
                 <span>
                     <span class="block font-medium">All users</span>
@@ -14,7 +14,7 @@
                 </span>
             </label>
 
-            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'preferences' ? 'border-lime-500 bg-lime-50 dark:bg-lime-400/10' : 'border-slate-200 dark:border-slate-700' }}">
+            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'preferences' ? 'border-brand-500 bg-brand-50 dark:bg-brand-400/10' : 'border-slate-200 dark:border-slate-700' }}">
                 <input type="radio" wire:model.live="email_recipient_type" value="preferences" class="mt-1">
                 <span class="w-full">
                     <span class="block font-medium">Notification preferences</span>
@@ -33,7 +33,7 @@
                 </span>
             </label>
 
-            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'specific' ? 'border-lime-500 bg-lime-50 dark:bg-lime-400/10' : 'border-slate-200 dark:border-slate-700' }}">
+            <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 {{ $email_recipient_type === 'specific' ? 'border-brand-500 bg-brand-50 dark:bg-brand-400/10' : 'border-slate-200 dark:border-slate-700' }}">
                 <input type="radio" wire:model.live="email_recipient_type" value="specific" class="mt-1">
                 <span class="w-full">
                     <span class="block font-medium">Specific email addresses</span>

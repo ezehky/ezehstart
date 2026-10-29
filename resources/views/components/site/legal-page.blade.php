@@ -3,9 +3,9 @@
     'intro' => null,
     'version' => null,
     'updatedAt' => null,
-    // Compiled by PolicyContentService: id, title (null keeps it out of the
-    // contents sidebar) and html. The html is markdown-derived with raw input
-    // escaped by MarkdownService, so it is safe to render unescaped.
+    // Split by PolicyContentService: id, title (null keeps it out of the
+    // contents sidebar) and html. The html was sanitised on the way in by
+    // BlogService::sanitize(), so it is safe to render unescaped.
     'sections' => [],
     // The other policies, linked at the foot of the page.
     'related' => [],
@@ -59,7 +59,7 @@
                             <li>
                                 <a
                                     href="#{{ $section['id'] }}"
-                                    class="text-sm text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500 dark:text-slate-400 dark:hover:text-white"
+                                    class="text-sm text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:text-slate-400 dark:hover:text-white"
                                 >
                                     {{ $section['title'] }}
                                 </a>
@@ -83,7 +83,7 @@
                                 </h2>
                             @endif
 
-                            <div class="markdown-prose mt-4">
+                            <div class="rich-prose mt-4">
                                 {!! $section['html'] !!}
                             </div>
                         </section>
@@ -108,7 +108,7 @@
                             <li>
                                 <a
                                     href="{{ $item['href'] }}"
-                                    class="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3.5 transition-colors hover:border-lime-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500 dark:border-white/10 dark:hover:border-lime-400/30 dark:hover:bg-white/5"
+                                    class="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3.5 transition-colors hover:border-brand-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-white/10 dark:hover:border-brand-400/30 dark:hover:bg-white/5"
                                 >
                                     <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $item['label'] }}</span>
                                     <flux:icon name="arrow-right" class="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />

@@ -37,7 +37,6 @@ existing file.
 | `kConvertToString` | `(mixed $value): string` | Any value → string (JSON for arrays/objects) |
 | `kRemoveUnicode` | `(string $text): string` | Strip emoji / non-ASCII |
 | `kStripDomainProtocols` | `(?string $url = null, ?string $prefix = null, string $character = '@', ?string $protocol = null): string` | `https://site.test` → `site.test`, or `info@site.test`. Any port is dropped, so a local `APP_URL` still yields a valid address |
-| `kMarkdownFormat` | `(): array` | The markdown cheat-sheet rendered in `x-form.markdown-field` |
 
 ### `money-helpers.php`
 

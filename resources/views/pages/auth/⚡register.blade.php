@@ -254,7 +254,7 @@ new #[Layout('layouts::auth')] class extends Component
                 <button
                     type="button"
                     x-on:click="withPasskey = ! withPasskey; error = null"
-                    class="text-sm font-medium text-lime-700 hover:text-lime-800 dark:text-lime-400"
+                    class="text-sm font-medium text-brand-700 hover:text-brand-800 dark:text-brand-400"
                     x-text="withPasskey ? @js(__('Use a password instead')) : @js(__('Sign up with a passkey instead'))"
                 ></button>
             </div>

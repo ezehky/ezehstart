@@ -40,7 +40,7 @@ test('an icon sits on a tinted tile by default, or bare when asked', function ()
     $plain = Blade::render('<x-util.counter :to="10" icon="users" icon-style="plain" />');
 
     expect($boxed)->toContain('bg-sky-50')->toContain('<svg')
-        ->and($plain)->not->toContain('rounded-xl')->toContain('text-lime-700')->toContain('<svg')
+        ->and($plain)->not->toContain('rounded-xl')->toContain('text-brand-700')->toContain('<svg')
         ->and(Blade::render('<x-util.counter :to="10" />'))->not->toContain('<svg');
 });
 

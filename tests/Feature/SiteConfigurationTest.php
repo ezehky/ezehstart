@@ -3,6 +3,7 @@
 use App\Enums\UserTypeEnum;
 use App\Services\CaptchaService;
 use App\Services\SiteConfigurationService;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 // test('a fresh install reads no stored configuration', function () {
@@ -156,4 +157,25 @@ test('a switch turned off stays off after a save', function () {
     // Read with kSiteFlag rather than kSiteConfig: a deliberate false would come
     // back as the default through kSiteConfig's falsy check.
     expect(kSiteFlag('security', 'passwordless-login', true))->toBeFalse();
+});
+
+// |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+// LOGO
+
+test('an uploaded logo stands in for a dark one that was never uploaded', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('site-config/site-logo.png', 'png');
+
+    $service = app(SiteConfigurationService::class);
+    $service->update([...$service->getConfigs(raw: true), 'logo' => 'site-config/site-logo.png', 'logo-dark' => null]);
+
+    expect(kSiteConfig('logo-dark'))->toBe(kSiteConfig('logo'))
+        ->and(kSiteConfig('logo'))->toContain('site-logo.png');
+});
+
+test('the brand shows both logos, each to its own theme', function () {
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertSee('dark:hidden', false)
+        ->assertSee('official logo');
 });

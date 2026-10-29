@@ -104,7 +104,7 @@ new class extends Component
                     <flux:card class="space-y-0! overflow-hidden p-0!" wire:key="template-{{ $item->id }}">
                         <div class="flex h-32 items-center justify-center bg-slate-100 dark:bg-slate-800">
                             @if ($item->thumbnailImage)
-                                <img src="{{ $item->thumbnailImage->url() }}" alt="" class="h-full w-full object-cover" />
+                                <img src="{{ $item->thumbnailImage->url() }}" alt="{{ __('Thumbnail of :name', ['name' => $item->name]) }}" class="h-full w-full object-cover" />
                             @else
                                 <flux:icon name="document-duplicate" class="size-8 text-slate-300 dark:text-slate-600" />
                             @endif
