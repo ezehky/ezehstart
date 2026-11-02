@@ -200,6 +200,8 @@ in that folder.
 ## Getting started
 
 ```bash
+laravel new app-name --using=ezehky/ezehstart
+cd app-name
 composer setup     # install, key, migrate, npm install, npm run build
 composer dev       # server + queue + vite together
 ```
