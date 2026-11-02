@@ -60,7 +60,7 @@ is integer minor units throughout. Administrators get a review queue and a manua
 adjustment that records who moved what and why.
 
 **Payments** — gateway checkouts for Paystack, Flutterwave, Stripe, PayPal, OPay,
-Monnify and Korapay, as plain HTTP calls with no vendor SDKs. A payment is never
+Monnify, Korapay and Bachs, as plain HTTP calls with no vendor SDKs. A payment is never
 confirmed from the URL: the callback, the signed and queued webhook, and a reconcile
 sweep every ten minutes all ask the vendor, and short or wrong-currency money is held
 for review instead of credited. Partial and full refunds go through the vendor, or are
@@ -68,15 +68,18 @@ recorded by hand for a bank transfer. Domain events (`PaymentSucceeded`,
 `RefundProcessed` and others) let a project fulfil an order without the kit knowing
 what an order is. An optional **processing fee** per vendor (a percentage, plus a flat
 amount, up to a cap) goes on top of a purchase. It's kept as its own charge row and
-never added to a wallet deposit. Every fee is zero until an owner sets one. An admin
+never added to a wallet deposit. A vendor can carry a second, dearer fee for cards from
+outside a home country. Every fee is zero until an owner sets one. An admin
 **Payments** screen shows the webhooks, the traces, which vendors are configured, and
 each vendor's fee.
 
 **Subscriptions** — billed by the vendor (Paystack, Flutterwave, Stripe, PayPal). Each
 plan has one price per interval, and the pricing card works out what a longer interval
 saves. There's an optional free plan, card-less trials the kit runs itself, and plans
-that include another plan. Paid features are gated by feature, never by plan name:
-`SubscriptionService::allows()` and `limitFor()` with a `SubscriptionFeatureEnum` case.
+that include another plan. A member who cancels can switch renewal back on while paid
+time is left (all but PayPal, whose cancel is final). Paid features are gated by
+feature, never by plan name: `SubscriptionService::allows()` and `limitFor()` with a
+`SubscriptionFeatureEnum` case.
 
 **Roles and workspaces** — a role is a row an administrator creates from the dashboard,
 not an enum case, and it divides up the admin workspace only. An admin carries **any
@@ -138,7 +141,9 @@ versioned: published text is superseded by a new draft rather than edited, and t
 version stays readable at `?version=`, because a consent record points at it. Terms and
 privacy are marked as requiring consent, so registration asks for it and records the
 version accepted, with timestamp, IP and user agent. Publish a replacement and everyone
-is outstanding again until they accept it.
+is outstanding again until they accept it. Publishing can also email every active
+member a notice with a link to the new version. It's a box in the publish dialog, off by
+default, and the emails are queued after the response.
 
 **Public site** — read-only pages are plain controllers under `Site\` rendering
 `resources/views/site/` views, so they're crawlable and cost no Livewire snapshot. Only a
@@ -152,7 +157,8 @@ off the enum.
 database notifications whose *types* are rows rather than code, so a new one can be
 added without a deploy and every account picks up a switch for it on their next visit. A
 site configuration editable from the admin rather than from a deploy, 250 countries
-seeded from a file in the repository rather than a network call, and a styled
+and their states and regions seeded from files in the repository rather than a network
+call, and a styled
 confirmation modal in front of every destructive write.
 
 **Passkeys** — WebAuthn through `spatie/laravel-passkeys`, behind `security.passkeys`.
@@ -166,6 +172,12 @@ daily-to-quarterly recurrence; and a sent history. `{{token | default: "…"}}` 
 the same way in a subject as in a block. A builder template can also stand in for a
 system mailable (`SystemEmailEnum`, `WithSystemTemplate`); unassigned, the Blade view is
 sent as before.
+
+**Email delivery** — Configuration › Email delivery picks where mail goes: the log (the
+default), Resend, Brevo, or any SMTP service. Resend and Brevo are the kit's own HTTP
+transports, so there's no SDK. Keys live in `.env`, never in the site configuration. A
+provider without its keys can't be picked, and a test email shows the provider's own
+answer.
 
 **Newsletter and announcements** — no subscribers table: an address is a `users` row
 and the subscription is the `ANNOUNCEMENTS` switch it already carries. The public popup
@@ -192,8 +204,8 @@ composer setup     # install, key, migrate, npm install, npm run build
 composer dev       # server + queue + vite together
 ```
 
-Then seed the roles, the notification types, the countries, the site configuration and
-an admin:
+Then seed the roles, the notification types, the countries and their regions, the site
+configuration and an admin:
 
 ```bash
 php artisan db:seed
@@ -226,7 +238,9 @@ because payment webhooks are processed on the queue.
 
 Optional environment keys: `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` for the
 captcha (the switch does nothing without both), `LARAVEL_PDF_DRIVER`, which is `dompdf`
-and needs nothing installed, and the payments block in `.env.example`. A payment vendor
+and needs nothing installed, `RESEND_API_KEY` or `BREVO_API_KEY` (or the `MAIL_*` SMTP
+keys) for the provider picked on Email delivery, and the payments block in
+`.env.example`. Until a provider is picked, email goes to the log. A payment vendor
 is offered once every key it needs is filled in. `php artisan payments:health` checks
 them, and each vendor's webhook URL is `/webhooks/payments/{vendor}`.
 

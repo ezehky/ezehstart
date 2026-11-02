@@ -9,6 +9,141 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-02
+
+Email can now go out through Resend, Brevo or any SMTP service, picked from the
+dashboard. There's an eighth payment vendor (Bachs), a separate fee for cards from
+abroad, a way to switch a cancelled subscription back on, an optional email to members
+when a policy is published, and every country's states and regions as reference data.
+There's one new table (`regions`) and nothing is renamed. **A project that implements
+`SupportsSubscriptions` itself has one method to add.** See **Upgrading**.
+
+### Added
+
+#### Email delivery
+
+- **Configuration › Email delivery** (`admin.config.email-delivery`) picks where
+  outgoing email goes: **Log only** (the default), **Resend**, **Brevo** or **SMTP**.
+  SMTP covers every other service that offers it: Mailgun, SendGrid, Zoho, Amazon SES,
+  or a host's own mail server. The cases are on the new `MailProviderEnum`.
+  - The keys stay in `.env` (`RESEND_API_KEY`, `BREVO_API_KEY`, or the usual `MAIL_*`
+    for SMTP) and are never shown or stored in the site configuration. The screen only
+    says which ones are set.
+  - A provider whose keys are missing can't be picked. If a pick loses its keys later,
+    mail goes to the log until they're back, so nothing fails and nothing leaves the
+    server by accident.
+  - **Send a test** sends straight away (not queued) through the selected provider,
+    saved or not, and shows the provider's own answer.
+  - Changing the provider needs full access. Sending a test needs modify.
+- **Resend and Brevo are our own HTTP transports**, in `app/Services/Mail/`
+  (`ApiTransport`, `ResendTransport`, `BrevoTransport`). There's no SDK to install.
+  Resend's replaces Laravel's built-in `resend` transport, which needs the Resend SDK.
+  Attachments, cc, bcc, reply-to and custom headers such as
+  `List-Unsubscribe` are all passed on. A provider that refuses a message throws, so a
+  queued email retries.
+- **`MailDeliveryService`** reads the pick (`mail-delivery.provider` in the site
+  configuration) and sets `mail.default` when the app boots and again before every
+  queued job. A running queue worker follows a change without a restart.
+
+#### Payments
+
+- **Bachs**, the eighth vendor (`PaymentVendorEnum::BACHS`): cards, NGN bank transfer,
+  mobile money and stablecoins in one hosted checkout. It supports checkouts,
+  verification, signed webhooks (with a five-minute replay window), and full and
+  partial refunds. It is one-off only and is never offered for a subscription plan. The
+  key decides the host: `sk_live_` goes to the live API, anything else to the sandbox.
+  Set `BACHS_SECRET_KEY`, plus `BACHS_WEBHOOK_SECRET` in production.
+- **A separate processing fee for cards from abroad.** Each vendor can have a second
+  set of terms (percentage, flat amount, cap) for a card issued outside the **home
+  country**. Both are set on **Payments › Gateways**.
+  - They're stored under `payments.fees.{vendor}.international` and
+    `payments.home-country`. Null international terms mean the vendor charges every
+    card the same, which is how every vendor starts.
+  - The vendor only says where a card is from after the charge, so the terms are picked
+    before it. Pass `international:` to `PaymentService::checkout()` when the customer
+    has said. Left null, `PaymentFeeService::isInternational()` decides from the
+    profile country, then the phone country. An account with neither, or an install
+    with no home country set, pays the local fee.
+  - A row charged the international terms carries `fee_terms: international` in its
+    meta.
+  - `feeFor()`, `termsFor()` and `describe()` take an optional `$international` flag.
+    New: `hasInternationalTerms()`, `homeCountry()`, `saveHomeCountry()`. Both writes
+    are logged.
+- **Resuming a cancelled subscription.** `SubscriptionService::resume()` switches
+  renewal back on while paid time is left. The row goes back to `ACTIVE`, nothing is
+  charged now, and the vendor bills the card on file on the next renewal date.
+  - It works on Paystack, Flutterwave and Stripe
+    (`PaymentVendorEnum::resumesSubscriptions()`). PayPal's cancel is final, so a
+    member there subscribes again once the period ends. The member's screen says so.
+  - `Subscription::canBeResumed()` is true for a cancelled row, with time left, on a
+    vendor that can resume.
+  - Members get **Turn renewal back on** on their Subscriptions screen. Admins get
+    **Resume renewal** in the row menu, which is logged.
+  - It fires the new `SubscriptionResumed` event, the opposite of
+    `SubscriptionCancelled`.
+
+#### Policies
+
+- **Email members when a policy is published.** The publish dialog has an **Email all
+  members about this update** box, unticked by default, with the number it would reach.
+  Ticked, every active member gets a `PolicyUpdatedEmail` with the policy's intro and a
+  link to the version in force. Admins, newsletter-only addresses and suspended or
+  deleting accounts are left out.
+  - The emails are queued after the response has gone, one each, in chunks of 200. A
+    bad address costs nobody else theirs, and an email that fails to queue is logged to
+    the `ezeh` channel.
+  - It's a notice about the service, not marketing, so the account-email switch isn't
+    consulted.
+  - The activity log line says how many members were emailed.
+  - `PolicyContentService::memberRecipients()` and `emailMembers()` are the two new
+    methods.
+
+#### Reference data
+
+- **`regions`**: every country's top-level states and regions, as a `Region` model
+  (`Country::regions()`, `Region::country()`, an `active()` scope). `RegionSeeder` reads
+  `database/data/regions.json`, from the same dataset as the countries, so seeding
+  needs no network. It only ever inserts: a region somebody renamed or switched off
+  stays as they left it, and a re-seed skips the rows already there. A region in use is
+  switched off, never deleted.
+- `UserProfile::country()`, the relation the international fee reads.
+
+### Changed
+
+- `SupportsSubscriptions` has a new method, `resumeSubscription(Subscription)`. It
+  returns null when it worked, otherwise the reason it didn't. PayPal's always returns
+  the reason.
+- The **Payments › Gateways** fee column shows a second "Abroad:" line for a vendor
+  with international terms.
+
+### Upgrading
+
+Run the new migration and seed the regions:
+
+```bash
+php artisan migrate
+php artisan db:seed --class=RegionSeeder
+```
+
+**If your project implements `SupportsSubscriptions` on a gateway of its own**, add
+`resumeSubscription()`. If the vendor can't resume a subscription, return a sentence
+saying so (see `PaypalGatewayService`). It is only called for a vendor listed in
+`PaymentVendorEnum::resumesSubscriptions()`.
+
+**An install that sends email today will stop until a provider is picked.** The new
+screen's choice sets `mail.default` and overrides `MAIL_MAILER`, and it starts on Log
+only. An install delivering through `MAIL_MAILER=smtp` should open **Configuration ›
+Email delivery**, pick **SMTP** and save straight after deploying. Until then, receipts,
+codes and reminders go to the log. For Resend or Brevo, add the key to `.env` (see `.env.example`), then
+pick the provider and send a test.
+
+If the config is cached, rebuild it so the new mailer, the Brevo key and the Bachs
+block are read:
+
+```bash
+php artisan config:cache
+```
+
 ## [2.3.0] - 2026-10-30
 
 The public pages are now plain controllers, policies and FAQ answers are written in the
