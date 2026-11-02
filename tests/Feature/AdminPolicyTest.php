@@ -3,10 +3,13 @@
 use App\Enums\ActivityActionEnum;
 use App\Enums\PolicyTypeEnum;
 use App\Enums\StatusPolicy;
+use App\Enums\StatusUser;
 use App\Enums\UserTypeEnum;
+use App\Mail\PolicyUpdatedEmail;
 use App\Models\ActivityLog;
 use App\Models\Policy;
 use App\Services\PolicyContentService;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -193,4 +196,59 @@ test('the next version is offered as a whole number above the last', function ()
     publishedPolicy(attributes: ['version' => '1.0']);
 
     expect($service->getNextVersion(PolicyTypeEnum::TERMS))->toBe('2.0');
+});
+
+// ==================== Telling members
+
+test('publishing with the box ticked emails every active member and no admin', function () {
+    Mail::fake();
+    $this->withoutDefer();
+
+    $member = userOfType(UserTypeEnum::USER);
+    $suspended = userOfType(UserTypeEnum::USER, ['status' => StatusUser::SUSPENDED]);
+
+    $draft = Policy::query()->create([
+        'policy_type' => PolicyTypeEnum::TERMS,
+        'version' => '2.0',
+        'title' => 'Terms of Service',
+        'intro' => 'We now explain refunds.',
+        'content' => '<h2>New</h2>',
+        'status' => StatusPolicy::DRAFT,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.static.policies')
+        ->call('confirmPublish', $draft->id)
+        ->assertSee('Email all members about this update')
+        ->set('notify_members', true)
+        ->call('publish')
+        ->assertHasNoErrors();
+
+    Mail::assertQueued(PolicyUpdatedEmail::class, fn ($mail) => $mail->hasTo($member->email) && $mail->policy->is($draft));
+    Mail::assertNotQueued(PolicyUpdatedEmail::class, fn ($mail) => $mail->hasTo($this->admin->email) || $mail->hasTo($suspended->email));
+
+    expect(ActivityLog::query()->where('description', 'like', '%emailed to 1 member%')->exists())->toBeTrue();
+});
+
+test('publishing with the box left clear emails nobody', function () {
+    Mail::fake();
+    $this->withoutDefer();
+
+    userOfType(UserTypeEnum::USER);
+
+    $draft = Policy::query()->create([
+        'policy_type' => PolicyTypeEnum::TERMS,
+        'version' => '2.0',
+        'title' => 'Terms of Service',
+        'content' => '<h2>New</h2>',
+        'status' => StatusPolicy::DRAFT,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.static.policies')
+        ->call('confirmPublish', $draft->id)
+        ->call('publish')
+        ->assertHasNoErrors();
+
+    Mail::assertNothingQueued();
 });

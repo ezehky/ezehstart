@@ -19,6 +19,7 @@ use App\Events\SubscriptionCancelled;
 use App\Events\SubscriptionEnded;
 use App\Events\SubscriptionPaymentFailed;
 use App\Events\SubscriptionRenewed;
+use App\Events\SubscriptionResumed;
 use App\Events\SubscriptionStarted;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
@@ -417,6 +418,38 @@ class SubscriptionService
         $subscription->save();
 
         SubscriptionCancelled::dispatch($subscription);
+
+        return null;
+    }
+
+    /**
+     * Undo a cancel while the paid time is still running: the vendor bills the
+     * card on file again from the next renewal date, so nothing is charged now.
+     */
+    public function resume(Subscription $subscription): ?string
+    {
+        if (! $subscription->canBeResumed()) {
+            return $subscription->vendor?->resumesSubscriptions() === false
+                ? "{$subscription->vendor->label()} cannot switch a cancelled subscription back on. Subscribe again once the current period ends."
+                : 'This subscription cannot be resumed.';
+        }
+
+        $gateway = $subscription->vendor->gateway();
+
+        if (! $gateway instanceof SupportsSubscriptions) {
+            return "{$subscription->vendor->label()} does not bill subscriptions.";
+        }
+
+        if ($error = $gateway->resumeSubscription($subscription)) {
+            return $error;
+        }
+
+        $subscription->status = StatusSubscription::ACTIVE;
+        $subscription->cancel_at_period_end = false;
+        $subscription->cancelled_at = null;
+        $subscription->save();
+
+        SubscriptionResumed::dispatch($subscription);
 
         return null;
     }

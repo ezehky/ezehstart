@@ -61,8 +61,15 @@ return [
             // ],
         ],
 
+        // Resend and Brevo are sent over their HTTP APIs by our own transports
+        // (App\Services\Mail), registered in AppServiceProvider. Keys in
+        // config/services.php; the one used is picked on Email delivery.
         'resend' => [
             'transport' => 'resend',
+        ],
+
+        'brevo' => [
+            'transport' => 'brevo',
         ],
 
         'sendmail' => [

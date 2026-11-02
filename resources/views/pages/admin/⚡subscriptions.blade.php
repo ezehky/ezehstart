@@ -359,6 +359,31 @@ new class extends Component
         return $this->respondSuccess('The subscription will not renew.');
     }
 
+    /**
+     * Undo a cancel for a member who changed their mind, while the paid time
+     * still runs. The provider bills the card again on the renewal date.
+     */
+    public function resumeSubscription(int $subscriptionId): bool
+    {
+        $this->checkGate();
+
+        $subscription = Subscription::query()->with(['user', 'plan'])->findOrFail($subscriptionId);
+
+        $error = app(SubscriptionService::class)->resume($subscription);
+
+        $this->respondError($error, $error !== null);
+
+        app(ActivityLogService::class)->logActivity(
+            ActivityActionEnum::UPDATE,
+            " subscription: resumed renewal of {$subscription->label()}",
+            model: $subscription,
+        );
+
+        unset($this->subscriptions);
+
+        return $this->respondSuccess("It will renew on {$subscription->current_period_ends_at?->format('M d, Y')}.");
+    }
+
     // Tools
 
     /**
@@ -583,6 +608,10 @@ new class extends Component
                                                 @if ($subscription->canBeCancelled())
                                                     <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="x-circle" variant="danger" wire:click="confirmCancel({{ $subscription->id }})">
                                                         Cancel
+                                                    </x-dashboard.gate.menu-item>
+                                                @elseif ($subscription->canBeResumed())
+                                                    <x-dashboard.gate.menu-item :gate="$pageGate" :level="$gateModify" icon="arrow-path" wire:click="resumeSubscription({{ $subscription->id }})">
+                                                        Resume renewal
                                                     </x-dashboard.gate.menu-item>
                                                 @endif
                                             </flux:menu>

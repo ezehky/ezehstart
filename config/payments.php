@@ -30,8 +30,8 @@ return [
     | vendor off without deleting its keys.
     |
     | `sandbox` picks the test host for the vendors that use a separate one
-    | (PayPal, OPay, Monnify). Paystack, Flutterwave, Stripe and Korapay tell
-    | test from live by the key itself.
+    | (PayPal, OPay, Monnify). Paystack, Flutterwave, Stripe, Korapay and
+    | Bachs tell test from live by the key itself.
     |
     */
 
@@ -95,6 +95,15 @@ return [
             'enabled' => (bool) env('KORAPAY_ENABLED', true),
             'public' => env('KORAPAY_PUBLIC_KEY'),
             'secret' => env('KORAPAY_SECRET_KEY'),
+        ],
+
+        // The key picks the host: sk_live_ goes to the live API, sk_sandbox_
+        // to the sandbox. The webhook secret is the endpoint's own signing
+        // secret, from the Developer Portal's Webhooks page.
+        'bachs' => [
+            'enabled' => (bool) env('BACHS_ENABLED', true),
+            'secret' => env('BACHS_SECRET_KEY'),
+            'webhook_secret' => env('BACHS_WEBHOOK_SECRET'),
         ],
 
     ],

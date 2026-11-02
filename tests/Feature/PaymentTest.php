@@ -22,6 +22,7 @@ use App\Services\Payment\Gateways\OpayGatewayService;
 use App\Services\Payment\PaymentFeeService;
 use App\Services\Payment\PaymentService;
 use App\Services\TransactionService;
+use Database\Seeders\CountrySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -667,4 +668,146 @@ test('the add funds button is hidden when no vendor is configured', function () 
     Livewire::actingAs($this->member)
         ->test('pages::user.transactions')
         ->assertDontSee('Add funds');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// CARDS FROM ABROAD
+
+test('a card from abroad pays the international terms, and the local ones while none are set', function () {
+    $fees = app(PaymentFeeService::class);
+
+    $fees->saveTerms(PaymentVendorEnum::PAYSTACK, 1.5, 100, 2000, ['percent' => 3.9, 'flat' => 100, 'cap' => 0]);
+    $fees->saveTerms(PaymentVendorEnum::STRIPE, 2, 0, 0);
+
+    expect($fees->feeFor(PaymentVendorEnum::PAYSTACK, 10000))->toBe(250.0)
+        ->and($fees->feeFor(PaymentVendorEnum::PAYSTACK, 10000, international: true))->toBe(490.0)
+        // No cap abroad, so a large sale pays the full percentage.
+        ->and($fees->feeFor(PaymentVendorEnum::PAYSTACK, 200000, international: true))->toBe(7900.0)
+        ->and($fees->hasInternationalTerms(PaymentVendorEnum::STRIPE))->toBeFalse()
+        ->and($fees->feeFor(PaymentVendorEnum::STRIPE, 10000, international: true))->toBe(200.0);
+});
+
+test('an account is presumed abroad only when its country is known and is not the home country', function () {
+    $fees = app(PaymentFeeService::class);
+
+    $this->member->update(['phone_iso2' => 'GB']);
+
+    // No home country set: nobody is abroad.
+    expect($fees->isInternational($this->member))->toBeFalse();
+
+    $fees->saveHomeCountry('ng');
+
+    expect($fees->homeCountry())->toBe('NG')
+        ->and($fees->isInternational($this->member->fresh()))->toBeTrue();
+
+    $this->member->update(['phone_iso2' => 'NG']);
+    expect($fees->isInternational($this->member->fresh()))->toBeFalse();
+
+    // Saying nothing about where you are is the cheaper guess.
+    $this->member->update(['phone_iso2' => null]);
+    expect($fees->isInternational($this->member->fresh()))->toBeFalse();
+});
+
+test('a checkout presumes the card from the account and a caller can say otherwise', function () {
+    $fees = app(PaymentFeeService::class);
+    $fees->saveTerms(PaymentVendorEnum::PAYSTACK, 1.5, 0, 0, ['percent' => 4, 'flat' => 0, 'cap' => 0]);
+    $fees->saveHomeCountry('NG');
+
+    $this->member->update(['phone_iso2' => 'GB']);
+
+    Http::fake([
+        'api.paystack.co/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => ['authorization_url' => 'https://checkout.paystack.com/abc', 'access_code' => 'abc', 'reference' => 'ignored'],
+        ]),
+    ]);
+
+    $purchase = fn (?bool $international = null) => app(PaymentService::class)->checkout(
+        $this->member->fresh(),
+        PaymentVendorEnum::PAYSTACK,
+        10000,
+        'An order',
+        TransactionGroupEnum::PURCHASE,
+        TransactionTypeEnum::DIRECT,
+        TransactionWalletEnum::NONE,
+        international: $international,
+    );
+
+    $presumed = $purchase();
+    $told = $purchase(false);
+
+    expect((float) $presumed->amount)->toBe(10400.0)
+        ->and($presumed->meta->content['fee_terms'] ?? null)->toBe('international')
+        ->and((float) $told->amount)->toBe(10150.0);
+});
+
+test('an administrator sets fees for cards from abroad and the home country', function () {
+    $this->seed(CountrySeeder::class);
+
+    $admin = userOfType(UserTypeEnum::ADMIN, ['email_verified_at' => now()]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.payments', ['tab' => 'gateways'])
+        ->call('editFee', PaymentVendorEnum::PAYSTACK->value)
+        ->set('feePercent', 1.5)
+        ->set('feeFlat', 100)
+        ->set('feeCap', 2000)
+        ->set('feeAbroad', true)
+        ->set('feeAbroadPercent', 3.9)
+        ->set('feeAbroadFlat', 100)
+        ->set('feeAbroadCap', 0)
+        ->call('saveFee')
+        ->assertHasNoErrors()
+        ->set('homeCountry', 'NG')
+        ->call('saveHomeCountry')
+        ->assertHasNoErrors()
+        ->set('homeCountry', 'ZZ')
+        ->call('saveHomeCountry')
+        ->assertHasErrors('homeCountry');
+
+    $fees = app(PaymentFeeService::class);
+
+    expect($fees->termsFor(PaymentVendorEnum::PAYSTACK, international: true))->toBe(['percent' => 3.9, 'flat' => 100.0, 'cap' => 0.0])
+        ->and($fees->homeCountry())->toBe('NG');
+});
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// BACHS
+
+test('Bachs opens a priced checkout session in major units', function () {
+    config(['payments.vendors.bachs.secret' => 'sk_sandbox_bachs']);
+
+    Http::fake([
+        'sandbox-api.bachs.io/v1/checkout-sessions' => Http::response([
+            'checkout_id' => 'cs_123',
+            'checkout_url' => 'https://pay.bachs.io/cs_123',
+        ]),
+    ]);
+
+    $transaction = app(PaymentService::class)->checkout($this->member, PaymentVendorEnum::BACHS, 5000, 'Wallet top-up');
+
+    expect($transaction->gateway->gateway_url)->toBe('https://pay.bachs.io/cs_123')
+        ->and($transaction->gateway->gateway_id)->toBe('cs_123');
+
+    Http::assertSent(fn ($request) => $request['pricing']['amount'] === '5000.00'
+        && $request['reference'] === $transaction->reference
+        && $request->hasHeader('Authorization', 'Bearer sk_sandbox_bachs'));
+});
+
+test('Bachs webhooks are signed over the timestamp and body, and stale ones are refused', function () {
+    config(['payments.vendors.bachs.webhook_secret' => 'whsec_bachs']);
+
+    $body = json_encode(['id' => 'evt_1', 'type' => 'checkout.completed', 'data' => ['reference' => 'TXN-1']]);
+    $signed = function (int $time, string $secret) use ($body) {
+        $request = Request::create('/', 'POST', content: $body);
+        $request->headers->set('X-Bachs-Signature-V2', "t={$time},v1=".hash_hmac('sha256', "{$time}.{$body}", $secret));
+
+        return $request;
+    };
+
+    $gateway = PaymentVendorEnum::BACHS->gateway();
+
+    expect($gateway->verifyWebhook($signed(time(), 'whsec_bachs')))->toBeTrue()
+        ->and($gateway->verifyWebhook($signed(time(), 'another-secret')))->toBeFalse()
+        ->and($gateway->verifyWebhook($signed(time() - 3600, 'whsec_bachs')))->toBeFalse();
 });

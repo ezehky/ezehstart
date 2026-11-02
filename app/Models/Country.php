@@ -48,6 +48,14 @@ class Country extends Model
         return $this->hasMany(UserProfile::class);
     }
 
+    /**
+     * Its states or regions, seeded from database/data/regions.json.
+     */
+    public function regions(): HasMany
+    {
+        return $this->hasMany(Region::class);
+    }
+
     // Scopes
 
     #[Scope]

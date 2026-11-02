@@ -39,6 +39,9 @@ new class extends Component
     /** The draft queued for publishing, held while the dialog states what it costs. */
     public ?int $publishId = null;
 
+    /** Ticked in the publish dialog: tell every member the policy changed. */
+    public bool $notify_members = false;
+
     /** Show the body split into its sections instead of the editor. */
     public bool $previewing = false;
 
@@ -46,6 +49,15 @@ new class extends Component
     {
         kSetSiteTitle('static', 'policies');
         $this->setPageGate('static.policies');
+    }
+
+    /**
+     * How many members the publish dialog's email would reach.
+     */
+    #[Computed]
+    public function memberCount(): int
+    {
+        return app(PolicyContentService::class)->memberRecipients()->count();
     }
 
     /**
@@ -253,6 +265,7 @@ new class extends Component
         $this->checkGate(GateAccessEnum::MODIFY);
 
         $this->publishId = $policyId;
+        $this->notify_members = false;
 
         Flux::modal('publishModal')->show();
     }
@@ -280,16 +293,21 @@ new class extends Component
         // consent record still points at it.
         $superseded?->update(['status' => StatusPolicy::ARCHIVED]);
 
+        // Queued after the response; the count is who it is going to.
+        $emailed = $this->notify_members ? app(PolicyContentService::class)->emailMembers($policy) : null;
+
         app(ActivityLogService::class)->logActivity(
             ActivityActionEnum::POLICY_PUBLISH,
-            " policy: {$policy->label()}",
+            " policy: {$policy->label()}".($emailed !== null ? ', emailed to '.kPluralize('member', $emailed) : ''),
             model: $policy,
         );
 
-        $this->reset('publishId');
+        $this->reset('publishId', 'notify_members');
         unset($this->grouped);
 
-        return $this->respondSuccess("{$policy->label()} is now live.");
+        return $this->respondSuccess($emailed !== null
+            ? "{$policy->label()} is now live. Emailing ".kPluralize('member', $emailed).' about it.'
+            : "{$policy->label()} is now live.");
     }
 
     private function resetForm(): void
@@ -494,5 +512,13 @@ new class extends Component
     >
         It replaces the version currently in force, which is archived rather than deleted so
         the people who accepted it can still read it. Published text can no longer be edited.
+
+        <div class="mt-4 rounded-xl border border-slate-200 p-3 text-start dark:border-white/10">
+            <flux:checkbox
+                wire:model="notify_members"
+                label="Email all members about this update"
+                :description="'Sends a notice with a link to the new version to '.kPluralize('active member', $this->memberCount).'. Admins are not emailed.'"
+            />
+        </div>
     </x-dashboard.confirm-modal>
 </div>

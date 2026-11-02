@@ -243,6 +243,27 @@ new class extends Component
 
         return $this->respondSuccess('Your subscription will not renew. You keep access until the end of the period you paid for.');
     }
+
+    /**
+     * Switch renewal back on after a cancel, while the paid time still runs.
+     * Nothing is charged now; the provider bills the card on the renewal date.
+     */
+    public function resume(): bool
+    {
+        abort_if(! $this->canAct, 404);
+
+        $subscription = $this->current;
+
+        abort_unless($subscription && $subscription->user_id === $this->user->id, 404);
+
+        $error = app(SubscriptionService::class)->resume($subscription);
+
+        unset($this->current);
+
+        $this->respondError($error, $error !== null);
+
+        return $this->respondSuccess("Your subscription will renew on {$subscription->current_period_ends_at?->format('M d, Y')}.");
+    }
 };
 ?>
 
@@ -267,6 +288,9 @@ new class extends Component
                     Waiting for {{ $this->current->vendor?->label() }} to confirm your first payment.
                 @elseif ($this->current->status->isCancelled())
                     It will not renew. You have access until {{ $this->current->current_period_ends_at?->format('M d, Y') }}.
+                    @if (! $this->current->canBeResumed() && $this->current->vendor)
+                        {{ $this->current->vendor->label() }} cannot switch it back on, so subscribe again once it ends.
+                    @endif
                 @elseif ($this->current->status->isPastDue())
                     Your last payment did not go through. {{ $this->current->vendor?->label() }} will try again.
                 @else
@@ -278,6 +302,12 @@ new class extends Component
                 <div>
                     <flux:button variant="ghost" icon="x-circle" x-on:click="$flux.modal('cancelModal').show()">
                         Cancel subscription
+                    </flux:button>
+                </div>
+            @elseif ($this->canAct && $this->current->canBeResumed())
+                <div>
+                    <flux:button variant="primary" icon="arrow-path" wire:click="resume" wire:loading.attr="disabled" wire:target="resume">
+                        Turn renewal back on
                     </flux:button>
                 </div>
             @endif

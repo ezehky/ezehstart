@@ -456,6 +456,15 @@ class PaypalGatewayService extends BasePaymentGateway implements SupportsSubscri
         return $response?->successful() ? null : $this->errorMessage($response);
     }
 
+    /**
+     * A cancelled PayPal subscription cannot be revived; the member subscribes
+     * again once the paid period is over.
+     */
+    public function resumeSubscription(Subscription $subscription): ?string
+    {
+        return 'PayPal cannot switch a cancelled subscription back on. Subscribe again once the current period ends.';
+    }
+
     public function parseSubscriptionEvent(PaymentWebhook $webhook): ?array
     {
         $resource = (array) data_get($webhook->payload, 'resource', []);

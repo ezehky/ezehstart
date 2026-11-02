@@ -2,10 +2,19 @@
 
 namespace App\Services;
 
+use App\Enums\LogChannelEnum;
 use App\Enums\PolicyTypeEnum;
+use App\Enums\StatusUser;
+use App\Enums\UserTypeEnum;
+use App\Mail\PolicyUpdatedEmail;
 use App\Models\Policy;
+use App\Models\User;
 use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 /**
  * Resolves which version of a policy is in force, and splits its rich-text body into
@@ -164,5 +173,53 @@ class PolicyContentService
         }
 
         return $sections;
+    }
+
+    // Notices
+
+    /**
+     * Who hears of a published policy: every active member account. Not admins,
+     * not newsletter-only addresses (they hold no account the terms govern), not
+     * suspended or deleting accounts. The account-email switch is not consulted:
+     * a change to the terms of service is a notice about the service itself.
+     *
+     * @return Builder<User>
+     */
+    public function memberRecipients(): Builder
+    {
+        return User::query()
+            ->where('user_type', UserTypeEnum::USER)
+            ->where('status', StatusUser::ACTIVE);
+    }
+
+    /**
+     * Queue the 'we have updated our policy' email to every member, after the
+     * response has gone — the admin is not kept waiting on a long list. One
+     * queued email each, in chunks, so a bad address costs nobody else theirs.
+     * Returns how many it is going to.
+     */
+    public function emailMembers(Policy $policy): int
+    {
+        $count = $this->memberRecipients()->count();
+
+        defer(function () use ($policy) {
+            $this->memberRecipients()
+                ->select(['id', 'name', 'email'])
+                ->chunkById(200, function ($members) use ($policy) {
+                    foreach ($members as $member) {
+                        try {
+                            Mail::to($member->email)->queue(new PolicyUpdatedEmail($member, $policy));
+                        } catch (Throwable $exception) {
+                            Log::channel(LogChannelEnum::EZEH->value)->error('Policy update email failed to queue', [
+                                'policy_id' => $policy->id,
+                                'user_id' => $member->id,
+                                'message' => $exception->getMessage(),
+                            ]);
+                        }
+                    }
+                });
+        });
+
+        return $count;
     }
 }

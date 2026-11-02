@@ -115,6 +115,10 @@ class PaymentService
      * A deposit by default; a purchase passes its own group, a DIRECT type,
      * the NONE wallet, and the model it pays for.
      *
+     * `$international` says whether the card is from abroad, for the fee. A
+     * screen that asked the customer passes the answer; left null it is
+     * presumed from the account's country (PaymentFeeService::isInternational).
+     *
      * @param  array<string, mixed>  $meta
      */
     public function checkout(
@@ -127,6 +131,7 @@ class PaymentService
         TransactionWalletEnum $wallet = TransactionWalletEnum::BALANCE,
         ?Model $against = null,
         array $meta = [],
+        ?bool $international = null,
     ): string|Transaction {
         if ($vendor->isManual() || ! $vendor->isAvailable()) {
             return 'That payment method is not available right now.';
@@ -141,7 +146,15 @@ class PaymentService
         // holds its answer against. The fee is kept as its own charge row so a
         // receipt can say what it was. A deposit is left alone — its amount is
         // what lands in the wallet, and a balance is a sum of amounts.
-        $fee = $wallet->isBalance() ? 0.0 : app(PaymentFeeService::class)->feeFor($vendor, $amount);
+        $fees = app(PaymentFeeService::class);
+        $international ??= $fees->isInternational($user);
+        $fee = $wallet->isBalance() ? 0.0 : $fees->feeFor($vendor, $amount, $international);
+
+        // Which terms the fee came from, so a receipt or a dispute over it can
+        // be answered from the row.
+        if ($fee > 0 && $international && $fees->hasInternationalTerms($vendor)) {
+            $meta['fee_terms'] = 'international';
+        }
 
         $transaction = app(TransactionService::class)->record(
             $user,

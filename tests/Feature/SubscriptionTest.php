@@ -663,3 +663,69 @@ test('the subscriptions screens are behind their gate', function () {
     $this->actingAs($this->admin)->get(route('admin.subscriptions'))->assertOk();
     $this->actingAs($this->member)->get(route('user.subscriptions'))->assertOk();
 });
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// RESUMING
+
+test('a member switches renewal back on before the period ends', function () {
+    $subscription = activePaystackSubscription($this);
+    $subscription->update(['vendor_subscription_id' => 'SUB_abc', 'vendor_token' => 'tok_1']);
+
+    Http::fake([
+        'api.paystack.co/subscription/disable' => Http::response(['status' => true]),
+        'api.paystack.co/subscription/enable' => Http::response(['status' => true]),
+    ]);
+
+    $page = Livewire::actingAs($this->member)->test('pages::user.subscriptions')->call('cancel');
+
+    expect($subscription->fresh()->canBeResumed())->toBeTrue();
+
+    $page->assertSee('Turn renewal back on')->call('resume')->assertHasNoErrors();
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/subscription/enable')
+        && $request['code'] === 'SUB_abc' && $request['token'] === 'tok_1');
+
+    $subscription->refresh();
+
+    expect($subscription->status)->toBe(StatusSubscription::ACTIVE)
+        ->and($subscription->cancel_at_period_end)->toBeFalse()
+        ->and($subscription->cancelled_at)->toBeNull();
+});
+
+test('a cancelled subscription cannot be resumed once its period is over or on PayPal', function () {
+    $subscription = activePaystackSubscription($this);
+    $subscription->update(['status' => StatusSubscription::CANCELLED, 'cancelled_at' => now()]);
+
+    $this->travelTo($subscription->current_period_ends_at->addDay());
+
+    expect(app(SubscriptionService::class)->resume($subscription->fresh()))->toBe('This subscription cannot be resumed.');
+
+    $this->travelBack();
+
+    $subscription->update(['vendor' => PaymentVendorEnum::PAYPAL]);
+
+    expect(app(SubscriptionService::class)->resume($subscription->fresh()))->toContain('PayPal cannot switch');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'enable') || str_contains($request->url(), 'activate'));
+});
+
+test('an admin resumes a subscriber and it is logged', function () {
+    $subscription = activePaystackSubscription($this);
+    $subscription->update([
+        'vendor_subscription_id' => 'SUB_abc',
+        'vendor_token' => 'tok_1',
+        'status' => StatusSubscription::CANCELLED,
+        'cancel_at_period_end' => true,
+        'cancelled_at' => now(),
+    ]);
+
+    Http::fake(['api.paystack.co/subscription/enable' => Http::response(['status' => true])]);
+
+    Livewire::actingAs($this->admin)
+        ->test('pages::admin.subscriptions', ['tab' => 'subscribers'])
+        ->call('resumeSubscription', $subscription->id)
+        ->assertHasNoErrors();
+
+    expect($subscription->fresh()->status)->toBe(StatusSubscription::ACTIVE)
+        ->and(ActivityLog::query()->where('description', 'like', '%resumed renewal%')->exists())->toBeTrue();
+});

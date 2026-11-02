@@ -376,6 +376,26 @@ class StripeGatewayService extends BasePaymentGateway implements SupportsSubscri
         return $response?->successful() ? null : $this->errorMessage($response);
     }
 
+    /**
+     * The kit cancels at the period's end, so the subscription is still alive
+     * on Stripe until then — taking the flag off is all a resume is.
+     */
+    public function resumeSubscription(Subscription $subscription): ?string
+    {
+        if (! $subscription->vendor_subscription_id) {
+            return 'Stripe has not reported a subscription id for this yet.';
+        }
+
+        $response = $this->send(
+            PaymentTraceStepEnum::SUBSCRIPTION,
+            'POST',
+            '/subscriptions/'.rawurlencode($subscription->vendor_subscription_id),
+            ['cancel_at_period_end' => 'false'],
+        );
+
+        return $response?->successful() ? null : $this->errorMessage($response);
+    }
+
     public function parseSubscriptionEvent(PaymentWebhook $webhook): ?array
     {
         $object = (array) data_get($webhook->payload, 'data.object', []);

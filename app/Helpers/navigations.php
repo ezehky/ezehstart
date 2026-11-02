@@ -40,6 +40,10 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Preferences',
                         'link' => route('admin.config.preferences'),
                     ],
+                    'email-delivery' => [
+                        'label' => 'Email delivery',
+                        'link' => route('admin.config.email-delivery'),
+                    ],
                     'email-senders' => [
                         'label' => 'Email Senders',
                         'link' => route('admin.config.email-senders'),

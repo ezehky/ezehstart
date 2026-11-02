@@ -11,6 +11,8 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/security', 'pages::admin.configs.security')->name('security');
     Route::livewire('/preferences', 'pages::admin.configs.preferences')->name('preferences');
     Route::livewire('/email-senders', 'pages::admin.configs.email-senders')->name('email-senders');
+    // Which provider outgoing email goes through: log, Resend, Brevo or SMTP.
+    Route::livewire('/email-delivery', 'pages::admin.configs.email-delivery')->name('email-delivery');
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
     Route::livewire('/contact-locations', 'pages::admin.configs.contact-locations')->name('contact-locations');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');

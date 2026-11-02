@@ -280,6 +280,34 @@ class PaystackGatewayService extends BasePaymentGateway implements SupportsSubsc
         return $response?->successful() && $response->json('status') ? null : $this->errorMessage($response);
     }
 
+    /**
+     * "Enable" is disable's opposite and takes the same code and email token,
+     * so the card on file is charged again on the next payment date.
+     */
+    public function resumeSubscription(Subscription $subscription): ?string
+    {
+        $code = $subscription->vendor_subscription_id;
+        $token = $subscription->vendor_token;
+
+        if (! $code || ! $token) {
+            $state = $this->fetchSubscription($subscription);
+
+            if (\is_string($state)) {
+                return $state;
+            }
+
+            $code ??= $state['vendor_subscription_id'];
+            $token ??= $state['token'];
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'POST', '/subscription/enable', [
+            'code' => $code,
+            'token' => $token,
+        ]);
+
+        return $response?->successful() && $response->json('status') ? null : $this->errorMessage($response);
+    }
+
     public function parseSubscriptionEvent(PaymentWebhook $webhook): ?array
     {
         $data = (array) data_get($webhook->payload, 'data', []);

@@ -3,6 +3,7 @@
 namespace App\Enums;
 
 use App\Contracts\PaymentGateway;
+use App\Services\Payment\Gateways\BachsGatewayService;
 use App\Services\Payment\Gateways\FlutterwaveGatewayService;
 use App\Services\Payment\Gateways\KorapayGatewayService;
 use App\Services\Payment\Gateways\MonnifyGatewayService;
@@ -36,6 +37,7 @@ enum PaymentVendorEnum: string
     case OPAY = 'opay';
     case MONNIFY = 'monnify';
     case KORAPAY = 'korapay';
+    case BACHS = 'bachs';
 
     public function isManual(): bool
     {
@@ -77,6 +79,21 @@ enum PaymentVendorEnum: string
         return $this === self::KORAPAY;
     }
 
+    public function isBachs(): bool
+    {
+        return $this === self::BACHS;
+    }
+
+    /**
+     * Whether a subscription whose renewal was switched off can have it switched
+     * back on before its paid time runs out. PayPal's cancel is final — a member
+     * there subscribes again once the period is over.
+     */
+    public function resumesSubscriptions(): bool
+    {
+        return \in_array($this, [self::PAYSTACK, self::FLUTTERWAVE, self::STRIPE], true);
+    }
+
     /**
      * Brand names are not title case, and "Paypal" on a checkout button reads
      * as a phishing page.
@@ -92,6 +109,7 @@ enum PaymentVendorEnum: string
             self::OPAY => 'OPay',
             self::MONNIFY => 'Monnify',
             self::KORAPAY => 'Korapay',
+            self::BACHS => 'Bachs',
         };
 
         return $lowercase ? strtolower($label) : $label;
@@ -112,6 +130,7 @@ enum PaymentVendorEnum: string
             self::OPAY => OpayGatewayService::class,
             self::MONNIFY => MonnifyGatewayService::class,
             self::KORAPAY => KorapayGatewayService::class,
+            self::BACHS => BachsGatewayService::class,
         };
 
         return $class ? app($class) : null;

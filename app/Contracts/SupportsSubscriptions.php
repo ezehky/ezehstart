@@ -63,6 +63,13 @@ interface SupportsSubscriptions
     public function cancelSubscription(Subscription $subscription, bool $atPeriodEnd = true): ?string;
 
     /**
+     * Switch renewals back on for a subscription cancelled before its period
+     * ended. Null when it worked, otherwise why not. Only called for a vendor
+     * whose resumesSubscriptions() says it can.
+     */
+    public function resumeSubscription(Subscription $subscription): ?string;
+
+    /**
      * Read a stored webhook as a subscription event. Null when it is not one.
      *
      * @return ?array{event: SubscriptionEventEnum, vendor_subscription_id: ?string, customer_email: ?string, vendor_plan_id: ?string, payment_id: ?string, period_ends_at: ?CarbonInterface, token: ?string}

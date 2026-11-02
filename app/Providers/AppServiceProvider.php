@@ -2,8 +2,13 @@
 
 namespace App\Providers;
 
+use App\Services\Mail\BrevoTransport;
+use App\Services\Mail\MailDeliveryService;
+use App\Services\Mail\ResendTransport;
 use App\Services\SiteConfigurationService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +27,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Email over the Resend and Brevo HTTP APIs — our own transports, so no
+        // SDK; Resend's replaces Laravel's, which needs one. The provider used is
+        // the admin's pick (MailDeliveryService), applied now and again before
+        // each queued job, so a running worker follows a change.
+        Mail::extend('resend', fn () => new ResendTransport((string) config('services.resend.key')));
+        Mail::extend('brevo', fn () => new BrevoTransport((string) config('services.brevo.key')));
+        app(MailDeliveryService::class)->apply();
+        Queue::before(fn () => app(MailDeliveryService::class)->apply());
+
         Builder::macro('searchMacro', function ($columns, $search) {
             if ($search) {
                 if (\is_array($columns)) {

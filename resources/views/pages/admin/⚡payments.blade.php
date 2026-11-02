@@ -2,6 +2,7 @@
 
 use App\Enums\PaymentVendorEnum;
 use App\Enums\StatusPaymentWebhook;
+use App\Models\Country;
 use App\Models\PaymentTrace;
 use App\Models\PaymentWebhook;
 use App\Services\Payment\PaymentFeeService;
@@ -53,6 +54,18 @@ new class extends Component
 
     public $feeCap = 0;
 
+    /** On: cards from abroad pay the second set of terms below. */
+    public bool $feeAbroad = false;
+
+    public $feeAbroadPercent = 0;
+
+    public $feeAbroadFlat = 0;
+
+    public $feeAbroadCap = 0;
+
+    /** The country cards count as local to, as its ISO code; blank for none. */
+    public string $homeCountry = '';
+
     public function mount(): void
     {
         kSetSiteTitle('payments');
@@ -61,6 +74,8 @@ new class extends Component
         if (! \in_array($this->tab, ['webhooks', 'traces', 'gateways'], true)) {
             $this->tab = 'webhooks';
         }
+
+        $this->homeCountry = (string) app(PaymentFeeService::class)->homeCountry();
     }
 
     public function updatedTab(): void
@@ -110,7 +125,7 @@ new class extends Component
      * Every vendor the kit can talk to and whether this install can use it. Keys
      * are never shown — only whether they are there.
      *
-     * @return array<int, array{vendor: PaymentVendorEnum, configured: bool, available: bool, default: bool, fee: ?string}>
+     * @return array<int, array{vendor: PaymentVendorEnum, configured: bool, available: bool, default: bool, fee: ?string, feeAbroad: ?string, hasAbroad: bool}>
      */
     #[Computed]
     public function gateways(): array
@@ -123,9 +138,20 @@ new class extends Component
                 'available' => $vendor->isAvailable(),
                 'default' => config('payments.default') === $vendor->value,
                 'fee' => app(PaymentFeeService::class)->describe($vendor),
+                'feeAbroad' => app(PaymentFeeService::class)->describe($vendor, international: true),
+                'hasAbroad' => app(PaymentFeeService::class)->hasInternationalTerms($vendor),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * The countries the home-country picker offers.
+     */
+    #[Computed]
+    public function countries()
+    {
+        return Country::query()->active()->alphabetical()->get(['id', 'name', 'iso2', 'flag']);
     }
 
     /**
@@ -193,13 +219,19 @@ new class extends Component
 
         abort_unless($case && ! $case->isManual(), 404);
 
-        $terms = app(PaymentFeeService::class)->termsFor($case);
+        $fees = app(PaymentFeeService::class);
+        $terms = $fees->termsFor($case);
+        $abroad = $fees->termsFor($case, international: true);
 
         $this->resetValidation();
         $this->feeVendor = $case->value;
         $this->feePercent = $terms['percent'];
         $this->feeFlat = $terms['flat'];
         $this->feeCap = $terms['cap'];
+        $this->feeAbroad = $fees->hasInternationalTerms($case);
+        $this->feeAbroadPercent = $abroad['percent'];
+        $this->feeAbroadFlat = $abroad['flat'];
+        $this->feeAbroadCap = $abroad['cap'];
 
         unset($this->feeVendorLabel);
 
@@ -212,6 +244,9 @@ new class extends Component
             'feePercent' => ['required', 'numeric', 'min:0', 'max:100'],
             'feeFlat' => ['required', 'numeric', 'min:0'],
             'feeCap' => ['required', 'numeric', 'min:0'],
+            'feeAbroadPercent' => ['exclude_unless:feeAbroad,true', 'required', 'numeric', 'min:0', 'max:100'],
+            'feeAbroadFlat' => ['exclude_unless:feeAbroad,true', 'required', 'numeric', 'min:0'],
+            'feeAbroadCap' => ['exclude_unless:feeAbroad,true', 'required', 'numeric', 'min:0'],
         ];
     }
 
@@ -221,6 +256,9 @@ new class extends Component
             'feePercent' => 'percentage',
             'feeFlat' => 'flat amount',
             'feeCap' => 'cap',
+            'feeAbroadPercent' => 'percentage for cards from abroad',
+            'feeAbroadFlat' => 'flat amount for cards from abroad',
+            'feeAbroadCap' => 'cap for cards from abroad',
         ];
     }
 
@@ -238,7 +276,15 @@ new class extends Component
 
         $this->validate();
 
-        $error = app(PaymentFeeService::class)->saveTerms($vendor, (float) $this->feePercent, (float) $this->feeFlat, (float) $this->feeCap);
+        $error = app(PaymentFeeService::class)->saveTerms(
+            $vendor,
+            (float) $this->feePercent,
+            (float) $this->feeFlat,
+            (float) $this->feeCap,
+            $this->feeAbroad
+                ? ['percent' => (float) $this->feeAbroadPercent, 'flat' => (float) $this->feeAbroadFlat, 'cap' => (float) $this->feeAbroadCap]
+                : null,
+        );
 
         $this->respondError($error, $error !== null);
 
@@ -247,6 +293,25 @@ new class extends Component
         Flux::modal('feeModal')->close();
 
         return $this->respondSuccess($vendor->label().' processing fee saved.');
+    }
+
+    /**
+     * Which country's cards pay the local fee. Only matters once a vendor has
+     * terms for cards from abroad; until then every card pays the same.
+     */
+    public function saveHomeCountry(): bool
+    {
+        $this->checkGate();
+
+        $this->validate(['homeCountry' => ['nullable', 'string', 'size:2', 'exists:countries,iso2']], attributes: ['homeCountry' => 'home country']);
+
+        $error = app(PaymentFeeService::class)->saveHomeCountry($this->homeCountry ?: null);
+
+        $this->respondError($error, $error !== null);
+
+        return $this->respondSuccess($this->homeCountry
+            ? 'Cards from outside '.$this->countries->firstWhere('iso2', $this->homeCountry)?->name.' now pay the fee for cards from abroad, where a provider has one.'
+            : 'No home country: every card pays the local fee.');
     }
 
     // Tools
@@ -427,10 +492,20 @@ new class extends Component
                     checkout once every key it needs is set and it is not switched off.
                 </flux:text>
 
-                <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" icon="signal" wire:click="checkHealth">
+                <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" type="button" icon="signal" wire:click="checkHealth">
                     Check connections
                 </x-dashboard.gate.button>
             </div>
+
+            <form wire:submit="saveHomeCountry" class="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-end dark:border-white/10">
+                <flux:select wire:model="homeCountry" label="Home country" description="Cards from anywhere else pay a provider's fee for cards from abroad, where it has one. Presumed from the customer's profile or phone country, because the provider only says after the charge." class="sm:max-w-md">
+                    <flux:select.option value="">None — every card pays the local fee</flux:select.option>
+                    @foreach ($this->countries as $country)
+                        <flux:select.option value="{{ $country->iso2 }}">{{ $country->flag }} {{ $country->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+                <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" variant="filled" icon="check">Save</x-dashboard.gate.button>
+            </form>
 
             <flux:table>
                 <flux:table.columns>
@@ -472,7 +547,12 @@ new class extends Component
                             </flux:table.cell>
                             <flux:table.cell>
                                 <div class="flex items-center gap-2">
-                                    <span @class(['text-slate-900 dark:text-white' => $row['fee'], 'text-slate-400' => ! $row['fee']])>{{ $row['fee'] ?? 'None' }}</span>
+                                    <span>
+                                        <span @class(['block text-slate-900 dark:text-white' => $row['fee'], 'block text-slate-400' => ! $row['fee']])>{{ $row['fee'] ?? 'None' }}</span>
+                                        @if ($row['hasAbroad'])
+                                            <span class="block text-xs text-slate-500 dark:text-slate-400">Abroad: {{ $row['feeAbroad'] ?? 'None' }}</span>
+                                        @endif
+                                    </span>
                                     <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" type="button" size="xs" variant="ghost" icon="pencil-square" tooltip="Edit fee" wire:click="editFee('{{ $row['vendor']->value }}')" />
                                 </div>
                             </flux:table.cell>
@@ -499,6 +579,19 @@ new class extends Component
                 <x-form.money-field wire:model="feeFlat" label="Plus a flat amount" placeholder="e.g. 100" />
                 <x-form.money-field wire:model="feeCap" label="Capped at" placeholder="0 for no cap" description="0 for no cap." />
             </div>
+
+            <flux:switch wire:model.live="feeAbroad" label="Different fee for cards from abroad" description="Most providers charge more for a card issued outside the home country set on this tab." />
+
+            @if ($feeAbroad)
+                <div class="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-white/10">
+                    <flux:input wire:model="feeAbroadPercent" type="number" step="0.01" min="0" max="100" label="Percentage for cards from abroad" placeholder="e.g. 3.9" suffix="%" />
+
+                    <div wire:key="fee-abroad-money-{{ $feeVendor }}" class="grid gap-4 sm:grid-cols-2">
+                        <x-form.money-field wire:model="feeAbroadFlat" label="Plus a flat amount" placeholder="e.g. 100" />
+                        <x-form.money-field wire:model="feeAbroadCap" label="Capped at" placeholder="0 for no cap" description="0 for no cap." />
+                    </div>
+                </div>
+            @endif
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>

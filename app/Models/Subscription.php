@@ -64,6 +64,17 @@ class Subscription extends Model
         return $this->status->isActive() || $this->status->isPastDue();
     }
 
+    /**
+     * Cancelled, with paid time still left, on a vendor that can switch the
+     * renewals back on.
+     */
+    public function canBeResumed(): bool
+    {
+        return $this->status->isCancelled()
+            && ($this->current_period_ends_at?->isFuture() ?? false)
+            && ($this->vendor?->resumesSubscriptions() ?? false);
+    }
+
     public function isTrial(): bool
     {
         return $this->status->isTrialing();

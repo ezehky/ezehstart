@@ -72,17 +72,28 @@ class SiteConfigurationService
             'telegram-support' => null,
             'social-handles' => [],
 
+            // Where outgoing email goes, picked on Configuration › Email delivery
+            // (MailProviderEnum). The log until somebody picks a provider whose
+            // keys are in .env.
+            'mail-delivery' => [
+                'provider' => 'log',
+            ],
+
             // A processing fee added on top of a purchase paid through a gateway,
             // one per vendor because each prices its service differently. Percent
             // of the price, plus a flat amount, held under a cap (0 means no cap);
             // flat and cap are in the default currency, the one the ledger keeps.
             // All zero: what to pass on to a customer is the owner's decision,
             // so nothing is added until somebody sets it on Payments › Gateways.
+            // `international` is a second set of the same three for a card from
+            // outside home-country, null while the vendor prices every card the
+            // same; with no home country set, every card counts as local.
             'payments' => [
+                'home-country' => null,
                 'fees' => collect(PaymentVendorEnum::cases())
                     ->reject(fn (PaymentVendorEnum $vendor) => $vendor->isManual())
                     ->mapWithKeys(fn (PaymentVendorEnum $vendor) => [
-                        $vendor->value => ['percent' => 0, 'flat' => 0, 'cap' => 0],
+                        $vendor->value => ['percent' => 0, 'flat' => 0, 'cap' => 0, 'international' => null],
                     ])
                     ->all(),
             ],

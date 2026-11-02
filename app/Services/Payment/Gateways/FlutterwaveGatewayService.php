@@ -283,6 +283,25 @@ class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSu
         return $response?->successful() && $response->json('status') === 'success' ? null : $this->errorMessage($response);
     }
 
+    public function resumeSubscription(Subscription $subscription): ?string
+    {
+        $id = $subscription->vendor_subscription_id;
+
+        if (! $id) {
+            $state = $this->fetchSubscription($subscription);
+
+            if (\is_string($state)) {
+                return $state;
+            }
+
+            $id = $state['vendor_subscription_id'];
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBSCRIPTION, 'PUT', '/subscriptions/'.rawurlencode((string) $id).'/activate');
+
+        return $response?->successful() && $response->json('status') === 'success' ? null : $this->errorMessage($response);
+    }
+
     public function parseSubscriptionEvent(PaymentWebhook $webhook): ?array
     {
         $payload = (array) $webhook->payload;

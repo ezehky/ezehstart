@@ -25,7 +25,7 @@ the payments module only ever writes through it.
 | Member | "Add funds" on `pages::user.transactions`, `pages::user.subscriptions` | |
 | Commands | `payments:reconcile`, `payments:retry-webhooks`, `payments:health`, `payments:prune-traces` | |
 
-Seven vendors ship: Paystack, Flutterwave, Stripe, PayPal, OPay, Monnify, Korapay.
+Eight vendors ship: Paystack, Flutterwave, Stripe, PayPal, OPay, Monnify, Korapay, Bachs.
 All of them are plain `Http::` calls on guzzle 8 — no vendor SDK is a dependency.
 
 ## The flow
@@ -96,8 +96,8 @@ payment is never edited — it stays `CONFIRMED`, because it happened.
 ## Subscriptions
 
 Billed by the vendor — it holds the card, runs the schedule and retries. Paystack,
-Flutterwave, Stripe and PayPal implement `SupportsSubscriptions`; OPay, Monnify and
-Korapay do not, and are never offered for a plan.
+Flutterwave, Stripe and PayPal implement `SupportsSubscriptions`; OPay, Monnify,
+Korapay and Bachs do not, and are never offered for a plan.
 
 | Piece | How |
 | --- | --- |
@@ -112,6 +112,7 @@ Korapay do not, and are never offered for a plan.
 | Failed renewal | `PAST_DUE` + `SubscriptionPaymentFailed`. Access during it is the project's call |
 | Anything else | `CHANGED` → the subscription is re-read from the vendor (`refresh()`) |
 | Cancel | stops the vendor billing; the row is `CANCELLED` with access to `current_period_ends_at`, then `EXPIRED` via `payments:sync-subscriptions` (hourly) |
+| Resume | `resume()` undoes a cancel while paid time is left (`canBeResumed()`): renewal back on at the vendor, row `ACTIVE`, `SubscriptionResumed`. Paystack, Flutterwave and Stripe only (`PaymentVendorEnum::resumesSubscriptions()`) — PayPal's cancel is final |
 
 **Gate paid features by feature, never by plan name:**
 `app(SubscriptionService::class)->allows($user, SubscriptionFeatureEnum::API_ACCESS)`
@@ -185,9 +186,18 @@ is asked for (so `verify()` checks against the same figure), and the fee is kept
 **deposit** is never charged it — its amount is what lands in the wallet, and a
 balance is a sum of amounts.
 
+**Cards from abroad.** A vendor can carry a second set of terms
+(`payments.fees.{vendor}.international`, null = same as local), used for a card from
+outside `payments.home-country` — both set on the Gateways tab. The vendor names the
+card's country only after the charge, so the terms are picked before it: pass
+`international:` to `checkout()` when the customer has said; left null it is presumed
+by `PaymentFeeService::isInternational()` from the profile country, then the phone
+country — unknown, or no home country set, is local. A row charged the international
+terms carries `fee_terms: international` in its meta.
+
 Tell the customer before they leave for the vendor:
-`app(PaymentFeeService::class)->feeFor($vendor, $price)` in the page's `#[Computed]`,
-shown next to the total. Never work the fee out anywhere else.
+`app(PaymentFeeService::class)->feeFor($vendor, $price, $international)` in the page's
+`#[Computed]`, shown next to the total. Never work the fee out anywhere else.
 
 ## Adding a vendor
 
