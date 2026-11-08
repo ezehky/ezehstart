@@ -3,14 +3,17 @@
 namespace App\Services\Payment\Gateways;
 
 use App\Contracts\BasePaymentGateway;
+use App\Contracts\SupportsSubaccounts;
 use App\Enums\PaymentTraceStepEnum;
 use App\Enums\PaymentVendorEnum;
 use App\Enums\PaymentWebhookTopicEnum;
 use App\Enums\StatusTransaction;
+use App\Models\PaymentSubaccount;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -21,9 +24,13 @@ use Illuminate\Support\Facades\Cache;
  * expires. Amounts go out in major units. Our reference is Monnify's
  * paymentReference. Webhooks are signed with an HMAC-SHA512 of the raw body,
  * keyed with the secret key, in a monnify-signature header.
+ *
+ * Subaccounts: Monnify's split sub-accounts. Monnify counts the split from
+ * the other side — splitPercentage is what the sub-account receives — so it
+ * is told the complement of the share the site keeps.
  */
 #[Singleton]
-class MonnifyGatewayService extends BasePaymentGateway
+class MonnifyGatewayService extends BasePaymentGateway implements SupportsSubaccounts
 {
     public function vendor(): PaymentVendorEnum
     {
@@ -65,6 +72,7 @@ class MonnifyGatewayService extends BasePaymentGateway
             'contractCode' => (string) $this->config('contract_code'),
             'redirectUrl' => $this->callbackUrl($transaction),
             'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
+            ...$this->splitFor($transaction),
         ], $transaction);
 
         if (! $response?->successful() || ! $response->json('requestSuccessful')) {
@@ -192,7 +200,99 @@ class MonnifyGatewayService extends BasePaymentGateway
         return $this->fromRefund((array) $response->json('responseBody'), $reference);
     }
 
+    // Subaccounts
+
+    public function banks(): string|array
+    {
+        if (! $this->accessToken()) {
+            return 'Monnify could not be reached. Please try again.';
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'GET', '/api/v1/banks');
+
+        if (! $response?->successful() || ! $response->json('requestSuccessful')) {
+            return $this->errorMessage($response);
+        }
+
+        return collect((array) $response->json('responseBody'))
+            ->filter(fn ($bank) => filled($bank['code'] ?? null))
+            ->map(fn ($bank) => ['code' => (string) $bank['code'], 'name' => (string) $bank['name']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Monnify creates sub-accounts in a batch, so one goes out as a list of
+     * one and comes back the same way.
+     */
+    public function createSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        if (! $this->accessToken()) {
+            return 'Monnify could not be reached. Please try again.';
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'POST', '/api/v1/sub-accounts', [$this->subaccountBody($subaccount)]);
+
+        return $this->fromSubaccount($response, (array) $response?->json('responseBody.0'));
+    }
+
+    public function updateSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        if (! $this->accessToken()) {
+            return 'Monnify could not be reached. Please try again.';
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'PUT', '/api/v1/sub-accounts', [
+            'subAccountCode' => $subaccount->subaccount_code,
+            ...$this->subaccountBody($subaccount),
+        ]);
+
+        return $this->fromSubaccount($response, (array) $response?->json('responseBody'));
+    }
+
+    /**
+     * Monnify's own fee is borne by the main account.
+     */
+    public function splitFields(PaymentSubaccount $subaccount, Transaction $transaction): array
+    {
+        return [
+            'incomeSplitConfig' => [[
+                'subAccountCode' => $subaccount->subaccount_code,
+                'feePercentage' => 0,
+                'splitPercentage' => $subaccount->subaccountPercentage(),
+                'feeBearer' => false,
+            ]],
+        ];
+    }
+
     // Tools
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function subaccountBody(PaymentSubaccount $subaccount): array
+    {
+        return [
+            'currencyCode' => strtoupper((string) $subaccount->currency),
+            'bankCode' => $subaccount->bank_code,
+            'accountNumber' => $subaccount->account_number,
+            'email' => (string) $subaccount->contact_email,
+            'defaultSplitPercentage' => $subaccount->subaccountPercentage(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return string|array{subaccount_code: string, vendor_record_id: ?string, account_name: ?string, bank_name: ?string}
+     */
+    protected function fromSubaccount(?Response $response, array $data): string|array
+    {
+        if (! $response?->successful() || ! $response->json('requestSuccessful') || blank($data['subAccountCode'] ?? null)) {
+            return $this->errorMessage($response);
+        }
+
+        return $this->subaccountResult($data['subAccountCode'], null, $data['accountName'] ?? null, $data['bankName'] ?? null);
+    }
 
     /**
      * Monnify's refunds are asked about by our refund reference, so that is

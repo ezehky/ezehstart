@@ -64,8 +64,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('subscriptions');
-        $this->setPageGate('subscriptions');
+        kSetSiteTitle('finance', 'subscriptions');
+        $this->setPageGate('finance.subscriptions');
 
         if (! \in_array($this->tab, ['plans', 'subscribers'], true)) {
             $this->tab = 'plans';

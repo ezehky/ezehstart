@@ -145,20 +145,27 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                 ],
                 'icon' => 'megaphone',
             ],
-            'transactions' => [
-                'label' => 'Transactions',
-                'link' => route('admin.transactions'),
+            'finance' => [
+                'label' => 'Finance',
+                'children' => [
+                    'transactions' => [
+                        'label' => 'Transactions',
+                        'link' => route('admin.transactions'),
+                    ],
+                    'payments' => [
+                        'label' => 'Payments',
+                        'link' => route('admin.payments'),
+                    ],
+                    'subscriptions' => [
+                        'label' => 'Subscriptions',
+                        'link' => route('admin.subscriptions'),
+                    ],
+                    'subaccounts' => [
+                        'label' => 'Subaccounts',
+                        'link' => route('admin.subaccounts'),
+                    ],
+                ],
                 'icon' => 'banknotes',
-            ],
-            'payments' => [
-                'label' => 'Payments',
-                'link' => route('admin.payments'),
-                'icon' => 'credit-card',
-            ],
-            'subscriptions' => [
-                'label' => 'Subscriptions',
-                'link' => route('admin.subscriptions'),
-                'icon' => 'arrow-path-rounded-square',
             ],
             'users' => [
                 'label' => 'Users',

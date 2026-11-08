@@ -57,8 +57,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('transactions');
-        $this->setPageGate('transactions');
+        kSetSiteTitle('finance', 'transactions');
+        $this->setPageGate('finance.transactions');
     }
 
     /**

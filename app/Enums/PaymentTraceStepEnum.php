@@ -19,6 +19,7 @@ enum PaymentTraceStepEnum: string
     case WEBHOOK = 'webhook';
     case REFUND = 'refund';
     case SUBSCRIPTION = 'subscription';
+    case SUBACCOUNT = 'subaccount';
     case HEALTH = 'health';
 
     public function color(): string
@@ -30,6 +31,7 @@ enum PaymentTraceStepEnum: string
             self::WEBHOOK => 'purple',
             self::REFUND => 'yellow',
             self::SUBSCRIPTION => 'sky',
+            self::SUBACCOUNT => 'orange',
         };
     }
 }

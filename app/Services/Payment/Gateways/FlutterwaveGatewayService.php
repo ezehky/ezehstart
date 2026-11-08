@@ -3,6 +3,7 @@
 namespace App\Services\Payment\Gateways;
 
 use App\Contracts\BasePaymentGateway;
+use App\Contracts\SupportsSubaccounts;
 use App\Contracts\SupportsSubscriptions;
 use App\Enums\PaymentTraceStepEnum;
 use App\Enums\PaymentVendorEnum;
@@ -10,12 +11,14 @@ use App\Enums\PaymentWebhookTopicEnum;
 use App\Enums\StatusSubscription;
 use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
+use App\Models\PaymentSubaccount;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPrice;
 use App\Models\SubscriptionPlanVendor;
 use App\Models\Transaction;
 use App\Models\TransactionGateway;
+use App\Services\Payment\PaymentFeeService;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Request;
@@ -32,9 +35,13 @@ use Illuminate\Http\Request;
  * carries its id. Renewal charges come in as charge.completed with a tx_ref
  * that is not ours; they are matched to a subscription by the customer's
  * email and checked by Flutterwave's own transaction id.
+ *
+ * Subaccounts: Flutterwave's split subaccounts, on a percentage split whose
+ * split_value is the main account's share as a fraction. A split checkout
+ * names the RS_ id; an update is addressed to the numeric record id.
  */
 #[Singleton]
-class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSubscriptions
+class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSubaccounts, SupportsSubscriptions
 {
     protected const BASE_URL = 'https://api.flutterwave.com/v3';
 
@@ -59,7 +66,7 @@ class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSu
 
     public function initialize(Transaction $transaction): string|array
     {
-        return $this->openCheckout($transaction);
+        return $this->openCheckout($transaction, $this->splitFor($transaction));
     }
 
     /**
@@ -189,6 +196,74 @@ class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSu
         }
 
         return $this->fromRefund((array) $response->json('data'));
+    }
+
+    // Subaccounts
+
+    public function banks(): string|array
+    {
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'GET', '/banks/'.rawurlencode($this->country()));
+
+        if (! $response?->successful() || $response->json('status') !== 'success') {
+            return $this->errorMessage($response);
+        }
+
+        return collect((array) $response->json('data'))
+            ->filter(fn ($bank) => filled($bank['code'] ?? null))
+            ->map(fn ($bank) => ['code' => (string) $bank['code'], 'name' => (string) $bank['name']])
+            ->values()
+            ->all();
+    }
+
+    public function createSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'POST', '/subaccounts', [
+            ...$this->subaccountBody($subaccount),
+            'business_mobile' => (string) $subaccount->contact_phone,
+            'country' => $this->country(),
+        ]);
+
+        if (! $response?->successful() || $response->json('status') !== 'success' || blank($response->json('data.subaccount_id'))) {
+            return $this->errorMessage($response);
+        }
+
+        return $this->subaccountResult(
+            $response->json('data.subaccount_id'),
+            $response->json('data.id'),
+            $response->json('data.full_name'),
+            $response->json('data.bank_name'),
+        );
+    }
+
+    /**
+     * Flutterwave has no on/off switch for a subaccount, so switching one off
+     * stays on our side: the kit stops naming it on a checkout.
+     */
+    public function updateSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        if (! $subaccount->vendor_record_id) {
+            return 'Flutterwave never returned a record id for this subaccount, so it cannot be updated there.';
+        }
+
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'PUT', '/subaccounts/'.rawurlencode($subaccount->vendor_record_id), $this->subaccountBody($subaccount));
+
+        if (! $response?->successful() || $response->json('status') !== 'success') {
+            return $this->errorMessage($response);
+        }
+
+        // The update can answer with nothing but a message, and the code a
+        // checkout names never changes, so what is on file stands in.
+        return $this->subaccountResult(
+            $response->json('data.subaccount_id') ?? $subaccount->subaccount_code,
+            $response->json('data.id') ?? $subaccount->vendor_record_id,
+            $response->json('data.full_name') ?? $subaccount->account_name,
+            $response->json('data.bank_name') ?? $subaccount->bank_name,
+        );
+    }
+
+    public function splitFields(PaymentSubaccount $subaccount, Transaction $transaction): array
+    {
+        return ['subaccounts' => [['id' => $subaccount->subaccount_code]]];
     }
 
     // Subscriptions
@@ -351,6 +426,30 @@ class FlutterwaveGatewayService extends BasePaymentGateway implements SupportsSu
     }
 
     // Tools
+
+    /**
+     * The country a subaccount's bank is in — the home country set on the
+     * Gateways tab, Nigeria where none is.
+     */
+    protected function country(): string
+    {
+        return app(PaymentFeeService::class)->homeCountry() ?? 'NG';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function subaccountBody(PaymentSubaccount $subaccount): array
+    {
+        return array_filter([
+            'account_bank' => $subaccount->bank_code,
+            'account_number' => $subaccount->account_number,
+            'business_name' => $subaccount->business_name,
+            'business_email' => $subaccount->contact_email,
+            'split_type' => 'percentage',
+            'split_value' => round((float) $subaccount->platform_percentage / 100, 4),
+        ], fn ($value) => $value !== null && $value !== '');
+    }
 
     /**
      * @param  array<string, mixed>  $data

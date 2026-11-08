@@ -68,8 +68,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('payments');
-        $this->setPageGate('payments');
+        kSetSiteTitle('finance', 'payments');
+        $this->setPageGate('finance.payments');
 
         if (! \in_array($this->tab, ['webhooks', 'traces', 'gateways'], true)) {
             $this->tab = 'webhooks';

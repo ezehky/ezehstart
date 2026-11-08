@@ -14,6 +14,7 @@ the payments module only ever writes through it.
 | Orchestrator | `app/Services/Payment/PaymentService.php` | Checkout, verify, webhooks, reconcile — every decision |
 | Refunds | `app/Services/Payment/RefundService.php` | Refund rows, the refundable check, refund webhooks |
 | Subscriptions | `app/Services/Payment/SubscriptionService.php`, `app/Contracts/SupportsSubscriptions.php` | Plans synced to vendors, the first payment, renewals, cancel, sync |
+| Subaccounts | `app/Services/Payment/PaymentSubaccountService.php`, `app/Contracts/SupportsSubaccounts.php` | Payees a checkout is split with, created on the vendor; the checkout guard |
 | Tracing | `app/Services/Payment/PaymentTraceService.php` | Redacted call log, off by default |
 | Vendor list | `PaymentVendorEnum` | Case → gateway service, labels, availability |
 | Config | `config/payments.php` | Keys (env only), queue, reconcile windows, tracing |
@@ -21,7 +22,7 @@ the payments module only ever writes through it.
 | Webhook | `PaymentWebhookController` | `POST /webhooks/payments/{vendor}` |
 | Queue | `app/Jobs/ProcessPaymentWebhook.php` | Works a stored webhook with retries |
 | Events | `app/Events/Payment*.php`, `Refund*.php`, `Subscription*.php` | Extension points for the project |
-| Admin | `pages::admin.payments` (gate `payments`), `pages::admin.subscriptions` (gate `subscriptions`), refund + "check with provider" on `pages::admin.transactions` | |
+| Admin | Under the **Finance** sidebar group: `pages::admin.transactions` (gate `finance.transactions`, refund + "check with provider"), `pages::admin.payments` (gate `finance.payments`), `pages::admin.subscriptions` (gate `finance.subscriptions`), `pages::admin.subaccounts` (gate `finance.subaccounts`). A role holding `finance` reaches all four | |
 | Member | "Add funds" on `pages::user.transactions`, `pages::user.subscriptions` | |
 | Commands | `payments:reconcile`, `payments:retry-webhooks`, `payments:health`, `payments:prune-traces` | |
 
@@ -128,6 +129,60 @@ reference; on Flutterwave, `charge.completed` whose `tx_ref` is not ours, matche
 customer's email; on Stripe, `invoice.paid` not for `subscription_create`; on PayPal,
 `PAYMENT.SALE.COMPLETED` — which PayPal also sends for the first payment, hence the
 dedupe. A PayPal subscription payment is refunded through the sales API, not captures.
+
+## Subaccounts (split payments)
+
+A subaccount is a payee a checkout can be split with: the vendor pays the payee its
+share straight into the payee's own bank account and the rest to the site. Paystack,
+Flutterwave and Monnify implement `SupportsSubaccounts`; Stripe, PayPal, OPay, Korapay
+and Bachs do not, and are never offered where a payment is split.
+
+| Piece | How |
+| --- | --- |
+| Row | `payment_subaccounts`, one per vendor — a payee paid through two vendors is two rows, because bank codes are each vendor's own. `subaccount_code` is what a checkout names (`ACCT_`, `RS_`, `MFY_SUB_`); `vendor_record_id` is what an update is addressed to where that differs (Flutterwave) |
+| Split | `platform_percentage` is what the **site keeps**; the payee gets the rest (`subaccountPercentage()`). Monnify counts from the other side and is sent the complement. The vendor's own fee comes out of the site's share |
+| Create / edit | **Subaccounts** admin screen (Finance › Subaccounts, gate `finance.subaccounts`). `PaymentSubaccountService::save()` calls the vendor first and saves the row only once the vendor accepts it, so every code on file is one the vendor knows. The vendor names the account holder. A subaccount never moves vendor |
+| Banks | `PaymentSubaccountService::banks($vendor)`, cached a day on success |
+| Switch off | Status on the row. Sent to Paystack as `active`; Flutterwave and Monnify have no switch, so it stays on our side — the kit stops naming it |
+| Delete | Only while no checkout has been split with it, and only from this site — the vendor's copy stays |
+| Record | `transaction_gateways.payment_subaccount_id`, so a receipt or a dispute can say who was paid |
+
+Split a purchase by passing the row to `checkout()`:
+
+```php
+$result = app(PaymentService::class)->checkout(
+    $user,
+    PaymentVendorEnum::from($this->vendor),
+    $order->total,
+    "Order {$order->number}",
+    TransactionGroupEnum::PURCHASE,
+    TransactionTypeEnum::DIRECT,
+    TransactionWalletEnum::NONE,
+    against: $order,
+    subaccount: $order->store->paystackSubaccount,
+);
+```
+
+`checkout()` asks `PaymentSubaccountService::usableWith()` before a row is written and
+refuses: a vendor that cannot split, a vendor other than the subaccount's own, a
+switched-off subaccount, a currency other than the ledger's, and a **wallet deposit**
+(the balance would hold money the site never received).
+
+Offer only the vendors that can take the split. A screen paying one payee lists
+`app(PaymentSubaccountService::class)->checkoutOptionsFor($payee->subaccounts)` —
+available, able to split, and holding an active subaccount of that payee's.
+`PaymentVendorEnum::subaccountOptions()` is the same without the payee. Never
+`checkoutOptions()` where a payment is split.
+
+The kit ties a subaccount to nothing; a project points its own model at it (a
+`payment_subaccount_id` on a store, say). Subscriptions are never split. A refund of a
+split payment is the vendor's ordinary refund — how the vendor recovers the payee's
+share is its own rule, so read it before refunding marketplace sales.
+
+Adding a vendor that splits: implement `SupportsSubaccounts` on its gateway service
+(`banks()`, `createSubaccount()`, `updateSubaccount()`, `splitFields()`), and spread
+`$this->splitFor($transaction)` into its `initialize()` call. `supportsSubaccounts()`
+reads the interface, so nothing else needs to know.
 
 ## Two ids per checkout
 

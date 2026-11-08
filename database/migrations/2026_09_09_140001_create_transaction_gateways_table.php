@@ -19,6 +19,10 @@ return new class extends Migration
 
             $table->string('vendor', 100)->default(PaymentVendorEnum::MANUAL)->index();
 
+            // The subaccount the checkout was split with, when it was. The row
+            // keeps pointing at it so a receipt or a dispute can say who was paid.
+            $table->foreignId('payment_subaccount_id')->nullable()->constrained()->nullOnDelete();
+
             // What the vendor was asked to charge in. The ledger is written in the
             // site default, and the verification compares against this, so a
             // payment settled in a different currency is caught rather than

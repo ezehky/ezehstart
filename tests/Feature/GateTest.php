@@ -65,7 +65,7 @@ test('a child with no gate of its own inherits its parent', function () {
 test('two roles merge with the highest access winning each key', function () {
     $media = roleWithGates('Media', [
         'content' => GateAccessEnum::VIEW->value,
-        'transactions' => GateAccessEnum::FULL->value,
+        'finance.transactions' => GateAccessEnum::FULL->value,
     ]);
     $editor = roleWithGates('Editor', [
         'content' => GateAccessEnum::FULL->value,
@@ -74,16 +74,16 @@ test('two roles merge with the highest access winning each key', function () {
     $admin = adminWithRoles($media, $editor);
 
     expect($this->service->accessFor($admin, 'content'))->toBe(GateAccessEnum::FULL)
-        ->and($this->service->accessFor($admin, 'transactions'))->toBe(GateAccessEnum::FULL);
+        ->and($this->service->accessFor($admin, 'finance.transactions'))->toBe(GateAccessEnum::FULL);
 });
 
 test('a role denying a key does not veto another role granting it', function () {
-    $narrow = roleWithGates('Narrow', ['transactions' => GateAccessEnum::NONE->value]);
-    $wide = roleWithGates('Wide', ['transactions' => GateAccessEnum::MODIFY->value]);
+    $narrow = roleWithGates('Narrow', ['finance.transactions' => GateAccessEnum::NONE->value]);
+    $wide = roleWithGates('Wide', ['finance.transactions' => GateAccessEnum::MODIFY->value]);
 
     $admin = adminWithRoles($narrow, $wide);
 
-    expect($this->service->accessFor($admin, 'transactions'))->toBe(GateAccessEnum::MODIFY);
+    expect($this->service->accessFor($admin, 'finance.transactions'))->toBe(GateAccessEnum::MODIFY);
 });
 
 test('an override still narrows what the merged roles grant', function () {
@@ -155,7 +155,7 @@ test('an override can deny something the role allows', function () {
         // The children fall with the parent, because they were inheriting it.
         ->and($this->service->accessFor($this->admin, 'content.tags'))->toBe(GateAccessEnum::NONE)
         // Everything not named in the override is untouched.
-        ->and($this->service->accessFor($this->admin, 'transactions'))->toBe(GateAccessEnum::FULL);
+        ->and($this->service->accessFor($this->admin, 'finance.transactions'))->toBe(GateAccessEnum::FULL);
 });
 
 // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -216,7 +216,7 @@ test('the sidebar drops a branch the account cannot reach', function () {
 
     expect($links)->toHaveKey('users')
         ->and($links)->not->toHaveKey('content')
-        ->and($links)->not->toHaveKey('transactions')
+        ->and($links)->not->toHaveKey('finance')
         // Never gated, so they survive an otherwise empty map.
         ->and($links)->toHaveKey('dashboard')
         ->and($links)->toHaveKey('profile');

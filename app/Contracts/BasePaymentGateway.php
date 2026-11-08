@@ -120,6 +120,37 @@ abstract class BasePaymentGateway implements PaymentGateway
     }
 
     /**
+     * The shape createSubaccount() and updateSubaccount() return.
+     *
+     * @return array{subaccount_code: string, vendor_record_id: ?string, account_name: ?string, bank_name: ?string}
+     */
+    protected function subaccountResult(mixed $code, mixed $recordId = null, ?string $accountName = null, ?string $bankName = null): array
+    {
+        return [
+            'subaccount_code' => (string) $code,
+            'vendor_record_id' => filled($recordId) ? (string) $recordId : null,
+            'account_name' => filled($accountName) ? $accountName : null,
+            'bank_name' => filled($bankName) ? $bankName : null,
+        ];
+    }
+
+    /**
+     * The split fields a checkout carries, when it was opened against a
+     * subaccount and this vendor can split. Empty otherwise, so a vendor's
+     * initialize() can spread it in unconditionally.
+     *
+     * @return array<string, mixed>
+     */
+    protected function splitFor(Transaction $transaction): array
+    {
+        $subaccount = $transaction->gateway?->subaccount;
+
+        return $subaccount && $this instanceof SupportsSubaccounts
+            ? $this->splitFields($subaccount, $transaction)
+            : [];
+    }
+
+    /**
      * The id the money moved under, which most vendors refund against. Missing
      * when the payment was never verified through the kit.
      */

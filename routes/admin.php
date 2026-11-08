@@ -54,6 +54,11 @@ Route::livewire('/payments', 'pages::admin.payments')->name('payments');
 // Subscription plans and the people on them.
 Route::livewire('/subscriptions', 'pages::admin.subscriptions')->name('subscriptions');
 
+// The payees a checkout can be split with, created on the providers that
+// split. Its own gate: who is paid out, and to which bank account, is not
+// something every role that reads payments should change.
+Route::livewire('/subaccounts', 'pages::admin.subaccounts')->name('subaccounts');
+
 // Blog. The editor is its own screen rather than a modal: a post is long-form,
 // and a rich-text editor inside a dialog fights the page for scroll.
 Route::livewire('/categories/{category_group}', 'pages::admin.content.categories')->name('categories');

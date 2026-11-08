@@ -49,4 +49,12 @@ class TransactionGateway extends Model
     {
         return $this->belongsTo(Transaction::class);
     }
+
+    /**
+     * Who the payment was split with, when it was.
+     */
+    public function subaccount(): BelongsTo
+    {
+        return $this->belongsTo(PaymentSubaccount::class, 'payment_subaccount_id');
+    }
 }

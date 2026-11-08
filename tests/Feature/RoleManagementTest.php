@@ -43,7 +43,7 @@ test('an admin can hold several roles at once', function () {
 
     $admin = adminWithoutRole();
     $media = roleWithGates('Media', ['content' => 'full']);
-    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $support = roleWithGates('Support', ['finance.transactions' => 'view']);
 
     expect(app(RoleService::class)->syncRoles($admin, [$media, $support]))->toBeTrue()
         ->and($admin->fresh()->roles->pluck('slug')->sort()->values()->all())
@@ -54,13 +54,13 @@ test('the role set is absolute, so a role left out of it is revoked', function (
     userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
 
     $media = roleWithGates('Media', ['content' => 'full']);
-    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $support = roleWithGates('Support', ['finance.transactions' => 'view']);
     $admin = adminWithRoles($media, $support);
 
     app(RoleService::class)->syncRoles($admin, [$media]);
 
     expect($admin->fresh()->roles->pluck('slug')->all())->toBe(['media'])
-        ->and(kGate('transactions', user: $admin->fresh()))->toBeFalse();
+        ->and(kGate('finance.transactions', user: $admin->fresh()))->toBeFalse();
 });
 
 test('the same role posted twice is one grant, not two', function () {
@@ -111,7 +111,7 @@ test('switching one role off leaves what the others grant standing', function ()
     userOfType(UserTypeEnum::ADMIN, ['email' => 'keeper@example.test']);
 
     $media = roleWithGates('Media', ['content' => 'full']);
-    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $support = roleWithGates('Support', ['finance.transactions' => 'view']);
     $admin = adminWithRoles($media, $support);
 
     app(RoleService::class)->update($media, 'Media', null, active: false);
@@ -120,7 +120,7 @@ test('switching one role off leaves what the others grant standing', function ()
 
     expect($admin->hasLiveRole())->toBeTrue()
         ->and(kGate('content', user: $admin))->toBeFalse()
-        ->and(kGate('transactions', user: $admin))->toBeTrue();
+        ->and(kGate('finance.transactions', user: $admin))->toBeTrue();
 });
 
 test('changing type to member clears the role', function () {
@@ -191,7 +191,7 @@ test('the access modal puts an admin on two roles at once', function () {
     $admin = userOfType(UserTypeEnum::ADMIN);
     $account = adminWithoutRole();
     $media = roleWithGates('Media', ['content' => 'full']);
-    $support = roleWithGates('Support', ['transactions' => 'view']);
+    $support = roleWithGates('Support', ['finance.transactions' => 'view']);
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users.admins')
@@ -203,7 +203,7 @@ test('the access modal puts an admin on two roles at once', function () {
 
     expect($account->roles)->toHaveCount(2)
         ->and(kGate('content', user: $account))->toBeTrue()
-        ->and(kGate('transactions', user: $account))->toBeTrue();
+        ->and(kGate('finance.transactions', user: $account))->toBeTrue();
 });
 
 test('the access modal moves an account between workspaces', function () {

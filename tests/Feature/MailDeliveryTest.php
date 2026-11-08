@@ -87,7 +87,7 @@ test('the new emails render', function () {
 });
 
 test('the screen is behind its gate', function () {
-    $clerk = adminWithRoles(roleWithGates('Clerk', ['transactions' => 'full']));
+    $clerk = adminWithRoles(roleWithGates('Clerk', ['finance.transactions' => 'full']));
 
     $this->actingAs($clerk)->get(route('admin.config.email-delivery'))->assertNotFound();
 });

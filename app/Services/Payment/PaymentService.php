@@ -18,6 +18,7 @@ use App\Events\PaymentNeedsReview;
 use App\Events\PaymentSucceeded;
 use App\Events\PaymentWebhookReceived;
 use App\Jobs\ProcessPaymentWebhook;
+use App\Models\PaymentSubaccount;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
 use App\Models\Transaction;
@@ -119,6 +120,11 @@ class PaymentService
      * screen that asked the customer passes the answer; left null it is
      * presumed from the account's country (PaymentFeeService::isInternational).
      *
+     * `$subaccount` splits the payment with a payee: the vendor settles the
+     * subaccount's share to it and the rest to the site. Only the subaccount's
+     * own vendor can take it, and only a vendor that splits at all — anything
+     * else is refused before a row is written.
+     *
      * @param  array<string, mixed>  $meta
      */
     public function checkout(
@@ -132,9 +138,21 @@ class PaymentService
         ?Model $against = null,
         array $meta = [],
         ?bool $international = null,
+        ?PaymentSubaccount $subaccount = null,
     ): string|Transaction {
         if ($vendor->isManual() || ! $vendor->isAvailable()) {
             return 'That payment method is not available right now.';
+        }
+
+        if ($subaccount && $error = app(PaymentSubaccountService::class)->usableWith($subaccount, $vendor)) {
+            return $error;
+        }
+
+        // A deposit credits its whole amount to the wallet, and a split hands
+        // part of it to somebody else — the balance would hold money the site
+        // never received.
+        if ($subaccount && $wallet->isBalance()) {
+            return 'A wallet deposit cannot be split with a subaccount.';
         }
 
         if (round($amount, 2) <= 0) {
@@ -174,7 +192,11 @@ class PaymentService
         $gateway = $transaction->gateway;
         $gateway->currency = strtoupper(kDefaultCurrency()['code']);
         $gateway->expires_at = now()->addMinutes(max(5, (int) config('payments.checkout.expires_in_minutes', 60)));
+        $gateway->payment_subaccount_id = $subaccount?->id;
         $gateway->save();
+
+        // The vendor's initialize() reads the split off the gateway row.
+        $gateway->setRelation('subaccount', $subaccount);
 
         $opened = $vendor->gateway()->initialize($transaction);
 

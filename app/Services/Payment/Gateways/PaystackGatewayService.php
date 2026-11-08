@@ -3,6 +3,7 @@
 namespace App\Services\Payment\Gateways;
 
 use App\Contracts\BasePaymentGateway;
+use App\Contracts\SupportsSubaccounts;
 use App\Contracts\SupportsSubscriptions;
 use App\Enums\PaymentTraceStepEnum;
 use App\Enums\PaymentVendorEnum;
@@ -10,6 +11,7 @@ use App\Enums\PaymentWebhookTopicEnum;
 use App\Enums\StatusSubscription;
 use App\Enums\StatusTransaction;
 use App\Enums\SubscriptionEventEnum;
+use App\Models\PaymentSubaccount;
 use App\Models\PaymentWebhook;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlanPrice;
@@ -19,6 +21,7 @@ use App\Models\TransactionGateway;
 use Carbon\CarbonInterface;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 
 /**
@@ -33,9 +36,12 @@ use Illuminate\Http\Request;
  * checkout with the plan_code on it, and Paystack starts the subscription when
  * that charge succeeds. Renewals arrive as charge.success with a plan and a
  * reference of Paystack's own, which is what tells them apart from the first.
+ *
+ * Subaccounts: Paystack's own subaccounts, whose percentage_charge is the
+ * share the main account keeps. A split checkout names the subaccount_code.
  */
 #[Singleton]
-class PaystackGatewayService extends BasePaymentGateway implements SupportsSubscriptions
+class PaystackGatewayService extends BasePaymentGateway implements SupportsSubaccounts, SupportsSubscriptions
 {
     protected const BASE_URL = 'https://api.paystack.co';
 
@@ -60,7 +66,7 @@ class PaystackGatewayService extends BasePaymentGateway implements SupportsSubsc
 
     public function initialize(Transaction $transaction): string|array
     {
-        return $this->openCheckout($transaction);
+        return $this->openCheckout($transaction, $this->splitFor($transaction));
     }
 
     /**
@@ -182,6 +188,52 @@ class PaystackGatewayService extends BasePaymentGateway implements SupportsSubsc
         }
 
         return $this->fromRefund((array) $response->json('data'));
+    }
+
+    // Subaccounts
+
+    public function banks(): string|array
+    {
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'GET', '/bank', [
+            'currency' => $this->currency(),
+            'perPage' => 100,
+        ]);
+
+        if (! $response?->successful() || ! $response->json('status')) {
+            return $this->errorMessage($response);
+        }
+
+        return collect((array) $response->json('data'))
+            ->filter(fn ($bank) => filled($bank['code'] ?? null) && ($bank['active'] ?? true))
+            ->map(fn ($bank) => ['code' => (string) $bank['code'], 'name' => (string) $bank['name']])
+            ->values()
+            ->all();
+    }
+
+    public function createSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'POST', '/subaccount', $this->subaccountBody($subaccount));
+
+        return $this->fromSubaccount($response);
+    }
+
+    public function updateSubaccount(PaymentSubaccount $subaccount): string|array
+    {
+        $response = $this->send(PaymentTraceStepEnum::SUBACCOUNT, 'PUT', '/subaccount/'.rawurlencode($subaccount->subaccount_code), [
+            ...$this->subaccountBody($subaccount),
+            'active' => $subaccount->status->isActive(),
+        ]);
+
+        return $this->fromSubaccount($response);
+    }
+
+    /**
+     * The split itself is set on the subaccount, so naming it is enough.
+     * Paystack's own fee is borne by the main account, its default.
+     */
+    public function splitFields(PaymentSubaccount $subaccount, Transaction $transaction): array
+    {
+        return ['subaccount' => $subaccount->subaccount_code];
     }
 
     // Subscriptions
@@ -342,6 +394,39 @@ class PaystackGatewayService extends BasePaymentGateway implements SupportsSubsc
     }
 
     // Tools
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function subaccountBody(PaymentSubaccount $subaccount): array
+    {
+        return array_filter([
+            'business_name' => $subaccount->business_name,
+            'settlement_bank' => $subaccount->bank_code,
+            'account_number' => $subaccount->account_number,
+            'percentage_charge' => (float) $subaccount->platform_percentage,
+            'description' => $subaccount->description,
+            'primary_contact_email' => $subaccount->contact_email,
+            'primary_contact_phone' => $subaccount->contact_phone,
+        ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * @return string|array{subaccount_code: string, vendor_record_id: ?string, account_name: ?string, bank_name: ?string}
+     */
+    protected function fromSubaccount(?Response $response): string|array
+    {
+        if (! $response?->successful() || ! $response->json('status') || blank($response->json('data.subaccount_code'))) {
+            return $this->errorMessage($response);
+        }
+
+        return $this->subaccountResult(
+            $response->json('data.subaccount_code'),
+            $response->json('data.id'),
+            $response->json('data.account_name'),
+            $response->json('data.settlement_bank'),
+        );
+    }
 
     /**
      * @return array<string, mixed>|string|null

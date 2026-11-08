@@ -657,7 +657,7 @@ test('an admin cancels a subscriber and it is logged', function () {
 });
 
 test('the subscriptions screens are behind their gate', function () {
-    $clerk = adminWithRoles(roleWithGates('Clerk', ['transactions' => 'full']));
+    $clerk = adminWithRoles(roleWithGates('Clerk', ['finance.transactions' => 'full']));
 
     $this->actingAs($clerk)->get(route('admin.subscriptions'))->assertNotFound();
     $this->actingAs($this->admin)->get(route('admin.subscriptions'))->assertOk();

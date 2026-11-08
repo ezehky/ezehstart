@@ -3,6 +3,7 @@
 namespace App\Enums;
 
 use App\Contracts\PaymentGateway;
+use App\Contracts\SupportsSubaccounts;
 use App\Services\Payment\Gateways\BachsGatewayService;
 use App\Services\Payment\Gateways\FlutterwaveGatewayService;
 use App\Services\Payment\Gateways\KorapayGatewayService;
@@ -95,6 +96,16 @@ enum PaymentVendorEnum: string
     }
 
     /**
+     * Whether a checkout through this vendor can be split with a subaccount.
+     * Read off the gateway service, so a vendor gains it by implementing
+     * SupportsSubaccounts and nowhere else.
+     */
+    public function supportsSubaccounts(): bool
+    {
+        return $this->gateway() instanceof SupportsSubaccounts;
+    }
+
+    /**
      * Brand names are not title case, and "Paypal" on a checkout button reads
      * as a phishing page.
      */
@@ -174,5 +185,30 @@ enum PaymentVendorEnum: string
             - (int) ($first->value === config('payments.default')));
 
         return $available;
+    }
+
+    /**
+     * The gateways a split checkout can offer: the checkout options, less any
+     * vendor that cannot split a payment. Where a screen pays a subaccount,
+     * this is the list it offers — never checkoutOptions().
+     *
+     * @return array<int, self>
+     */
+    public static function subaccountOptions(): array
+    {
+        return array_values(array_filter(
+            self::checkoutOptions(),
+            fn (self $case) => $case->supportsSubaccounts(),
+        ));
+    }
+
+    /**
+     * Every vendor the kit can create a subaccount on, configured or not.
+     *
+     * @return array<int, self>
+     */
+    public static function subaccountVendors(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $case) => $case->supportsSubaccounts()));
     }
 }

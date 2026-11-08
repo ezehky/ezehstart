@@ -305,7 +305,7 @@ test('an admin refunds from the transactions screen', function () {
 test('refunding needs create access on transactions', function () {
     $deposit = confirmedPaystackDeposit($this->member, 1000);
 
-    $viewer = adminWithRoles(roleWithGates('Viewer', ['transactions' => GateAccessEnum::VIEW->value]));
+    $viewer = adminWithRoles(roleWithGates('Viewer', ['finance.transactions' => GateAccessEnum::VIEW->value]));
 
     Livewire::actingAs($viewer)
         ->test('pages::admin.transactions')
@@ -369,7 +369,7 @@ test('the payments screen checks every configured provider on request', function
 });
 
 test('the payments screen is closed to a role without its gate', function () {
-    $clerk = adminWithRoles(roleWithGates('Clerk', ['transactions' => GateAccessEnum::FULL->value]));
+    $clerk = adminWithRoles(roleWithGates('Clerk', ['finance.transactions' => GateAccessEnum::FULL->value]));
 
     $this->actingAs($clerk)->get(route('admin.payments'))->assertNotFound();
     $this->actingAs($this->admin)->get(route('admin.payments'))->assertOk();
