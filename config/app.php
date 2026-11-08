@@ -123,4 +123,31 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Source Repository
+    |--------------------------------------------------------------------------
+    |
+    | Where the GitHub link in the public header, the public footer and the
+    | dashboard sidebar points (<x-util.repository-link>). It starts at the
+    | kit's own repository. Set APP_REPOSITORY_URL to a project's own, or set
+    | it empty to take every one of those links away.
+    |
+    */
+
+    'repository' => env('APP_REPOSITORY_URL', 'https://github.com/ezehky/ezehstart'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Documentation
+    |--------------------------------------------------------------------------
+    |
+    | The docs link beside the GitHub one (<x-util.documentation-link>). It
+    | starts at the kit's own documentation. Set APP_DOCUMENTATION_URL to a
+    | project's own, or set it empty to take the links away.
+    |
+    */
+
+    'documentation' => env('APP_DOCUMENTATION_URL', 'https://ezehky.github.io/ezehstart-doc/'),
+
 ];

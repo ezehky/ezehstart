@@ -22,6 +22,9 @@
                     {{ $policy->defaultTitle() }}
                 </a>
             @endforeach
+
+            <x-util.documentation-link class="text-sm text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">{{ __('Docs') }}</x-util.documentation-link>
+            <x-util.repository-link class="text-sm text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">GitHub</x-util.repository-link>
         </nav>
     </div>
 </footer>

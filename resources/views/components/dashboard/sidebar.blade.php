@@ -77,6 +77,17 @@
         </div>
     </div>
 
+    {{-- Outside the gated tree on purpose: they leave the app, so there is no
+         screen behind them for a role to grant or refuse. --}}
+    <x-util.documentation-link class="press mt-4 shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-slate-700 hover:text-slate-100 dark:text-slate-300 dark:hover:bg-slate-900">
+        <span class="flex-1">{{ __('Documentation') }}</span>
+        <flux:icon.arrow-up-right variant="micro" class="text-slate-400" />
+    </x-util.documentation-link>
+    <x-util.repository-link class="press shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium text-white transition-colors duration-150 ease-out hover:bg-slate-700 hover:text-slate-100 dark:text-slate-300 dark:hover:bg-slate-900">
+        <span class="flex-1">{{ __('Repository') }}</span>
+        <flux:icon.arrow-up-right variant="micro" class="text-slate-400" />
+    </x-util.repository-link>
+
     <div class="mt-4 shrink-0 border-t border-brand-700 pt-4 dark:border-slate-800">
         <div class="flex items-center gap-3 px-2">
             <x-dashboard.avatar :user="auth()->user()" />

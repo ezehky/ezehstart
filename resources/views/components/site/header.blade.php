@@ -7,6 +7,8 @@
     <div class="flex items-center gap-2">
         <livewire:livewire.currency-switcher />
         <livewire:livewire.language-switcher />
+        <x-util.documentation-link class="rounded-md p-1.5 text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" />
+        <x-util.repository-link class="rounded-md p-1.5 text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" />
         <flux:switch x-data x-model="$flux.dark" />
 
         @auth
