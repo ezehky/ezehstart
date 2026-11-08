@@ -73,6 +73,14 @@ outside a home country. Every fee is zero until an owner sets one. An admin
 **Payments** screen shows the webhooks, the traces, which vendors are configured, and
 each vendor's fee.
 
+**Split payments** — a checkout through Paystack, Flutterwave or Monnify can be split
+with a **subaccount**: the vendor pays the payee's share into the payee's own bank
+account and the rest to the site. Administrators create subaccounts on **Finance ›
+Subaccounts**. The vendor is asked first, and a row is only saved once the vendor accepts
+it. Pass one to `checkout(..., subaccount:)`. The kit refuses a vendor that can't split,
+a wallet deposit, and a switched-off or wrong-currency subaccount, all before anything
+is written.
+
 **Subscriptions** — billed by the vendor (Paystack, Flutterwave, Stripe, PayPal). Each
 plan has one price per interval, and the pricing card works out what a longer interval
 saves. There's an optional free plan, card-less trials the kit runs itself, and plans
@@ -106,8 +114,9 @@ account can already see — the gate and the column list decide the file.
 queue; admin and member listings with search, filters and exports; a roles page; a
 searchable activity log with an optional retention window; a single-account view; a
 deleted-accounts screen; and a manage-roles modal with guards (you cannot revoke your
-own admin role, or the last one). Blog posts, categories and tags. The transaction
-ledger and its review queue, refunds, payments and subscription plans. Site configuration across four screens — branding, security
+own admin role, or the last one). Blog posts, categories and tags. A **Finance**
+group: the ledger and its review queue, refunds, payments, subscription plans and
+split-payment subaccounts. Site configuration across four screens — branding, security
 switches, preferences, social handles, the legal pages, the FAQs and notification types
 — plus a raw JSON editor for the key no screen has grown a field for yet.
 
@@ -194,8 +203,9 @@ them in development — never at runtime.
 ## Documentation
 
 The full documentation (installation, configuration, every feature, extending the kit and
-going to production) is the companion `ezehstart-doc` site. Run `npm install && npm run dev`
-in that folder.
+going to production) is at **[ezehky.github.io/ezehstart-doc](https://ezehky.github.io/ezehstart-doc/)**.
+Its source is the companion `ezehstart-doc` repository. Run `npm install && npm run dev`
+there to work on it locally.
 
 ## Getting started
 
@@ -293,6 +303,8 @@ The short version:
 
 Laravel 13 · PHP 8.3+ · Livewire 4 · Flux UI free v2 · Tailwind v4 · Alpine · Pest 5 ·
 Pint · Larastan.
+
+Source: [github.com/ezehky/ezehstart](https://github.com/ezehky/ezehstart).
 
 ## Releases
 

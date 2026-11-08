@@ -9,6 +9,162 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-08
+
+A checkout can now be split with a payee. The vendor pays the payee's share straight
+into the payee's own bank account and the rest to the site. Paystack, Flutterwave and
+Monnify can do this. The four money screens now sit together under a new **Finance**
+group in the sidebar, and the kit links to its GitHub repository and its documentation
+from the public header, the footer and the dashboard. There's one new table (`payment_subaccounts`),
+one new column, and no route is renamed. **The gate keys of the money screens have
+moved, so every saved role needs a one-off fix.** See **Upgrading**.
+
+### Added
+
+#### Split payments (subaccounts)
+
+- **Finance › Subaccounts** (`admin.subaccounts`, gate `finance.subaccounts`) lists the
+  payees a checkout can be split with and creates them on the vendor. For each one you
+  set a business name, the bank account the payee is paid into, and the share the site
+  keeps (`platform_percentage`). The payee gets the rest. The vendor's own fee comes out
+  of the site's share.
+  - The vendor is called first and the row is saved only once the vendor accepts it,
+    so every code on file is one the vendor knows. The vendor names the account holder,
+    so a wrong account number shows up before any money moves.
+  - The bank list comes from the vendor (each vendor has its own bank codes) and is
+    cached for a day.
+  - A payee paid through two vendors is two rows. A subaccount never moves vendor.
+  - Switching one off stops checkouts naming it. Paystack is told. Flutterwave and
+    Monnify have no switch, so the change stays on this site.
+  - A subaccount can only be deleted while no checkout has been split with it, and
+    only from this site. The vendor's copy stays.
+  - Creating, editing and deleting all need their own access level, and every write
+    is logged.
+- **`PaymentService::checkout(..., subaccount:)`** splits a purchase with a
+  `PaymentSubaccount`. Before any row is written, it refuses:
+  - a vendor that can't split
+  - a vendor other than the subaccount's own
+  - a switched-off subaccount
+  - a subaccount in a currency other than the ledger's
+  - a **wallet deposit**, because the balance would hold money the site never received
+- **`PaymentSubaccountService`**: `save()`, `banks()`, `usableWith()`, `isUsed()` and
+  `checkoutOptionsFor($subaccounts)`. That last one is the list of gateways to offer on
+  a screen that pays one payee: available, able to split, and holding an active
+  subaccount of that payee's. **Never offer `checkoutOptions()` where a payment is
+  split.**
+- **`SupportsSubaccounts`**, the contract a gateway implements to split payments:
+  `banks()`, `createSubaccount()`, `updateSubaccount()` and `splitFields()`. A vendor's
+  `initialize()` spreads `$this->splitFor($transaction)` into its call. Paystack,
+  Flutterwave and Monnify implement it. Stripe, PayPal, OPay, Korapay and Bachs don't,
+  and are never offered for a split payment.
+- `PaymentVendorEnum::supportsSubaccounts()`, `subaccountOptions()` and
+  `subaccountVendors()`. A vendor gains the first by implementing the contract, and
+  nowhere else.
+- `transaction_gateways.payment_subaccount_id` and `TransactionGateway::subaccount()`,
+  so a receipt or a dispute can say who was paid.
+- `PaymentTraceStepEnum::SUBACCOUNT`, so subaccount calls show up in the payment traces.
+
+The kit doesn't tie a subaccount to anything. A project points its own model at it,
+for example a `payment_subaccount_id` on a store. Subscriptions are never split. A
+refund of a split payment is the vendor's ordinary refund, and each vendor has its own
+rule for getting the payee's share back. Read it before refunding marketplace sales.
+
+#### Repository and documentation links
+
+- **A GitHub link and a docs link** in the public header (as icons), the public footer,
+  and the dashboard sidebar of both workspaces, via the new `<x-util.repository-link>`
+  and `<x-util.documentation-link>`.
+  - They point at `app.repository` (`APP_REPOSITORY_URL`, default
+    `https://github.com/ezehky/ezehstart`) and `app.documentation`
+    (`APP_DOCUMENTATION_URL`, default `https://ezehky.github.io/ezehstart-doc/`).
+  - Set each to the project's own, or leave one empty to remove its links.
+
+### Changed
+
+- **Transactions, Payments, Subscriptions and Subaccounts sit under a Finance group**
+  in the admin sidebar. Their gate keys moved with them:
+
+  | Screen | Was | Now |
+  | --- | --- | --- |
+  | Transactions | `transactions` | `finance.transactions` |
+  | Payments | `payments` | `finance.payments` |
+  | Subscriptions | `subscriptions` | `finance.subscriptions` |
+  | Subaccounts | *(new)* | `finance.subaccounts` |
+
+  A role holding `finance` reaches all four. The route names and URLs haven't changed.
+
+### Upgrading
+
+Run the migrations:
+
+```bash
+php artisan migrate
+```
+
+This is the new `payment_subaccounts` table, and a `payment_subaccount_id` column
+added to `transaction_gateways`. The kit adds the column by editing the create
+migration, so **a project made from the kit needs its own `add_*` migration for it**:
+
+```php
+Schema::table('transaction_gateways', function (Blueprint $table) {
+    $table->foreignId('payment_subaccount_id')->nullable()->after('vendor')
+        ->constrained()->nullOnDelete();
+});
+```
+
+Date it after the `payment_subaccounts` migration.
+
+**Move the stored gate keys.** Roles and admin overrides keep their gates in the
+database, and the old `transactions`, `payments` and `subscriptions` keys don't match
+anything any more. **Until this is done, every role loses the money screens, including
+the seeded Administrator role.** Run this once, in `php artisan tinker` or a one-off
+migration:
+
+```php
+use App\Models\Role;
+use App\Models\User;
+use App\Services\RoleService;
+
+$moved = ['transactions', 'payments', 'subscriptions'];
+
+foreach ([Role::query(), User::query()] as $query) {
+    $query->whereNotNull('gates')->each(function ($row) use ($moved) {
+        $gates = $row->gatesArray();
+
+        foreach ($moved as $key) {
+            if (array_key_exists($key, $gates)) {
+                $gates["finance.{$key}"] ??= $gates[$key];
+                unset($gates[$key]);
+            }
+        }
+
+        $row->gates = $gates;
+        $row->saveQuietly();
+    });
+}
+
+// The Administrator role is meant to reach everything, Subaccounts included.
+$administrator = app(RoleService::class)->protectedRole();
+$administrator->gates = [...$administrator->gatesArray(), 'finance.subaccounts' => 'full'];
+$administrator->saveQuietly();
+```
+
+It keeps each role's level, so a role that could view Transactions still can. A denial
+in an admin's override stays a denial. No other role is given Subaccounts. That screen
+decides who gets paid and into which bank account, so grant it on **Roles** on purpose.
+
+**Check code of your own that names the old keys.** Search for `kGate('transactions'`,
+`setPageGate('payments'`, `kSetSiteTitle('subscriptions')` and the like, and add the
+`finance.` prefix (`kSetSiteTitle('finance', 'payments')` for a title).
+
+**Set the repository and docs links.** Add `APP_REPOSITORY_URL` and
+`APP_DOCUMENTATION_URL` to `.env`, each either your own or empty to remove its links.
+Left unset, they point at the kit's repository and documentation. If the config is cached, rebuild it:
+
+```bash
+php artisan config:cache
+```
+
 ## [2.4.0] - 2026-11-02
 
 Email can now go out through Resend, Brevo or any SMTP service, picked from the
