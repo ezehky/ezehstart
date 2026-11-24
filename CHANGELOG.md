@@ -9,6 +9,166 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-25
+
+An install can now pick its own brand colour from the dashboard, and the whole site,
+Flux's accent and the email builder follow it with no rebuild. The public header can
+offer a **Translate this page** menu. The image library crops in place and saves photos
+as WebP, and a member's library now holds only what that member uploaded. Email
+addresses are stored and looked up in lower case everywhere. There are no new tables,
+no migrations and no renames, and one new route (`admin.config.brand-colors`). **Stored
+email addresses need a one-off lower-casing, and members lose sight of site media that
+was shared with them.** See **Upgrading**.
+
+### Added
+
+#### Brand colour
+
+- **Configuration › Brand colour** (`admin.config.brand-colors`, gate
+  `config.brand-colors`). Pick one of six presets (teal, sky, indigo, violet, rose,
+  amber) or type any hex. A preview shows the full ramp, a heading and a sample
+  button, and warns when the button text falls below 4.5:1.
+- **`BrandColorService`** derives the other ten shades from the one picked, in OKLCH,
+  with the picked colour on `brand-400`. It prints them as CSS variables in the base
+  layout's `<head>`, after the compiled stylesheet, so every `brand-*` utility and Flux's
+  accent follow the setting. Nothing is rebuilt. For the teal `app.css` is compiled
+  with, it prints nothing.
+  - Button text is worked out per colour: white where it reaches 3:1, dark otherwise.
+  - A hex outside sRGB at some shade gives up chroma rather than clipping.
+- **`BrandPaletteEnum`**: the presets, each with its `primary()` hex. `CUSTOM` reads the
+  stored one.
+- **`kBrandColor($shade = 400)`** returns one shade as a hex, for places a CSS variable
+  can't reach, mostly email. **`kBrandStyles()`** is what the base layout prints.
+- The email builder's **brand** swatch now starts on the site's colour instead of a
+  hard-coded `#2DD4B5`.
+- Site config: `brand.palette` and `brand.primary`.
+
+#### Translate this page
+
+- **`<livewire:livewire.page-translator>`** in the public header. It's a menu over
+  Google's website translator that machine-translates whatever is on screen, posts
+  included, in the visitor's browser. It's separate from the language switcher, which
+  serves reviewed `lang/{code}.json` files, and it never changes the server's locale.
+  - **Off by default** (`translator.status`). Google's script loads only once a
+    visitor picks a language, and the choice is kept in Google's `googtrans` cookie.
+  - Configuration › Preferences gains a **Translate this page** card: the on/off switch
+    and the list of languages offered (French, Spanish, Portuguese, German and Arabic
+    to start), with add and remove.
+  - Names and flags come from `database/data/translator-languages.json` (61 languages),
+    not from the administrator. `PageTranslatorService` reads it.
+  - Google's own banner, tooltip and highlight are hidden in `app.css`.
+
+#### Image library
+
+- **Crop**, a new panel for a single selected JPEG, PNG or WebP image. Drag the box
+  (`resources/js/image-cropper.js`), and the file is cut and written back over itself.
+  **The URL doesn't change**, so every post already using the image shows the cropped
+  one. GIF (animation) and SVG (no pixels) are refused. The crop is logged, and the
+  owner is told when it's a member's image. `ImageLibraryService::canCrop()` and
+  `crop()`.
+- **Convert photos to WebP**, a switch under Configuration › Security
+  (`uploads.convert-to-webp`, **on by default**). JPEG and PNG uploads are re-encoded at
+  quality 80 and scaled down to 2560px on the longest side. GIF and SVG are kept as
+  they are. A WebP upload is only re-encoded if it needs scaling. A conversion that
+  comes out larger, or fails for any reason, keeps the original, so an upload never
+  fails here. It needs GD built with WebP. Without it, nothing changes.
+- `Image::previewUrl()` stamps `?v={updated_at}` on the library's own tiles so a crop
+  shows at once. Posts keep the plain `url()`.
+
+#### Forms
+
+- `<x-util.floating-actions in-modal>` pins the bar to the bottom of a `<flux:modal>`
+  instead of floating above the page's menu. Extra classes now land on the sticky
+  element itself, so `class="lg:col-span-2"` spans a grid form.
+
+### Changed
+
+- **A member's library holds only what that member uploaded.** Before, a member also
+  saw images, videos and folders an admin had marked **public** or shared with their
+  account type, in their library and in every picker. Now `Image`, `Video`,
+  `ImageFolder` and `VideoFolder` all scope a member to `user_id`, and `isVisibleTo()`
+  refuses anything else, so an id sent by hand can't get past the grid. Admins are
+  unchanged. Per-item visibility still decides what a **signed-out** visitor can see.
+- **Email addresses are stored trimmed and in lower case.** A setter on `User::email`
+  does it on every write, and `User::normalizeEmail()` is used for every lookup by a
+  typed address: sign-in, registration, password reset, OTP, social sign-in, the
+  newsletter, campaigns, subscription webhooks, and the admin, member and email-change
+  screens. `WithAuthWorker` normalises the `email` property as soon as it's typed. On a
+  case-sensitive database (SQLite, PostgreSQL), `John@` and `john@` used to be two
+  accounts, and an address saved in mixed case could only sign in typed exactly that
+  way.
+- Form descriptions across the dashboard use `description:trailing`. Toggles keep a
+  leading description.
+- Modal forms on the admin and member screens end in `<x-util.floating-actions in-modal>`.
+- The Boost skill files under `.agents/`, `.claude/` and `.github/` were regenerated
+  (sentence-case headings, no change in substance).
+- Dependencies: `laravel/framework` 13.33.0 → 13.44.1, `guzzlehttp/guzzle` 8.2.0 →
+  8.6.0, and routine updates in `composer.lock` and `package-lock.json`.
+
+### Upgrading
+
+Install the dependencies and rebuild the assets. There are two new JS modules and new
+CSS:
+
+```bash
+composer install
+npm install && npm run build
+```
+
+There are no migrations.
+
+**Lower-case the stored email addresses.** Lookups now normalise what's typed, so a row
+still stored as `John@Example.com` can't be found on SQLite or PostgreSQL, and that
+account can't sign in. Two rows that differ only by case would collide on the unique
+index, so look for them first in `php artisan tinker`:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+
+DB::table('users')->whereNotNull('email')->get(['id', 'email'])
+    ->groupBy(fn ($row) => User::normalizeEmail($row->email))
+    ->filter(fn ($rows) => $rows->count() > 1);
+```
+
+Merge or rename any it finds, then lower-case the rest:
+
+```php
+DB::table('users')->whereNotNull('email')->orderBy('id')->each(
+    fn ($row) => DB::table('users')->where('id', $row->id)
+        ->update(['email' => User::normalizeEmail($row->email)])
+);
+```
+
+`DB::table()` is used on purpose. It reaches soft-deleted rows and fires no model
+events. MySQL's default collation already ignores case, but run it there too, so the
+stored shape is the same everywhere.
+
+**Members no longer see site media.** If your project relied on sharing library images
+or videos with members by marking them public or by account type, that has stopped.
+Offer that media some other way, or bring back the old `visibleTo` and `browsableBy`
+scopes from the 2.5.0 tag in your own copy.
+
+**Check WebP before going live.** New JPEG and PNG uploads are now saved as WebP.
+Existing files are not touched. Desktop Outlook can't show WebP, so if library images
+go out in email, turn off **Convert photos to WebP** under Configuration › Security. To
+see whether the server can convert at all:
+
+```bash
+php -r "var_dump(function_exists('imagewebp'));"
+```
+
+**The brand colour needs nothing.** The default is the teal the kit was built with, and
+for it nothing is printed. If your own email views hard-code `#2DD4B5`, use
+`kBrandColor()` instead so they follow the setting. `config.brand-colors` inherits
+`config`, so a role holding `config` reaches the new screen. A role holding only some
+`config.*` children needs it granted on **Roles**.
+
+**The translate menu is off.** If you turn it on, mention Google's translator and its
+`googtrans` cookie in your cookie and privacy policies.
+
+Suite at this release: 1145 tests, 3070 assertions, all passing.
+
 ## [2.5.0] - 2026-11-08
 
 A checkout can now be split with a payee. The vendor pays the payee's share straight

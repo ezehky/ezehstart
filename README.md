@@ -27,8 +27,11 @@ whole site. Every one of these is a site-config switch that closes its route, no
 its button.
 
 **Image library** — upload several at once into a folder tree, search by name, rename
-the title without ever changing the stored URL, and set who can see each image: private,
-a role, or everybody. Deletion is guarded by an `image_usages` table with a restricting
+the title without ever changing the stored URL, and **crop in place**, which keeps the
+URL too, so every post already using the image shows the cropped one. Photos are saved
+as WebP and scaled to 2560px on the way in (a switch, on by default). A member's library
+holds only what that member uploaded; per-item visibility decides what a signed-out
+visitor can see. Deletion is guarded by an `image_usages` table with a restricting
 foreign key, so an image on a published post refuses to go rather than leaving a broken
 picture behind. Members have a configurable quota; administrators do not. Uploads run
 through `spatie/laravel-image-optimizer` where its binaries are installed.
@@ -198,7 +201,20 @@ a stored row.
 
 **Languages** — `LocaleEnum` plus `lang/{code}.json`, a case offered only once its file
 exists. `lang:extract` collects the strings, and `lang:translate` machine-translates
-them in development — never at runtime.
+them in development — never at runtime. Separately, an optional **Translate this page**
+menu in the public header puts Google's website translator behind the site's own menu,
+for content no lang file reaches; it is off by default, and the administrator picks
+the languages it offers.
+
+**Brand colour** — pick a preset or any hex under Configuration › Brand colour, and the
+other ten shades are derived around it in OKLCH and printed as CSS variables over the
+compiled stylesheet. Every `brand-*` utility, Flux's accent and the email builder follow
+it, with no rebuild. `kBrandColor()` hands the same colour to email, where a CSS
+variable can't reach.
+
+**Email addresses** — stored trimmed and lower case, by a setter on the model, and every
+lookup by a typed address goes through `User::normalizeEmail()`, so `John@` and `john@`
+are one account on every database.
 
 ## Documentation
 
