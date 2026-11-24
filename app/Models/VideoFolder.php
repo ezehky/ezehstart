@@ -40,22 +40,13 @@ class VideoFolder extends Model
     /**
      * Whether this account may browse the folder.
      *
-     * This gates the folder, not the videos in it. A video carries its own
-     * visibility and keeps it wherever it is filed, so a folder somebody may not
-     * browse can still hold a video they are allowed to see through the library
-     * root — which is the intended behaviour, not a leak.
+     * A member's library holds only what they uploaded, so a member browses
+     * their own folders and no others.
      */
     public function isVisibleTo(User $user): bool
     {
-        if ($user->isAdmin() || $this->user_id === $user->id) {
-            return true;
-        }
-
-        return match ($this->visibility) {
-            MediaVisibilityEnum::PUBLIC => true,
-            MediaVisibilityEnum::TYPE => $this->visible_to_type === $user->user_type,
-            default => false,
-        };
+        // A member browses their own folders only; an administrator browses all.
+        return $user->isAdmin() || $this->user_id === $user->id;
     }
 
     /**
@@ -119,8 +110,8 @@ class VideoFolder extends Model
     }
 
     /**
-     * The folders this user may browse: their own, plus anything whose visibility
-     * lets them in. An administrator browses the lot — the library is also the
+     * The folders this user may browse. A member gets their own and nothing
+     * else. An administrator browses the lot — the library is also the
      * site's media manager, and hiding folders from the person maintaining the
      * site hides the site from them.
      */
@@ -143,11 +134,8 @@ class VideoFolder extends Model
             return;
         }
 
-        $query->where(fn (Builder $inner) => $inner
-            ->where('user_id', $user->id)
-            ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
-            ->orWhere(fn (Builder $typeQuery) => $typeQuery
-                ->where('visibility', MediaVisibilityEnum::TYPE)
-                ->where('visible_to_type', $user->user_type)));
+        // A member sees what they uploaded and nothing else. The site's media is
+        // not theirs to browse, however it is marked.
+        $query->where('user_id', $user->id);
     }
 }

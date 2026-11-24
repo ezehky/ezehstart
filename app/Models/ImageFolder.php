@@ -40,22 +40,13 @@ class ImageFolder extends Model
     /**
      * Whether this account may browse the folder.
      *
-     * This gates the folder, not the images in it. An image carries its own
-     * visibility and keeps it wherever it is filed, so a folder somebody may not
-     * browse can still hold an image they are allowed to see through the library
-     * root — which is the intended behaviour, not a leak.
+     * A member's library holds only what they uploaded, so a member browses
+     * their own folders and no others.
      */
     public function isVisibleTo(User $user): bool
     {
-        if ($user->isAdmin() || $this->user_id === $user->id) {
-            return true;
-        }
-
-        return match ($this->visibility) {
-            MediaVisibilityEnum::PUBLIC => true,
-            MediaVisibilityEnum::TYPE => $this->visible_to_type === $user->user_type,
-            default => false,
-        };
+        // A member browses their own folders only; an administrator browses all.
+        return $user->isAdmin() || $this->user_id === $user->id;
     }
 
     /**
@@ -119,8 +110,7 @@ class ImageFolder extends Model
     }
 
     /**
-     * The folders this user may browse: their own, plus anything whose visibility
-     * lets them in.
+     * The folders this user may browse. A member gets their own and nothing else.
      *
      * An administrator browses the site's own folders — the shared ones that
      * belong to nobody, and those an admin account made. A folder a member
@@ -147,11 +137,8 @@ class ImageFolder extends Model
             return;
         }
 
-        $query->where(fn (Builder $inner) => $inner
-            ->where('user_id', $user->id)
-            ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
-            ->orWhere(fn (Builder $typeQuery) => $typeQuery
-                ->where('visibility', MediaVisibilityEnum::TYPE)
-                ->where('visible_to_type', $user->user_type)));
+        // A member sees what they uploaded and nothing else. The site's media is
+        // not theirs to browse, however it is marked.
+        $query->where('user_id', $user->id);
     }
 }

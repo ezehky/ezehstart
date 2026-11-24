@@ -75,9 +75,8 @@ class Image extends Model
     /**
      * Whether the given account may see this image.
      *
-     * The owner always can. Beyond that it is the image's own visibility that
-     * decides — never its folder's, so moving one between folders cannot change
-     * who can see it.
+     * The owner always can, and a member can see nothing else. An administrator
+     * sees the site's media, and a member's only through the per-member screen.
      *
      * @param  bool  $ownerScoped  True only when the caller is a screen that has
      *                             already established a right to look at this
@@ -101,11 +100,9 @@ class Image extends Model
             return $ownerScoped || ! $this->user?->isUser();
         }
 
-        return match (true) {
-            $this->visibility->isPublic() => true,
-            $this->visibility->isType() => $this->visible_to_type === $user->user_type,
-            default => false,
-        };
+        // A member only ever sees their own uploads — the same rule as the
+        // visibleTo scope, so an id sent by hand cannot reach past the grid.
+        return false;
     }
 
     // Relationships
@@ -134,8 +131,8 @@ class Image extends Model
     }
 
     /**
-     * Everything the given account is allowed to pick from: their own uploads,
-     * anything public, and anything shared with their account type.
+     * Everything the given account is allowed to pick from. A member gets their
+     * own uploads and nothing else.
      *
      * An administrator sees the site's own library — images uploaded by admin
      * accounts — and deliberately not the members'. A member's uploads are
@@ -161,12 +158,9 @@ class Image extends Model
             return;
         }
 
-        $query->where(fn (Builder $inner) => $inner
-            ->where('user_id', $user->id)
-            ->orWhere('visibility', MediaVisibilityEnum::PUBLIC)
-            ->orWhere(fn (Builder $typeQuery) => $typeQuery
-                ->where('visibility', MediaVisibilityEnum::TYPE)
-                ->where('visible_to_type', $user->user_type)));
+        // A member sees what they uploaded and nothing else. The site's media is
+        // not theirs to browse, however it is marked.
+        $query->where('user_id', $user->id);
     }
 
     /**

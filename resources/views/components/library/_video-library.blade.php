@@ -331,7 +331,10 @@
                         </div>
                     @endif
 
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {{-- Tiles hold a fixed width and the grid fits as many as the space allows,
+                         so a full-screen picker shows more videos rather than three huge ones.
+                         Wider than the image tiles: a 16:9 thumbnail and its title need it. --}}
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]">
                         @foreach ($this->videos as $video)
                             @php($isSelected = in_array($video->id, $selected, true))
 

@@ -139,33 +139,22 @@ test('the picker refuses a member image an administrator asked for by id', funct
         ->assertHasErrors();
 });
 
-test('a public image is visible to anybody', function () {
-    // Owned by an administrator, because only site media can be public now — a
-    // member's uploads are forced private however they are stored.
-    $image = app(ImageLibraryService::class)->store(
-        $this->admin,
-        uploadedImage(),
-        visibility: MediaVisibilityEnum::PUBLIC
-    );
+test('a member never sees site media, however it is marked', function () {
+    $service = app(ImageLibraryService::class);
 
-    $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
-
-    expect($image->isVisibleTo($stranger))->toBeTrue()
-        ->and($image->isVisibleTo(null))->toBeTrue();
-});
-
-test('a type image is visible only to accounts of that type', function () {
-    $image = app(ImageLibraryService::class)->store(
+    $public = $service->store($this->admin, uploadedImage(), visibility: MediaVisibilityEnum::PUBLIC);
+    $forMembers = $service->store(
         $this->admin,
         uploadedImage(),
         visibility: MediaVisibilityEnum::TYPE,
         visibleToType: UserTypeEnum::USER,
     );
+    $own = $service->store($this->member, uploadedImage());
 
-    $member = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
-
-    expect($image->visible_to_type)->toBe(UserTypeEnum::USER)
-        ->and($image->isVisibleTo($member))->toBeTrue();
+    expect($public->isVisibleTo($this->member))->toBeFalse()
+        ->and($forMembers->isVisibleTo($this->member))->toBeFalse()
+        ->and($own->isVisibleTo($this->member))->toBeTrue()
+        ->and($service->libraryQuery($this->member)->pluck('id')->all())->toBe([$own->id]);
 });
 
 test('leaving TYPE clears the type column so an old audience cannot come back', function () {
@@ -269,7 +258,7 @@ test('a folder made from the page is opened straight away', function () {
     $component->assertSet('folder', ImageFolder::query()->where('name', 'Banners')->value('id'));
 });
 
-test('a member only sees their own folders plus the shared ones', function () {
+test('a member only sees their own folders', function () {
     $service = app(ImageLibraryService::class);
 
     $service->createFolder($this->member, 'Mine');
@@ -279,7 +268,7 @@ test('a member only sees their own folders plus the shared ones', function () {
     $labels = $service->folderOptions($this->member)->pluck('label');
 
     expect($labels)->toContain('Mine')
-        ->and($labels)->toContain('Everyone')
+        ->and($labels)->not->toContain('Everyone')
         ->and($labels)->not->toContain('Theirs');
 });
 
@@ -361,7 +350,7 @@ test('detaching frees an image for deletion again', function () {
 // ||||||||||||||||||||||||||||||||||||||||||||||||
 // FOLDER VISIBILITY
 
-test('a private folder stays out of another member folder rail', function () {
+test('another member folder and a public site folder both stay out of the rail', function () {
     $service = app(ImageLibraryService::class);
     $other = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
@@ -372,7 +361,7 @@ test('a private folder stays out of another member folder rail', function () {
 
     $labels = $service->folderOptions($this->member)->pluck('label');
 
-    expect($labels)->toContain('Open to all')
+    expect($labels)->not->toContain('Open to all')
         ->and($labels)->not->toContain('Theirs');
 });
 

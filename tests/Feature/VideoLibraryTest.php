@@ -124,7 +124,7 @@ test('a member video is invisible to everybody but its owner', function () {
         ->and($video->isVisibleTo($this->admin, ownerScoped: true))->toBeTrue();
 });
 
-test('a type video reaches everybody of that type', function () {
+test('a video shared with members still stays out of a member library', function () {
     $video = app(VideoLibraryService::class)->store(
         $this->admin,
         'https://youtu.be/dQw4w9WgXcQ',
@@ -132,7 +132,7 @@ test('a type video reaches everybody of that type', function () {
         visibleToType: UserTypeEnum::USER,
     );
 
-    expect($video->isVisibleTo($this->member))->toBeTrue();
+    expect($video->isVisibleTo($this->member))->toBeFalse();
 });
 
 test('changing away from role clears the role, so it cannot be restored by accident', function () {
@@ -159,16 +159,17 @@ test('the library query offers only what the account may see', function () {
 
     $stranger = userOfType(UserTypeEnum::USER, ['email_verified_at' => now()]);
 
-    // The public one only: the member's is theirs, and the admin's private one is
-    // nobody else's business.
-    expect($service->libraryQuery($stranger)->pluck('video_id')->all())->toBe(['123456789'])
+    // Nothing: the member's is theirs, and site media is never in a member's
+    // library, public or not.
+    expect($service->libraryQuery($stranger)->count())->toBe(0)
+        ->and($service->libraryQuery($this->member)->pluck('video_id')->all())->toBe(['dQw4w9WgXcQ'])
         // The administrator sees the site's own two and not the member's. A
         // member's references are reached through the per-member screen.
         ->and($service->libraryQuery($this->admin)->count())->toBe(2)
         ->and($service->libraryQuery($this->admin, owner: $this->member)->count())->toBe(1);
 });
 
-test('a folder somebody may not browse still does not hide a video they may see', function () {
+test('a public site video in a site folder stays out of a member library', function () {
     $service = app(VideoLibraryService::class);
 
     $folder = $service->createFolder($this->admin, 'Private folder');
@@ -180,7 +181,7 @@ test('a folder somebody may not browse still does not hide a video they may see'
         visibility: MediaVisibilityEnum::PUBLIC,
     );
 
-    expect($service->libraryQuery($this->member)->count())->toBe(1);
+    expect($service->libraryQuery($this->member)->count())->toBe(0);
 });
 
 // ||||||||||||||||||||||||||||||||||||||||||||||||
