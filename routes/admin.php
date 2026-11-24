@@ -10,6 +10,7 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/info', 'pages::admin.configs.site-config')->name('site');
     Route::livewire('/security', 'pages::admin.configs.security')->name('security');
     Route::livewire('/preferences', 'pages::admin.configs.preferences')->name('preferences');
+    Route::livewire('/brand-colour', 'pages::admin.configs.brand-colors')->name('brand-colors');
     Route::livewire('/email-senders', 'pages::admin.configs.email-senders')->name('email-senders');
     // Which provider outgoing email goes through: log, Resend, Brevo or SMTP.
     Route::livewire('/email-delivery', 'pages::admin.configs.email-delivery')->name('email-delivery');

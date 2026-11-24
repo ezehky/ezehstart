@@ -2,9 +2,11 @@
 
 use App\Enums\LocaleEnum;
 use App\Services\NewsletterService;
+use App\Services\PageTranslatorService;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
@@ -17,6 +19,9 @@ use Livewire\Component;
 new class extends Component
 {
     use WithGateProps, WithSiteConfigProcessor;
+
+    /** The language picked in the translator's Add select, before it is added. */
+    public string $translatorAdd = '';
 
     protected function configSubject(): string
     {
@@ -53,6 +58,12 @@ new class extends Component
                 Rule::in(array_map(fn (LocaleEnum $locale) => $locale->value, LocaleEnum::available())),
             ],
             'config.localization.switcher' => ['required', 'boolean'],
+
+            // Only a code the catalogue knows, since that is where its name and
+            // flag come from.
+            'config.translator.status' => ['required', 'boolean'],
+            'config.translator.languages' => ['array'],
+            'config.translator.languages.*' => ['string', Rule::in(app(PageTranslatorService::class)->catalogue()->keys()->all())],
         ];
 
         // Where the sign-up appears. Neither placement means anything while the
@@ -72,6 +83,58 @@ new class extends Component
         }
 
         return $rules;
+    }
+
+    /**
+     * The languages on the translator's menu as they stand on screen, with the
+     * name and flag the catalogue gives each code.
+     */
+    #[Computed]
+    public function translatorLanguages(): array
+    {
+        $catalogue = app(PageTranslatorService::class)->catalogue();
+
+        return collect((array) data_get($this->config, 'translator.languages', []))
+            ->filter(fn ($code) => $catalogue->has($code))
+            ->mapWithKeys(fn ($code) => [$code => $catalogue->get($code)])
+            ->all();
+    }
+
+    #[Computed]
+    public function translatorAddable(): array
+    {
+        return app(PageTranslatorService::class)
+            ->addable(array_keys($this->translatorLanguages))
+            ->all();
+    }
+
+    /**
+     * Only the code is stored. The flag is the catalogue's choice, so it is
+     * never something an administrator has to get right.
+     */
+    public function addTranslatorLanguage(): void
+    {
+        $this->validate([
+            'translatorAdd' => ['required', Rule::in(array_keys($this->translatorAddable))],
+        ], attributes: ['translatorAdd' => 'language']);
+
+        $languages = (array) data_get($this->config, 'translator.languages', []);
+        $languages[] = $this->translatorAdd;
+
+        data_set($this->config, 'translator.languages', array_values(array_unique($languages)));
+
+        $this->reset('translatorAdd');
+        unset($this->translatorLanguages, $this->translatorAddable);
+    }
+
+    public function removeTranslatorLanguage(string $code): void
+    {
+        data_set($this->config, 'translator.languages', array_values(array_diff(
+            (array) data_get($this->config, 'translator.languages', []),
+            [$code],
+        )));
+
+        unset($this->translatorLanguages, $this->translatorAddable);
     }
 
     public function save(): bool
@@ -152,6 +215,61 @@ new class extends Component
                 />
             </flux:card>
 
+            <flux:card class="space-y-3">
+                <div class="mb-4">
+                    <flux:heading level="2" size="lg">Translate this page</flux:heading>
+                    <flux:text class="mt-1">
+                        Google's machine translation of whatever is on screen, posts included, from a
+                        menu in the public header. It needs no translation file; Google's script loads
+                        only once a visitor picks a language.
+                    </flux:text>
+                </div>
+
+                <flux:switch
+                    wire:model.live="config.translator.status"
+                    label="Show the translate menu"
+                    description="Off by default. Forms on the public pages are left in the original language, so they keep working."
+                />
+
+                @if (data_get($config, 'translator.status'))
+                    <flux:separator variant="subtle" class="my-5" />
+
+                    @if (filled($this->translatorLanguages))
+                        <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-white/5 dark:border-white/10">
+                            @foreach ($this->translatorLanguages as $code => $language)
+                                <li wire:key="translator-{{ $code }}" class="flex items-center gap-3 px-3 py-2">
+                                    <flux:flag class="leading-none" :country="$language['flag']" size="xs" />
+                                    <span class="flex-1 text-sm text-slate-800 dark:text-slate-100">
+                                        {{ $language['name'] }}
+                                        <span class="text-slate-500 dark:text-slate-400" lang="{{ $code }}">· {{ $language['native'] }}</span>
+                                    </span>
+                                    <flux:button
+                                        size="xs"
+                                        variant="ghost"
+                                        icon="x-mark"
+                                        wire:click="removeTranslatorLanguage('{{ $code }}')"
+                                        :aria-label="'Remove '.$language['name']"
+                                    />
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <flux:text size="sm">No languages yet, so the menu stays hidden. Add one below.</flux:text>
+                    @endif
+
+                    <div class="flex items-end gap-2">
+                        <flux:select wire:model="translatorAdd" label="Add a language" placeholder="Choose a language" class="flex-1">
+                            @foreach ($this->translatorAddable as $code => $language)
+                                <flux:select.option value="{{ $code }}">{{ $language['name'] }} · {{ $language['native'] }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:button icon="plus" wire:click="addTranslatorLanguage">Add</flux:button>
+                    </div>
+                    <flux:error name="translatorAdd" />
+                    <flux:text size="sm">The flag is chosen for you from the language.</flux:text>
+                @endif
+            </flux:card>
+
             <flux:card class="space-y-2">
                 <div class="mb-4">
                     <flux:heading level="2" size="lg">Cookie notice</flux:heading>
@@ -215,7 +333,7 @@ new class extends Component
         </div>
     </div>
 
-    <div class="flex justify-end">
+    <x-util.floating-actions>
         <x-dashboard.gate.button
             :gate="$pageGate"
             :level="$gateModify"
@@ -225,5 +343,5 @@ new class extends Component
         >
             Save preferences
         </x-dashboard.gate.button>
-    </div>
+    </x-util.floating-actions>
 </form>

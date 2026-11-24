@@ -41,19 +41,19 @@
     <flux:input
         wire:model="name"
         label="Campaign name"
-        description="Internal only, never shown in the email."
+        description:trailing="Internal only, never shown in the email."
         placeholder="e.g. September Product Update"
     />
     <flux:input
         wire:model="subject"
         label="Subject"
-        description="Supports variables, e.g. @{{user.first_name}}."
+        description:trailing="Supports variables, e.g. @{{user.first_name}}."
         placeholder="e.g. New products you'll love"
     />
     <flux:input
         wire:model="preview_text"
         label="Preview text"
-        description="Shown next to the subject line in most inboxes."
+        description:trailing="Shown next to the subject line in most inboxes."
         placeholder="e.g. Take a look at what's new..."
     />
 

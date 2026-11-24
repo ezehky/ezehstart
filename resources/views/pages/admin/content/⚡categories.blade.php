@@ -626,7 +626,7 @@ new class extends Component
                 label="Names"
                 rows="4"
                 placeholder="Skincare, Routine, Winter"
-                description="Separate them with commas. They are added in the order typed, and names already in this group are left as they are."
+                description:trailing="Separate them with commas. They are added in the order typed, and names already in this group are left as they are."
             />
 
             <div class="flex justify-end gap-3">

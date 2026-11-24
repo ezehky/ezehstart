@@ -12,13 +12,13 @@
     </div>
 
     <flux:input wire:model="name" label="Template name" placeholder="e.g. Newsletter Template" />
-    <flux:input wire:model="description" label="Description" placeholder="e.g. Monthly newsletter with three posts" description="Internal only — shown to admins picking a starting point for a campaign." />
+    <flux:input wire:model="description" label="Description" placeholder="e.g. Monthly newsletter with three posts" description:trailing="Internal only — shown to admins picking a starting point for a campaign." />
 
     <flux:separator variant="subtle" />
 
     {{-- A template can stand in for one of the emails the app sends by itself.
          Unassigned, that email goes out from its built-in view as before. --}}
-    <flux:select wire:model.live="system_email" label="Use as a system email" description="Replaces the built-in design of that email. Leave on None for an ordinary campaign template.">
+    <flux:select wire:model.live="system_email" label="Use as a system email" description:trailing="Replaces the built-in design of that email. Leave on None for an ordinary campaign template.">
         <flux:select.option value="">None</flux:select.option>
         @foreach (App\Enums\SystemEmailEnum::cases() as $case)
             <flux:select.option :value="$case->value">{{ $case->label() }}</flux:select.option>
@@ -30,7 +30,7 @@
             wire:model="subject"
             label="Subject"
             :placeholder="$this->systemEmailCase->defaultSubject()"
-            description="Tokens work here too. Blank uses the placeholder."
+            description:trailing="Tokens work here too. Blank uses the placeholder."
         />
 
         <flux:callout icon="variable" color="zinc" class="text-sm">

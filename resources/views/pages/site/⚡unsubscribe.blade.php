@@ -109,7 +109,7 @@ new #[Layout('layouts::site')] class extends Component
 };
 ?>
 
-<div class="mx-auto flex w-full max-w-3xl flex-col px-6 py-16">
+<div class="notranslate mx-auto flex w-full max-w-3xl flex-col px-6 py-16" translate="no">
     <x-dashboard.icon-box icon="check-circle" tone="emerald" />
 
     <h1 class="mt-5 font-heading text-3xl font-bold tracking-tight dark:text-white">

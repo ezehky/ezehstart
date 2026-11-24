@@ -65,10 +65,6 @@
         <flux:label>{{ $label }}</flux:label>
     @endif
 
-    @if ($description)
-        <flux:description>{{ $description }}</flux:description>
-    @endif
-
     <div
         class="relative"
         x-data="{
@@ -166,6 +162,12 @@
             </div>
         </div>
     </div>
+
+    {{-- Below the control, like every field in a form: a description above
+         would push this input out of line with the fields beside it. --}}
+    @if ($description)
+        <flux:description>{{ $description }}</flux:description>
+    @endif
 
     <flux:error name="{{ $model }}" />
 </flux:field>

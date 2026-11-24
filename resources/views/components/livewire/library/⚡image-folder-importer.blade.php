@@ -370,7 +370,7 @@ new class extends Component
             x-bind:class="dragging
                 ? 'border-accent bg-accent/10'
                 : 'border-slate-300 bg-slate-50 dark:border-white/15 dark:bg-white/5'"
-            class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition"
+            class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center md:min-h-112 transition"
         >
             <input x-ref="picker" type="file" class="sr-only" webkitdirectory directory multiple x-on:change="pick($event)" />
 

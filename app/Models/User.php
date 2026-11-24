@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -66,6 +67,31 @@ class User extends Authenticatable implements HasLocalePreference, HasPasskeys
             'user_type' => UserTypeEnum::class,
             'gates' => AsArrayObject::class,
         ];
+    }
+
+    /**
+     * The one shape an address is stored and looked up in: trimmed, lower case.
+     *
+     * SQLite compares text case-sensitively, so an address kept as typed could
+     * only be signed in with in exactly that case — and the unique index would
+     * take John@ and john@ as two accounts. Every lookup by a typed address goes
+     * through this, so it compares against what the setter below wrote.
+     */
+    public static function normalizeEmail(?string $email): string
+    {
+        return mb_strtolower(trim((string) $email));
+    }
+
+    /**
+     * Lower-cases on every write, whichever screen or service does it. A setter
+     * rather than a line in each save, because an address written once in mixed
+     * case is an account that cannot sign in.
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => $value === null ? null : self::normalizeEmail($value),
+        );
     }
 
     // Getters

@@ -51,6 +51,11 @@
 		@livewireStyles
         @fluxAppearance
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        {{-- The install's brand colour over the compiled one. After @vite, and
+             unlayered, so it wins; empty for the colour app.css was built with. --}}
+        @if ($brandStyles = kBrandStyles())
+            <style>{!! $brandStyles !!}</style>
+        @endif
         {{-- FONT --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600&display=swap" rel="stylesheet" />

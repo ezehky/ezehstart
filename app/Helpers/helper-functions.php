@@ -2,6 +2,7 @@
 
 use App\Enums\GateAccessEnum;
 use App\Models\User;
+use App\Services\BrandColorService;
 use App\Services\GateService;
 use App\Services\SiteConfigurationService;
 use Illuminate\Http\UploadedFile;
@@ -228,6 +229,30 @@ if (! function_exists('kSiteConfig')) {
     function kSiteConfig(string $key = '', array $keys = [], mixed $default = [])
     {
         return app(SiteConfigurationService::class)->getConfigs($key, $keys, $default);
+    }
+}
+
+if (! function_exists('kBrandColor')) {
+    /**
+     * One shade of the site's brand as a hex, 50 to 950.
+     *
+     * Only for where a CSS variable cannot reach — email above all. A page styles
+     * itself with brand-* utilities, which follow the setting already.
+     */
+    function kBrandColor(int $shade = BrandColorService::ANCHOR): string
+    {
+        return app(BrandColorService::class)->color($shade);
+    }
+}
+
+if (! function_exists('kBrandStyles')) {
+    /**
+     * The CSS variables that repaint the site in its brand colour, for the base
+     * layout's <head>. Empty while the colour is the one app.css was built with.
+     */
+    function kBrandStyles(): string
+    {
+        return app(BrandColorService::class)->styles();
     }
 }
 

@@ -204,10 +204,13 @@ new class extends Component
             if: ! $this->access->covers(GateAccessEnum::MODIFY),
         );
 
+        // Before validate(), so the uniqueness check compares the stored shape.
+        $this->email = User::normalizeEmail($this->email);
+
         $this->validate();
 
         $this->user->name = $this->name;
-        $this->user->email = strtolower($this->email);
+        $this->user->email = $this->email;
         $this->user->phone_number = $this->phone_number;
         // Cleared together with the number: a dialling code with nothing to dial
         // is a country the account never actually gave us.

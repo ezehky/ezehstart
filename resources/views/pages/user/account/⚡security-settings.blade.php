@@ -158,6 +158,9 @@ new class extends Component
 
     public function emailStep1(): void
     {
+        // Before validate(), so the uniqueness check compares the stored shape.
+        $this->new_email = User::normalizeEmail($this->new_email);
+
         $this->validate([
             'new_email' => ['required', 'email', 'max:50', 'unique:users,email'],
         ]);

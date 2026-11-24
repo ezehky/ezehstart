@@ -143,7 +143,9 @@ new class extends Component
         $event.detail?.selected ?? null,
     )"
 >
-    <flux:modal wire:model="show" name="imagePicker" class="max-w-4xl">
+    {{-- Full screen: the library has a folder sidebar and a grid, and a centred
+         dialog left both cramped. The class lands on the <dialog> itself. --}}
+    <flux:modal wire:model="show" name="imagePicker" class="m-0 h-dvh max-h-none w-full max-w-none rounded-none! sm:p-8">
         <div class="space-y-5">
             <div>
                 <flux:heading size="lg" class="font-heading font-bold">Choose an image</flux:heading>

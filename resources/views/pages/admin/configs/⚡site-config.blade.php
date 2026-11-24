@@ -189,9 +189,9 @@ new class extends Component
         </div>
     </flux:card>
 
-    <div class="flex justify-end">
+    <x-util.floating-actions>
         <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" type="submit" variant="primary" icon="check">
             Save changes
         </x-dashboard.gate.button>
-    </div>
+    </x-util.floating-actions>
 </form>

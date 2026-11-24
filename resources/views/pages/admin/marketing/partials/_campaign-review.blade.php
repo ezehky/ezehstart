@@ -40,7 +40,7 @@
                     wire:model="from_username"
                     label="Address"
                     placeholder="e.g. news"
-                    :description="'Sends as whatever you type, at @'.$this->senderDomain.'.'"
+                    :description:trailing="'Sends as whatever you type, at @'.$this->senderDomain.'.'"
                 />
             @endif
 
@@ -128,7 +128,7 @@
                     type="date"
                     wire:model="recurrence_ends_at"
                     label="Repeat until (optional)"
-                    :description="$recurrence->description().' Leave empty to keep going.'"
+                    :description:trailing="$recurrence->description().' Leave empty to keep going.'"
                 />
             @endif
 

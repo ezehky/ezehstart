@@ -1244,3 +1244,85 @@ test('an administrator is offered the import tab', function () {
         ->call('switchTab', 'import')
         ->assertSet('tab', 'import');
 });
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// WEBP AND CROPPING
+
+test('a photo wider than the ceiling is stored as webp and scaled down', function () {
+    $image = app(ImageLibraryService::class)->store(
+        $this->member,
+        UploadedFile::fake()->image('panorama.jpg', ImageLibraryService::MAX_DIMENSION + 400, 100),
+    );
+
+    expect($image->extension)->toBe('webp')
+        ->and($image->mime_type)->toBe('image/webp')
+        ->and($image->width)->toBe(ImageLibraryService::MAX_DIMENSION)
+        ->and($image->file_path)->toEndWith('.webp');
+
+    Storage::disk('public')->assertExists($image->file_path);
+});
+
+test('turning webp off keeps the upload as it arrived', function () {
+    app(SiteConfigurationService::class)->update(['uploads' => ['convert-to-webp' => false]]);
+
+    $image = app(ImageLibraryService::class)->store(
+        $this->member,
+        UploadedFile::fake()->image('panorama.jpg', ImageLibraryService::MAX_DIMENSION + 400, 100),
+    );
+
+    expect($image->extension)->toBe('jpg')
+        ->and($image->width)->toBe(ImageLibraryService::MAX_DIMENSION + 400);
+});
+
+test('a crop cuts the file in place and keeps its path', function () {
+    app(SiteConfigurationService::class)->update(['uploads' => ['convert-to-webp' => false]]);
+
+    $image = app(ImageLibraryService::class)->store($this->member, UploadedFile::fake()->image('wide.png', 400, 200));
+    $path = $image->file_path;
+
+    Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->set('selected', [$image->id])
+        ->call('openPanel', 'crop')
+        ->assertSet('panel', 'crop')
+        ->call('cropImage', 0.25, 0, 0.5, 1)
+        ->assertHasNoErrors()
+        ->assertSet('panel', null);
+
+    $image->refresh();
+
+    expect($image->file_path)->toBe($path)
+        ->and($image->width)->toBe(200)
+        ->and($image->height)->toBe(200)
+        ->and(getimagesize(Storage::disk('public')->path($path))[0])->toBe(200);
+});
+
+test('a crop box hanging off the picture is cut at its edge', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, UploadedFile::fake()->image('wide.png', 400, 200));
+
+    app(ImageLibraryService::class)->crop($image, 0.75, 0.5, 0.9, 0.9);
+
+    expect($image->fresh()->width)->toBe(100)
+        ->and($image->fresh()->height)->toBe(100);
+});
+
+test('a member cannot crop somebody else image', function () {
+    $image = app(ImageLibraryService::class)->store(
+        $this->admin,
+        uploadedImage(),
+        visibility: MediaVisibilityEnum::PUBLIC,
+    );
+
+    Livewire::actingAs($this->member)
+        ->test('pages::shared.image-library')
+        ->set('selected', [$image->id])
+        ->call('openPanel', 'crop')
+        ->assertHasErrors();
+});
+
+test('a gif is not offered for cropping', function () {
+    $image = app(ImageLibraryService::class)->store($this->member, UploadedFile::fake()->image('moving.gif', 40, 30));
+
+    expect(app(ImageLibraryService::class)->canCrop($image))->toBeFalse()
+        ->and(app(ImageLibraryService::class)->crop($image, 0, 0, 0.5, 0.5))->toBeNull();
+});

@@ -418,7 +418,7 @@
             <flux:input
                 wire:model.live.debounce.1000ms="{{ $prefix }}.link_url"
                 label="Link URL"
-                description="Where clicking the image takes the reader. Leave empty for a plain picture."
+                description:trailing="Where clicking the image takes the reader. Leave empty for a plain picture."
                 placeholder="https://"
             />
         @endif

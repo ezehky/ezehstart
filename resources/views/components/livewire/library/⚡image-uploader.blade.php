@@ -176,7 +176,7 @@ new class extends Component
             x-bind:class="dragging
                 ? 'border-accent bg-accent/10'
                 : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/30 dark:hover:bg-white/10'"
-            class="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 disabled:cursor-wait dark:border-white/15 dark:focus-visible:ring-white dark:focus-visible:ring-offset-slate-950"
+            class="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center md:min-h-112 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 disabled:cursor-wait dark:border-white/15 dark:focus-visible:ring-white dark:focus-visible:ring-offset-slate-950"
         >
             <template x-if="! uploading">
                 <div class="flex flex-col items-center gap-2">

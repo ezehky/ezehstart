@@ -561,7 +561,7 @@ new class extends Component
                 <x-form.number-field
                     label="Order"
                     wire:model.number="flow_order"
-                    description="Lower numbers appear first."
+                    description:trailing="Lower numbers appear first."
                     badge="required"
                 />
 
@@ -582,12 +582,12 @@ new class extends Component
                 with them.
             </flux:callout>
 
-            <div class="flex justify-end gap-3">
+            <x-util.floating-actions in-modal>
                 <flux:modal.close>
                     <flux:button type="button" variant="ghost">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Save question</flux:button>
-            </div>
+            </x-util.floating-actions>
         </form>
     </flux:modal>
 

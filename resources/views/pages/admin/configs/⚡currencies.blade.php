@@ -385,7 +385,7 @@ new class extends Component
                     wire:model="symbol"
                     label="Symbol"
                     placeholder="$"
-                    description="The glyph itself, or its HTML entity — &amp;#36; for a dollar sign."
+                    description:trailing="The glyph itself, or its HTML entity — &amp;#36; for a dollar sign."
                 />
                 <flux:select wire:model="symbol_position" label="Symbol goes">
                     @foreach (CurrencySymbolPositionEnum::cases() as $case)

@@ -96,6 +96,23 @@ trait WithAuthWorker
     }
 
     /**
+     * Every screen with this trait takes an address in `email`, and it is put in
+     * its stored shape the moment it arrives — before validation, the uniqueness
+     * check, the lookup, the throttle or the code that is mailed to it. One hook
+     * here rather than a line at the top of each step, because those screens have
+     * several entry points between them and the one that forgets is a sign-in that
+     * fails on a capital letter.
+     */
+    public function updatedWithAuthWorker(string $property, mixed $value): void
+    {
+        // SocialAuthController shares this trait and has no address field, so
+        // the property is checked for rather than assumed.
+        if ($property === 'email' && \is_string($value) && property_exists($this, 'email')) {
+            $this->email = User::normalizeEmail($value);
+        }
+    }
+
+    /**
      * The email rule every sign-up form uses.
      *
      * A plain unique() would refuse an address that is on the newsletter list,
@@ -149,7 +166,7 @@ trait WithAuthWorker
                 // column default only applies to an insert, and the row being
                 // claimed is carrying NEWSLETTER_SUBSCRIBER.
                 $claimable = User::query()
-                    ->where('email', $data['email'] ?? '')
+                    ->where('email', User::normalizeEmail($data['email'] ?? ''))
                     ->where('status', StatusUser::NEWSLETTER_SUBSCRIBER)
                     ->first();
 

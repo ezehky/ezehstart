@@ -473,7 +473,7 @@ new class extends Component
                 label="Names"
                 rows="4"
                 placeholder="skincare, routine, winter"
-                description="Separate them with commas. Names that already exist are left as they are."
+                description:trailing="Separate them with commas. Names that already exist are left as they are."
             />
 
             <div class="flex justify-end gap-3">

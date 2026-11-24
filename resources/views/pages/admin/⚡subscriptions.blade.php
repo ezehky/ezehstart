@@ -662,7 +662,7 @@ new class extends Component
                         </flux:text>
                     @endif
 
-                    <flux:input wire:model="trial_days" type="number" min="0" max="365" label="Free trial" placeholder="14" description="Days an account can try the plan before paying — no card asked for, one trial per account. Leave empty for none." class="sm:max-w-56" />
+                    <flux:input wire:model="trial_days" type="number" min="0" max="365" label="Free trial" placeholder="14" description:trailing="Days an account can try the plan before paying — no card asked for, one trial per account. Leave empty for none." class="sm:max-w-56" />
                 </div>
             @endunless
 

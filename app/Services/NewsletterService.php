@@ -103,7 +103,7 @@ class NewsletterService
      */
     public function subscribe(string $email): User
     {
-        $email = mb_strtolower(trim($email));
+        $email = User::normalizeEmail($email);
 
         return DB::transaction(function () use ($email) {
             $user = User::query()->where('email', $email)->first()
@@ -125,7 +125,7 @@ class NewsletterService
      */
     public function unsubscribe(string $email): bool
     {
-        $user = User::query()->where('email', mb_strtolower(trim($email)))->first();
+        $user = User::query()->where('email', User::normalizeEmail($email))->first();
 
         if (! $user) {
             return false;
@@ -141,7 +141,7 @@ class NewsletterService
      */
     public function isSubscribed(string $email): bool
     {
-        $user = User::query()->where('email', mb_strtolower(trim($email)))->first();
+        $user = User::query()->where('email', User::normalizeEmail($email))->first();
 
         return $user !== null && $this->preferenceFor($user)?->status->isActive() === true;
     }

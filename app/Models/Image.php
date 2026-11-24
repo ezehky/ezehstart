@@ -39,6 +39,18 @@ class Image extends Model
     }
 
     /**
+     * The URL with the last change stamped on, for the library's own tiles.
+     *
+     * A crop writes over the same file, so the browser would go on showing the
+     * copy it already holds. Only the library uses this: a post keeps the plain
+     * url(), which is the address that must never change.
+     */
+    public function previewUrl(): string
+    {
+        return $this->url().'?v='.($this->updated_at?->timestamp ?? 0);
+    }
+
+    /**
      * The size as somebody would say it, for a listing column.
      */
     public function readableSize(): string

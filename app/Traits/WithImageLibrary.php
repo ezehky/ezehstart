@@ -77,7 +77,7 @@ trait WithImageLibrary
     /** 'library' or 'upload'. */
     public string $tab = 'library';
 
-    /** Which inline panel is open: null, 'edit', 'move', 'delete' or 'folder'. */
+    /** Which inline panel is open: null, 'edit', 'crop', 'move', 'delete' or 'folder'. */
     public ?string $panel = null;
 
     // Editing one image
@@ -400,6 +400,16 @@ trait WithImageLibrary
             $this->visible_to_type = $image->visible_to_type?->value;
         }
 
+        if ($panel === 'crop') {
+            $this->respondError('Choose one image to crop.', $this->manageableSelection->count() !== 1);
+
+            $image = $this->manageableSelection->first();
+
+            $this->respondError('Only JPEG, PNG and WebP images can be cropped.', ! app(ImageLibraryService::class)->canCrop($image));
+
+            $this->edit_id = $image->id;
+        }
+
         if ($panel === 'move') {
             $this->respondError('Choose an image to move.', $this->manageableSelection->isEmpty());
 
@@ -500,6 +510,43 @@ trait WithImageLibrary
         unset($this->images, $this->manageableSelection);
 
         return $this->respondSuccess('The image has been updated. Its URL has not changed.');
+    }
+
+    /**
+     * The image the crop panel is showing, read fresh so the preview is the file
+     * as it is now rather than as it was when the selection was made.
+     */
+    #[Computed]
+    public function cropping(): ?Image
+    {
+        return $this->panel === 'crop' && $this->edit_id
+            ? Image::query()->whereKey($this->edit_id)->first()
+            : null;
+    }
+
+    /**
+     * The box comes from the crop panel as fractions of the picture. The file is
+     * cut in place, so its URL — and every post already using it — stays put.
+     */
+    public function cropImage(float $x, float $y, float $width, float $height): bool
+    {
+        $this->guardLibrary(GateAccessEnum::MODIFY, 'edit');
+
+        $image = Image::query()->whereKey($this->edit_id)->first();
+
+        abort_unless((bool) $image, 404);
+        abort_unless($this->canManage($image), 403);
+
+        $cropped = app(ImageLibraryService::class)->crop($image, $x, $y, $width, $height);
+
+        $this->respondError('That crop could not be made. Try a larger box.', ! $cropped);
+
+        $this->selected = [];
+
+        $this->closePanel();
+        unset($this->images, $this->manageableSelection, $this->cropping);
+
+        return $this->respondSuccess('The image has been cropped. Its URL has not changed.');
     }
 
     public function moveSelected(): bool

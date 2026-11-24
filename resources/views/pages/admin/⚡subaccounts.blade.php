@@ -435,7 +435,7 @@ new class extends Component
             </div>
 
             <div class="space-y-4">
-                <flux:select wire:model.live="vendor" label="Provider" placeholder="Pick a provider" :disabled="(bool) $editingId" :description="$editingId ? 'A subaccount stays on the provider it was made on.' : 'Only providers that can split a payment are listed.'">
+                <flux:select wire:model.live="vendor" label="Provider" placeholder="Pick a provider" :disabled="(bool) $editingId" :description:trailing="$editingId ? 'A subaccount stays on the provider it was made on.' : 'Only providers that can split a payment are listed.'">
                     @foreach ($this->vendorOptions as $row)
                         <flux:select.option value="{{ $row['vendor']->value }}" :disabled="! $row['configured']">
                             {{ $row['vendor']->label() }}{{ $row['configured'] ? '' : ' — keys not set' }}
@@ -483,7 +483,7 @@ new class extends Component
                     label="Site share"
                     placeholder="e.g. 10"
                     suffix="%"
-                    description="What this site keeps of each payment split with the subaccount. The payee is paid the rest. The provider's own fee comes out of the site's share."
+                    description:trailing="What this site keeps of each payment split with the subaccount. The payee is paid the rest. The provider's own fee comes out of the site's share."
                 />
 
                 <div class="grid gap-4 sm:grid-cols-2">

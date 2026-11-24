@@ -443,7 +443,7 @@ new class extends Component
                 wire:model="intro"
                 label="Intro"
                 placeholder="One line shown under the page heading"
-                description="Also used as the page description for search engines."
+                description:trailing="Also used as the page description for search engines."
             />
 
             <flux:switch
@@ -490,12 +490,12 @@ new class extends Component
                 </flux:callout>
             @endif
 
-            <div class="flex justify-end gap-3">
+            <x-util.floating-actions in-modal>
                 <flux:modal.close>
                     <flux:button type="button" variant="ghost">Cancel</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary">Save draft</flux:button>
-            </div>
+            </x-util.floating-actions>
         </form>
     </flux:modal>
 

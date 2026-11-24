@@ -51,7 +51,7 @@ new class extends Component
 };
 ?>
 
-<div>
+<div class="notranslate" translate="no">
     @php
         $announcement = $this->announcement;
         $key = $announcement?->dismissKey() ?? 'newsletter-popup';

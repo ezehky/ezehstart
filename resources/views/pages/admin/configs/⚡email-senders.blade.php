@@ -143,7 +143,7 @@ new class extends Component
                             :label="$field['label']"
                             :type="$field['type']"
                             :placeholder="$field['placeholder']"
-                            :description="$field['description']"
+                            :description:trailing="$field['description']"
                             :badge="$field['badge'] ?? null"
                         />
                     @endforeach

@@ -392,8 +392,8 @@ new class extends Component
             @endif
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <flux:input wire:model="link_url" label="Link" placeholder="https://…" description="Where clicking the picture goes. Optional." />
-                <flux:input wire:model="link_label" label="Button text" placeholder="Shop the sale" description="Adds a button under the copy. Needs a link." />
+                <flux:input wire:model="link_url" label="Link" placeholder="https://…" description:trailing="Where clicking the picture goes. Optional." />
+                <flux:input wire:model="link_label" label="Button text" placeholder="Shop the sale" description:trailing="Adds a button under the copy. Needs a link." />
             </div>
 
             <flux:input wire:model="title" label="Title" placeholder="Get 25% off your first order" />
@@ -419,16 +419,14 @@ new class extends Component
                 description="Leave empty to start now and run until a newer one replaces it."
             />
 
-            <div class="flex items-center justify-between gap-3">
-                <flux:switch wire:model="status" label="Active" />
+            <flux:switch wire:model="status" label="Active" />
 
-                <div class="flex gap-3">
-                    <flux:modal.close>
-                        <flux:button variant="ghost" type="button">Cancel</flux:button>
-                    </flux:modal.close>
-                    <flux:button type="submit" variant="primary">Save</flux:button>
-                </div>
-            </div>
+            <x-util.floating-actions in-modal>
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Cancel</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary">Save</flux:button>
+            </x-util.floating-actions>
         </form>
     </flux:modal>
 

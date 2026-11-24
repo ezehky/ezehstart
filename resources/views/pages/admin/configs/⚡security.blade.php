@@ -88,6 +88,7 @@ new class extends Component
             'config.uploads.user-image-limit' => ['required', 'integer', 'min:0', 'max:10000'],
             'config.uploads.max-image-size' => ['required', 'integer', 'min:64', 'max:20480'],
             'config.uploads.optimize-images' => ['required', 'boolean'],
+            'config.uploads.convert-to-webp' => ['required', 'boolean'],
             'config.uploads.user-video-limit' => ['required', 'integer', 'min:0', 'max:10000'],
         ];
 
@@ -278,6 +279,12 @@ new class extends Component
                     wire:model="config.uploads.optimize-images"
                     label="Optimise uploads"
                     description="Needs jpegoptim, optipng and pngquant on the server. Where they are missing this does nothing rather than failing."
+                />
+
+                <flux:switch
+                    wire:model="config.uploads.convert-to-webp"
+                    label="Convert photos to WebP"
+                    description="JPEG and PNG uploads are saved as WebP and scaled down to 2560px on the longest side - usually a fraction of the size. GIF and SVG are kept as they are. Turn it off if library images go out in emails read in desktop Outlook, which cannot show WebP."
                 />
 
                 {{-- A video costs no disk, so this is not a storage limit. It is

@@ -197,7 +197,7 @@ class EmailCampaignService
             foreach ($this->validEmails($campaign->recipient_config['emails'] ?? []) as $email) {
                 EmailCampaignRecipient::create([
                     'email_campaign_id' => $campaign->id,
-                    'user_id' => User::query()->where('email', $email)->value('id'),
+                    'user_id' => User::query()->where('email', User::normalizeEmail($email))->value('id'),
                     'email' => $email,
                     'status' => StatusEmailCampaignRecipient::PENDING,
                 ]);

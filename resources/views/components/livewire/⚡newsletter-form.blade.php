@@ -61,7 +61,7 @@ new class extends Component
 };
 ?>
 
-<div>
+<div class="notranslate" translate="no">
     @if ($subscribed)
         <div class="flex items-start gap-3 rounded-lg bg-brand-50 px-4 py-3 dark:bg-brand-500/10">
             <flux:icon name="check-circle" class="mt-0.5 size-5 shrink-0 text-brand-600 dark:text-brand-400" />

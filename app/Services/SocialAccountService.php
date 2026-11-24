@@ -125,7 +125,7 @@ class SocialAccountService
         }
 
         // 2. A local account already uses this email — link, do not duplicate.
-        $user = User::query()->where('email', $email)->first();
+        $user = User::query()->where('email', User::normalizeEmail($email))->first();
 
         if ($user) {
             // Checked before the link is written, not after: matching on email is

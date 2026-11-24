@@ -624,3 +624,27 @@
 .iti__dial-code {
     @apply dark:text-slate-300;
 }
+
+/* Google's website translator, behind <livewire:livewire.page-translator>. Its
+   own bar, tooltip and highlight are hidden: the site's menu replaces them, and
+   the bar would otherwise push the whole page down by its height. Unlayered and
+   !important because Google sets these inline. */
+body > .skiptranslate,
+.goog-te-banner-frame,
+iframe.skiptranslate,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf {
+    display: none !important;
+}
+
+body {
+    top: 0 !important;
+}
+
+.goog-text-highlight,
+font[style] {
+    background: none !important;
+    box-shadow: none !important;
+}

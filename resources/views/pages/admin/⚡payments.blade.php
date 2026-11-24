@@ -498,7 +498,7 @@ new class extends Component
             </div>
 
             <form wire:submit="saveHomeCountry" class="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-end dark:border-white/10">
-                <flux:select wire:model="homeCountry" label="Home country" description="Cards from anywhere else pay a provider's fee for cards from abroad, where it has one. Presumed from the customer's profile or phone country, because the provider only says after the charge." class="sm:max-w-md">
+                <flux:select wire:model="homeCountry" label="Home country" description:trailing="Cards from anywhere else pay a provider's fee for cards from abroad, where it has one. Presumed from the customer's profile or phone country, because the provider only says after the charge." class="sm:max-w-md">
                     <flux:select.option value="">None — every card pays the local fee</flux:select.option>
                     @foreach ($this->countries as $country)
                         <flux:select.option value="{{ $country->iso2 }}">{{ $country->flag }} {{ $country->name }}</flux:select.option>

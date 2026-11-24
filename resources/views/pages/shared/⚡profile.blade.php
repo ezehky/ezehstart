@@ -266,7 +266,7 @@ new class extends Component
                     wire:model="work"
                     label="Role"
                     placeholder="e.g. Staff writer"
-                    description="Sits beside your name on the author card."
+                    description:trailing="Sits beside your name on the author card."
                 />
 
                 <flux:textarea
@@ -293,7 +293,9 @@ new class extends Component
                     simply not shown.
                 </flux:text>
 
-                <flux:button type="submit" variant="primary">Save author profile</flux:button>
+                <x-util.floating-actions position="start">
+                    <flux:button type="submit" variant="primary">Save author profile</flux:button>
+                </x-util.floating-actions>
             </form>
         </flux:card>
     @endif

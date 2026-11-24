@@ -374,7 +374,7 @@ new class extends Component
                 ></iframe>
             @endif
 
-            <div class="flex justify-end gap-3">
+            <x-util.floating-actions in-modal>
                 <flux:modal.close>
                     <flux:button variant="ghost">Cancel</flux:button>
                 </flux:modal.close>
@@ -382,7 +382,7 @@ new class extends Component
                 <flux:button type="submit" variant="primary" wire:loading.attr="disabled" wire:target="save">
                     Save location
                 </flux:button>
-            </div>
+            </x-util.floating-actions>
         </form>
     </flux:modal>
 

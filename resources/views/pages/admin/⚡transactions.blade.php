@@ -613,7 +613,7 @@ new class extends Component
                 one moves the account's balance.
             </flux:text>
 
-            <flux:textarea wire:model="settleNote" label="Note" rows="2" placeholder="Matched against the bank statement for 12 Oct." description="Recorded in the activity log." />
+            <flux:textarea wire:model="settleNote" label="Note" rows="2" placeholder="Matched against the bank statement for 12 Oct." description:trailing="Recorded in the activity log." />
 
             <div class="flex justify-end gap-3">
                 <flux:modal.close>

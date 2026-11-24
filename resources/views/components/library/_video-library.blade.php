@@ -51,7 +51,7 @@
                 label="Video link"
                 name="video_url"
                 placeholder="https://www.youtube.com/watch?v=..."
-                description="Paste the link from the share button. {{ collect(App\Enums\VideoProviderEnum::cases())->map(fn ($provider) => $provider->domainHint())->implode(', ') }}."
+                description:trailing="Paste the link from the share button. {{ collect(App\Enums\VideoProviderEnum::cases())->map(fn ($provider) => $provider->domainHint())->implode(', ') }}."
             />
 
             <flux:input
@@ -59,7 +59,7 @@
                 label="Title"
                 name="new_title"
                 placeholder="What is this video?"
-                description="Optional. Only ever used inside the library, so name it however you will find it."
+                description:trailing="Optional. Only ever used inside the library, so name it however you will find it."
             />
 
             {{-- Nothing calls out to the provider, so the video is added private and
@@ -222,8 +222,8 @@
                     <flux:card class="space-y-4">
                         <flux:heading size="md">Video details</flux:heading>
 
-                        <flux:input wire:model="title" label="Title" placeholder="e.g. Product walkthrough" description="Only ever used inside the library." />
-                        <flux:textarea wire:model="description" label="Notes" placeholder="e.g. Use on the pricing page, not the homepage" rows="3" description="Optional. For whoever picks this video later." />
+                        <flux:input wire:model="title" label="Title" placeholder="e.g. Product walkthrough" description:trailing="Only ever used inside the library." />
+                        <flux:textarea wire:model="description" label="Notes" placeholder="e.g. Use on the pricing page, not the homepage" rows="3" description:trailing="Optional. For whoever picks this video later." />
 
                         {{-- Typed rather than fetched: nothing here calls out to a
                              provider API, so a length nobody enters stays unknown and
@@ -233,7 +233,7 @@
                             label="Length (seconds)"
                             min="1"
                             max="43200"
-                            description="Optional. Shown on the tile and used by the Longest first sort."
+                            description:trailing="Optional. Shown on the tile and used by the Longest first sort."
                         />
 
                         <flux:select wire:model="video_folder_id" label="Folder">

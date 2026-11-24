@@ -170,7 +170,7 @@ new class extends Component
 
             <div class="grid gap-6 sm:grid-cols-2">
                 @if ($this->locales !== [])
-                    <flux:select wire:model="locale" :label="__('Language')" :description="__('Messages we send you are written in it too.')">
+                    <flux:select wire:model="locale" :label="__('Language')" :description:trailing="__('Messages we send you are written in it too.')">
                         @foreach ($this->locales as $option)
                             <flux:select.option :value="$option->value">{{ $option->flag() }} {{ $option->label() }}</flux:select.option>
                         @endforeach
@@ -178,7 +178,7 @@ new class extends Component
                 @endif
 
                 @if ($this->currencies->count() > 1)
-                    <flux:select wire:model="currency_id" :label="__('Currency')" :description="__('Amounts are converted at the site\'s current rates.')">
+                    <flux:select wire:model="currency_id" :label="__('Currency')" :description:trailing="__('Amounts are converted at the site\'s current rates.')">
                         @foreach ($this->currencies as $currency)
                             <flux:select.option :value="$currency['id']">{{ html_entity_decode($currency['symbol']) }} {{ $currency['name'] }} ({{ $currency['code'] }})</flux:select.option>
                         @endforeach
@@ -186,9 +186,9 @@ new class extends Component
                 @endif
             </div>
 
-            <div class="flex justify-end">
+            <x-util.floating-actions>
                 <flux:button type="submit" variant="primary" icon="check">Save preferences</flux:button>
-            </div>
+            </x-util.floating-actions>
         </flux:card>
     </form>
 </div>

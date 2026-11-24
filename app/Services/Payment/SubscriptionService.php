@@ -677,7 +677,7 @@ class SubscriptionService
         $candidates = Subscription::query()
             ->where('vendor', $vendor)
             ->whereIn('status', [StatusSubscription::PENDING, StatusSubscription::ACTIVE, StatusSubscription::PAST_DUE, StatusSubscription::CANCELLED])
-            ->whereHas('user', fn ($query) => $query->where('email', $event['customer_email']))
+            ->whereHas('user', fn ($query) => $query->where('email', User::normalizeEmail($event['customer_email'])))
             ->when($event['vendor_plan_id'], fn ($query, $planId) => $query->where('vendor_plan_id', $planId))
             ->when($event['vendor_subscription_id'], fn ($query) => $query->whereNull('vendor_subscription_id'))
             ->newestFirst()

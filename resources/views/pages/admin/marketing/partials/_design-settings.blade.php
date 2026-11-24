@@ -34,7 +34,7 @@
             <x-form.color-field
                 wire:model.live="design.container_background"
                 label="Letter bg"
-                description:trailing="The card blocks sit on."
+                description="The card blocks sit on."
                 size="sm"
             />
             <x-marketing.fonts class="w-full" wire:model.live="design.font_family" label="Typeface" :service="$itemService" />
@@ -44,7 +44,7 @@
             <x-form.number-field
                 wire:model.live.debounce.1000ms="design.container_width"
                 label="Width (px)"
-                description="The letter's maximum width."
+                description:trailing="The letter's maximum width."
                 min="320"
                 max="800"
                 size="sm"

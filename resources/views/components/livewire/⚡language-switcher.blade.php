@@ -59,7 +59,7 @@ new class extends Component
 };
 ?>
 
-<div>
+<div class="notranslate" translate="no">
     @if ($this->enabled)
         <flux:dropdown position="bottom" align="end">
             <flux:button variant="ghost" size="sm" :aria-label="__('Change language')" class="gap-1.5">

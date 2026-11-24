@@ -17,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Spatie\LaravelImageOptimizer\Facades\ImageOptimizer;
 
 /**
@@ -34,6 +35,15 @@ class ImageLibraryService
      * folder the day this changes.
      */
     public const STORAGE_PATH = 'library';
+
+    /**
+     * The longest side a converted photo is kept at - wider than any screen it
+     * is shown on, so a full-width hero still looks sharp.
+     */
+    public const MAX_DIMENSION = 2560;
+
+    /** GD's WebP quality, 0-100. Past about 80 the file grows faster than the eye can tell. */
+    public const WEBP_QUALITY = 80;
 
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // LIMITS
@@ -78,6 +88,15 @@ class ImageLibraryService
         return (bool) kSiteFlag('uploads', 'optimize-images', true);
     }
 
+    /**
+     * Whether photos are re-encoded as WebP on the way in. Needs GD built with
+     * WebP; a server without it keeps the original file rather than failing.
+     */
+    public function webpEnabled(): bool
+    {
+        return (bool) kSiteFlag('uploads', 'convert-to-webp', true) && \function_exists('imagewebp');
+    }
+
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // UPLOADING
 
@@ -109,7 +128,18 @@ class ImageLibraryService
         // disk — which makes a bulk export or a per-account cleanup trivial.
         $path = kStoreFile($file, $title, self::STORAGE_PATH.'/'.$user->id);
 
-        // Measured before optimising, because optimising is what changes it.
+        $mimeType = (string) $file->getMimeType();
+        $extension = mb_strtolower((string) $file->getClientOriginalExtension());
+
+        // A phone photo arrives at 4000px and several megabytes, to be shown in a
+        // card a few hundred pixels wide. Re-encoded here, once, the stored file
+        // is the small one - and the path saved below already points at it.
+        if ($this->webpEnabled() && $converted = $this->convertToWebp($path)) {
+            [$path, $mimeType, $extension] = [$converted, 'image/webp', 'webp'];
+        }
+
+        // Measured after the conversion, which may have scaled the image down,
+        // and before optimising, because optimising is what changes it.
         $dimensions = $this->readDimensions($path);
 
         if ($this->optimizationEnabled()) {
@@ -121,8 +151,8 @@ class ImageLibraryService
             'title' => $title,
             'file_path' => $path,
             'disk' => 'public',
-            'mime_type' => (string) $file->getMimeType(),
-            'extension' => mb_strtolower((string) $file->getClientOriginalExtension()),
+            'mime_type' => $mimeType,
+            'extension' => $extension,
             // Read back off the disk rather than from the upload: optimisation has
             // already run, and the stored size is the one that matters.
             'size' => Storage::disk('public')->size($path),
@@ -191,6 +221,109 @@ class ImageLibraryService
         $activity->logActivity(ActivityActionEnum::IMAGE_UPDATE, $image->title, $affected, $image);
 
         $this->tellOwner($image, "Your image \"{$image->title}\" was updated.");
+
+        return $image;
+    }
+
+    /**
+     * Whether this image can be cropped here. GIF is refused because GD keeps
+     * only the first frame of an animation, and SVG because it has no pixels.
+     */
+    public function canCrop(Image $image): bool
+    {
+        return \in_array($image->mime_type, ['image/jpeg', 'image/png', 'image/webp'], true);
+    }
+
+    /**
+     * Cut the stored file down to a box and write it back over itself.
+     *
+     * The box arrives as fractions of the picture (0 to 1), the way the crop
+     * panel draws it, so the preview's size never matters. The path is kept,
+     * exactly as a rename keeps it: every post and page already pointing at
+     * this image shows the cropped one, and nothing needs relinking. Returns
+     * null, leaving the file untouched, when the image cannot be cropped or the
+     * box is too small to be a picture.
+     */
+    public function crop(Image $image, float $x, float $y, float $width, float $height): ?Image
+    {
+        if (! $this->canCrop($image)) {
+            return null;
+        }
+
+        $disk = Storage::disk($image->disk ?? 'public');
+        $source = $disk->path($image->file_path);
+
+        try {
+            [$fullWidth, $fullHeight, $type] = getimagesize($source) ?: [0, 0, 0];
+
+            $picture = match ($type) {
+                IMAGETYPE_JPEG => imagecreatefromjpeg($source),
+                IMAGETYPE_PNG => imagecreatefrompng($source),
+                IMAGETYPE_WEBP => imagecreatefromwebp($source),
+                default => false,
+            };
+
+            if ($picture === false) {
+                return null;
+            }
+
+            // Held inside the picture whatever the browser sent: a box hanging off
+            // an edge is cut at the edge rather than padded with black.
+            $left = (int) round(max(0, min(1, $x)) * $fullWidth);
+            $top = (int) round(max(0, min(1, $y)) * $fullHeight);
+            $cropWidth = (int) round(max(0, min(1, $width)) * $fullWidth);
+            $cropHeight = (int) round(max(0, min(1, $height)) * $fullHeight);
+            $cropWidth = min($cropWidth, $fullWidth - $left);
+            $cropHeight = min($cropHeight, $fullHeight - $top);
+
+            if ($cropWidth < 10 || $cropHeight < 10) {
+                return null;
+            }
+
+            imagepalettetotruecolor($picture);
+            $cropped = imagecrop($picture, ['x' => $left, 'y' => $top, 'width' => $cropWidth, 'height' => $cropHeight]);
+
+            if ($cropped === false) {
+                return null;
+            }
+
+            imagealphablending($cropped, false);
+            imagesavealpha($cropped, true);
+
+            $written = match ($type) {
+                IMAGETYPE_JPEG => imagejpeg($cropped, $source, 90),
+                IMAGETYPE_PNG => imagepng($cropped, $source),
+                IMAGETYPE_WEBP => imagewebp($cropped, $source, self::WEBP_QUALITY),
+            };
+
+            if (! $written) {
+                return null;
+            }
+        } catch (\Throwable $e) {
+            Log::channel('ezeh')->warning('Image crop failed: '.$e->getMessage(), [
+                'image_id' => $image->id,
+            ]);
+
+            return null;
+        }
+
+        $activity = app(ActivityLogService::class);
+
+        $image->fill([
+            'width' => $cropWidth,
+            'height' => $cropHeight,
+            'size' => $disk->size($image->file_path),
+        ]);
+
+        $affected = $activity->affectedColumns($image);
+
+        // Saved even when the numbers came out the same, so updated_at moves and
+        // the library's preview asks for the new file rather than its cached copy.
+        $image->touch();
+
+        $activity->logActivity(ActivityActionEnum::IMAGE_UPDATE, $image->title, $affected, $image);
+
+        $this->tellOwner($image, "Your image \"{$image->title}\" was cropped.");
 
         return $image;
     }
@@ -618,6 +751,106 @@ class ImageLibraryService
             // An SVG, or a driver with no local path. Not knowing the dimensions
             // is not a reason to refuse the upload.
             return ['width' => null, 'height' => null];
+        }
+    }
+
+    /**
+     * Re-encode a stored JPEG or PNG as WebP, scaled down to MAX_DIMENSION on
+     * its longest side, and remove the original. Returns the new path, or null
+     * to keep the file as it was.
+     *
+     * GIF is left alone because GD would keep only the first frame of an
+     * animation, and SVG because it is already text. A WebP upload is only
+     * touched when it needs scaling: re-encoding it at the same size loses
+     * quality for nothing. A conversion that comes out larger - a small, flat
+     * PNG can - is thrown away. Any failure, a photo too large for the memory
+     * limit included, keeps the original: an upload never fails here.
+     */
+    private function convertToWebp(string $path): ?string
+    {
+        $disk = Storage::disk('public');
+        $source = $disk->path($path);
+        $target = null;
+
+        try {
+            [$width, $height, $type] = getimagesize($source) ?: [0, 0, 0];
+
+            $image = match ($type) {
+                IMAGETYPE_JPEG => imagecreatefromjpeg($source),
+                IMAGETYPE_PNG => imagecreatefrompng($source),
+                IMAGETYPE_WEBP => imagecreatefromwebp($source),
+                default => false,
+            };
+
+            if ($image === false) {
+                return null;
+            }
+
+            $scale = max($width, $height) > self::MAX_DIMENSION;
+
+            if ($type === IMAGETYPE_WEBP && ! $scale) {
+                return null;
+            }
+
+            // A phone records which way up the photo was taken as a tag rather
+            // than turning the pixels. The re-encoded file carries no tags, so
+            // the turn is made here or the photo comes out on its side.
+            if ($type === IMAGETYPE_JPEG && \function_exists('exif_read_data')) {
+                $angle = match ((int) (@exif_read_data($source)['Orientation'] ?? 1)) {
+                    3 => 180,
+                    6 => -90,
+                    8 => 90,
+                    default => 0,
+                };
+
+                if ($angle !== 0) {
+                    $image = imagerotate($image, $angle, 0);
+                    [$width, $height] = [imagesx($image), imagesy($image)];
+                }
+            }
+
+            if ($scale) {
+                $ratio = self::MAX_DIMENSION / max($width, $height);
+                $image = imagescale($image, (int) round($width * $ratio), (int) round($height * $ratio), IMG_BICUBIC);
+            }
+
+            // Keep a PNG's transparency through the conversion.
+            imagepalettetotruecolor($image);
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+
+            $stem = \dirname($path).'/'.pathinfo($path, PATHINFO_FILENAME);
+            $target = $stem.'.webp';
+
+            if ($target !== $path && $disk->exists($target)) {
+                $target = $stem.'-'.Str::lower(Str::random(5)).'.webp';
+            }
+
+            if (! imagewebp($image, $disk->path($target), self::WEBP_QUALITY)) {
+                return null;
+            }
+
+            if (! $scale && $disk->size($target) >= $disk->size($path)) {
+                $disk->delete($target);
+
+                return null;
+            }
+
+            if ($target !== $path) {
+                $disk->delete($path);
+            }
+
+            return $target;
+        } catch (\Throwable $e) {
+            if ($target && $target !== $path && $disk->exists($target)) {
+                $disk->delete($target);
+            }
+
+            Log::channel('ezeh')->warning('WebP conversion skipped: '.$e->getMessage(), [
+                'path' => $path,
+            ]);
+
+            return null;
         }
     }
 

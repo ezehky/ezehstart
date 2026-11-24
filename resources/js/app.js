@@ -12,6 +12,8 @@ import passkey from "./passkey";
 import phoneInput from "./phone-input";
 import moneyInput from "./money-input";
 import folderImport from "./folder-import";
+import imageCropper from "./image-cropper";
+import pageTranslator from "./page-translator";
 // ||||||||||||||||||||||||||
 // ALPINE
 // PLUGINS
@@ -87,6 +89,20 @@ Alpine.data("moneyInput", moneyInput);
  * list under somebody halfway through choosing.
  */
 Alpine.data("folderImport", folderImport);
+
+/**
+ * The crop box on the image library's Crop panel. Registered once here so a
+ * Livewire re-render keeps the box where somebody dragged it rather than
+ * snapping it back to the middle.
+ */
+Alpine.data("imageCropper", imageCropper);
+
+/**
+ * "Translate this page" in the public header. Registered once here so a Livewire
+ * re-render keeps the language already chosen rather than loading Google's
+ * script a second time.
+ */
+Alpine.data("pageTranslator", pageTranslator);
 
 /**
  * Adds a class the first time an element scrolls into view, so entrance

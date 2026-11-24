@@ -252,6 +252,9 @@ new class extends Component
         // The button is hidden either way, which stops nobody who can open a console.
         $this->checkGate($this->admin ? GateAccessEnum::MODIFY : GateAccessEnum::CREATE);
 
+        // Before validate(), so the uniqueness check compares the stored shape.
+        $this->email = User::normalizeEmail($this->email);
+
         $this->validate();
 
         $logService = app(ActivityLogService::class);
@@ -270,7 +273,7 @@ new class extends Component
         }
 
         $this->admin->name = $this->name;
-        $this->admin->email = strtolower($this->email);
+        $this->admin->email = User::normalizeEmail($this->email);
         $this->admin->phone_number = $this->phone_number;
         // Cleared together with the number: a dialling code with nothing to dial
         // is a country the account never actually gave us.
@@ -575,13 +578,13 @@ new class extends Component
                 <flux:switch wire:model="status" label="Active account" description="Allow this admin to sign in." />
             </div>
 
-            <div class="flex justify-end gap-3">
+            <x-util.floating-actions in-modal>
                 <flux:modal.close>
                     <flux:button variant="ghost">Cancel</flux:button>
                 </flux:modal.close>
 
                 <flux:button type="submit" variant="primary">Save admin</flux:button>
-            </div>
+            </x-util.floating-actions>
         </form>
     </flux:modal>
 

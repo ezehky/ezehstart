@@ -193,3 +193,58 @@ test('the registration screen offers nothing social while the switch is off', fu
 
     $this->get(route('register'))->assertSuccessful()->assertDontSee(route('social.redirect', 'google'));
 });
+
+// ||||||||||||||||||||||||||||||||||||||||||||||||
+// ADDRESSES ARE STORED IN LOWER CASE
+
+test('an address is stored in lower case whoever writes it', function () {
+    $user = userOfType(UserTypeEnum::USER, ['email' => '  Ada.Lovelace@Example.TEST ']);
+
+    expect($user->fresh()->email)->toBe('ada.lovelace@example.test');
+});
+
+test('registering with capitals stores the address in lower case', function () {
+    Mail::fake();
+
+    Livewire::test('pages::auth.register')
+        ->set('name', 'Ada Lovelace')
+        ->set('email', 'Ada@Example.TEST')
+        ->set('password', 'Password123!')
+        ->set('password_confirmation', 'Password123!')
+        ->set('agreed_to_terms', true)
+        ->call('register');
+
+    expect(User::query()->where('email', 'ada@example.test')->exists())->toBeTrue();
+});
+
+test('signing in matches the address whatever case it is typed in', function () {
+    Mail::fake();
+
+    userOfType(UserTypeEnum::USER, [
+        'email' => 'grace@example.test',
+        'password' => Hash::make('Password123!'),
+        'email_verified_at' => now(),
+    ]);
+
+    Livewire::test('pages::auth.login')
+        ->set('email', 'Grace@EXAMPLE.test')
+        ->set('password', 'Password123!')
+        ->call('login');
+
+    $this->assertAuthenticated();
+});
+
+test('the same address in a different case cannot open a second account', function () {
+    Mail::fake();
+
+    userOfType(UserTypeEnum::USER, ['email' => 'ada@example.test']);
+
+    Livewire::test('pages::auth.register')
+        ->set('name', 'Ada Again')
+        ->set('email', 'ADA@example.test')
+        ->set('password', 'Password123!')
+        ->set('password_confirmation', 'Password123!')
+        ->set('agreed_to_terms', true)
+        ->call('register')
+        ->assertHasErrors('email');
+});

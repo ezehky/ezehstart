@@ -200,8 +200,8 @@
                     <flux:card class="space-y-4">
                         <flux:heading size="md">Image details</flux:heading>
 
-                        <flux:input wire:model="title" label="Title" placeholder="e.g. Spring banner" description="Renaming here does not change the image's URL." />
-                        <flux:input wire:model="alt_text" label="Alt text" placeholder="e.g. Two people laughing over coffee" description="Describes the image to screen readers." />
+                        <flux:input wire:model="title" label="Title" placeholder="e.g. Spring banner" description:trailing="Renaming here does not change the image's URL." />
+                        <flux:input wire:model="alt_text" label="Alt text" placeholder="e.g. Two people laughing over coffee" description:trailing="Describes the image to screen readers." />
 
                         <flux:select wire:model="image_folder_id" label="Folder">
                             <flux:select.option value="">No folder</flux:select.option>
@@ -229,6 +229,78 @@
                         <div class="flex justify-end gap-3">
                             <flux:button variant="ghost" wire:click="closePanel">Cancel</flux:button>
                             <flux:button variant="primary" wire:click="saveImage">Save</flux:button>
+                        </div>
+                    </flux:card>
+                @endif
+
+                @if ($panel === 'crop' && $this->cropping)
+                    @php($cropImage = $this->cropping)
+
+                    {{-- The box is drawn in fractions of the picture and the server
+                         cuts the stored file, so the preview can be any size. --}}
+                    <flux:card
+                        class="space-y-4"
+                        wire:key="crop-{{ $cropImage->id }}-{{ $cropImage->updated_at?->timestamp }}"
+                        x-data="imageCropper({ width: {{ (int) $cropImage->width }}, height: {{ (int) $cropImage->height }} })"
+                    >
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <flux:heading size="md">Crop image</flux:heading>
+
+                            <div class="flex flex-wrap gap-1">
+                                @foreach (['Free' => 'null', '1:1' => '1', '4:3' => '4/3', '16:9' => '16/9', '3:4' => '3/4'] as $ratioLabel => $ratioValue)
+                                    <button
+                                        type="button"
+                                        x-on:click="setRatio({{ $ratioValue }})"
+                                        x-bind:class="ratio === ({{ $ratioValue }})
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15'"
+                                        class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+                                    >
+                                        {{ $ratioLabel }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div class="flex justify-center rounded-lg bg-slate-100 p-2 dark:bg-white/5">
+                            <div
+                                x-ref="frame"
+                                class="relative inline-block touch-none select-none"
+                                x-on:pointermove="move($event)"
+                                x-on:pointerup="stop()"
+                                x-on:pointercancel="stop()"
+                            >
+                                <img
+                                    src="{{ $cropImage->previewUrl() }}"
+                                    alt="{{ $cropImage->alt_text ?: $cropImage->title }}"
+                                    class="block max-h-[60vh] w-auto max-w-full"
+                                    draggable="false"
+                                />
+
+                                <div
+                                    class="absolute cursor-move border-2 border-white shadow-[0_0_0_9999px_rgb(0_0_0/0.5)] outline outline-1 outline-black/40"
+                                    x-bind:style="style"
+                                    x-on:pointerdown="start($event, 'move')"
+                                >
+                                    @foreach (['nw' => '-start-1.5 -top-1.5 cursor-nwse-resize', 'ne' => '-end-1.5 -top-1.5 cursor-nesw-resize', 'sw' => '-start-1.5 -bottom-1.5 cursor-nesw-resize', 'se' => '-end-1.5 -bottom-1.5 cursor-nwse-resize'] as $corner => $cornerClasses)
+                                        <span
+                                            class="absolute size-3 rounded-sm border border-slate-700 bg-white {{ $cornerClasses }}"
+                                            x-on:pointerdown.stop="start($event, '{{ $corner }}')"
+                                        ></span>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+
+                        <flux:text size="sm">
+                            The file is cut in place, so its URL stays the same and every page
+                            using it shows the cropped picture. This cannot be undone.
+                        </flux:text>
+
+                        <div class="flex justify-end gap-3">
+                            <flux:button variant="ghost" x-on:click="reset()">Reset</flux:button>
+                            <flux:button variant="ghost" wire:click="closePanel">Cancel</flux:button>
+                            <flux:button variant="primary" icon="scissors" x-on:click="$wire.cropImage(...rect)">Crop</flux:button>
                         </div>
                     </flux:card>
                 @endif
@@ -291,7 +363,9 @@
                         </div>
                     @endif
 
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    {{-- Tiles hold a fixed width and the grid fits as many as the space allows,
+                         so a full-screen picker shows more images rather than four huge ones. --}}
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]">
                         @foreach ($this->images as $image)
                             @php($isSelected = in_array($image->id, $selected, true))
 
@@ -306,7 +380,7 @@
                                     ])
                                 >
                                     <img
-                                        src="{{ $image->url() }}"
+                                        src="{{ $image->previewUrl() }}"
                                         alt="{{ $image->alt_text ?: $image->title }}"
                                         class="aspect-square w-full object-cover"
                                         loading="lazy"
@@ -352,6 +426,10 @@
                         @if ($this->manageableSelection->count() === 1)
                             <x-dashboard.gate.button gate="content.image-library" level="modify" size="sm" variant="ghost" icon="pencil-square" wire:click="openPanel('edit')">
                                 Edit
+                            </x-dashboard.gate.button>
+
+                            <x-dashboard.gate.button gate="content.image-library" level="modify" size="sm" variant="ghost" icon="scissors" wire:click="openPanel('crop')">
+                                Crop
                             </x-dashboard.gate.button>
                         @endif
 

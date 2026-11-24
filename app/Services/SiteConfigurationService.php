@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BrandPaletteEnum;
 use App\Enums\EmailSenderEnum;
 use App\Enums\LogChannelEnum;
 use App\Enums\PaymentVendorEnum;
@@ -65,6 +66,17 @@ class SiteConfigurationService
                 ],
             ],
             'timezone' => config('app.timezone'),
+
+            // The brand colour, edited from Configuration › Brand colour. A
+            // preset's hex is read from BrandPaletteEnum, not from here, so
+            // primary only matters once the palette is Custom. The default is the
+            // teal app.css is compiled with, which BrandColorService leaves
+            // unprinted.
+            'brand' => [
+                'palette' => BrandPaletteEnum::TEAL->value,
+                'primary' => BrandPaletteEnum::TEAL->primary(),
+            ],
+
             'logo' => null,
             'logo-dark' => null,
             'favicon' => null,
@@ -193,6 +205,10 @@ class SiteConfigurationService
                 'max-image-size' => 2048, // kilobytes
                 'optimize-images' => true,
 
+                // JPEG and PNG are re-encoded as WebP and scaled down to
+                // ImageLibraryService::MAX_DIMENSION on the way in.
+                'convert-to-webp' => true,
+
                 // A video costs no disk, so the ceiling is lower for a different
                 // reason: a library nobody can find anything in is not a library.
                 'user-video-limit' => 25,
@@ -212,6 +228,15 @@ class SiteConfigurationService
             'localization' => [
                 'default' => config('app.locale'),
                 'switcher' => true,
+            ],
+
+            // Google's "Translate this page" menu on the public site. Off by
+            // default: it loads a Google script once a visitor picks a language.
+            // Languages are codes from database/data/translator-languages.json,
+            // which also supplies each one's name and flag.
+            'translator' => [
+                'status' => false,
+                'languages' => ['fr', 'es', 'pt', 'de', 'ar'],
             ],
 
             'preferences' => [

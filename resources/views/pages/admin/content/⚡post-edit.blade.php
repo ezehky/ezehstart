@@ -247,7 +247,7 @@ new class extends Component
                     wire:model="excerpt"
                     label="Excerpt"
                     rows="2"
-                    description="Shown on cards and in search results."
+                    description:trailing="Shown on cards and in search results."
                     placeholder="Type..."
                 />
             </flux:card>
@@ -258,8 +258,8 @@ new class extends Component
 
             <flux:card class="space-y-4">
                 <flux:heading level="2" size="sm">Search engine listing</flux:heading>
-                <flux:input wire:model="meta_title" label="Meta title" placeholder="e.g. Ten ways to start the week well" description="Falls back to the post title." />
-                <flux:textarea wire:model="meta_description" label="Meta description" placeholder="One or two sentences search results show under the title" rows="2" description="Falls back to the excerpt." />
+                <flux:input wire:model="meta_title" label="Meta title" placeholder="e.g. Ten ways to start the week well" description:trailing="Falls back to the post title." />
+                <flux:textarea wire:model="meta_description" label="Meta description" placeholder="One or two sentences search results show under the title" rows="2" description:trailing="Falls back to the excerpt." />
             </flux:card>
         </div>
 
@@ -293,7 +293,7 @@ new class extends Component
                     type="datetime-local"
                     wire:model="published_at"
                     label="Publish at"
-                    description="Leave empty to publish the moment you set the status to published."
+                    description:trailing="Leave empty to publish the moment you set the status to published."
                 />
 
                 <flux:switch wire:model="is_featured" label="Feature this post" />
