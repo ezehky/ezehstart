@@ -9,9 +9,12 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-27
+
 Search engines get an app-built `robots.txt`, a sitemap, schema.org data and a blog
 feed. Google Analytics can be switched on from Site info, and the cookie banner
-becomes a real choice when it is. Uploads can go to Cloudflare R2. The two email
+becomes a real choice when it is. Uploads can go to Cloudflare R2. One column gains an
+index (`images.disk`); there are no new tables. The two email
 screens are now one, **Email settings**, with Sender and Delivery tabs. **Two routes
 and two gate keys are renamed**, which a minor release normally does not do — see
 **Upgrading**.
@@ -30,9 +33,11 @@ and two gate keys are renamed**, which a minor release normally does not do — 
   (`analytics.ga4-id`), `AnalyticsService`, `<x-site.analytics>`. Public pages only,
   never a workspace or an impersonation, page views only.
 - `CookieCategoryEnum` and `CookieConsentService`. With an analytics ID set the
-  banner offers Necessary only, Accept all, or a switch per category, and the
-  footer gets **Cookie settings**; without one it stays a notice. The answer is the
-  `site_consent` cookie, left out of cookie encryption.
+  banner offers **Accept all**, **Reject optional**, or **Manage preferences** for a
+  switch per category, and the footer gets **Cookie settings**; without one it stays
+  a notice with a single **Got it**. The answer is the `site_consent` cookie, left out
+  of cookie encryption. Taking a category back reloads the page, so a script that has
+  already run is gone and the analytics tag clears its cookies.
 - Cloudflare R2: `CloudStorageService`, the `r2` disk and **Configuration › File
   storage** (`admin.config.file-storage`, gate `config.file-storage`) with the
   switch, the public address and a batched sync. Keys in `.env` as `R2_*`.
@@ -44,6 +49,8 @@ and two gate keys are renamed**, which a minor release normally does not do — 
 - **Configuration › Email settings** replaces Email senders and Email delivery: one
   sidebar entry, two tabs (`<x-dashboard.email-settings-tabs>`), each still its own
   form.
+- The cookie banner is a card in the bottom corner rather than a strip across the
+  page, with its own heading, and is described to assistive technology by its text.
 - Library images record their disk on upload, crop and delete through it, and the
   logo and favicon are looked for on either disk. `images.disk` is indexed.
 - `phpunit.xml` raises the test memory limit to 1G.
@@ -57,6 +64,8 @@ and two gate keys are renamed**, which a minor release normally does not do — 
 - Delete any `public/robots.txt` you added: a static file there is served before the
   app's.
 - A visitor who dismissed the old cookie notice is asked once more.
+
+Suite at this release: 1179 tests, 3192 assertions, all passing.
 
 ## [2.6.0] - 2026-11-25
 

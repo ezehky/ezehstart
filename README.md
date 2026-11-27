@@ -119,9 +119,10 @@ searchable activity log with an optional retention window; a single-account view
 deleted-accounts screen; and a manage-roles modal with guards (you cannot revoke your
 own admin role, or the last one). Blog posts, categories and tags. A **Finance**
 group: the ledger and its review queue, refunds, payments, subscription plans and
-split-payment subaccounts. Site configuration across four screens — branding, security
-switches, preferences, social handles, the legal pages, the FAQs and notification types
-— plus a raw JSON editor for the key no screen has grown a field for yet.
+split-payment subaccounts. Site configuration — branding and analytics, brand colour,
+security switches, preferences, email settings, file storage, social handles, the legal
+pages, the FAQs and notification types — plus a raw JSON editor for the key no screen
+has grown a field for yet.
 
 **Member workspace** — dashboard with a next-steps checklist, profile, preferences,
 security settings (password, email, sessions, two-factor, connected accounts), their own
@@ -185,11 +186,30 @@ the same way in a subject as in a block. A builder template can also stand in fo
 system mailable (`SystemEmailEnum`, `WithSystemTemplate`); unassigned, the Blade view is
 sent as before.
 
-**Email delivery** — Configuration › Email delivery picks where mail goes: the log (the
-default), Resend, Brevo, or any SMTP service. Resend and Brevo are the kit's own HTTP
-transports, so there's no SDK. Keys live in `.env`, never in the site configuration. A
-provider without its keys can't be picked, and a test email shows the provider's own
-answer.
+**Email settings** — one screen, two tabs. **Delivery** picks where mail goes: the log
+(the default), Resend, Brevo, or any SMTP service. Resend and Brevo are the kit's own
+HTTP transports, so there's no SDK. Keys live in `.env`, never in the site
+configuration. A provider without its keys can't be picked, and a test email shows the
+provider's own answer. **Sender** holds the from-addresses.
+
+**Search engines** — `robots.txt` and `sitemap.xml` are written by the app, so the
+sitemap line carries the full address and robots.txt never names a workspace; both
+workspaces send `X-Robots-Tag: noindex` instead. schema.org JSON-LD marks up the home
+page (`Organization`) and every post (`BlogPosting`), and `/blog/feed` is an RSS feed of
+the latest live posts — excerpt and link, never the body.
+
+**Analytics and cookie consent** — paste a Google Analytics 4 measurement ID on Site
+info and the tag goes on public pages only, never a workspace or an impersonation, and
+**only after consent**. With an ID set the cookie banner becomes a choice — Accept all,
+Reject optional, or a switch per category — and the footer gets **Cookie settings** to
+change it later. Without one it stays a plain notice, because a site setting only the
+cookies it needs to work has nothing to ask permission for.
+
+**File storage** — uploads can be kept on Cloudflare R2. Configuration › File storage
+holds the switch and the public address; the keys stay in `.env`. Every upload lands
+locally first (WebP, optimise, measure) and is then promoted, and each image records
+which disk it went to. Flipping the switch moves nothing on its own — a batched **Sync**
+does.
 
 **Newsletter and announcements** — no subscribers table: an address is a `users` row
 and the subscription is the `ANNOUNCEMENTS` switch it already carries. The public popup
@@ -267,8 +287,8 @@ because payment webhooks are processed on the queue.
 Optional environment keys: `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` for the
 captcha (the switch does nothing without both), `LARAVEL_PDF_DRIVER`, which is `dompdf`
 and needs nothing installed, `RESEND_API_KEY` or `BREVO_API_KEY` (or the `MAIL_*` SMTP
-keys) for the provider picked on Email delivery, and the payments block in
-`.env.example`. Until a provider is picked, email goes to the log. A payment vendor
+keys) for the provider picked on Email settings › Delivery, the `R2_*` keys for
+Cloudflare R2 storage, and the payments block in `.env.example`. Until a provider is picked, email goes to the log. A payment vendor
 is offered once every key it needs is filled in. `php artisan payments:health` checks
 them, and each vendor's webhook URL is `/webhooks/payments/{vendor}`.
 
