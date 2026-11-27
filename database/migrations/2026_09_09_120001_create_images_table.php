@@ -30,7 +30,7 @@ return new class extends Migration
             // at the old URL, which is exactly why the two are separate columns.
             $table->string('file_path')->unique();
 
-            $table->string('disk', 20)->default('public');
+            $table->string('disk', 20)->default('public')->index();
 
             $table->string('mime_type', 100);
             $table->string('extension', 10);

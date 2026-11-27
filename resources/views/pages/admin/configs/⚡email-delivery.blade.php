@@ -11,12 +11,12 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Where outgoing email goes: the log (the default — nothing leaves the server),
+ * Configuration › Email settings › Delivery. Where outgoing email goes: the log (the default — nothing leaves the server),
  * Resend, Brevo, or any SMTP service. Keys are in .env and never shown here; a
  * provider without them cannot be picked. A test email goes through the card
  * that is selected, before or after saving, and shows the provider's answer.
  *
- * The from-addresses are on Email senders; this screen only decides the road.
+ * The from-addresses are on the Sender tab; this one only decides the road.
  */
 new class extends Component
 {
@@ -34,8 +34,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('config', 'email-delivery');
-        $this->setPageGate('config.email-delivery');
+        kSetSiteTitle('config', 'email-settings', 'delivery');
+        $this->setPageGate('config.email-settings');
         $this->setConfigInitial();
 
         data_set($this->config, 'mail-delivery.provider', $this->service->picked()->value);
@@ -94,7 +94,9 @@ new class extends Component
 ?>
 
 <div class="space-y-6">
-    <x-dashboard.page-header icon="paper-airplane" subtitle="Which service delivers the site's email. Keys live in .env and are never shown here." />
+    <x-dashboard.page-header icon="envelope" subtitle="Who the site's email comes from, and which service delivers it." />
+
+    <x-dashboard.email-settings-tabs active="delivery" />
 
     @php
         $active = $this->service->active();
@@ -123,7 +125,7 @@ new class extends Component
                 @elseif (! $active->delivers())
                     Receipts, sign-in codes and reminders are written to storage/logs instead of being sent. Pick a provider below when it is set up.
                 @else
-                    Receipts, sign-in codes, reminders and campaigns all go this way. The from-addresses are on Email senders.
+                    Receipts, sign-in codes, reminders and campaigns all go this way. The from-addresses are on the Sender tab.
                 @endif
             </flux:text>
         </div>

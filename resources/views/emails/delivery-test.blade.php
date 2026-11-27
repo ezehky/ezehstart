@@ -1,10 +1,10 @@
 <x-layouts.email
     :$emailConfig
     title="Email delivery works"
-    preheader="This is a test from Configuration › Email delivery."
+    preheader="This is a test from Configuration › Email settings › Delivery."
 >
     <p class="para-lg">
-        This email was sent through <strong>{{ $provider->label() }}</strong> from the Email delivery screen.
+        This email was sent through <strong>{{ $provider->label() }}</strong> from Configuration › Email settings › Delivery.
         If you are reading it, the site can send email — receipts, codes and reminders will arrive the same way.
     </p>
 

@@ -9,7 +9,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
 /**
- * The "it works" email from Configuration › Email delivery. Sent, not queued:
+ * The "it works" email from Configuration › Email settings › Delivery. Sent, not queued:
  * the screen wants the provider's answer, not a queue's.
  */
 class DeliveryTestEmail extends Mailable

@@ -11,6 +11,10 @@
     must stay identical below this comment — change one, change both.
 --}}
 <x-layouts.base class="min-h-screen">
+    @push('head')
+        <link rel="alternate" type="application/rss+xml" title="{{ __(':name Blog', ['name' => $_configs['name'] ?? config('app.name')]) }}" href="{{ route('blog.feed') }}">
+    @endpush
+
     <div class="flex min-h-screen flex-col">
         <x-site.header />
 

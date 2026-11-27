@@ -10,7 +10,7 @@ use Throwable;
 
 /**
  * Which provider outgoing email goes through — the admin's pick on
- * Configuration › Email delivery (`mail-delivery.provider`), log by default.
+ * Configuration › Email settings › Delivery (`mail-delivery.provider`), log by default.
  *
  * A pick whose keys are missing from .env falls back to the log rather than
  * failing every send. The choice is applied when the app boots and again before

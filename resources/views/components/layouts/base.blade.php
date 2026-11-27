@@ -61,6 +61,12 @@
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600&display=swap" rel="stylesheet" />
         {{-- FONT --}}
 		@stack('styles')
+        {{-- Head tags only the public pages carry — the blog feed link, pushed by the site layouts --}}
+        @stack('head')
+        {{-- schema.org JSON-LD from StructuredDataService, pushed by the pages that have any --}}
+        @stack('structured-data')
+        {{-- Google Analytics, only with measurement allowed — see AnalyticsService --}}
+        <x-site.analytics />
 	</head>
 
 	<body

@@ -44,13 +44,14 @@ function kPageNavigationLinks(string $key = 'admin', bool $strict = true, bool $
                         'label' => 'Brand colour',
                         'link' => route('admin.config.brand-colors'),
                     ],
-                    'email-delivery' => [
-                        'label' => 'Email delivery',
-                        'link' => route('admin.config.email-delivery'),
+                    // One entry and one gate for both tabs — see email-settings-tabs.
+                    'email-settings' => [
+                        'label' => 'Email settings',
+                        'link' => route('admin.config.email-settings.sender'),
                     ],
-                    'email-senders' => [
-                        'label' => 'Email Senders',
-                        'link' => route('admin.config.email-senders'),
+                    'file-storage' => [
+                        'label' => 'File storage',
+                        'link' => route('admin.config.file-storage'),
                     ],
                     'social-handles' => [
                         'label' => 'Social handles',

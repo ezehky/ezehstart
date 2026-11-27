@@ -3,8 +3,10 @@
 use App\Enums\GateAccessEnum;
 use App\Rules\ImageRule;
 use App\Rules\PhoneRule;
+use App\Services\CloudStorageService;
 use App\Traits\WithGateProps;
 use App\Traits\WithSiteConfigProcessor;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -45,15 +47,30 @@ new class extends Component
             'config.email' => ['nullable', 'email', 'max:190'],
             'config.contact-email' => ['nullable', 'email', 'max:190'],
             'config.address' => ['nullable', 'string', 'max:500'],
+            // A GA4 web stream's measurement ID; AnalyticsService ignores anything else.
+            'config.analytics.ga4-id' => ['nullable', 'string', 'regex:/^G-[A-Za-z0-9]{4,20}$/'],
             'logoUpload' => [new ImageRule(required: false, size: 1024)],
             'logoDarkUpload' => [new ImageRule(required: false, size: 1024)],
             'faviconUpload' => [new ImageRule(required: false, size: 512, addMimes: ['ico'])],
         ];
     }
 
+    protected function messages(): array
+    {
+        return [
+            'config.analytics.ga4-id.regex' => 'That is not a GA4 measurement ID — it starts with G-, like G-AB12CD34EF.',
+        ];
+    }
+
     public function save(): bool
     {
         $this->checkGate(GateAccessEnum::MODIFY);
+
+        // Pasted IDs arrive with stray spaces and in any case; stored the way
+        // Google prints them, so the comparison with the saved config is fair.
+        if (filled(data_get($this->config, 'analytics.ga4-id'))) {
+            data_set($this->config, 'analytics.ga4-id', strtoupper(trim(data_get($this->config, 'analytics.ga4-id'))));
+        }
 
         $this->validate();
 
@@ -64,11 +81,15 @@ new class extends Component
             ! $this->faviconUpload
         );
 
+        // Written to whichever disk is active. The old file is removed from both,
+        // because a path in the config carries no record of the disk it went to.
+        $storage = app(CloudStorageService::class);
+
         // Logo
         if ($this->logoUpload) {
             // Store new logo and delete old one
-            $filename = kStoreFile($this->logoUpload, filename: 'site-logo', path: 'site-config');
-            kDeleteFile(data_get($this->config, 'logo'));
+            $filename = kStoreFile($this->logoUpload, filename: 'site-logo', path: 'site-config', disk: $storage->disk());
+            $storage->delete(data_get($this->config, 'logo'));
 
             // Update config with new logo path for saving to database
             $this->config['logo'] = $filename;
@@ -77,8 +98,8 @@ new class extends Component
         // Logo Dark
         if ($this->logoDarkUpload) {
             // Store new logo and delete old one
-            $filename = kStoreFile($this->logoDarkUpload, filename: 'site-logo-dark', path: 'site-config');
-            kDeleteFile(data_get($this->config, 'logo-dark'));
+            $filename = kStoreFile($this->logoDarkUpload, filename: 'site-logo-dark', path: 'site-config', disk: $storage->disk());
+            $storage->delete(data_get($this->config, 'logo-dark'));
 
             // Update config with new logo dark path for saving to database
             $this->config['logo-dark'] = $filename;
@@ -87,8 +108,8 @@ new class extends Component
         // Favicon
         if ($this->faviconUpload) {
             // Store new favicon and delete old one
-            $filename = kStoreFile($this->faviconUpload, filename: 'site-favicon', path: 'site-config');
-            kDeleteFile(data_get($this->config, 'favicon'));
+            $filename = kStoreFile($this->faviconUpload, filename: 'site-favicon', path: 'site-config', disk: $storage->disk());
+            $storage->delete(data_get($this->config, 'favicon'));
 
             // Update config with new favicon path for saving to database
             $this->config['favicon'] = $filename;
@@ -101,6 +122,23 @@ new class extends Component
         $this->redirectRoute('admin.config.site', navigate: true);
 
         return $this->respondSuccess();
+    }
+
+    /**
+     * The saved logo and favicon, as the previews show them. Read from the cached
+     * config, which already knows which disk each one is on; a file never
+     * uploaded previews as the empty placeholder rather than the kit's artwork.
+     *
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function brandAssets(): array
+    {
+        return collect(CloudStorageService::CONFIG_FILE_KEYS)
+            ->mapWithKeys(fn (string $key) => [
+                $key => filled(data_get($this->currentConfig, $key)) ? (string) kSiteConfig($key) : kSafeImage(),
+            ])
+            ->all();
     }
 };
 ?>
@@ -149,9 +187,22 @@ new class extends Component
             </div>
         </flux:card>
 
-        <div class="">
+        <flux:card class="space-y-6">
+            <div>
+                <flux:heading level="2" size="lg">Analytics</flux:heading>
+                <flux:text class="mt-1">
+                    Google Analytics 4 loads on the public pages only, and only for visitors who allow it on the
+                    cookie banner. Neither workspace is ever measured.
+                </flux:text>
+            </div>
 
-        </div>
+            <flux:input
+                wire:model="config.analytics.ga4-id"
+                label="Measurement ID"
+                placeholder="G-AB12CD34EF"
+                description:trailing="In Google Analytics: Admin › Data streams › your web stream. Leave empty to turn analytics off."
+            />
+        </flux:card>
     </div>
 
     <flux:card class="space-y-6">
@@ -165,7 +216,7 @@ new class extends Component
                 wire:model="logoUpload"
                 label="Logo"
                 max-size="1 MB"
-                :default="kSafeImage(data_get($config, 'logo'), useStorage: true)"
+                :default="$this->brandAssets['logo']"
                 :temporary="$logoUpload?->temporaryUrl()"
             />
 
@@ -173,7 +224,7 @@ new class extends Component
                 wire:model="logoDarkUpload"
                 label="Dark logo"
                 max-size="1 MB"
-                :default="kSafeImage(data_get($config, 'logo-dark'), useStorage: true)"
+                :default="$this->brandAssets['logo-dark']"
                 :temporary="$logoDarkUpload?->temporaryUrl()"
             />
 
@@ -183,7 +234,7 @@ new class extends Component
                 formats="ICO, JPG, JPEG, PNG, WEBP"
                 max-size="512 KB"
                 accept="image/x-icon,image/jpeg,image/png,image/webp"
-                :default="kSafeImage(data_get($config, 'favicon'), useStorage: true)"
+                :default="$this->brandAssets['favicon']"
                 :temporary="$faviconUpload?->temporaryUrl()"
             />
         </div>

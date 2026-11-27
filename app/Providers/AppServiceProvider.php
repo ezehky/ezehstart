@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\AnalyticsService;
+use App\Services\CloudStorageService;
+use App\Services\CookieConsentService;
 use App\Services\Mail\BrevoTransport;
 use App\Services\Mail\MailDeliveryService;
 use App\Services\Mail\ResendTransport;
@@ -54,6 +57,10 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // The R2 disk's public address, from File storage. Before the config is
+        // cached below, because that cache resolves the logo's URL on this disk.
+        app(CloudStorageService::class)->apply();
+
         // Site Configuration Service
         $serviceInstance = app(SiteConfigurationService::class);
 
@@ -69,5 +76,19 @@ class AppServiceProvider extends ServiceProvider
 
             View::share(['_configs' => $configs]);
         }
+
+        // The cookie banner, the Google Analytics tag and the footer's "Cookie
+        // settings" link, each handed what it shows rather than asking a service
+        // from the view. The tag needs a route to tell a workspace from the public
+        // site; without one (an error page) it prints nothing.
+        View::composer('components.site.cookie-banner', fn ($view) => $view->with(
+            'banner', app(CookieConsentService::class)->banner(),
+        ));
+        View::composer('components.site.analytics', fn ($view) => $view->with(
+            'analytics', request()->route() ? app(AnalyticsService::class)->tag() : null,
+        ));
+        View::composer('components.site.footer', fn ($view) => $view->with(
+            'cookieSettings', app(CookieConsentService::class)->asksForConsent(),
+        ));
     }
 }

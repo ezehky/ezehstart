@@ -5,7 +5,7 @@ namespace App\Enums;
 use App\Traits\WithEnumHelpers;
 
 /**
- * Where outgoing email goes, picked on Configuration › Email delivery.
+ * Where outgoing email goes, picked on Configuration › Email settings › Delivery.
  *
  * The keys live in .env (config/services.php and config/mail.php), never in the
  * site configuration, which an admin can read back through the JSON editor. A

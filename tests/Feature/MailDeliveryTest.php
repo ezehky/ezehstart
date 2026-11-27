@@ -7,6 +7,7 @@ use App\Mail\DeliveryTestEmail;
 use App\Mail\PolicyUpdatedEmail;
 use App\Services\Mail\BrevoTransport;
 use App\Services\Mail\MailDeliveryService;
+use App\Services\SiteConfigurationService;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Symfony\Component\Mime\Email;
@@ -89,5 +90,28 @@ test('the new emails render', function () {
 test('the screen is behind its gate', function () {
     $clerk = adminWithRoles(roleWithGates('Clerk', ['finance.transactions' => 'full']));
 
-    $this->actingAs($clerk)->get(route('admin.config.email-delivery'))->assertNotFound();
+    $this->actingAs($clerk)->get(route('admin.config.email-settings.delivery'))->assertNotFound();
+});
+
+test('sender and delivery are two tabs of one email settings screen', function () {
+    app(SiteConfigurationService::class)->update(initials: true);
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.config.email-settings.sender'))
+        ->assertSuccessful()
+        ->assertSee(route('admin.config.email-settings.delivery'));
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.config.email-settings.delivery'))
+        ->assertSuccessful()
+        ->assertSee(route('admin.config.email-settings.sender'));
+});
+
+test('both tabs share the email settings gate', function () {
+    app(SiteConfigurationService::class)->update(initials: true);
+
+    $mailer = adminWithRoles(roleWithGates('Mailer', ['config.email-settings' => 'modify']));
+
+    $this->actingAs($mailer)->get(route('admin.config.email-settings.sender'))->assertSuccessful();
+    $this->actingAs($mailer)->get(route('admin.config.email-settings.delivery'))->assertSuccessful();
 });

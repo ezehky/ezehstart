@@ -105,8 +105,8 @@ new class extends Component
                 <flux:text class="mt-1">A campaign's "From" and "Reply-to" default here — set once for the whole site.</flux:text>
             </div>
 
-            <flux:button href="{{ route('admin.config.email-senders') }}" wire:navigate icon="at-symbol">
-                Open Email Senders
+            <flux:button href="{{ route('admin.config.email-settings.sender') }}" wire:navigate icon="at-symbol">
+                Open email settings
             </flux:button>
         </flux:card>
     </div>

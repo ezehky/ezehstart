@@ -281,13 +281,15 @@ class AccountDeletionService
      */
     protected function purgeLibraries(User $user): void
     {
-        $images = Image::query()->where('user_id', $user->id)->pluck('file_path', 'id');
+        $images = Image::query()->where('user_id', $user->id)->get(['id', 'file_path', 'disk'])->keyBy('id');
 
         if ($images->isNotEmpty()) {
             ImageUsage::query()->whereIn('image_id', $images->keys())->delete();
             Image::query()->whereIn('id', $images->keys())->delete();
 
-            $images->filter()->each(fn (string $path) => kDeleteFile($path));
+            // Each from the disk its row named — some may have gone to R2.
+            $images->filter(fn (Image $image) => filled($image->file_path))
+                ->each(fn (Image $image) => kDeleteFile($image->file_path, $image->disk ?: CloudStorageService::LOCAL_DISK));
         }
 
         // Videos are references rather than files, so there is nothing on disk to

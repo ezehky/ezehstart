@@ -4,8 +4,10 @@ use App\Enums\PolicyTypeEnum;
 use App\Http\Controllers\PaymentCallbackController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PolicyPageController;
+use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\Site\BlogController;
 use App\Http\Controllers\Site\HomeController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\SocialAuthController;
 use App\Models\User;
 use App\Services\AccountDeletionService;
@@ -17,6 +19,12 @@ use Illuminate\Support\Facades\Route;
 // The read-only public pages are controllers under Site\, one per section; only a
 // page the visitor fills in (unsubscribe below) is a Livewire page.
 Route::get('/', HomeController::class)->name('home');
+
+// For search engines. Built here, not kept in public/, so the sitemap line in
+// robots.txt carries the full domain; the sitemap lists public rows only. See
+// SearchEngineService.
+Route::get('/robots.txt', RobotsController::class)->name('robots');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 
 // Legal pages. One route per policy type, named after the case, so /terms is
 // route('terms') and adding a case to the enum publishes a page without anything
@@ -39,6 +47,8 @@ Route::livewire('/unsubscribe/{user:email}', 'pages::site.unsubscribe')
 // Blog. Public and unauthenticated — the show page refuses anything that is not
 // live, so drafts and scheduled posts are not reachable by guessing a slug.
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+// Registered ahead of the post route, or "feed" would be looked up as a slug.
+Route::get('/blog/feed', [BlogController::class, 'feed'])->name('blog.feed');
 Route::get('/blog/{post:slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // Authentication Routes

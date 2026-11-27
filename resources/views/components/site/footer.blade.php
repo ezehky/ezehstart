@@ -23,6 +23,19 @@
                 </a>
             @endforeach
 
+            {{-- Reopens the banner with its switches showing. Only while it asks for
+                 a choice: a notice has nothing to change. --}}
+            @if ($cookieSettings)
+                <button
+                    type="button"
+                    x-data
+                    x-on:click="$dispatch('cookie-settings')"
+                    class="text-sm text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:text-slate-400 dark:hover:text-white"
+                >
+                    {{ __('Cookie settings') }}
+                </button>
+            @endif
+
             <x-util.documentation-link class="text-sm text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">{{ __('Docs') }}</x-util.documentation-link>
             <x-util.repository-link class="text-sm text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">GitHub</x-util.repository-link>
         </nav>

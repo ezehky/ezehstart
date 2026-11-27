@@ -2,7 +2,9 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\LocaleMiddleware;
+use App\Http\Middleware\NoIndexMiddleware;
 use App\Http\Middleware\UserMiddleware;
+use App\Services\CookieConsentService;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,14 +18,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function (Application $app) {
             // Admin. The prefix is deliberately non-obvious — the admin surface stays
-            // off the guessable path.
-            Route::middleware(['web', 'auth', 'auth.session', AdminMiddleware::class])
+            // off the guessable path, which is also why robots.txt never names it:
+            // both workspaces answer with a noindex header instead.
+            Route::middleware(['web', NoIndexMiddleware::class, 'auth', 'auth.session', AdminMiddleware::class])
                 ->prefix('app-splash')
                 ->name('admin.')
                 ->group(__DIR__.'/../routes/admin.php');
 
             // Member workspace
-            Route::middleware(['web', 'auth', 'auth.session', UserMiddleware::class])
+            Route::middleware(['web', NoIndexMiddleware::class, 'auth', 'auth.session', UserMiddleware::class])
                 ->prefix('app')
                 ->name('user.')
                 ->group(__DIR__.'/../routes/user.php');
@@ -48,6 +51,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // route runs the web group too, so a component re-render is translated the
         // same way as the page it sits on.
         $middleware->web(append: [LocaleMiddleware::class]);
+
+        // The cookie choice is written by the banner in the browser, which cannot
+        // encrypt it, so it is read as it was written — see CookieConsentService.
+        $middleware->encryptCookies(except: [CookieConsentService::COOKIE]);
 
         // Prevent CSRF for webhooks
         $middleware->preventRequestForgery(except: [

@@ -1,6 +1,8 @@
 {{-- The front page, rendered by Site\HomeController. Every section is handed its
      data as a prop; each renders nothing when handed nothing. --}}
 <x-layouts.site>
+    <x-site.structured-data :data="$structuredData" />
+
     <div>
         <section class="mx-auto flex w-full max-w-6xl flex-col justify-center px-6 py-16">
             <div class="max-w-2xl">

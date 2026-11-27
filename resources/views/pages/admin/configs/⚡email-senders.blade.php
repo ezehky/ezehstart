@@ -8,11 +8,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * How the workspaces behave, as opposed to what they let somebody do.
- *
- * The home for switches that change the shape of a screen rather than the rules
- * behind it. Nothing here closes a route or guards anything — a preference that
- * did would belong on the security screen instead.
+ * Configuration › Email settings › Sender: the "from" and "reply-to" each kind
+ * of outgoing email carries. Which service actually delivers it is the Delivery
+ * tab next door — a separate form, so saving one never saves the other.
  */
 new class extends Component
 {
@@ -25,8 +23,8 @@ new class extends Component
 
     public function mount(): void
     {
-        kSetSiteTitle('config', 'email-senders');
-        $this->setPageGate('config.email-senders');
+        kSetSiteTitle('config', 'email-settings', 'sender');
+        $this->setPageGate('config.email-settings');
         $this->setConfigInitial();
     }
 
@@ -113,48 +111,54 @@ new class extends Component
 
         $this->saveConfig();
 
-        $this->redirectRoute('admin.config.email-senders', navigate: true);
+        $this->redirectRoute('admin.config.email-settings.sender', navigate: true);
 
         return $this->respondSuccess();
     }
 };
 ?>
 
-<form wire:submit="save" class="space-y-6">
-    <flux:card class="space-y-6">
-        <div class="">
-            <flux:heading level="2" size="lg">Email Senders</flux:heading>
-            <flux:text class="mt-1">
-                Configure the "from" and "reply-to" addresses for outgoing emails.
-                Each sender can have its own settings, allowing you to customize the email experience for different types of notifications.
-            </flux:text>
-        </div>
+<div class="space-y-6">
+    <x-dashboard.page-header icon="envelope" subtitle="Who the site's email comes from, and which service delivers it." />
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            @foreach ($this->senderFields as $senderField)
-                <flux:card class="space-y-4">
-                    <div class="mb-4">
-                        <flux:heading level="3" size="md">{{ $senderField['label'] }}</flux:heading>
-                    </div>
+    <x-dashboard.email-settings-tabs active="sender" />
 
-                    @foreach ($senderField['fields'] as $fieldKey => $field)
-                        <flux:input
-                            wire:model="{{ $fieldKey }}"
-                            :label="$field['label']"
-                            :type="$field['type']"
-                            :placeholder="$field['placeholder']"
-                            :description:trailing="$field['description']"
-                            :badge="$field['badge'] ?? null"
-                        />
-                    @endforeach
-                </flux:card>
-            @endforeach
-        </div>
-    </flux:card>
+    <form wire:submit="save" class="space-y-6">
+        <flux:card class="space-y-6">
+            <div class="">
+                <flux:heading level="2" size="lg">Senders</flux:heading>
+                <flux:text class="mt-1">
+                    Configure the "from" and "reply-to" addresses for outgoing emails.
+                    Each sender can have its own settings, allowing you to customize the email experience for different types of notifications.
+                </flux:text>
+            </div>
 
-    <x-util.floating-actions position="end">
-        <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" icon="check">
-            Save senders
-        </x-dashboard.gate.button>
-    </x-util.floating-actions>
-</form>
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                @foreach ($this->senderFields as $senderField)
+                    <flux:card class="space-y-4">
+                        <div class="mb-4">
+                            <flux:heading level="3" size="md">{{ $senderField['label'] }}</flux:heading>
+                        </div>
+
+                        @foreach ($senderField['fields'] as $fieldKey => $field)
+                            <flux:input
+                                wire:model="{{ $fieldKey }}"
+                                :label="$field['label']"
+                                :type="$field['type']"
+                                :placeholder="$field['placeholder']"
+                                :description:trailing="$field['description']"
+                                :badge="$field['badge'] ?? null"
+                            />
+                        @endforeach
+                    </flux:card>
+                @endforeach
+            </div>
+        </flux:card>
+
+        <x-util.floating-actions position="end">
+            <x-dashboard.gate.button :gate="$pageGate" :level="$gateModify" icon="check">
+                Save senders
+            </x-dashboard.gate.button>
+        </x-util.floating-actions>
+    </form>
+</div>

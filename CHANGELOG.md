@@ -9,6 +9,55 @@ ones already there — that is what a major is for.
 
 ## [Unreleased]
 
+Search engines get an app-built `robots.txt`, a sitemap, schema.org data and a blog
+feed. Google Analytics can be switched on from Site info, and the cookie banner
+becomes a real choice when it is. Uploads can go to Cloudflare R2. The two email
+screens are now one, **Email settings**, with Sender and Delivery tabs. **Two routes
+and two gate keys are renamed**, which a minor release normally does not do — see
+**Upgrading**.
+
+### Added
+
+- `/robots.txt` and `/sitemap.xml` (`robots`, `sitemap`), written by
+  `SearchEngineService`. robots.txt carries the sitemap's full address and names no
+  workspace; `public/robots.txt` is removed.
+- `NoIndexMiddleware` on both workspace groups: `X-Robots-Tag: noindex, nofollow`.
+- `StructuredDataService` and `<x-site.structured-data>`: `Organization` on the home
+  page (the logo only once one is uploaded), `BlogPosting` on a post.
+- `/blog/feed` (`blog.feed`): RSS 2.0 of the latest twenty live posts — excerpt,
+  author, categories and image, linking to the page. The public layouts advertise it.
+- Google Analytics 4: a measurement ID on Configuration › Site info
+  (`analytics.ga4-id`), `AnalyticsService`, `<x-site.analytics>`. Public pages only,
+  never a workspace or an impersonation, page views only.
+- `CookieCategoryEnum` and `CookieConsentService`. With an analytics ID set the
+  banner offers Necessary only, Accept all, or a switch per category, and the
+  footer gets **Cookie settings**; without one it stays a notice. The answer is the
+  `site_consent` cookie, left out of cookie encryption.
+- Cloudflare R2: `CloudStorageService`, the `r2` disk and **Configuration › File
+  storage** (`admin.config.file-storage`, gate `config.file-storage`) with the
+  switch, the public address and a batched sync. Keys in `.env` as `R2_*`.
+  `ActivityActionEnum::STORAGE_SYNC`.
+- Dependency: `league/flysystem-aws-s3-v3` (guzzle stays on 8).
+
+### Changed
+
+- **Configuration › Email settings** replaces Email senders and Email delivery: one
+  sidebar entry, two tabs (`<x-dashboard.email-settings-tabs>`), each still its own
+  form.
+- Library images record their disk on upload, crop and delete through it, and the
+  logo and favicon are looked for on either disk. `images.disk` is indexed.
+- `phpunit.xml` raises the test memory limit to 1G.
+
+### Upgrading
+
+- Routes `admin.config.email-senders` and `admin.config.email-delivery` are now
+  `admin.config.email-settings.sender` and `admin.config.email-settings.delivery`.
+- Gate keys `config.email-senders` and `config.email-delivery` are now
+  `config.email-settings`. A custom role that held either needs the new key granted.
+- Delete any `public/robots.txt` you added: a static file there is served before the
+  app's.
+- A visitor who dismissed the old cookie notice is asked once more.
+
 ## [2.6.0] - 2026-11-25
 
 An install can now pick its own brand colour from the dashboard, and the whole site,

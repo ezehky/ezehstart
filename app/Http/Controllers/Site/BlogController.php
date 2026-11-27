@@ -9,7 +9,10 @@ use App\Models\Post;
 use App\Models\Tag;
 use App\Services\BlogService;
 use App\Services\CategoryService;
+use App\Services\LocaleService;
+use App\Services\StructuredDataService;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 /**
@@ -81,6 +84,35 @@ class BlogController extends Controller
         return view('site.blog.show', [
             'post' => $post,
             'related' => $service->relatedTo($post),
+            'structuredData' => app(StructuredDataService::class)->article($post),
         ]);
+    }
+
+    /**
+     * The RSS feed of the latest live posts, for feed readers and the newsletter
+     * tools that build an email from one.
+     *
+     * Each item is the excerpt and a link, not the whole post: a reader is sent
+     * to the page to read the rest. The same publishedQuery() the listing reads,
+     * so a draft or a scheduled post cannot reach a reader before it reaches the
+     * site. Twenty is what readers expect; anybody subscribed already has the
+     * older ones.
+     */
+    public function feed(): Response
+    {
+        $posts = app(BlogService::class)->publishedQuery()->limit(20)->get();
+        $siteName = kSiteConfig('name') ?: config('app.name');
+
+        $xml = view('feed', [
+            'posts' => $posts,
+            'title' => __(':name Blog', ['name' => $siteName]),
+            'description' => __('The latest posts from :name.', ['name' => $siteName]),
+            'language' => app(LocaleService::class)->current()->value,
+            // The newest post's date rather than now(), so an unchanged feed reads
+            // as unchanged and a reader polling it is not told there is news.
+            'updatedAt' => $posts->max('updated_at') ?? now(),
+        ])->render();
+
+        return response($xml, 200, ['Content-Type' => 'application/rss+xml; charset=UTF-8']);
     }
 }

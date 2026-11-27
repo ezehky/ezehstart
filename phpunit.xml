@@ -18,6 +18,9 @@
         </include>
     </source>
     <php>
+        <!-- The whole suite runs in one process and outgrew a 200M php.ini limit
+             at around 1,180 tests; raised here so `php artisan test` needs no flag. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

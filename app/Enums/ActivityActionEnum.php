@@ -123,6 +123,10 @@ enum ActivityActionEnum: string
     case IMAGE_FOLDER_UPDATE = 'image-folder.update';
     case IMAGE_FOLDER_DELETE = 'image-folder.delete';
 
+    // Moving uploaded files between the local disk and Cloudflare R2. One entry per
+    // sync, not per file — the subject carries the count and the destination.
+    case STORAGE_SYNC = 'storage.sync';
+
     // Video library. ADD rather than UPLOAD: nothing is uploaded, a video row is
     // a reference to somebody else's file on somebody else's host.
     case VIDEO_ADD = 'video.add';
@@ -245,6 +249,7 @@ enum ActivityActionEnum: string
 
             // Uploads
             self::IMAGE_UPLOAD => 'Uploaded ',
+            self::STORAGE_SYNC => 'Moved ',
 
             // Video library. Nothing is uploaded, so the verb is not 'Uploaded'.
             self::VIDEO_ADD => 'Added ',

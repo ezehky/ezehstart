@@ -146,16 +146,24 @@ class ImageLibraryService
             $this->optimize($path);
         }
 
+        // Read back off the disk rather than from the upload: optimisation has
+        // already run, and the stored size is the one that matters. Measured here,
+        // while the file is still on this server.
+        $size = Storage::disk(CloudStorageService::LOCAL_DISK)->size($path);
+
+        // Every step above needs a real path, so the file is handed to R2 only
+        // now, when File storage has it on. The disk it ends up on is recorded:
+        // an R2 refusal leaves it here, working, rather than losing the upload.
+        $disk = app(CloudStorageService::class)->promote($path);
+
         $image = $user->images()->create([
             'image_folder_id' => $folder?->id,
             'title' => $title,
             'file_path' => $path,
-            'disk' => 'public',
+            'disk' => $disk,
             'mime_type' => $mimeType,
             'extension' => $extension,
-            // Read back off the disk rather than from the upload: optimisation has
-            // already run, and the stored size is the one that matters.
-            'size' => Storage::disk('public')->size($path),
+            'size' => $size,
             'width' => $dimensions['width'],
             'height' => $dimensions['height'],
             ...$this->visibilityAttributes($visibility, $visibleToType, $user),
@@ -250,8 +258,19 @@ class ImageLibraryService
             return null;
         }
 
-        $disk = Storage::disk($image->disk ?? 'public');
+        // GD needs a real path. An image on R2 is brought down for the crop and
+        // sent back over itself afterwards, so its URL holds either way.
+        $storage = app(CloudStorageService::class);
+        $home = $image->disk ?: CloudStorageService::LOCAL_DISK;
+
+        if (! $storage->pull($image->file_path, $home)) {
+            return null;
+        }
+
+        $disk = Storage::disk(CloudStorageService::LOCAL_DISK);
         $source = $disk->path($image->file_path);
+        $written = false;
+        $cropWidth = $cropHeight = 0;
 
         try {
             [$fullWidth, $fullHeight, $type] = getimagesize($source) ?: [0, 0, 0];
@@ -295,15 +314,27 @@ class ImageLibraryService
                 IMAGETYPE_PNG => imagepng($cropped, $source),
                 IMAGETYPE_WEBP => imagewebp($cropped, $source, self::WEBP_QUALITY),
             };
-
-            if (! $written) {
-                return null;
-            }
         } catch (\Throwable $e) {
             Log::channel('ezeh')->warning('Image crop failed: '.$e->getMessage(), [
                 'image_id' => $image->id,
             ]);
+        } finally {
+            // Runs on every way out, the early returns above included. Measured
+            // before the working copy goes home, and the copy always goes:
+            // cropped, it replaces the original on R2; not, it is only a stray
+            // duplicate of a file that lives there.
+            $size = $written ? $disk->size($image->file_path) : null;
 
+            if ($home !== CloudStorageService::LOCAL_DISK) {
+                if ($written) {
+                    $written = $storage->push($image->file_path, $home);
+                } else {
+                    $disk->delete($image->file_path);
+                }
+            }
+        }
+
+        if (! $written) {
             return null;
         }
 
@@ -312,7 +343,7 @@ class ImageLibraryService
         $image->fill([
             'width' => $cropWidth,
             'height' => $cropHeight,
-            'size' => $disk->size($image->file_path),
+            'size' => $size,
         ]);
 
         $affected = $activity->affectedColumns($image);
@@ -344,12 +375,15 @@ class ImageLibraryService
         }
 
         $path = $image->file_path;
+        $disk = $image->disk ?: CloudStorageService::LOCAL_DISK;
         $title = $image->title;
         $owner = $image->user;
 
         $image->delete();
 
-        kDeleteFile($path);
+        // From the disk the row names: an image uploaded while R2 was on is still
+        // there after the switch went off.
+        kDeleteFile($path, $disk);
 
         app(ActivityLogService::class)->logActivity(ActivityActionEnum::IMAGE_DELETE, $title);
 

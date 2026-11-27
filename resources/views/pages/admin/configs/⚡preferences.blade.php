@@ -193,19 +193,20 @@ new class extends Component
 
             <flux:card class="space-y-2">
                 <div class="mb-4">
-                    <flux:heading level="2" size="lg">Cookie notice</flux:heading>
+                    <flux:heading level="2" size="lg">Cookie banner</flux:heading>
                     <flux:text class="mt-1">
-                        The bar along the bottom of every page until a visitor acknowledges it.
-                        It describes the sign-in cookies this site sets; an install that adds
-                        analytics needs a real choice rather than a notice, and should turn this
-                        off and put that in its place.
+                        The bar along the bottom of every page until a visitor answers it. While
+                        the site sets only its sign-in cookies it is a notice; once a Google
+                        Analytics ID is set on Site info it becomes a choice, and analytics loads
+                        only for visitors who allow it. Turned off, nobody is asked, so analytics
+                        never loads.
                     </flux:text>
                 </div>
 
                 <flux:switch
                     wire:model="config.preferences.accept-cookies"
-                    label="Show the cookie notice"
-                    description="Links to the published Cookie Policy. Dismissing it is remembered by the visitor's browser."
+                    label="Show the cookie banner"
+                    description="Links to the published Cookie Policy. The answer is kept in a cookie for 180 days."
                 />
             </flux:card>
         </div>

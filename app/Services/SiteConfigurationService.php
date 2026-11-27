@@ -84,7 +84,22 @@ class SiteConfigurationService
             'telegram-support' => null,
             'social-handles' => [],
 
-            // Where outgoing email goes, picked on Configuration › Email delivery
+            // Where new uploads go, set on Configuration › File storage. Off keeps
+            // them on this server; on sends them to Cloudflare R2 once the keys are
+            // in .env. The public address may be given here in place of
+            // R2_PUBLIC_URL — see CloudStorageService.
+            'storage' => [
+                'cloud' => false,
+                'public-url' => null,
+            ],
+
+            // Google Analytics 4, set on Site info. Empty means no tag and a
+            // cookie banner that stays a notice — see AnalyticsService.
+            'analytics' => [
+                'ga4-id' => null,
+            ],
+
+            // Where outgoing email goes, picked on Configuration › Email settings › Delivery
             // (MailProviderEnum). The log until somebody picks a provider whose
             // keys are in .env.
             'mail-delivery' => [
@@ -315,9 +330,11 @@ class SiteConfigurationService
             $file_path = $real_path;
         }
 
-        // FIND FILE
-        if ($file_path && Storage::disk('public')->exists($file_path)) {
-            return $image ? kSafeImage($file_path, useStorage: true) : Storage::url($file_path);
+        // FIND FILE. Looked for on both disks, since a path in this file does not say
+        // which one it was written to — see CloudStorageService. This runs while the
+        // config is being cached, not on every render.
+        if ($disk = app(CloudStorageService::class)->locate($file_path)) {
+            return $image ? kSafeImage($file_path, useStorage: true, disk: $disk) : Storage::disk($disk)->url($file_path);
         }
 
         // CHECK IF ITS IMAGE
@@ -518,7 +535,7 @@ class SiteConfigurationService
 
         // DELETE FILES
         foreach ($deleteFiles as $file) {
-            kDeleteFile($file);
+            app(CloudStorageService::class)->delete($file);
         }
 
         return $output;

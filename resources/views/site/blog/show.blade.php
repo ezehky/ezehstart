@@ -1,5 +1,7 @@
 {{-- One post, rendered by Site\BlogController::show(). --}}
 <x-layouts.site>
+    <x-site.structured-data :data="$structuredData" />
+
     <div class="mx-auto max-w-3xl px-4 py-12">
         <article class="space-y-6">
             <div class="space-y-3">

@@ -7,6 +7,7 @@ use App\Models\Faq;
 use App\Services\BlogService;
 use App\Services\SiteConfigurationService;
 use App\Services\SiteStatsService;
+use App\Services\StructuredDataService;
 use Illuminate\View\View;
 
 /**
@@ -35,6 +36,7 @@ class HomeController extends Controller
             'latestPosts' => app(BlogService::class)->publishedQuery()->limit(3)->get(),
             'faqs' => Faq::query()->active()->inFlowOrder()->get(),
             'contactLocations' => app(SiteConfigurationService::class)->contactLocations(),
+            'structuredData' => app(StructuredDataService::class)->organization(),
         ]);
     }
 }

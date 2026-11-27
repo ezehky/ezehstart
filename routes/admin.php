@@ -11,9 +11,16 @@ Route::prefix('/site-config')->name('config.')->group(function () {
     Route::livewire('/security', 'pages::admin.configs.security')->name('security');
     Route::livewire('/preferences', 'pages::admin.configs.preferences')->name('preferences');
     Route::livewire('/brand-colour', 'pages::admin.configs.brand-colors')->name('brand-colors');
-    Route::livewire('/email-senders', 'pages::admin.configs.email-senders')->name('email-senders');
-    // Which provider outgoing email goes through: log, Resend, Brevo or SMTP.
-    Route::livewire('/email-delivery', 'pages::admin.configs.email-delivery')->name('email-delivery');
+    // Email settings: two tabs, each its own route and its own form. Sender is the
+    // from and reply-to addresses; Delivery is which provider carries the mail —
+    // log, Resend, Brevo or SMTP.
+    Route::prefix('/email-settings')->name('email-settings.')->group(function () {
+        Route::livewire('/sender', 'pages::admin.configs.email-senders')->name('sender');
+        Route::livewire('/delivery', 'pages::admin.configs.email-delivery')->name('delivery');
+    });
+    // Where uploads are kept — this server or a Cloudflare R2 bucket — and the
+    // sync that moves what is already there.
+    Route::livewire('/file-storage', 'pages::admin.configs.file-storage')->name('file-storage');
     Route::livewire('/social-handles', 'pages::admin.configs.social-handles')->name('social-handles');
     Route::livewire('/contact-locations', 'pages::admin.configs.contact-locations')->name('contact-locations');
     Route::livewire('/json', 'pages::admin.configs.json-editor')->name('json');
